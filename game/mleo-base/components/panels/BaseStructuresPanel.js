@@ -250,9 +250,9 @@ export function BaseStructuresPanel({
                       <div className="h-full min-h-[3.5rem] w-full rounded-lg border border-white/[0.06] bg-black/10" aria-hidden />
                     )}
                   </div>
-                  <div className="mt-1 min-h-[1.75rem]">
+                  <div className="mt-1 h-[1.75rem]">
                     {!card.ready && card.requirementsText ? (
-                      <div className="w-full rounded-md border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[9px] leading-snug text-amber-100/90">
+                      <div className="h-[1.75rem] w-full overflow-hidden rounded-md border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[9px] leading-snug text-amber-100/90">
                         <span className="font-semibold">Missing:</span>{" "}
                         <span className="line-clamp-2">{card.requirementsText}</span>
                       </div>

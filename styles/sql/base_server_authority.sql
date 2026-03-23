@@ -680,6 +680,34 @@ AS $$
   END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.base_hq_reward_multiplier(p_hq integer)
+RETURNS numeric
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN greatest(1, coalesce(p_hq, 1)) >= 9 THEN 1.60::numeric
+    WHEN greatest(1, coalesce(p_hq, 1)) >= 7 THEN 1.42::numeric
+    WHEN greatest(1, coalesce(p_hq, 1)) >= 5 THEN 1.26::numeric
+    WHEN greatest(1, coalesce(p_hq, 1)) >= 3 THEN 1.12::numeric
+    ELSE 1.00::numeric
+  END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.base_scale_reward_amount(p_base numeric, p_mult numeric)
+RETURNS bigint
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN coalesce(p_base, 0) <= 0 THEN 0::bigint
+    ELSE greatest(
+      1,
+      floor(coalesce(p_base, 0) * greatest(0::numeric, coalesce(p_mult, 1::numeric)))
+    )::bigint
+  END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.base_get_or_create_state(
   p_device_id text
 )
@@ -1763,6 +1791,12 @@ DECLARE
   v_completed numeric := 0;
   v_target numeric := 0;
   v_xp_gain integer := 0;
+  v_hq integer := 1;
+  v_reward_mult numeric := 1.0;
+  v_gold_reward bigint := 0;
+  v_ore_reward bigint := 0;
+  v_scrap_reward bigint := 0;
+  v_data_reward bigint := 0;
 BEGIN
   IF coalesce(trim(p_device_id), '') = '' THEN
     RAISE EXCEPTION 'device_id is required';
@@ -1783,6 +1817,8 @@ BEGIN
   v_resources := coalesce(v_state.resources, '{}'::jsonb);
   v_stats := coalesce(v_state.stats, public.base_default_stats());
   v_mission_state := coalesce(v_state.mission_state, public.base_default_mission_state(current_date::text));
+  v_hq := greatest(1, coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'hq')::integer, 1));
+  v_reward_mult := public.base_hq_reward_multiplier(v_hq);
 
   IF coalesce(v_mission_state->>'dailySeed', '') <> current_date::text THEN
     v_mission_state := public.base_default_mission_state(current_date::text);
@@ -1797,38 +1833,45 @@ BEGIN
   IF p_mission_key = 'upgrade_building' THEN
     v_completed := coalesce((v_stats->>'upgradesToday')::numeric, 0);
     v_target := 1;
-    v_resources := jsonb_set(v_resources, '{DATA}', to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 10), true);
+    v_data_reward := public.base_scale_reward_amount(10, v_reward_mult);
+    v_resources := jsonb_set(v_resources, '{DATA}', to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + v_data_reward::int), true);
     v_xp_gain := 30;
   ELSIF p_mission_key = 'run_expedition' THEN
     v_completed := coalesce((v_stats->>'expeditionsToday')::numeric, 0);
     v_target := 1;
-    v_resources := jsonb_set(v_resources, '{SCRAP}', to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 24), true);
+    v_scrap_reward := public.base_scale_reward_amount(24, v_reward_mult);
+    v_resources := jsonb_set(v_resources, '{SCRAP}', to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + v_scrap_reward::int), true);
     v_xp_gain := 35;
   ELSIF p_mission_key = 'generate_data' THEN
     v_completed := coalesce((v_stats->>'dataToday')::numeric, 0);
     v_target := 12;
-    v_resources := jsonb_set(v_resources, '{GOLD}', to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 90), true);
+    v_gold_reward := public.base_scale_reward_amount(90, v_reward_mult);
+    v_resources := jsonb_set(v_resources, '{GOLD}', to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + v_gold_reward::int), true);
     v_xp_gain := 30;
   ELSIF p_mission_key = 'perform_maintenance' THEN
     v_completed := coalesce((v_stats->>'maintenanceToday')::numeric, 0);
     v_target := 1;
-    v_resources := jsonb_set(v_resources, '{DATA}', to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 8), true);
+    v_data_reward := public.base_scale_reward_amount(8, v_reward_mult);
+    v_resources := jsonb_set(v_resources, '{DATA}', to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + v_data_reward::int), true);
     v_xp_gain := 35;
   ELSIF p_mission_key = 'double_expedition' THEN
     v_completed := coalesce((v_stats->>'expeditionsToday')::numeric, 0);
     v_target := 2;
-    v_resources := jsonb_set(v_resources, '{SCRAP}', to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 28), true);
+    v_scrap_reward := public.base_scale_reward_amount(28, v_reward_mult);
+    v_resources := jsonb_set(v_resources, '{SCRAP}', to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + v_scrap_reward::int), true);
     v_xp_gain := 40;
   ELSIF p_mission_key = 'ship_mleo' THEN
     v_completed := coalesce((v_stats->>'shippedToday')::numeric, 0);
     v_target := 60;
-    v_resources := jsonb_set(v_resources, '{GOLD}', to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 140), true);
+    v_gold_reward := public.base_scale_reward_amount(140, v_reward_mult);
+    v_resources := jsonb_set(v_resources, '{GOLD}', to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + v_gold_reward::int), true);
     v_xp_gain := 45;
   ELSIF p_mission_key = 'spend_vault' THEN
     v_completed := coalesce((v_stats->>'vaultSpentToday')::numeric, 0);
     v_target := 50;
-  v_resources := jsonb_set(v_resources, '{DATA}', to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 14), true);
-  v_xp_gain := 55;
+    v_data_reward := public.base_scale_reward_amount(14, v_reward_mult);
+    v_resources := jsonb_set(v_resources, '{DATA}', to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + v_data_reward::int), true);
+    v_xp_gain := 55;
   ELSE
     RAISE EXCEPTION 'Invalid mission key';
   END IF;
@@ -1858,7 +1901,13 @@ BEGIN
     'mission_claim',
     jsonb_build_object(
       'mission_key', p_mission_key,
-      'reward', jsonb_build_object('XP', v_xp_gain),
+      'reward', jsonb_strip_nulls(jsonb_build_object(
+        'XP', v_xp_gain,
+        'GOLD', CASE WHEN v_gold_reward > 0 THEN v_gold_reward ELSE NULL END,
+        'ORE', CASE WHEN v_ore_reward > 0 THEN v_ore_reward ELSE NULL END,
+        'SCRAP', CASE WHEN v_scrap_reward > 0 THEN v_scrap_reward ELSE NULL END,
+        'DATA', CASE WHEN v_data_reward > 0 THEN v_data_reward ELSE NULL END
+      )),
       'resources_after', v_resources,
       'banked_mleo_after', coalesce(v_state.banked_mleo, 0),
       'commander_xp_after', coalesce(v_state.commander_xp, 0) + v_xp_gain,
@@ -2088,6 +2137,12 @@ DECLARE
   v_elite_day text;
   v_elite_tpl text;
   v_b jsonb;
+  v_hq integer := 1;
+  v_reward_mult numeric := 1.0;
+  v_gold_reward bigint := 0;
+  v_ore_reward bigint := 0;
+  v_scrap_reward bigint := 0;
+  v_data_reward bigint := 0;
 BEGIN
   IF coalesce(trim(p_device_id), '') = '' THEN
     RAISE EXCEPTION 'device_id is required';
@@ -2108,6 +2163,8 @@ BEGIN
   v_resources := coalesce(v_state.resources, '{}'::jsonb);
   v_contract_state := coalesce(v_state.contract_state, public.base_default_contract_state());
   v_claimed := coalesce((v_contract_state->'claimed'->>p_contract_key)::boolean, false);
+  v_hq := greatest(1, coalesce((coalesce(v_state.buildings, '{}'::jsonb)->>'hq')::integer, 1));
+  v_reward_mult := public.base_hq_reward_multiplier(v_hq);
 
   IF v_claimed THEN
     RAISE EXCEPTION 'Contract already claimed';
@@ -2124,55 +2181,60 @@ BEGIN
 
   IF p_contract_key = 'stability_watch' THEN
     v_done := coalesce(v_state.stability, 100) >= 85;
+    v_data_reward := public.base_scale_reward_amount(10, v_reward_mult);
     v_resources := jsonb_set(
       v_resources,
       '{DATA}',
-      to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 10),
+      to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + v_data_reward::int),
       true
     );
     v_xp_gain := 20;
-    v_reward := jsonb_build_object('DATA', 10, 'XP', 20);
+    v_reward := jsonb_build_object('DATA', v_data_reward, 'XP', 20);
 
   ELSIF p_contract_key = 'energy_ready' THEN
     v_done := coalesce((v_resources->>'ENERGY')::numeric, 0) >= (v_energy_cap * 0.45);
+    v_gold_reward := public.base_scale_reward_amount(80, v_reward_mult);
     v_resources := jsonb_set(
       v_resources,
       '{GOLD}',
-      to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 80),
+      to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + v_gold_reward::int),
       true
     );
     v_xp_gain := 15;
-    v_reward := jsonb_build_object('GOLD', 80, 'XP', 15);
+    v_reward := jsonb_build_object('GOLD', v_gold_reward, 'XP', 15);
 
   ELSIF p_contract_key = 'banking_cycle' THEN
     v_done := coalesce(v_state.banked_mleo, 0) >= 120;
+    v_data_reward := public.base_scale_reward_amount(8, v_reward_mult);
+    v_scrap_reward := public.base_scale_reward_amount(16, v_reward_mult);
     v_resources := jsonb_set(
       jsonb_set(
         v_resources,
         '{DATA}',
-        to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + 8),
+        to_jsonb(coalesce((v_resources->>'DATA')::int, 0) + v_data_reward::int),
         true
       ),
       '{SCRAP}',
-      to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + 16),
+      to_jsonb(coalesce((v_resources->>'SCRAP')::int, 0) + v_scrap_reward::int),
       true
     );
     v_xp_gain := 18;
-    v_reward := jsonb_build_object('DATA', 8, 'SCRAP', 16, 'XP', 18);
+    v_reward := jsonb_build_object('DATA', v_data_reward, 'SCRAP', v_scrap_reward, 'XP', 18);
 
   ELSIF p_contract_key = 'field_readiness' THEN
     v_done :=
       coalesce(v_state.expedition_ready_at, now()) <= now()
       AND coalesce((v_resources->>'DATA')::int, 0) >= 4;
 
+    v_gold_reward := public.base_scale_reward_amount(60, v_reward_mult);
     v_resources := jsonb_set(
       v_resources,
       '{GOLD}',
-      to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + 60),
+      to_jsonb(coalesce((v_resources->>'GOLD')::int, 0) + v_gold_reward::int),
       true
     );
     v_xp_gain := 18;
-    v_reward := jsonb_build_object('GOLD', 60, 'XP', 18);
+    v_reward := jsonb_build_object('GOLD', v_gold_reward, 'XP', 18);
 
   ELSIF p_contract_key = 'route_discipline_window' THEN
     v_tiers := coalesce(v_state.building_tiers, '{}'::jsonb);
