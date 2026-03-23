@@ -31,9 +31,10 @@ export function ExpandablePanelSectionHeader({
   return (
     <button
       type="button"
+      data-base-inner-panel-header={panelKey}
       aria-expanded={isOpen}
       onClick={() => toggleInnerPanel(panelKey)}
-      className={`group flex w-full cursor-pointer touch-manipulation select-none items-stretch justify-between rounded-2xl text-left outline-none ${focusRingCls} ${rowInteract} ${
+      className={`group relative z-[1] flex w-full cursor-pointer touch-manipulation select-none items-stretch justify-between rounded-2xl text-left outline-none ${focusRingCls} ${rowInteract} ${
         compact
           ? "min-h-[40px] gap-2 py-0.5 pl-0.5 pr-0.5 sm:min-h-[44px]"
           : "min-h-[44px] gap-3 py-1.5 pl-1 pr-1"

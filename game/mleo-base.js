@@ -25,7 +25,7 @@ import {
 } from "./mleo-base/components/panels/PanelShells";
 import {
   findVerticalScrollContainer,
-  scrollPanelSectionTopIntoView,
+  scrollPanelHeaderIntoView,
 } from "./mleo-base/utils/scrollPanelSectionTopIntoView";
 import {
   getBaseVaultBalance,
@@ -3034,6 +3034,7 @@ function BaseResourceBar({
 
   return (
     <div
+      data-base-panel-sticky-chrome
       className={`sticky top-0 z-20 -mx-1 mb-3 rounded-2xl border border-white/10 bg-slate-950/90 backdrop-blur-md ${
         compact ? "px-2 py-2" : "px-3 py-2.5"
       }`}
@@ -4851,25 +4852,31 @@ export default function MleoBase() {
     if (openInnerPanel == null || openInnerPanel === prev) return;
 
     const run = () => {
-      let el = null;
+      const key = String(openInnerPanel);
+      let headerEl = null;
       try {
-        el = document.querySelector(
-          `[data-base-inner-panel="${CSS.escape(String(openInnerPanel))}"]`
-        );
+        headerEl = document.querySelector(`[data-base-inner-panel-header="${CSS.escape(key)}"]`);
       } catch {
-        el = document.querySelector(`[data-base-inner-panel="${String(openInnerPanel)}"]`);
+        headerEl = document.querySelector(`[data-base-inner-panel-header="${key}"]`);
       }
-      if (!el) return;
+      if (!headerEl) {
+        try {
+          headerEl = document.querySelector(`[data-base-inner-panel="${CSS.escape(key)}"]`);
+        } catch {
+          headerEl = document.querySelector(`[data-base-inner-panel="${key}"]`);
+        }
+      }
+      if (!headerEl) return;
 
       const mobileRoot = mobilePanel ? mobilePanelScrollRef.current : null;
       const desktopRoot = desktopPanelOpen ? desktopPanelScrollRef.current : null;
 
       let container = null;
-      if (mobileRoot?.contains(el)) container = mobileRoot;
-      else if (desktopRoot?.contains(el)) container = desktopRoot;
-      else container = findVerticalScrollContainer(el);
+      if (mobileRoot?.contains(headerEl)) container = mobileRoot;
+      else if (desktopRoot?.contains(headerEl)) container = desktopRoot;
+      else container = findVerticalScrollContainer(headerEl);
 
-      if (container) scrollPanelSectionTopIntoView(container, el, { offset: 10 });
+      if (container) scrollPanelHeaderIntoView(container, headerEl, { padding: 8 });
     };
 
     requestAnimationFrame(() => {

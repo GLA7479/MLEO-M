@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 import {
   findVerticalScrollContainer,
-  scrollPanelSectionTopIntoView,
+  scrollPanelHeaderIntoView,
 } from "../../utils/scrollPanelSectionTopIntoView";
 import {
   COMMAND_PROTOCOL_FAMILY_LABEL,
@@ -131,15 +131,13 @@ function DevCollapsibleSection({
   const open = openSection === sectionId;
 
   return (
-    <div
-      className="border-t border-white/10 pt-2 first:border-t-0 first:pt-0"
-      data-base-dev-accordion={sectionId}
-    >
+    <div className="border-t border-white/10 pt-2 first:border-t-0 first:pt-0">
       <button
         type="button"
+        data-base-dev-accordion-header={sectionId}
         aria-expanded={open}
         onClick={() => onAccordionSelect(sectionId)}
-        className="group flex min-h-[44px] w-full cursor-pointer touch-manipulation select-none items-stretch justify-between gap-2 rounded-xl px-0.5 py-1 text-left outline-none transition hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:py-1.5"
+        className="group relative z-[1] flex min-h-[44px] w-full cursor-pointer touch-manipulation select-none items-stretch justify-between gap-2 rounded-xl px-0.5 py-1 text-left outline-none transition hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:py-1.5"
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center pr-1">
           <div className="text-sm font-semibold text-white">{title}</div>
@@ -206,12 +204,12 @@ export function CrewModulesResearchPanel({
     if (openDevSubsection == null || openDevSubsection === prev) return;
 
     const run = () => {
-      const el = document.querySelector(
-        `[data-base-dev-accordion="${CSS.escape(String(openDevSubsection))}"]`
+      const headerEl = document.querySelector(
+        `[data-base-dev-accordion-header="${CSS.escape(String(openDevSubsection))}"]`
       );
-      const scrollParent = el ? findVerticalScrollContainer(el) : null;
-      if (scrollParent && el) {
-        scrollPanelSectionTopIntoView(scrollParent, el, { offset: 8 });
+      const scrollParent = headerEl ? findVerticalScrollContainer(headerEl) : null;
+      if (scrollParent && headerEl) {
+        scrollPanelHeaderIntoView(scrollParent, headerEl, { padding: 8 });
       }
     };
 

@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 import {
   findVerticalScrollContainer,
-  scrollPanelSectionTopIntoView,
+  scrollPanelHeaderIntoView,
 } from "../../utils/scrollPanelSectionTopIntoView";
 
 function AvailabilityBadge() {
@@ -84,12 +84,14 @@ export function BaseStructuresPanel({
       const after = next[cardKey] ?? null;
       if (after && after !== before) {
         const attr = `${cardKey}:${after}`;
-        const el = document.querySelector(`[data-base-structure-accordion="${CSS.escape(attr)}"]`);
-        const scrollParent = el ? findVerticalScrollContainer(el) : null;
-        if (scrollParent && el) {
+        const headerEl = document.querySelector(
+          `[data-base-structure-accordion-header="${CSS.escape(attr)}"]`
+        );
+        const scrollParent = headerEl ? findVerticalScrollContainer(headerEl) : null;
+        if (scrollParent && headerEl) {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              scrollPanelSectionTopIntoView(scrollParent, el, { offset: 8 });
+              scrollPanelHeaderIntoView(scrollParent, headerEl, { padding: 8 });
             });
           });
         }
@@ -258,18 +260,18 @@ export function BaseStructuresPanel({
 
               {card.supportsPrograms && card.programCards?.length ? (
                 <div
-                  data-base-structure-accordion={`${card.key}:programs`}
                   className={`mt-2 rounded-2xl border border-violet-400/20 bg-violet-500/8 px-2.5 py-2 ${
                     specSectionsLocked ? "opacity-75" : ""
                   }`}
                 >
                   <button
                     type="button"
+                    data-base-structure-accordion-header={`${card.key}:programs`}
                     onClick={() => toggleSpecSubsection(card.key, "programs")}
                     aria-expanded={supportProgramsOpen && !specSectionsLocked}
                     disabled={specSectionsLocked}
                     title={specSectionsLocked ? "Build this structure first" : undefined}
-                    className={`group flex min-h-[44px] w-full touch-manipulation select-none items-stretch justify-between gap-2 rounded-lg px-0.5 py-1 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-violet-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:py-0 ${
+                    className={`group relative z-[1] flex min-h-[44px] w-full touch-manipulation select-none items-stretch justify-between gap-2 rounded-lg px-0.5 py-1 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-violet-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:py-0 ${
                       specSectionsLocked
                         ? "cursor-not-allowed opacity-90"
                         : "cursor-pointer hover:bg-violet-500/[0.06] active:bg-violet-500/[0.09]"
@@ -363,18 +365,18 @@ export function BaseStructuresPanel({
 
               {card.supportsPrograms && card.milestoneCards?.length ? (
                 <div
-                  data-base-structure-accordion={`${card.key}:milestones`}
                   className={`mt-2 rounded-2xl bg-gradient-to-br from-amber-500/10 via-emerald-500/6 to-transparent px-2.5 py-2 ring-0 outline-none ${
                     specSectionsLocked ? "opacity-75" : ""
                   }`}
                 >
                   <button
                     type="button"
+                    data-base-structure-accordion-header={`${card.key}:milestones`}
                     onClick={() => toggleSpecSubsection(card.key, "milestones")}
                     aria-expanded={milestonesOpen && !specSectionsLocked}
                     disabled={specSectionsLocked}
                     title={specSectionsLocked ? "Build this structure first" : undefined}
-                    className={`group flex min-h-[44px] w-full touch-manipulation select-none items-stretch justify-between gap-2 rounded-lg px-0.5 py-1 text-left outline-none ring-0 transition focus-visible:ring-2 focus-visible:ring-amber-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:py-0 ${
+                    className={`group relative z-[1] flex min-h-[44px] w-full touch-manipulation select-none items-stretch justify-between gap-2 rounded-lg px-0.5 py-1 text-left outline-none ring-0 transition focus-visible:ring-2 focus-visible:ring-amber-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:py-0 ${
                       specSectionsLocked
                         ? "cursor-not-allowed opacity-90"
                         : "cursor-pointer hover:bg-amber-500/[0.07] active:bg-amber-500/[0.1]"
