@@ -4393,6 +4393,9 @@ export default function MleoBase() {
   const [openInfoKey, setOpenInfoKey] = useState(null);
   const [buildInfo, setBuildInfo] = useState(null);
   const [highlightTarget, setHighlightTarget] = useState(null);
+  /** Session-only: hide positive "Harmonized command window" after first open; resets when push window ends. */
+  const [harmonizedCommandWindowAlertAcked, setHarmonizedCommandWindowAlertAcked] = useState(false);
+  const prevHarmonizedPushWindowRef = useRef(false);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState(null);
@@ -4912,7 +4915,7 @@ export default function MleoBase() {
     }
 
     if (key === "world6-command-fractured" || key === "world6-command-harmonized") {
-      return { tab: "overview", target: "systems" };
+      return { tab: "overview", target: "world6-command" };
     }
 
     if (key === "world5-salvage-strained") {
@@ -5275,7 +5278,9 @@ export default function MleoBase() {
       window.clearTimeout(highlightTimeoutRef.current);
     }
     const highlightDurationMs =
-      normalizedStep.target === "expedition" || normalizedStep.target === "expedition-action"
+      normalizedStep.target === "expedition" ||
+      normalizedStep.target === "expedition-action" ||
+      normalizedStep.target === "world6-command"
         ? 6200
         : 4200;
     highlightTimeoutRef.current = window.setTimeout(() => {
@@ -5435,7 +5440,14 @@ export default function MleoBase() {
     );
   }
 
+  function acknowledgeHarmonizedCommandWindowAlertFromItem(item) {
+    if (item?.alertKey === "world6-command-harmonized") {
+      setHarmonizedCommandWindowAlertAcked(true);
+    }
+  }
+
   function handleCommandHubItemClick(item) {
+    acknowledgeHarmonizedCommandWindowAlertFromItem(item);
     const step = getCommandHubDeepLink(item);
     if (!step?.target) return;
     setShowReadyPanel(false);
@@ -5645,10 +5657,34 @@ export default function MleoBase() {
     return getWorld6CommandSnapshot(state, derived);
   }, [activeWorldOrder, state, derived]);
 
+  useEffect(() => {
+    const inHarmonizedPushWindow = Boolean(
+      activeWorldOrder === 6 &&
+        world6Command &&
+        world6Command.commandKey === "harmonized" &&
+        world6Command.recommendedPushNow
+    );
+    if (prevHarmonizedPushWindowRef.current && !inHarmonizedPushWindow) {
+      setHarmonizedCommandWindowAlertAcked(false);
+    }
+    prevHarmonizedPushWindowRef.current = inHarmonizedPushWindow;
+  }, [activeWorldOrder, world6Command]);
+
   const world6CommandAlert = useMemo(
     () => buildWorld6CommandAlert(world6Command),
     [world6Command]
   );
+
+  const world6CommandAlertForHub = useMemo(() => {
+    if (!world6CommandAlert) return null;
+    if (
+      world6CommandAlert.key === "world6-command-harmonized" &&
+      harmonizedCommandWindowAlertAcked
+    ) {
+      return null;
+    }
+    return world6CommandAlert;
+  }, [world6CommandAlert, harmonizedCommandWindowAlertAcked]);
 
   /** Compact header badge: catalog name + optional live state label from world snapshots (2–6). */
   const baseWorldHeaderIdentity = useMemo(() => {
@@ -6161,7 +6197,7 @@ export default function MleoBase() {
         world3TelemetryAlert,
         world4ReactorAlert,
         world5SalvageAlert,
-        world6CommandAlert
+        world6CommandAlertForHub
       ),
     [
       state,
@@ -6172,7 +6208,7 @@ export default function MleoBase() {
       world3TelemetryAlert,
       world4ReactorAlert,
       world5SalvageAlert,
-      world6CommandAlert,
+      world6CommandAlertForHub,
     ]
   );
   const desktopPriorityAlert = alerts[0] || null;
@@ -11532,8 +11568,8 @@ export default function MleoBase() {
       }
 
       if (item.alertKey === "world6-command-fractured" || item.alertKey === "world6-command-harmonized") {
-        openMobilePanel("overview");
-        setHighlightTarget("systems");
+        acknowledgeHarmonizedCommandWindowAlertFromItem(item);
+        navigateToBaseTarget({ tab: "overview", target: "world6-command" });
         return;
       }
     }
@@ -12854,9 +12890,14 @@ export default function MleoBase() {
                       <DesktopPanelSection resourceBar={compactResourceBar}>
                         {world6Command ? (
                           <div
+                            data-base-target="world6-command"
                             className={`mb-3 rounded-2xl border px-3 py-3 ${worldCommandToneClass(
                               world6Command.commandKey
-                            )}`}
+                            )} ${
+                              isHighlightedTarget("world6-command", highlightTarget)
+                                ? "ring-2 ring-cyan-300/90 border-cyan-300 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                                : ""
+                            }`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
@@ -13388,9 +13429,14 @@ export default function MleoBase() {
                     <MobilePanelSection resourceBar={mobileCompactResourceBar}>
                       {world6Command ? (
                         <div
+                          data-base-target="world6-command"
                           className={`mb-3 rounded-2xl border px-3 py-2.5 ${worldCommandToneClass(
                             world6Command.commandKey
-                          )}`}
+                          )} ${
+                            isHighlightedTarget("world6-command", highlightTarget)
+                              ? "ring-2 ring-cyan-300/90 border-cyan-300 shadow-[0_0_0_1px_rgba(103,232,249,0.45),0_0_28px_rgba(34,211,238,0.18)]"
+                              : ""
+                          }`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0">

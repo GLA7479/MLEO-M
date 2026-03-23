@@ -305,7 +305,7 @@ export function buildWorld6CommandAlert(snapshot) {
       tone: "warning",
       title: "Nexus coordination drifting",
       text: snapshot.priority || "World 6 command discipline is slipping.",
-      target: { tab: "overview", target: "systems" },
+      target: { tab: "overview", target: "world6-command" },
     };
   }
 
@@ -315,7 +315,7 @@ export function buildWorld6CommandAlert(snapshot) {
       tone: "success",
       title: "Harmonized command window",
       text: "Grid aligned — good moment for a coordinated multi-system push.",
-      target: { tab: "overview", target: "systems" },
+      target: { tab: "overview", target: "world6-command" },
     };
   }
 
