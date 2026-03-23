@@ -5545,7 +5545,7 @@ export default function MleoBase() {
     try {
       const isMobile =
         typeof window !== "undefined" &&
-        window.matchMedia("(max-width: 639px)").matches;
+        window.matchMedia("(max-width: 767px)").matches;
 
       if (normalizedStep.target === "crew" || normalizedStep.target === "command-protocol") {
         setDevTab("crew");
@@ -5616,7 +5616,7 @@ export default function MleoBase() {
 
       const isMobile =
         typeof window !== "undefined" &&
-        window.matchMedia("(max-width: 639px)").matches;
+        window.matchMedia("(max-width: 767px)").matches;
 
       const el = getBestTargetElement(targetForScroll, isMobile);
       if (!el) {
@@ -12103,7 +12103,7 @@ export default function MleoBase() {
     }
 
     const isDesktopViewport =
-      typeof window !== "undefined" && window.matchMedia("(min-width: 640px)").matches;
+      typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
 
     const routePanel = (panel, inner) => {
       if (isDesktopViewport) {
@@ -12633,7 +12633,7 @@ export default function MleoBase() {
                 <h1 className="whitespace-nowrap text-2xl font-black tracking-tight sm:text-4xl">
                   {CONFIG.title}
                 </h1>
-                <div className="flex items-center gap-2 sm:hidden">
+                <div className="flex items-center gap-2 md:hidden">
                   <button
                     type="button"
                     onClick={() => {
@@ -12808,7 +12808,7 @@ export default function MleoBase() {
               {/* subtitle removed */}
             </div>
 
-            <div className="hidden w-full min-w-0 flex-nowrap items-center justify-start gap-1.5 pb-0.5 max-md:overflow-x-auto max-md:no-scrollbar sm:flex md:mt-0 md:min-w-0 md:flex-1 md:overflow-visible md:justify-start md:pb-0 lg:mt-0 lg:max-w-full lg:justify-start lg:gap-1.5 xl:gap-2">
+            <div className="hidden w-full min-w-0 flex-nowrap items-center justify-start gap-1.5 pb-0.5 max-md:overflow-x-auto max-md:no-scrollbar md:flex md:mt-0 md:min-w-0 md:flex-1 md:overflow-visible md:justify-start md:pb-0 lg:mt-0 lg:max-w-full lg:justify-start lg:gap-1.5 xl:gap-2">
               <button
                 type="button"
                 onClick={handleCommandHubBarClick}
@@ -13615,21 +13615,21 @@ export default function MleoBase() {
           {shownInfo ? (
             <>
               <div
-                className="fixed inset-0 z-[300] bg-slate-950/78 backdrop-blur-sm sm:hidden"
+                className="fixed inset-0 z-[300] bg-slate-950/78 backdrop-blur-sm md:hidden"
                 onClick={() => {
                   setOpenInfoKey(null);
                   setBuildInfo(null);
                 }}
               />
 
-              <div className="fixed inset-x-3 top-[88px] bottom-3 z-[301] sm:hidden">
+              <div className="fixed inset-x-3 top-[88px] bottom-3 z-[301] md:hidden">
                 {renderInfoFloatingPanel()}
               </div>
             </>
           ) : null}
 
           {/* Mobile — world playfield canvas (tabs below use matching bg) */}
-          <div className="relative mt-4 space-y-3 sm:hidden overscroll-none pb-28">
+          <div className="relative mt-4 space-y-3 md:hidden overscroll-none pb-28">
             <div
               className="relative overflow-hidden rounded-[24px] border border-white/[0.07] shadow-[0_12px_40px_rgba(0,0,0,0.18)]"
               style={{ background: worldPlayfieldBackgroundMobile }}
@@ -13746,10 +13746,10 @@ export default function MleoBase() {
             {showBankedPanel ? (
               <>
                 <div
-                  className="fixed inset-0 z-[125] bg-black/45 sm:hidden"
+                  className="fixed inset-0 z-[125] bg-black/45 md:hidden"
                   onClick={() => setShowBankedPanel(false)}
                 />
-                <div className="fixed inset-x-3 top-[88px] bottom-3 z-[126] sm:hidden">
+                <div className="fixed inset-x-3 top-[88px] bottom-3 z-[126] md:hidden">
                   <BankedQuickPanel
                     snapshot={bankedSnapshot}
                     bankedValue={bankedDisplayValue}
@@ -13779,7 +13779,7 @@ export default function MleoBase() {
           </div>
 
           {/* Mobile Bottom Nav - fixed above panels so switching doesn't require closing */}
-          <div className="fixed inset-x-0 bottom-0 z-[120] px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 sm:hidden">
+          <div className="fixed inset-x-0 bottom-0 z-[120] px-3 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 md:hidden">
             <div
               className="relative mx-auto max-w-md overflow-hidden rounded-3xl border border-white/[0.06] p-2 shadow-[0_-6px_24px_rgba(0,0,0,0.22)] backdrop-blur-sm"
               style={{ background: worldPlayfieldBackgroundMobile }}
@@ -14014,7 +14014,7 @@ export default function MleoBase() {
           {/* Mobile Menu */}
           {mobileMenuOpen ? (
             <div
-              className="fixed inset-0 z-[116] bg-black/60 backdrop-blur-sm sm:hidden"
+              className="fixed inset-0 z-[116] bg-black/60 backdrop-blur-sm md:hidden"
               onClick={() => setMobileMenuOpen(false)}
             >
               <div
