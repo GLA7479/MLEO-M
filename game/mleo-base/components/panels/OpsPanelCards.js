@@ -42,6 +42,7 @@ export function OpsPanelCards({
       {/* A) Action now — daily missions */}
       <section aria-label="Daily missions">
         <div
+          data-base-inner-panel="ops-missions"
           className={`rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${missionsCardClass} ${
             missionsAvailableCount > 0 ? "shadow-[0_0_20px_rgba(251,191,36,0.06)]" : ""
           }`}
@@ -83,7 +84,10 @@ export function OpsPanelCards({
 
       {/* B) Operating console — ship, expedition, blueprint, utilities */}
       <section aria-label="Operations console">
-        <div className={`rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${opsCardClass}`}>
+        <div
+          data-base-inner-panel="ops-console"
+          className={`rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${opsCardClass}`}
+        >
           <ExpandablePanelSectionHeader
             panelKey="ops-console"
             openInnerPanel={openInnerPanel}

@@ -27,8 +27,9 @@ export function MobilePanelOverlayShell({ title, bankedBadge, onClose, scrollRef
           <div className="flex shrink-0 items-center gap-2">
             {bankedBadge}
             <button
+              type="button"
               onClick={onClose}
-              className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-bold text-white/90 hover:bg-white/10"
+              className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-bold text-white/90 outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1526]"
             >
               Close
             </button>
@@ -61,8 +62,9 @@ export function ReadyNowSummaryBlock({
       <div className="space-y-2">
         {readyCounts.missions > 0 ? (
           <button
+            type="button"
             onClick={onOpenMissions}
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1526]"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -78,8 +80,9 @@ export function ReadyNowSummaryBlock({
 
         {readyCounts.contracts > 0 ? (
           <button
+            type="button"
             onClick={onOpenContracts}
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1526]"
           >
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -95,8 +98,9 @@ export function ReadyNowSummaryBlock({
 
         {showExpeditions && readyCounts.expedition > 0 ? (
           <button
+            type="button"
             onClick={onOpenOpsConsole}
-            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1526]"
           >
             <div className="flex items-center justify-between gap-3">
               <div>

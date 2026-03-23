@@ -58,6 +58,7 @@ export function WorldSectorPanel({
 
   return (
     <div
+      data-base-inner-panel={openKey}
       className={`rounded-2xl border ${shellBorder} bg-gradient-to-br ${shellFrom} to-transparent ${
         compactHeader ? "p-3" : "p-4"
       } ${shellExtra}`.trim()}

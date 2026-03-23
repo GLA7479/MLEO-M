@@ -24,6 +24,10 @@ import {
   ReadyNowSummaryBlock,
 } from "./mleo-base/components/panels/PanelShells";
 import {
+  findVerticalScrollContainer,
+  scrollPanelSectionTopIntoView,
+} from "./mleo-base/utils/scrollPanelSectionTopIntoView";
+import {
   getBaseVaultBalance,
   getBaseState,
   buildBuilding,
@@ -4838,6 +4842,40 @@ export default function MleoBase() {
 
   const mobilePanelScrollRef = useRef(null);
   const desktopPanelScrollRef = useRef(null);
+  const prevOpenInnerPanelForScrollRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const prev = prevOpenInnerPanelForScrollRef.current;
+    prevOpenInnerPanelForScrollRef.current = openInnerPanel;
+
+    if (openInnerPanel == null || openInnerPanel === prev) return;
+
+    const run = () => {
+      let el = null;
+      try {
+        el = document.querySelector(
+          `[data-base-inner-panel="${CSS.escape(String(openInnerPanel))}"]`
+        );
+      } catch {
+        el = document.querySelector(`[data-base-inner-panel="${String(openInnerPanel)}"]`);
+      }
+      if (!el) return;
+
+      const mobileRoot = mobilePanel ? mobilePanelScrollRef.current : null;
+      const desktopRoot = desktopPanelOpen ? desktopPanelScrollRef.current : null;
+
+      let container = null;
+      if (mobileRoot?.contains(el)) container = mobileRoot;
+      else if (desktopRoot?.contains(el)) container = desktopRoot;
+      else container = findVerticalScrollContainer(el);
+
+      if (container) scrollPanelSectionTopIntoView(container, el, { offset: 10 });
+    };
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(run);
+    });
+  }, [openInnerPanel, mobilePanel, desktopPanelOpen]);
 
   const activeInfo = openInfoKey ? INFO_COPY[openInfoKey] : null;
   const shownInfo = activeInfo || buildInfo;
@@ -13305,9 +13343,11 @@ export default function MleoBase() {
                     <button
                       key={tab.key}
                       type="button"
-                      aria-label={tab.ariaLabel}
+                      aria-label={
+                        hasBadge ? `${tab.ariaLabel}. ${badgeN} ready` : tab.ariaLabel
+                      }
                       onClick={() => openMobilePanel(tab.key)}
-                      className={`relative min-h-[44px] min-w-0 rounded-2xl px-2 py-2.5 text-center text-[11px] font-bold leading-tight transition min-[400px]:px-3 min-[400px]:py-3 min-[400px]:text-xs ${
+                      className={`relative min-h-[44px] min-w-0 rounded-2xl px-2 py-2.5 text-center text-[11px] font-bold leading-tight outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-400/55 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 active:scale-[0.98] motion-reduce:active:scale-100 min-[400px]:px-3 min-[400px]:py-3 min-[400px]:text-xs ${
                         active
                           ? "bg-cyan-500 text-white"
                           : hasBadge
@@ -13318,6 +13358,7 @@ export default function MleoBase() {
                       <span className="line-clamp-2">{tab.label}</span>
                       {hasBadge ? (
                         <span
+                          aria-hidden
                           title={badgeN > 99 ? `${badgeN} ready` : undefined}
                           className="absolute -right-0.5 -top-0.5 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-cyan-400 px-1 text-[9px] font-black tabular-nums text-slate-950 min-[400px]:-right-1 min-[400px]:-top-1 min-[400px]:text-[10px]"
                         >

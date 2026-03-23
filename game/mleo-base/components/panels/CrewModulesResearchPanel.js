@@ -1,4 +1,9 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+
+import {
+  findVerticalScrollContainer,
+  scrollPanelSectionTopIntoView,
+} from "../../utils/scrollPanelSectionTopIntoView";
 import {
   COMMAND_PROTOCOL_FAMILY_LABEL,
   COMMAND_PROTOCOL_STORED_INACTIVE_OVERVIEW,
@@ -126,14 +131,17 @@ function DevCollapsibleSection({
   const open = openSection === sectionId;
 
   return (
-    <div className="border-t border-white/10 pt-2 first:border-t-0 first:pt-0">
+    <div
+      className="border-t border-white/10 pt-2 first:border-t-0 first:pt-0"
+      data-base-dev-accordion={sectionId}
+    >
       <button
         type="button"
         aria-expanded={open}
         onClick={() => onAccordionSelect(sectionId)}
-        className="group flex w-full touch-manipulation items-center justify-between gap-2 rounded-xl px-0.5 py-1 text-left outline-none transition hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-cyan-400/35 sm:py-1.5"
+        className="group flex min-h-[44px] w-full cursor-pointer touch-manipulation select-none items-stretch justify-between gap-2 rounded-xl px-0.5 py-1 text-left outline-none transition hover:bg-white/[0.05] focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:py-1.5"
       >
-        <div className="min-w-0 flex-1 pr-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center pr-1">
           <div className="text-sm font-semibold text-white">{title}</div>
           {open ? (
             openSubtitle ? (
@@ -143,7 +151,7 @@ function DevCollapsibleSection({
             <div className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/48 sm:text-[11px]">{collapsedHint}</div>
           )}
         </div>
-        <span className="pointer-events-none shrink-0 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold text-white transition group-hover:border-white/15 group-hover:bg-white/10">
+        <span className="pointer-events-none shrink-0 self-center rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold text-white transition group-hover:border-white/15 group-hover:bg-white/10">
           {open ? "CLOSE" : "OPEN"}
         </span>
       </button>
@@ -185,10 +193,32 @@ export function CrewModulesResearchPanel({
 
   /** Accordion: at most one Development subsection open; null = all closed. */
   const [openDevSubsection, setOpenDevSubsection] = useState(null);
+  const prevDevSubForScrollRef = useRef(null);
 
   const selectDevSubsection = (sectionId) => {
     setOpenDevSubsection((prev) => (prev === sectionId ? null : sectionId));
   };
+
+  useLayoutEffect(() => {
+    const prev = prevDevSubForScrollRef.current;
+    prevDevSubForScrollRef.current = openDevSubsection;
+
+    if (openDevSubsection == null || openDevSubsection === prev) return;
+
+    const run = () => {
+      const el = document.querySelector(
+        `[data-base-dev-accordion="${CSS.escape(String(openDevSubsection))}"]`
+      );
+      const scrollParent = el ? findVerticalScrollContainer(el) : null;
+      if (scrollParent && el) {
+        scrollPanelSectionTopIntoView(scrollParent, el, { offset: 8 });
+      }
+    };
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(run);
+    });
+  }, [openDevSubsection]);
 
   const activeRoleName = crewTab?.roles?.find((r) => r.active)?.name || "None";
   const activePathName = crewTab?.paths?.find((p) => p.active)?.name || "None";
@@ -312,7 +342,7 @@ export function CrewModulesResearchPanel({
                                 onOpenCrewRoleInfo(role.key);
                               }
                             }}
-                            className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[12px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                            className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[12px] font-black text-cyan-200 outline-none transition hover:bg-cyan-500/20 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                             aria-label={`Open info for ${role.name}`}
                             title={`Info about ${role.name}`}
                           >
@@ -378,7 +408,7 @@ export function CrewModulesResearchPanel({
                               onOpenCommanderPathInfo(path.key);
                             }
                           }}
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[12px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[12px] font-black text-cyan-200 outline-none transition hover:bg-cyan-500/20 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                           aria-label={`Open info for ${path.name}`}
                           title={`Info about ${path.name}`}
                         >
@@ -537,7 +567,7 @@ export function CrewModulesResearchPanel({
                       e.stopPropagation();
                       onOpenModuleInfo(module.key);
                     }}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white lg:h-6 lg:w-6 lg:text-xs"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 outline-none transition hover:bg-cyan-500/20 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 lg:h-6 lg:w-6 lg:text-xs"
                     aria-label={`Open info for ${module.name}`}
                     title={`Info about ${module.name}`}
                   >
@@ -608,7 +638,7 @@ export function CrewModulesResearchPanel({
                       e.stopPropagation();
                       onOpenResearchInfo(item.key);
                     }}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white lg:h-6 lg:w-6 lg:text-xs"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 outline-none transition hover:bg-cyan-500/20 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 lg:h-6 lg:w-6 lg:text-xs"
                     aria-label={`Open info for ${item.name}`}
                     title={`Info about ${item.name}`}
                   >

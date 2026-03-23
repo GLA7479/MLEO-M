@@ -81,20 +81,25 @@ export function ActivityLogPanel({ panelTone, logEntries, onResetGame }) {
       <div className="mb-1.5 flex flex-wrap gap-1">
         <Link
           href="/mleo-miners"
-          className="rounded-md border border-emerald-500/15 bg-emerald-500/[0.05] px-2.5 py-1 text-[11px] font-medium text-emerald-200/75 hover:bg-emerald-500/12 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
+          aria-label="Open MLEO Miners"
+          title="Open MLEO Miners"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-emerald-500/15 bg-emerald-500/[0.05] px-2.5 py-1 text-[11px] font-medium text-emerald-200/75 outline-none hover:bg-emerald-500/12 focus-visible:ring-2 focus-visible:ring-emerald-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
         >
           Miners
         </Link>
         <Link
           href="/arcade"
-          className="rounded-md border border-sky-500/15 bg-sky-500/[0.05] px-2.5 py-1 text-[11px] font-medium text-sky-200/75 hover:bg-sky-500/12 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
+          aria-label="Open Arcade"
+          title="Open Arcade"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-sky-500/15 bg-sky-500/[0.05] px-2.5 py-1 text-[11px] font-medium text-sky-200/75 outline-none hover:bg-sky-500/12 focus-visible:ring-2 focus-visible:ring-sky-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
         >
           Arcade
         </Link>
         <button
           type="button"
           onClick={onResetGame}
-          className="rounded-md border border-rose-500/15 bg-rose-500/[0.05] px-2.5 py-1 text-[11px] font-medium text-rose-200/75 hover:bg-rose-500/12 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
+          aria-label="Reset local game progress"
+          className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-rose-500/15 bg-rose-500/[0.05] px-2.5 py-1 text-[11px] font-medium text-rose-200/75 outline-none hover:bg-rose-500/12 focus-visible:ring-2 focus-visible:ring-rose-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs"
         >
           Reset
         </button>
@@ -141,6 +146,7 @@ export function IntelPanelCards({
     <div className="flex flex-col gap-2.5">
       {/* Primary — current intel snapshot */}
       <div
+        data-base-inner-panel="intel-summary"
         className={
           progressCardClass
             ? `rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${progressCardClass}`
@@ -174,6 +180,7 @@ export function IntelPanelCards({
 
       {/* Reference — log & tools */}
       <div
+        data-base-inner-panel="intel-log"
         className={
           logCardClass
             ? `rounded-2xl border border-white/[0.09] p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${logCardClass}`

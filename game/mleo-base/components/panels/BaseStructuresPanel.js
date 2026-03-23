@@ -1,4 +1,9 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+
+import {
+  findVerticalScrollContainer,
+  scrollPanelSectionTopIntoView,
+} from "../../utils/scrollPanelSectionTopIntoView";
 
 function AvailabilityBadge() {
   return (
@@ -66,6 +71,33 @@ export function BaseStructuresPanel({
       return { ...prev, [cardKey]: next };
     });
   };
+
+  const prevOpenSpecRef = useRef({});
+
+  useLayoutEffect(() => {
+    const prev = prevOpenSpecRef.current;
+    const next = openSpecSubsectionByCard;
+    const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+
+    for (const cardKey of keys) {
+      const before = prev[cardKey] ?? null;
+      const after = next[cardKey] ?? null;
+      if (after && after !== before) {
+        const attr = `${cardKey}:${after}`;
+        const el = document.querySelector(`[data-base-structure-accordion="${CSS.escape(attr)}"]`);
+        const scrollParent = el ? findVerticalScrollContainer(el) : null;
+        if (scrollParent && el) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              scrollPanelSectionTopIntoView(scrollParent, el, { offset: 8 });
+            });
+          });
+        }
+      }
+    }
+
+    prevOpenSpecRef.current = { ...next };
+  }, [openSpecSubsectionByCard]);
 
   return (
     <div>
@@ -148,7 +180,7 @@ export function BaseStructuresPanel({
                       e.stopPropagation();
                       onOpenBuildingInfo?.(card.key);
                     }}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 transition hover:bg-cyan-500/20 hover:text-white"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-cyan-400/35 bg-cyan-500/10 text-[13px] font-black text-cyan-200 outline-none transition hover:bg-cyan-500/20 hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                     aria-label={`Open info for ${card.name}`}
                     title={`Info about ${card.name}`}
                   >
@@ -226,6 +258,7 @@ export function BaseStructuresPanel({
 
               {card.supportsPrograms && card.programCards?.length ? (
                 <div
+                  data-base-structure-accordion={`${card.key}:programs`}
                   className={`mt-2 rounded-2xl border border-violet-400/20 bg-violet-500/8 px-2.5 py-2 ${
                     specSectionsLocked ? "opacity-75" : ""
                   }`}
@@ -236,17 +269,17 @@ export function BaseStructuresPanel({
                     aria-expanded={supportProgramsOpen && !specSectionsLocked}
                     disabled={specSectionsLocked}
                     title={specSectionsLocked ? "Build this structure first" : undefined}
-                    className={`group flex min-h-[44px] w-full touch-manipulation items-center justify-between gap-2 rounded-lg px-0.5 py-1 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-violet-400/40 focus-visible:ring-offset-0 sm:min-h-0 sm:py-0 ${
+                    className={`group flex min-h-[44px] w-full touch-manipulation select-none items-stretch justify-between gap-2 rounded-lg px-0.5 py-1 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-violet-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:py-0 ${
                       specSectionsLocked
                         ? "cursor-not-allowed opacity-90"
-                        : "hover:bg-violet-500/[0.06] active:bg-violet-500/[0.09]"
+                        : "cursor-pointer hover:bg-violet-500/[0.06] active:bg-violet-500/[0.09]"
                     }`}
                   >
-                    <div className="min-w-0 flex-1 text-[10px] font-black uppercase tracking-[0.16em] text-violet-200/80">
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center text-[10px] font-black uppercase tracking-[0.16em] text-violet-200/80">
                       Support Programs
                     </div>
                     <span
-                      className={`pointer-events-none shrink-0 rounded-lg border border-violet-400/35 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] transition ${
+                      className={`pointer-events-none shrink-0 self-center rounded-lg border border-violet-400/35 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] transition ${
                         specSectionsLocked
                           ? "border-violet-400/15 bg-violet-500/5 text-violet-100/35"
                           : "bg-violet-500/15 text-violet-100 group-hover:bg-violet-500/25"
@@ -330,6 +363,7 @@ export function BaseStructuresPanel({
 
               {card.supportsPrograms && card.milestoneCards?.length ? (
                 <div
+                  data-base-structure-accordion={`${card.key}:milestones`}
                   className={`mt-2 rounded-2xl bg-gradient-to-br from-amber-500/10 via-emerald-500/6 to-transparent px-2.5 py-2 ring-0 outline-none ${
                     specSectionsLocked ? "opacity-75" : ""
                   }`}
@@ -340,22 +374,24 @@ export function BaseStructuresPanel({
                     aria-expanded={milestonesOpen && !specSectionsLocked}
                     disabled={specSectionsLocked}
                     title={specSectionsLocked ? "Build this structure first" : undefined}
-                    className={`group flex min-h-[44px] w-full touch-manipulation items-center justify-between gap-2 rounded-lg px-0.5 py-1 text-left outline-none ring-0 transition focus-visible:ring-2 focus-visible:ring-amber-400/45 focus-visible:ring-offset-0 sm:min-h-0 sm:py-0 ${
+                    className={`group flex min-h-[44px] w-full touch-manipulation select-none items-stretch justify-between gap-2 rounded-lg px-0.5 py-1 text-left outline-none ring-0 transition focus-visible:ring-2 focus-visible:ring-amber-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 sm:min-h-0 sm:py-0 ${
                       specSectionsLocked
                         ? "cursor-not-allowed opacity-90"
-                        : "hover:bg-amber-500/[0.07] active:bg-amber-500/[0.1]"
+                        : "cursor-pointer hover:bg-amber-500/[0.07] active:bg-amber-500/[0.1]"
                     }`}
                   >
-                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-200/85">
-                        Specialization milestones
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-200/85">
+                          Specialization milestones
+                        </div>
+                        <span className="inline-flex rounded-full border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-100">
+                          Milestone
+                        </span>
                       </div>
-                      <span className="inline-flex rounded-full border border-amber-400/25 bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-100">
-                        Milestone
-                      </span>
                     </div>
                     <span
-                      className={`pointer-events-none shrink-0 rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] transition ${
+                      className={`pointer-events-none shrink-0 self-center rounded-lg border px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] transition ${
                         specSectionsLocked
                           ? "border-amber-400/15 bg-amber-500/5 text-amber-50/35"
                           : "border-amber-400/35 bg-amber-500/15 text-amber-50 group-hover:bg-amber-500/25"

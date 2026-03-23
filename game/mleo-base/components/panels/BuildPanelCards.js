@@ -40,6 +40,7 @@ export function BuildPanelCards({
     <div className="flex flex-col gap-2.5">
       {/* 1) Primary build loop — base structures first */}
       <div
+        data-base-inner-panel="build-structures"
         className={
           structuresCardClass
             ? `rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${structuresCardClass}`
@@ -76,6 +77,7 @@ export function BuildPanelCards({
 
       {/* 2) Strategic upgrades — crew modules & research */}
       <div
+        data-base-inner-panel="build-development"
         className={
           developmentCardClass
             ? `rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${developmentCardClass}`
@@ -112,6 +114,7 @@ export function BuildPanelCards({
 
       {/* 3) Supporting planning / tools — quieter */}
       <div
+        data-base-inner-panel="build-support"
         className={
           supportCardClass
             ? `rounded-2xl border p-2 transition sm:rounded-3xl sm:p-2.5${shell} ${supportCardClass}`

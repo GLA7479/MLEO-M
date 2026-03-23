@@ -258,7 +258,7 @@ function RatesBlock({ rates, openInnerPanel, toggleInnerPanel }) {
     : null;
 
   return (
-    <CardShell>
+    <CardShell data-base-inner-panel={openKey}>
       <ExpandablePanelSectionHeader
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
@@ -318,7 +318,7 @@ function StabilityBlock({ stability, openInnerPanel, toggleInnerPanel }) {
     : null;
 
   return (
-    <CardShell>
+    <CardShell data-base-inner-panel={openKey}>
       <ExpandablePanelSectionHeader
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
@@ -367,7 +367,7 @@ function DailyProgressBlock({ progress, openInnerPanel, toggleInnerPanel }) {
     : null;
 
   return (
-    <CardShell>
+    <CardShell data-base-inner-panel={openKey}>
       <ExpandablePanelSectionHeader
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
@@ -558,7 +558,7 @@ function IdentityCard({
   const isOpen = openInnerPanel === openKey;
 
   return (
-    <CardShell weight="muted" className="h-full">
+    <CardShell weight="muted" className="h-full" data-base-inner-panel={openKey}>
       <ExpandablePanelSectionHeader
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
@@ -625,6 +625,7 @@ function SpecializationSummaryCard({ summary, onNavigate, openInnerPanel, toggle
     <CardShell
       weight="muted"
       className="border-white/[0.045] bg-gradient-to-br from-cyan-500/[0.016] via-violet-500/[0.01] to-transparent"
+      data-base-inner-panel={openKey}
     >
       <ExpandablePanelSectionHeader
         panelKey={openKey}
@@ -767,7 +768,12 @@ function ContractsCard({
     : null;
 
   return (
-    <CardShell weight="muted" data-base-target="contracts" className="h-full">
+    <CardShell
+      weight="muted"
+      data-base-target="contracts"
+      className="h-full"
+      data-base-inner-panel={openKey}
+    >
       <ExpandablePanelSectionHeader
         panelKey={openKey}
         openInnerPanel={openInnerPanel}
