@@ -876,7 +876,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
 
       {/* BACKGROUND */}
       <main
-        className="relative flex min-h-0 flex-col overflow-hidden bg-[#0b0b0d] text-white h-[100dvh] max-h-[100dvh] md:h-auto md:max-h-none md:min-h-[var(--app-100vh,100vh)] md:overflow-visible"
+        className="relative flex min-h-0 flex-col overflow-hidden bg-[#0b0b0d] text-white h-[100dvh] max-h-[100dvh] md:h-auto md:max-h-none md:min-h-[var(--app-100vh,100vh)] md:overflow-hidden"
         dir={dir}
       >
         <div className="pointer-events-none absolute inset-0">
@@ -889,42 +889,43 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
         </div>
 
         {/* NAV — compact on mobile */}
-        <header className="relative z-10 shrink-0 max-w-6xl mx-auto px-4 pt-4 md:px-5 md:pt-6 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <img src="/images/leo-coin-gold.png" alt="MLEO" className="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-full object-contain" />
-            <span className="text-lg md:text-xl font-bold tracking-wide truncate">MLEO</span>
-          </div>
+        <header className="relative z-10 shrink-0 w-full px-4 pt-4 md:px-5 md:pt-6">
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2 md:gap-3">
+              <img src="/images/leo-coin-gold.png" alt="MLEO" className="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-full object-contain" />
+              <span className="text-lg md:text-xl font-bold tracking-wide truncate">MLEO</span>
+            </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-            {/* Language select */}
-            <LanguageSelector lang={lang} setLang={setLang} />
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+              {/* Language select */}
+              <LanguageSelector lang={lang} setLang={setLang} />
 
-            <PWAInstall />
+              <PWAInstall />
 
-            <button
-              onClick={async () => {
-                try {
-                  const remember = typeof window !== "undefined"
-                    ? window.localStorage?.getItem("mleo_remember_me")
-                    : "true";
-                  const { data } = await supabaseMP.auth.getSession();
-                  if (data?.session && remember !== "false") {
-                    router.push(GAME_ENTRY_URL);
-                    return;
-                  }
-                } catch {}
-                setShowAuth(true);
-              }}
-              className="hidden sm:inline-flex px-3 py-2 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition text-sm"
-            >
-              {t.start}
-            </button>
-
+              <button
+                onClick={async () => {
+                  try {
+                    const remember = typeof window !== "undefined"
+                      ? window.localStorage?.getItem("mleo_remember_me")
+                      : "true";
+                    const { data } = await supabaseMP.auth.getSession();
+                    if (data?.session && remember !== "false") {
+                      router.push(GAME_ENTRY_URL);
+                      return;
+                    }
+                  } catch {}
+                  setShowAuth(true);
+                }}
+                className="hidden sm:inline-flex px-3 py-2 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition text-sm"
+              >
+                {t.start}
+              </button>
+            </div>
           </div>
         </header>
 
         {/* HERO + VIDEO — mobile: top-stacked flow (no flex-1 centering on video); md+: two-column grid */}
-        <section className="relative z-10 flex min-h-0 flex-1 flex-col justify-start gap-3 overflow-hidden max-w-6xl mx-auto w-full px-4 pt-3 pb-0 md:grid md:flex-none md:min-h-0 md:overflow-visible md:grid-cols-2 md:gap-10 md:px-5 md:pt-16 md:pb-28 md:items-start">
+        <section className="relative z-10 flex min-h-0 flex-1 flex-col justify-start gap-3 overflow-hidden max-w-6xl mx-auto w-full px-4 pt-3 pb-0 md:grid md:flex-none md:min-h-0 md:overflow-visible md:grid-cols-2 md:gap-10 md:px-5 md:pt-16 md:pb-8 md:items-start">
           <div className="flex min-h-0 shrink-0 flex-col gap-3 md:gap-6 min-w-0">
             <div className="min-h-0">
               <div className="inline-flex items-center gap-1.5 md:gap-2 px-2.5 py-0.5 md:px-3 md:py-1 rounded-full bg-white/10 border border-white/10 text-[11px] md:text-xs mb-2.5 md:mb-5">
@@ -968,7 +969,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
             </div>
 
             {/* Bullets — desktop / tablet only (same layout as before) */}
-            <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-white/70">
+            <div className="hidden md:grid md:grid-cols-3 gap-3 text-sm text-white/70">
               {t.bullets.map((b, i) => (
                 <div key={i} className="p-3 rounded-xl bg-white/5 border border-white/10">{b}</div>
               ))}
@@ -1006,7 +1007,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
         </section>
 
         {/* FOOTER — shrink-0; mobile shell pins row to bottom of viewport */}
-        <footer className="relative z-10 shrink-0 w-full max-w-6xl mx-auto px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 md:px-5 md:pb-10 md:pt-0 text-[10px] md:text-xs text-white/50">
+        <footer className="relative z-10 shrink-0 w-full max-w-6xl mx-auto px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 md:px-5 md:pb-4 md:pt-0 text-[10px] md:text-xs text-white/50">
           <div className="flex w-full min-w-0 flex-row flex-nowrap items-center gap-x-1.5 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] md:justify-between md:gap-6 md:overflow-visible">
             <span className="shrink-0 whitespace-nowrap">
               © {new Date().getFullYear()} MLEO. All rights reserved.
