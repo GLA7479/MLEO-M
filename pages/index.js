@@ -876,7 +876,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
 
       {/* BACKGROUND */}
       <main
-        className="min-h-[var(--app-100vh,100vh)] relative overflow-hidden bg-[#0b0b0d] text-white"
+        className="relative flex min-h-0 flex-col overflow-hidden bg-[#0b0b0d] text-white h-[100dvh] max-h-[100dvh] md:h-auto md:max-h-none md:min-h-[var(--app-100vh,100vh)] md:overflow-visible"
         dir={dir}
       >
         <div className="pointer-events-none absolute inset-0">
@@ -889,7 +889,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
         </div>
 
         {/* NAV — compact on mobile */}
-        <header className="relative z-10 max-w-6xl mx-auto px-4 pt-4 md:px-5 md:pt-6 flex items-center justify-between gap-2">
+        <header className="relative z-10 shrink-0 max-w-6xl mx-auto px-4 pt-4 md:px-5 md:pt-6 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <img src="/images/leo-coin-gold.png" alt="MLEO" className="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-full object-contain" />
             <span className="text-lg md:text-xl font-bold tracking-wide truncate">MLEO</span>
@@ -923,24 +923,24 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
           </div>
         </header>
 
-        {/* HERO + VIDEO — mobile: single column, order = hero → CTA → video → bullets; md+: two columns */}
-        <section className="relative z-10 max-w-6xl mx-auto px-4 pt-4 pb-6 md:px-5 md:pt-16 md:pb-28 grid grid-cols-1 md:grid-cols-2 md:gap-10 md:items-start">
-          <div className="flex flex-col gap-2.5 md:gap-6 min-w-0">
-            <div>
-              <div className="inline-flex items-center gap-1.5 md:gap-2 px-2.5 py-0.5 md:px-3 md:py-1 rounded-full bg-white/10 border border-white/10 text-[11px] md:text-xs mb-3 md:mb-5">
+        {/* HERO + VIDEO — mobile: flex-1 fills shell between header & footer; md+: two-column grid */}
+        <section className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden max-w-6xl mx-auto w-full px-4 pt-3 pb-0 md:grid md:flex-none md:min-h-0 md:overflow-visible md:grid-cols-2 md:gap-10 md:px-5 md:pt-16 md:pb-28 md:items-start">
+          <div className="flex min-h-0 shrink-0 flex-col gap-3 md:gap-6 min-w-0">
+            <div className="min-h-0">
+              <div className="inline-flex items-center gap-1.5 md:gap-2 px-2.5 py-0.5 md:px-3 md:py-1 rounded-full bg-white/10 border border-white/10 text-[11px] md:text-xs mb-2.5 md:mb-5">
                 <span>{t.new}</span><span className="opacity-60">{t.early}</span>
               </div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.08] sm:leading-tight">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.08] md:leading-tight">
                 {t.heroH1_1}<br /><span className="text-yellow-400">{t.heroH1_2}</span>
               </h1>
 
-              <p className="mt-3 md:mt-5 text-sm sm:text-base md:text-lg text-white/85 max-w-xl leading-snug">
+              <p className="mt-3 text-sm md:mt-5 md:text-lg text-white/85 max-w-xl leading-snug">
                 {(t.slogans && (t.slogans[HERO_SLOGAN_INDEX] ?? t.slogans[0])) || ""}
               </p>
             </div>
 
-            <div className={`flex ${dir === "rtl" ? "flex-col sm:flex-row-reverse" : "flex-col sm:flex-row"} gap-2.5 md:gap-3`}>
+            <div className={`flex shrink-0 ${dir === "rtl" ? "flex-col sm:flex-row-reverse" : "flex-col sm:flex-row"} gap-2.5 md:gap-3`}>
               <button
                 onClick={async () => {
                   try {
@@ -955,13 +955,13 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
                   } catch {}
                   setShowAuth(true);
                 }}
-                className="px-6 py-2.5 md:py-3 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition text-[15px] md:text-base shadow-md shadow-yellow-400/10"
+                className="px-6 py-3 md:py-3 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition text-[15px] md:text-base shadow-md shadow-yellow-400/10"
               >
                 {t.start}
               </button>
               <button
                 onClick={() => setShowHow(true)}
-                className="px-6 py-2.5 md:py-3 rounded-2xl border border-white/20 font-semibold hover:bg-white/5 transition text-center text-[15px] md:text-base"
+                className="px-6 py-3 md:py-3 rounded-2xl border border-white/20 font-semibold hover:bg-white/5 transition text-center text-[15px] md:text-base"
               >
                 {t.how}
               </button>
@@ -975,24 +975,24 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
             </div>
           </div>
 
-          {/* VIDEO — main visual anchor; follows CTAs on mobile */}
-          <div className="relative mt-1 md:mt-0">
+          {/* VIDEO — mobile: flex-1 consumes spare height between hero and bullets; md: grid cell */}
+          <div className="relative mt-1 flex min-h-0 flex-1 flex-col justify-center md:mt-0 md:flex-none md:shrink md:justify-start">
             <div className="absolute -inset-4 md:-inset-6 rounded-[24px] md:rounded-[32px] bg-yellow-400/10 blur-2xl md:blur-3xl" />
-            <div className="relative rounded-2xl md:rounded-3xl border border-white/10 bg-white/5 p-2.5 md:p-3 shadow-xl backdrop-blur overflow-hidden">
+            <div className="relative min-h-0 w-full rounded-2xl md:rounded-3xl border border-white/10 bg-white/5 p-2.5 md:p-3 shadow-xl backdrop-blur overflow-hidden">
               <video
                 autoPlay
                 loop
                 muted
                 playsInline
                 poster="/images/mleo-hero-preview.png"
-                className="w-full max-h-[min(220px,38vh)] sm:max-h-[min(260px,42vh)] md:max-h-[min(300px,48vh)] h-auto rounded-xl md:rounded-2xl object-cover object-center"
+                className="w-full max-md:max-h-[min(260px,42vh)] md:max-h-[min(300px,48vh)] h-auto rounded-xl md:rounded-2xl object-cover object-center"
                 src="/videos/intro.mp4"
               />
             </div>
           </div>
 
           {/* Bullets — mobile: compact stack below video */}
-          <div className="md:hidden mt-4 flex flex-col gap-1.5 text-[11px] leading-tight text-white/75">
+          <div className="md:hidden mt-2 flex min-h-0 shrink-0 flex-col gap-1.5 text-[11px] leading-tight text-white/75">
             {t.bullets.map((b, i) => (
               <div
                 key={i}
@@ -1005,8 +1005,8 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
           </div>
         </section>
 
-        {/* FOOTER — mobile: single horizontal row (scroll if needed); md+: spaced row */}
-        <footer className="relative z-10 max-w-6xl mx-auto px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-5 md:pb-10 text-[10px] md:text-xs text-white/50">
+        {/* FOOTER — shrink-0; mobile shell pins row to bottom of viewport */}
+        <footer className="relative z-10 shrink-0 w-full max-w-6xl mx-auto px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 md:px-5 md:pb-10 md:pt-0 text-[10px] md:text-xs text-white/50">
           <div className="flex w-full min-w-0 flex-row flex-nowrap items-center gap-x-1.5 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] md:justify-between md:gap-6 md:overflow-visible">
             <span className="shrink-0 whitespace-nowrap">
               © {new Date().getFullYear()} MLEO. All rights reserved.
