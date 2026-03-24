@@ -771,7 +771,7 @@ export default function ArcadeHub() {
         }}
       >
         {/* —— Mobile: fixed-screen lobby (md:hidden) —— */}
-        <div className="flex md:hidden flex-col h-[100dvh] max-h-[100dvh] min-h-0 overflow-hidden px-2 pt-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] gap-1">
+        <div className="flex md:hidden flex-col h-[100dvh] max-h-[100dvh] min-h-0 overflow-hidden px-2 pt-2 pb-[max(0.2rem,env(safe-area-inset-bottom))] gap-1">
           {/* Top zone: readable control / header block */}
           <header className="flex-shrink-0 rounded-xl border border-white/20 bg-black/40 px-2.5 py-2 shadow-sm space-y-1.5">
             <div className="flex items-center justify-between gap-2">
@@ -837,7 +837,7 @@ export default function ArcadeHub() {
           </header>
 
           {/* Mobile groups: 4 tabs → 9 games each (no Prev/Next) */}
-          <div className="flex-shrink-0 flex justify-center gap-1 px-0.5">
+          <div className="flex-shrink-0 flex justify-center gap-1 px-0.5 mt-1 mb-1">
             {MOBILE_ARCADE_GROUPS.map((g) => (
               <button
                 key={g.id}
@@ -879,7 +879,7 @@ export default function ArcadeHub() {
               ))}
             </section>
             <div
-              className="mobile-arcade-grid-undergap min-h-3 flex-1 shrink-0 basis-0"
+              className="mobile-arcade-grid-undergap min-h-2 max-h-8 flex-1 shrink-0 basis-0"
               aria-hidden
             />
           </div>
