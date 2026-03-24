@@ -833,7 +833,6 @@ export default function Home() {
   const [lang, setLang] = useState("en");
   const [mounted, setMounted] = useState(false);
   const [showHow, setShowHow] = useState(false);
-  const howTriggerRef = useRef(null);
   const howCloseBtnRef = useRef(null);
 const router = useRouter();
 const [showAuth, setShowAuth] = useState(false);
@@ -848,15 +847,21 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
 
   useEffect(() => {
     if (!showHow || !mounted) return;
+    const previousActive = document.activeElement;
     const onKeyDown = (e) => {
       if (e.key === "Escape") setShowHow(false);
     };
     document.addEventListener("keydown", onKeyDown);
     howCloseBtnRef.current?.focus();
-    const trigger = howTriggerRef.current;
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      if (trigger && typeof trigger.focus === "function") trigger.focus();
+      if (
+        previousActive instanceof HTMLElement &&
+        document.body.contains(previousActive) &&
+        typeof previousActive.focus === "function"
+      ) {
+        previousActive.focus();
+      }
     };
   }, [showHow, mounted]);
 
@@ -972,15 +977,14 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
                   } catch {}
                   setShowAuth(true);
                 }}
-                className="px-6 py-3 md:py-3 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition text-[15px] md:text-base shadow-md shadow-yellow-400/10"
+                className="w-full px-6 py-3 md:w-auto md:py-3 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition text-[15px] md:text-base shadow-md shadow-yellow-400/10"
               >
                 {t.start}
               </button>
               <button
-                ref={howTriggerRef}
                 type="button"
                 onClick={() => setShowHow(true)}
-                className="max-md:w-fit max-md:self-start rounded-2xl border text-center transition md:px-6 md:py-3 md:border-white/20 md:font-semibold md:text-base md:hover:bg-white/5 max-md:rounded-lg max-md:border-white/12 max-md:px-3 max-md:py-1.5 max-md:text-xs max-md:font-medium max-md:text-white/65 max-md:hover:bg-white/[0.06] max-md:hover:text-white/85"
+                className="hidden md:inline-flex md:items-center md:justify-center px-6 py-3 rounded-2xl border border-white/20 font-semibold hover:bg-white/5 transition text-center text-base"
               >
                 {t.how}
               </button>
@@ -1021,6 +1025,16 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
                 <span>{b}</span>
               </div>
             ))}
+          </div>
+
+          <div className="md:hidden shrink-0 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowHow(true)}
+              className="rounded-lg border border-white/12 px-3 py-1.5 text-xs font-medium text-white/65 transition hover:bg-white/[0.06] hover:text-white/85"
+            >
+              {t.how}
+            </button>
           </div>
         </section>
 
