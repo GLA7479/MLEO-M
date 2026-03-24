@@ -924,7 +924,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
         </header>
 
         {/* HERO + VIDEO — mobile: top-stacked flow (no flex-1 centering on video); md+: two-column grid */}
-        <section className="relative z-10 flex min-h-0 flex-1 flex-col justify-start overflow-hidden max-w-6xl mx-auto w-full px-4 pt-3 pb-0 md:grid md:flex-none md:min-h-0 md:overflow-visible md:grid-cols-2 md:gap-10 md:px-5 md:pt-16 md:pb-28 md:items-start">
+        <section className="relative z-10 flex min-h-0 flex-1 flex-col justify-start gap-3 overflow-hidden max-w-6xl mx-auto w-full px-4 pt-3 pb-0 md:grid md:flex-none md:min-h-0 md:overflow-visible md:grid-cols-2 md:gap-10 md:px-5 md:pt-16 md:pb-28 md:items-start">
           <div className="flex min-h-0 shrink-0 flex-col gap-3 md:gap-6 min-w-0">
             <div className="min-h-0">
               <div className="inline-flex items-center gap-1.5 md:gap-2 px-2.5 py-0.5 md:px-3 md:py-1 rounded-full bg-white/10 border border-white/10 text-[11px] md:text-xs mb-2.5 md:mb-5">
@@ -976,7 +976,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
           </div>
 
           {/* VIDEO — mobile: shrink-0, flows under CTA (not vertically centered in flex-1 space); md: grid cell */}
-          <div className="relative mt-1 shrink-0 md:mt-0 md:flex-none md:shrink">
+          <div className="relative shrink-0 md:flex-none md:shrink">
             <div className="absolute -inset-4 md:-inset-6 rounded-[24px] md:rounded-[32px] bg-yellow-400/10 blur-2xl md:blur-3xl" />
             <div className="relative min-h-0 w-full rounded-2xl md:rounded-3xl border border-white/10 bg-white/5 p-2.5 md:p-3 shadow-xl backdrop-blur overflow-hidden">
               <video
@@ -992,7 +992,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
           </div>
 
           {/* Bullets — mobile: compact stack below video */}
-          <div className="md:hidden mt-1 flex min-h-0 shrink-0 flex-col gap-1.5 text-[11px] leading-tight text-white/75">
+          <div className="md:hidden flex min-h-0 shrink-0 flex-col gap-1.5 text-[11px] leading-tight text-white/75">
             {t.bullets.map((b, i) => (
               <div
                 key={i}
