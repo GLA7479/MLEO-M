@@ -1,12 +1,3 @@
-export default function TournamentRedirect() {
-  return null;
-}
+import CardRoomsPage from "../game/mleo-card-rooms";
 
-export async function getServerSideProps() {
-  return {
-    redirect: {
-      destination: "/arcade",
-      permanent: false,
-    },
-  };
-}
+export default CardRoomsPage;

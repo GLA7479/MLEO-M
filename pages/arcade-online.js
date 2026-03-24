@@ -157,10 +157,10 @@ const GAME_REGISTRY = [
   },
   {
     id: "poker-tables",
-    title: "Card Strategy Tables",
-    emoji: "🔴",
-    description: "Card Strategy vs Opponent! Strategic play rounds - PRE-FLOP, FLOP, TURN, RIVER. Best hand wins the prize pool!",
-    color: "#10B981",
+    title: "Card Rooms",
+    emoji: "🎰",
+    description: "Live multiplayer card tables with drop-in/drop-out play and session-based progression. Includes strategic heads-up rounds (pre-flop through river).",
+    color: "#7C3AED",
     isMultiplayer: false,
     isExternal: true,
     href: "/tournament"

@@ -330,15 +330,6 @@ const games = [
     category: "cards",
   },
   {
-    title: "Card Rooms",
-    emoji: "🎰",
-    description: "Join live multiplayer card tables with drop-in/drop-out play and session-based progression.",
-    reward: "Social",
-    href: "/tournament",
-    color: "#7C3AED",
-    category: "cards",
-  },
-  {
     title: "Ladder",
     emoji: "🪜",
     description: "Climb the ladder! Choose left or right to climb higher - lock in result before you fall!",
