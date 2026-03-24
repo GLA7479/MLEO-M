@@ -14,13 +14,16 @@ const AuthEmailPassword = dynamic(() => import("../components/AuthEmailPassword"
 
 const GAME_ENTRY_URL = "/mining"; // שנה אם צריך
 
+/** Fixed `slogans[n]` on all viewports — no rotation, stable layout. */
+const HERO_SLOGAN_INDEX = 1;
+
 // ===== Translations =====
 const TEXT = {
   en: {
     name: "English", dir: "ltr", code: "en",
     new: "New", early: "Early miners welcome",
     heroH1_1: "Mine. Merge. Earn.",
-    heroH1_2: "Welcome to the MLEO Rush.",
+    heroH1_2: "Welcome to MLEO.",
     start: "START NOW",
     how: "How it works",
     bullets: [
@@ -75,7 +78,7 @@ const TEXT = {
     name: "العربية", dir: "rtl", code: "ar",
     new: "جديد", early: "مرحبًا بالمنقّبين الأوائل",
     heroH1_1: "عدِّن. دمج. اربح.",
-    heroH1_2: "مرحبًا بك في اندفاعة MLEO.",
+    heroH1_2: "مرحبًا بك في MLEO.",
     start: "ابدأ الآن",
     how: "كيف يعمل",
     bullets: [
@@ -111,7 +114,7 @@ const TEXT = {
     name: "Русский", dir: "ltr", code: "ru",
     new: "Новое", early: "Добро пожаловать ранним майнерам",
     heroH1_1: "Майни. Объединяй. Зарабатывай.",
-    heroH1_2: "Добро пожаловать в MLEO Rush.",
+    heroH1_2: "Добро пожаловать в MLEO.",
     start: "НАЧАТЬ",
     how: "Как это работает",
     bullets: [
@@ -147,7 +150,7 @@ const TEXT = {
     name: "Español", dir: "ltr", code: "es",
     new: "Nuevo", early: "Bienvenidos los primeros mineros",
     heroH1_1: "Minar. Fusionar. Ganar.",
-    heroH1_2: "Bienvenido a la fiebre MLEO.",
+    heroH1_2: "Bienvenido a MLEO.",
     start: "EMPEZAR",
     how: "Cómo funciona",
     bullets: [
@@ -183,7 +186,7 @@ const TEXT = {
     name: "Français", dir: "ltr", code: "fr",
     new: "Nouveau", early: "Bienvenue aux premiers mineurs",
     heroH1_1: "Miner. Fusionner. Gagner.",
-    heroH1_2: "Bienvenue dans la ruée MLEO.",
+    heroH1_2: "Bienvenue sur MLEO.",
     start: "COMMENCER",
     how: "Comment ça marche",
     bullets: [
@@ -219,7 +222,7 @@ const TEXT = {
     name: "Deutsch", dir: "ltr", code: "de",
     new: "Neu", early: "Frühe Miner willkommen",
     heroH1_1: "Minen. Kombinieren. Verdienen.",
-    heroH1_2: "Willkommen beim MLEO-Rush.",
+    heroH1_2: "Willkommen bei MLEO.",
     start: "JETZT STARTEN",
     how: "So funktioniert es",
     bullets: [
@@ -255,7 +258,7 @@ pt: {
   name: "Português", dir: "ltr", code: "pt",
   new: "Novo", early: "Bem-vindos, mineradores iniciais",
   heroH1_1: "Minerar. Mesclar. Ganhar.",
-  heroH1_2: "Bem-vindo à corrida MLEO.",
+  heroH1_2: "Bem-vindo ao MLEO.",
   start: "COMEÇAR AGORA",
   how: "Como funciona",
   bullets: [
@@ -292,7 +295,7 @@ pt: {
     name: "中文", dir: "ltr", code: "zh",
     new: "新", early: "欢迎早期矿工",
     heroH1_1: "挖矿·合成·赚取",
-    heroH1_2: "欢迎来到 MLEO 热潮。",
+    heroH1_2: "欢迎来到 MLEO。",
     start: "立即开始",
     how: "如何运作",
     bullets: [
@@ -328,7 +331,7 @@ pt: {
     name: "日本語", dir: "ltr", code: "ja",
     new: "新着", early: "初期マイナー歓迎",
     heroH1_1: "採掘・マージ・アーン",
-    heroH1_2: "MLEO ラッシュへようこそ。",
+    heroH1_2: "MLEOへようこそ。",
     start: "今すぐ開始",
     how: "仕組み",
     bullets: [
@@ -364,7 +367,7 @@ pt: {
     name: "한국어", dir: "ltr", code: "ko",
     new: "신규", early: "초기 채굴자 환영",
     heroH1_1: "채굴·합치기·획득",
-    heroH1_2: "MLEO 러시에 오신 것을 환영합니다.",
+    heroH1_2: "MLEO에 오신 것을 환영합니다.",
     start: "지금 시작",
     how: "작동 방식",
     bullets: [
@@ -400,7 +403,7 @@ pt: {
     name: "Türkçe", dir: "ltr", code: "tr",
     new: "Yeni", early: "Erken madencilere hoş geldiniz",
     heroH1_1: "Kaz. Birleştir. Kazan.",
-    heroH1_2: "MLEO heyecanına hoş geldin.",
+    heroH1_2: "MLEO'ya hoş geldin.",
     start: "HEMEN BAŞLA",
     how: "Nasıl çalışır",
     bullets: [
@@ -436,7 +439,7 @@ pt: {
     name: "Italiano", dir: "ltr", code: "it",
     new: "Nuovo", early: "Benvenuti i primi miner",
     heroH1_1: "Minare. Unire. Guadagnare.",
-    heroH1_2: "Benvenuto nella corsa MLEO.",
+    heroH1_2: "Benvenuto in MLEO.",
     start: "INIZIA ORA",
     how: "Come funziona",
     bullets: [
@@ -472,7 +475,7 @@ pt: {
     name: "ქართული", dir: "ltr", code: "ka",
     new: "ახალი", early: "მოგესალმებით ადრეული მაინერები",
     heroH1_1: "მოპოვება. შერწყმა. მიღება.",
-    heroH1_2: "კეთილი იყოს თქვენი მობრძანება MLEO ბუმში.",
+    heroH1_2: "კეთილი იყოს თქვენი მობრძანება MLEO-ში.",
     start: "დაიწყე ახლა",
     how: "როგორ მუშაობს",
     bullets: [
@@ -508,7 +511,7 @@ pt: {
     name: "Polski", dir: "ltr", code: "pl",
     new: "Nowość", early: "Witamy wczesnych górników",
     heroH1_1: "Kop. Łącz. Zarabiaj.",
-    heroH1_2: "Witamy w gorączce MLEO.",
+    heroH1_2: "Witamy w MLEO.",
     start: "ZACZNIJ TERAZ",
     how: "Jak to działa",
     bullets: [
@@ -544,7 +547,7 @@ pt: {
     name: "Română", dir: "ltr", code: "ro",
     new: "Nou", early: "Bine ați venit, mineri timpurii",
     heroH1_1: "Minează. Unește. Câștigă.",
-    heroH1_2: "Bun venit la goana MLEO.",
+    heroH1_2: "Bun venit la MLEO.",
     start: "ÎNCEPE ACUM",
     how: "Cum funcționează",
     bullets: [
@@ -580,7 +583,7 @@ pt: {
     name: "Čeština", dir: "ltr", code: "cs",
     new: "Nové", early: "Vítejte, raní těžaři",
     heroH1_1: "Těž. Spojuj. Vydělávej.",
-    heroH1_2: "Vítej v MLEO horečce.",
+    heroH1_2: "Vítej v MLEO.",
     start: "ZAČÍT TEĎ",
     how: "Jak to funguje",
     bullets: [
@@ -616,7 +619,7 @@ pt: {
     name: "Nederlands", dir: "ltr", code: "nl",
     new: "Nieuw", early: "Vroege miners welkom",
     heroH1_1: "Minen. Mergen. Verdienen.",
-    heroH1_2: "Welkom bij de MLEO-rush.",
+    heroH1_2: "Welkom bij MLEO.",
     start: "NU STARTEN",
     how: "Hoe het werkt",
     bullets: [
@@ -652,7 +655,7 @@ pt: {
     name: "Ελληνικά", dir: "ltr", code: "el",
     new: "Νέο", early: "Καλωσορίζουμε τους πρώτους miners",
     heroH1_1: "Mining. Συνένωση. Κέρδος.",
-    heroH1_2: "Καλώς ήρθες στο MLEO Rush.",
+    heroH1_2: "Καλώς ήρθες στο MLEO.",
     start: "ΞΕΚΙΝΑ ΤΩΡΑ",
     how: "Πώς λειτουργεί",
     bullets: [
@@ -688,7 +691,7 @@ he: {
   name: "עברית", dir: "rtl", code: "he",
   new: "חדש", early: "ברוכים הבאים לכורים הראשונים",
   heroH1_1: "כרה. איחד. הרווח.",
-  heroH1_2: "ברוכים הבאים ל־MLEO Rush.",
+  heroH1_2: "ברוכים הבאים ל־MLEO.",
   start: "התחל עכשיו",
   how: "איך זה עובד",
   bullets: [
@@ -829,7 +832,6 @@ function LanguageSelector({ lang, setLang }) {
 export default function Home() {
   const [lang, setLang] = useState("en");
   const [mounted, setMounted] = useState(false);
-  const [idx, setIdx] = useState(0);
   const [showHow, setShowHow] = useState(false);
 const router = useRouter();
 const [showAuth, setShowAuth] = useState(false);
@@ -854,11 +856,6 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
       document.documentElement.setAttribute("dir", RTL_CODES.has(lang) ? "rtl" : "ltr");
     } catch {}
   }, [lang, mounted]);
-
-  useEffect(() => {
-    const id = setInterval(() => setIdx(i => (i + 1) % (TEXT[lang]?.slogans?.length || 1)), 2800);
-    return () => clearInterval(id);
-  }, [lang]);
 
   const t = useMemo(() => TEXT[lang] || TEXT.en, [lang]);
   const dir = t.dir || "ltr";
@@ -938,8 +935,8 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
                 {t.heroH1_1}<br /><span className="text-yellow-400">{t.heroH1_2}</span>
               </h1>
 
-              <p className="mt-3 md:mt-5 text-sm sm:text-base md:text-lg text-white/85 max-w-xl min-h-0 sm:min-h-[2.75rem] leading-snug">
-                {(t.slogans && t.slogans[idx]) || ""}
+              <p className="mt-3 md:mt-5 text-sm sm:text-base md:text-lg text-white/85 max-w-xl leading-snug">
+                {(t.slogans && (t.slogans[HERO_SLOGAN_INDEX] ?? t.slogans[0])) || ""}
               </p>
             </div>
 
