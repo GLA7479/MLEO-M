@@ -615,6 +615,7 @@ export default function ArcadeHub() {
   const [addingCoins, setAddingCoins] = useState(false);
   const [mobileGroupIndex, setMobileGroupIndex] = useState(0);
   const [showArcadeInfoModal, setShowArcadeInfoModal] = useState(false);
+  const touchStartRef = useRef({ x: 0, y: 0, active: false, blocked: false });
 
   // Wagmi hooks
   const { openConnectModal } = useConnectModal();
@@ -813,6 +814,49 @@ export default function ArcadeHub() {
     return games.slice(start, start + MOBILE_GAMES_PER_GROUP);
   }, [mobileGroupIndex]);
 
+  const SWIPE_THRESHOLD_PX = 40;
+  const SWIPE_INTENT_RATIO = 1.2;
+
+  function setMobileGroupIndexClamped(nextIndex) {
+    const maxIndex = MOBILE_ARCADE_GROUPS.length - 1;
+    setMobileGroupIndex(Math.max(0, Math.min(maxIndex, nextIndex)));
+  }
+
+  function handlePagerTouchStart(e) {
+    const t = e.touches?.[0];
+    if (!t) return;
+    const interactiveStart = e.target?.closest?.("button, a, input, textarea, select, [role='button']");
+    touchStartRef.current = {
+      x: t.clientX,
+      y: t.clientY,
+      active: true,
+      blocked: Boolean(interactiveStart),
+    };
+  }
+
+  function handlePagerTouchEnd(e) {
+    const start = touchStartRef.current;
+    touchStartRef.current = { x: 0, y: 0, active: false, blocked: false };
+    if (!start.active || start.blocked) return;
+    const t = e.changedTouches?.[0];
+    if (!t) return;
+
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+
+    if (adx < SWIPE_THRESHOLD_PX) return;
+    if (adx <= ady * SWIPE_INTENT_RATIO) return;
+
+    // Left swipe -> next page, right swipe -> previous page
+    if (dx < 0) {
+      setMobileGroupIndexClamped(mobileGroupIndex + 1);
+    } else {
+      setMobileGroupIndexClamped(mobileGroupIndex - 1);
+    }
+  }
+
   return (
     <Layout title="MLEO — Arcade Games">
       <main
@@ -907,7 +951,11 @@ export default function ArcadeHub() {
           </div>
 
           {/* Middle zone: grid uses 90% of flex slot (~10% shorter rows); spacer below = fixed empty strip before footer */}
-          <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+          <div
+            className="flex min-h-0 w-full min-w-0 flex-1 flex-col"
+            onTouchStart={handlePagerTouchStart}
+            onTouchEnd={handlePagerTouchEnd}
+          >
             <section
               className="grid h-[90%] min-h-0 w-full shrink-0 grid-cols-3 grid-rows-3 gap-x-0.5 gap-y-px"
               aria-label="Games"
