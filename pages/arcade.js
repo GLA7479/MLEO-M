@@ -81,7 +81,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
         <button
           onClick={() => setShowInfo(true)}
           type="button"
-          className={`absolute bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center transition-all z-10 leading-none ${compact ? 'top-1 right-1 h-10 w-10 min-h-[40px] min-w-[40px] rounded-full text-sm bg-white/5 hover:bg-white/12 border-white/10' : 'top-2 right-2 w-10 h-10 text-base rounded-full'}`}
+          className={`absolute bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center transition-all z-10 leading-none ${compact ? 'top-1 right-1 h-10 w-10 min-h-[40px] min-w-[40px] rounded-full text-sm bg-white/5 hover:bg-white/12 border-white/10' : 'top-2 right-2 h-7 w-7 text-sm rounded-full'}`}
           title="Info"
         >
           ℹ️
