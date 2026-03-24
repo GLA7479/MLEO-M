@@ -2836,8 +2836,8 @@ export default function GamesHub() {
               </div>
             </div>
 
-            {/* Mobile: shell + vertically centered card block (matches pre-shell placement); footer mt-auto */}
-            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden md:hidden">
+            {/* Mobile: compact 2x2 mode lobby (md and below) */}
+            <div className="md:hidden flex flex-col gap-2 min-h-[calc(100dvh-7rem)] max-h-[calc(100dvh-7rem)]">
               <header className="shrink-0 px-0.5 pt-0.5 text-center">
                 <span className="text-emerald-400 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/20 inline-block leading-tight">
                   {text.liveTestnet}
@@ -2850,8 +2850,8 @@ export default function GamesHub() {
                 </p>
               </header>
 
-              <div className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden py-2">
-              <section className="grid w-full shrink-0 grid-cols-2 gap-2">
+              <div className="flex-1 min-h-0 flex -translate-y-7 flex-col justify-center py-2">
+              <section className="grid grid-cols-2 gap-2 w-full shrink-0">
                 <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
                     <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{text.miners}</h2>

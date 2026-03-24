@@ -13764,7 +13764,7 @@ export default function MleoBase() {
               </>
             ) : null}
 
-            <div className="mt-1">
+            <div className="relative mt-1 -translate-y-7">
               <BaseHomeFlowScene
                 base={state}
                 derived={derived}
