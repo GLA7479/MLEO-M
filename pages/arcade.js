@@ -16,15 +16,13 @@ import {
 
 const ARCADE_BG = "linear-gradient(135deg, #1a1a1a 0%, #3a2a0a 50%, #1a1a1a 100%)";
 
-const MOBILE_PAGE_SIZE = 6;
-
-const ARCADE_CATEGORIES = [
-  { id: "featured", label: "Featured" },
-  { id: "cards", label: "Cards" },
-  { id: "picks", label: "Picks" },
-  { id: "action", label: "Action" },
-  { id: "classics", label: "Classics" },
-  { id: "soon", label: "Soon" },
+/** Mobile lobby: 4 tabs × up to 9 games (3×3) each, sequential slices of `games` */
+const MOBILE_GAMES_PER_GROUP = 9;
+const MOBILE_ARCADE_GROUPS = [
+  { id: 0, label: "1", shortLabel: "1–9" },
+  { id: 1, label: "2", shortLabel: "10–18" },
+  { id: 2, label: "3", shortLabel: "19–27" },
+  { id: 3, label: "4", shortLabel: "28+" },
 ];
 
 // ==== On-chain Claim (TBNB) config ====
@@ -55,7 +53,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
   return (
     <>
       <article 
-        className={`rounded-lg border border-white/10 backdrop-blur-md shadow-lg flex flex-col transition-all hover:scale-105 hover:border-white/30 relative overflow-hidden ${comingSoon ? 'opacity-60' : ''} ${compact ? 'p-2 h-full min-h-0' : 'p-4'}`}
+        className={`rounded-lg border border-white/10 backdrop-blur-md shadow-md transition-all hover:border-white/25 relative overflow-hidden ${comingSoon ? 'opacity-60' : ''} ${compact ? 'h-full min-h-0 p-0' : 'p-4 flex flex-col hover:scale-105 hover:border-white/30 shadow-lg'}`}
         style={{
           background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
           ...(compact ? { minHeight: 0 } : { height: '187px' }),
@@ -64,7 +62,8 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
         {/* Info button - fixed position top right */}
         <button
           onClick={() => setShowInfo(true)}
-          className={`absolute rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center transition-all z-10 ${compact ? 'top-1 right-1 w-6 h-6 text-xs' : 'top-2 right-2 w-7 h-7 text-base'}`}
+          type="button"
+          className={`absolute rounded bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center transition-all z-10 leading-none ${compact ? 'top-0 right-0 h-3.5 w-3.5 text-[7px] rounded-sm' : 'top-2 right-2 w-7 h-7 text-base rounded-full'}`}
           title="Info"
         >
           ℹ️
@@ -72,24 +71,26 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
 
         {compact ? (
           <>
-            <div className="text-center pt-0.5 flex-shrink-0">
-              <div className="text-3xl leading-none">{emoji}</div>
+            {/* 3×3 mobile grid: minimal vertical stack */}
+            <div className="absolute inset-x-0 top-0.5 text-center pointer-events-none leading-none">
+              <span className="text-lg leading-none select-none inline-block scale-100">{emoji}</span>
             </div>
-            <div className="text-center px-0.5 flex flex-col items-center justify-center gap-0.5 flex-shrink-0 py-0.5 min-h-0">
+            <div
+              className="absolute inset-x-0.5 flex items-center justify-center text-center px-px"
+              style={{ top: "22px", height: "20px" }}
+            >
               {comingSoon ? (
-                <h2 className="text-[11px] font-bold line-clamp-2 leading-tight text-amber-300">COMING SOON</h2>
+                <h2 className="text-[7px] font-bold leading-[1.05] line-clamp-2 text-amber-300">COMING SOON</h2>
               ) : (
-                <h2 className="text-[11px] font-bold line-clamp-2 leading-tight">{title}</h2>
-              )}
-              {reward && (
-                <p className="text-[9px] leading-tight text-amber-200/90 font-semibold line-clamp-1">{reward}</p>
+                <h2 className="text-[7px] font-bold leading-[1.05] line-clamp-2">{title}</h2>
               )}
             </div>
-            <div className="mt-auto pt-0.5 px-0.5 flex-shrink-0">
+            <div className="absolute inset-x-0.5 bottom-0.5">
               {comingSoon ? (
                 <button
+                  type="button"
                   disabled
-                  className="block w-full text-center px-1 py-1.5 rounded text-[10px] font-bold text-white/50 shadow-lg cursor-not-allowed opacity-50"
+                  className="block w-full text-center rounded-sm py-px leading-none text-[7px] font-bold text-white/50 cursor-not-allowed opacity-50"
                   style={{
                     background: `linear-gradient(135deg, ${color}40 0%, ${color}30 100%)`,
                   }}
@@ -99,7 +100,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
               ) : (
                 <Link
                   href={href}
-                  className="block w-full text-center px-1 py-1.5 rounded text-[10px] font-bold text-white shadow-lg transition-all hover:scale-105"
+                  className="block w-full text-center rounded-sm py-px leading-none text-[7px] font-bold text-white transition-colors"
                   style={{
                     background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
                   }}
@@ -538,8 +539,7 @@ export default function ArcadeHub() {
   const [devPassword, setDevPassword] = useState("");
   const [showDevButton, setShowDevButton] = useState(false);
   const [addingCoins, setAddingCoins] = useState(false);
-  const [mobileCategory, setMobileCategory] = useState("featured");
-  const [mobilePage, setMobilePage] = useState(0);
+  const [mobileGroupIndex, setMobileGroupIndex] = useState(0);
   const [showArcadeInfoModal, setShowArcadeInfoModal] = useState(false);
 
   // Wagmi hooks
@@ -734,25 +734,10 @@ export default function ArcadeHub() {
     };
   }, []);
 
-  const mobileFilteredGames = useMemo(
-    () => games.filter((g) => g.category === mobileCategory),
-    [mobileCategory]
-  );
-
-  const mobileTotalPages = Math.max(1, Math.ceil(mobileFilteredGames.length / MOBILE_PAGE_SIZE));
-
-  const mobilePageClamped = Math.min(mobilePage, mobileTotalPages - 1);
-
-  const mobilePageGames = useMemo(() => {
-    const start = mobilePageClamped * MOBILE_PAGE_SIZE;
-    return mobileFilteredGames.slice(start, start + MOBILE_PAGE_SIZE);
-  }, [mobileFilteredGames, mobilePageClamped]);
-
-  useEffect(() => {
-    if (mobilePage > mobileTotalPages - 1) {
-      setMobilePage(Math.max(0, mobileTotalPages - 1));
-    }
-  }, [mobilePage, mobileTotalPages]);
+  const mobileGroupGames = useMemo(() => {
+    const start = mobileGroupIndex * MOBILE_GAMES_PER_GROUP;
+    return games.slice(start, start + MOBILE_GAMES_PER_GROUP);
+  }, [mobileGroupIndex]);
 
   return (
     <Layout title="MLEO — Arcade Games">
@@ -763,127 +748,165 @@ export default function ArcadeHub() {
         }}
       >
         {/* —— Mobile: fixed-screen lobby (md:hidden) —— */}
-        <div className="flex md:hidden flex-col h-[100dvh] max-h-[100dvh] min-h-0 overflow-hidden px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] gap-1.5">
-          <div className="flex-shrink-0 flex items-center justify-between gap-2">
-            <Link
-              href="/mining"
-              className="rounded-full px-2.5 py-1 text-[10px] font-bold bg-white/10 border border-white/20 hover:bg-white/20 whitespace-nowrap"
-            >
-              ← BACK
-            </Link>
-            <div className="flex-1 min-w-0 text-center">
-              <h1 className="text-sm font-extrabold tracking-tight truncate">🎮 MLEO Arcade</h1>
-              <p className="text-[9px] text-white/75 leading-tight line-clamp-1">Vault • free play • mini-games</p>
-            </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowArcadeInfoModal(true)}
-                className="rounded-lg px-2 py-1 text-[10px] font-bold bg-purple-500/25 border border-purple-400/40 text-purple-200"
+        <div className="flex md:hidden flex-col h-[100dvh] max-h-[100dvh] min-h-0 overflow-hidden px-2 pt-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] gap-1">
+          {/* Top zone: readable control / header block */}
+          <header className="flex-shrink-0 rounded-xl border border-white/20 bg-black/40 px-2.5 py-2 shadow-sm space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <Link
+                href="/mining"
+                className="rounded-full px-2.5 py-1 text-[11px] font-bold bg-white/10 border border-white/25 hover:bg-white/20 whitespace-nowrap shrink-0"
               >
-                Info
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowSettingsModal(true)}
-                className="p-1.5 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20"
-                title="Settings"
-              >
-                <div className="flex flex-col gap-0.5">
-                  <div className="w-3.5 h-0.5 bg-white" />
-                  <div className="w-3.5 h-0.5 bg-white" />
-                  <div className="w-3.5 h-0.5 bg-white" />
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-shrink-0 flex items-center justify-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setShowVaultModal(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 border border-white/20 text-[10px] font-semibold"
-            >
-              <span>💰</span>
-              <span className="text-emerald-400">{fmt(vault)}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowFreePlayModal(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gradient-to-r from-amber-600/25 to-orange-600/25 border border-amber-500/35 text-[10px] font-semibold"
-            >
-              <span>🎁</span>
-              <span className="text-amber-300">
-                {freePlayLoaded ? `${freePlayStatus.tokens}/${freePlayStatus.maxTokens}` : "…"}
-              </span>
-              {freePlayStatus.tokens === 0 && !freePlayStatus.isFull && freePlayCountdown > 0 && (
-                <span className="text-[9px] text-amber-400/80">{formatTimeRemaining(freePlayCountdown)}</span>
-              )}
-            </button>
-          </div>
-
-          <div className="flex-shrink-0 -mx-1 overflow-x-auto pb-0.5">
-            <div className="flex gap-1.5 px-1 min-w-min">
-              {ARCADE_CATEGORIES.map((c) => (
+                ← BACK
+              </Link>
+              <div className="flex-1 min-w-0 text-center px-1">
+                <h1 className="text-[15px] sm:text-base font-extrabold tracking-tight truncate leading-tight">
+                  🎮 MLEO Arcade
+                </h1>
+                <p className="text-[10px] text-white/75 leading-snug line-clamp-2 mt-0.5">
+                  Vault • free play • mini-games
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
                 <button
-                  key={c.id}
                   type="button"
-                  onClick={() => {
-                    setMobileCategory(c.id);
-                    setMobilePage(0);
-                  }}
-                  className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
-                    mobileCategory === c.id
-                      ? "bg-amber-500/35 border-amber-400/60 text-amber-100"
-                      : "bg-white/5 border-white/15 text-white/80"
-                  }`}
+                  onClick={() => setShowArcadeInfoModal(true)}
+                  className="rounded-lg px-2 py-1 text-[11px] font-bold bg-purple-500/30 border border-purple-400/45 text-purple-100"
                 >
-                  {c.label}
+                  Info
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setShowSettingsModal(true)}
+                  className="p-1.5 rounded-lg bg-white/10 border border-white/25 hover:bg-white/20"
+                  title="Settings"
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <div className="w-3.5 h-0.5 bg-white" />
+                    <div className="w-3.5 h-0.5 bg-white" />
+                    <div className="w-3.5 h-0.5 bg-white" />
+                  </div>
+                </button>
+              </div>
             </div>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowVaultModal(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/10 border border-white/25 text-[11px] font-semibold"
+              >
+                <span>💰</span>
+                <span className="text-emerald-400 tabular-nums">{fmt(vault)}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFreePlayModal(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-600/30 to-orange-600/30 border border-amber-500/40 text-[11px] font-semibold max-w-[58%]"
+              >
+                <span>🎁</span>
+                <span className="text-amber-200 truncate">
+                  {freePlayLoaded ? `${freePlayStatus.tokens}/${freePlayStatus.maxTokens}` : "…"}
+                </span>
+                {freePlayStatus.tokens === 0 && !freePlayStatus.isFull && freePlayCountdown > 0 && (
+                  <span className="text-[9px] text-amber-300/90 shrink-0">{formatTimeRemaining(freePlayCountdown)}</span>
+                )}
+              </button>
+            </div>
+          </header>
+
+          {/* Mobile groups: 4 tabs → 9 games each (no Prev/Next) */}
+          <div className="flex-shrink-0 flex justify-center gap-1 px-0.5">
+            {MOBILE_ARCADE_GROUPS.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => setMobileGroupIndex(g.id)}
+                aria-label={`Games ${g.shortLabel}`}
+                className={`flex-1 max-w-[4.5rem] py-1 rounded-lg text-[11px] font-extrabold border transition-all ${
+                  mobileGroupIndex === g.id
+                    ? "bg-amber-500/40 border-amber-400/70 text-amber-50 shadow-sm"
+                    : "bg-white/5 border-white/15 text-white/85"
+                }`}
+              >
+                {g.label}
+              </button>
+            ))}
           </div>
 
-          <section className="flex-1 min-h-0 grid grid-cols-2 grid-rows-3 gap-1.5">
-            {mobilePageGames.map((game, idx) => (
+          {/* Middle zone: 3×3 dense grid */}
+          <section className="flex-1 min-h-0 grid grid-cols-3 grid-rows-3 gap-0.5" aria-label="Games">
+            {mobileGroupGames.map((game, idx) => (
               <GameCard
-                key={`${game.href}-${idx}`}
+                key={`${mobileGroupIndex}-${game.href}-${idx}`}
                 {...game}
                 freePlayStatus={freePlayStatus}
                 comingSoon={game.comingSoon}
                 compact
               />
             ))}
-            {Array.from({ length: Math.max(0, MOBILE_PAGE_SIZE - mobilePageGames.length) }).map((_, i) => (
+            {Array.from({ length: Math.max(0, MOBILE_GAMES_PER_GROUP - mobileGroupGames.length) }).map((_, i) => (
               <div
                 key={`pad-${i}`}
-                className="rounded-lg border border-white/5 bg-white/[0.02] min-h-0"
+                className="rounded-md border border-white/5 bg-white/[0.02] min-h-0 min-w-0"
                 aria-hidden
               />
             ))}
           </section>
 
-          <div className="flex-shrink-0 flex items-center justify-between gap-2 pt-1 border-t border-white/10">
-            <button
-              type="button"
-              disabled={mobilePageClamped <= 0}
-              onClick={() => setMobilePage((p) => Math.max(0, p - 1))}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-white/10 border border-white/20 disabled:opacity-35 disabled:cursor-not-allowed"
-            >
-              Prev
-            </button>
-            <span className="text-[10px] text-white/70 font-semibold tabular-nums">
-              {mobilePageClamped + 1} / {mobileTotalPages}
-            </span>
-            <button
-              type="button"
-              disabled={mobilePageClamped >= mobileTotalPages - 1}
-              onClick={() => setMobilePage((p) => Math.min(mobileTotalPages - 1, p + 1))}
-              className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-white/10 border border-white/20 disabled:opacity-35 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
+          {/* Bottom zone: replaceable footer actions (Back to Home + dev — temporary) */}
+          <footer className="mobile-arcade-footer flex-shrink-0 flex flex-col gap-1 pt-1 border-t border-white/20">
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              <Link
+                href="/mining"
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-[10px] font-bold text-white border border-emerald-400/40"
+              >
+                <span>⬅️</span>
+                <span>Back to Home</span>
+              </Link>
+              {!showDevButton ? (
+                <button
+                  type="button"
+                  onClick={() => setShowDevButton(true)}
+                  className="inline-flex items-center px-2 py-1 rounded-lg bg-red-600/25 border border-red-500/35 text-red-300 text-[10px] font-bold hover:bg-red-600/35"
+                  title="Dev Tools"
+                >
+                  🔧 +10K
+                </button>
+              ) : (
+                <div className="flex flex-wrap items-center justify-center gap-1 w-full">
+                  <input
+                    type="password"
+                    value={devPassword}
+                    onChange={(e) => setDevPassword(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        addDevCoins();
+                      }
+                    }}
+                    placeholder="Password"
+                    className="px-2 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[10px] placeholder-zinc-500 focus:outline-none focus:border-red-500 w-[100px]"
+                  />
+                  <button
+                    type="button"
+                    onClick={addDevCoins}
+                    disabled={addingCoins}
+                    className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-500 font-bold text-white text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {addingCoins ? "…" : "+10K"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDevButton(false);
+                      setDevPassword("");
+                    }}
+                    className="px-2 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[10px] hover:bg-white/20"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
+          </footer>
         </div>
 
         {/* —— Desktop / tablet —— */}
