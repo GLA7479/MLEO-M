@@ -1,5 +1,5 @@
 // pages/arcade.js - MLEO Arcade/Gaming Hub
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Layout from "../components/Layout";
 import Link from "next/link";
 import { ConnectButton, useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
@@ -81,7 +81,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
         <button
           onClick={() => setShowInfo(true)}
           type="button"
-          className={`absolute bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center transition-all z-10 leading-none ${compact ? 'top-1 right-1 h-7 w-7 min-h-[28px] min-w-[28px] rounded-md text-base' : 'top-2 right-2 w-7 h-7 text-base rounded-full'}`}
+          className={`absolute bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center transition-all z-10 leading-none ${compact ? 'top-1 right-1 h-10 w-10 min-h-[40px] min-w-[40px] rounded-md text-base' : 'top-2 right-2 w-10 h-10 text-base rounded-full'}`}
           title="Info"
         >
           ℹ️
@@ -93,23 +93,23 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
             <div className="flex h-full min-h-0 flex-col px-1 pb-1 pl-1 pr-2.5 pt-1.5">
               <div className="mt-1 flex shrink-0 justify-center leading-none">
                 <span
-                  className="inline-block translate-y-1 select-none text-[2.9rem] leading-none sm:text-[3.1rem]"
+                  className="inline-block translate-y-0.5 select-none text-[2.9rem] leading-none sm:text-[3.1rem]"
                   aria-hidden
                 >
                   {compactCardEmoji(emoji)}
                 </span>
               </div>
-              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-px px-0.5 text-center">
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-0 px-0.5 text-center">
                 {comingSoon ? (
-                  <h2 className="text-[11px] font-bold leading-snug line-clamp-2 text-amber-300">
+                  <h2 className="text-[11px] font-bold leading-tight line-clamp-2 text-amber-300">
                     COMING SOON
                   </h2>
                 ) : (
-                  <h2 className="text-[11px] font-bold leading-snug line-clamp-2">{title}</h2>
+                  <h2 className="text-[11px] font-bold leading-tight line-clamp-2">{title}</h2>
                 )}
                 {reward ? (
                   <p
-                    className="mt-0.5 max-w-full text-[9px] font-semibold leading-tight text-amber-200/95 line-clamp-1"
+                    className="mt-0 max-w-full px-0.5 text-[9px] font-semibold leading-none text-amber-200/95 line-clamp-1"
                     title={reward}
                   >
                     {reward}
@@ -218,12 +218,57 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
 }
 
 function Modal({ open, onClose, children, title = "🎮 How to Play", sheetOnMobile = false }) {
+  const modalRef = useRef(null);
+  const closeBtnRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const root = modalRef.current;
+      if (!root) return;
+      const focusable = root.querySelectorAll(
+        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    const prevActive = document.activeElement;
+    closeBtnRef.current?.focus();
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (prevActive && typeof prevActive.focus === "function") {
+        prevActive.focus();
+      }
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[100]">
+    <div className="fixed inset-0 z-[100]" role="presentation">
       <div
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
+        aria-hidden="true"
       />
       <div
         className={`absolute inset-0 flex justify-center px-0 sm:px-4 ${
@@ -231,6 +276,9 @@ function Modal({ open, onClose, children, title = "🎮 How to Play", sheetOnMob
         }`}
       >
         <div
+          ref={modalRef}
+          role="dialog"
+          aria-modal="true"
           className={`w-full max-w-sm bg-zinc-900 border border-zinc-800 shadow-2xl overflow-auto ${
             sheetOnMobile
               ? "rounded-t-2xl sm:rounded-2xl max-h-[88dvh] sm:max-h-[85vh]"
@@ -240,8 +288,11 @@ function Modal({ open, onClose, children, title = "🎮 How to Play", sheetOnMob
           <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 sticky top-0 bg-zinc-900 z-10">
             <h3 className="text-lg sm:text-xl font-bold text-white pr-2">{title}</h3>
             <button
+              ref={closeBtnRef}
+              type="button"
               onClick={onClose}
               className="rounded-lg px-3 py-1 text-zinc-300 hover:text-white hover:bg-zinc-800"
+              aria-label="Close modal"
             >
               ✕
             </button>

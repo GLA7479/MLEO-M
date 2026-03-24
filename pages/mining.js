@@ -1,5 +1,5 @@
 // pages/mining.js
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
@@ -1701,6 +1701,50 @@ function acceptTerms() {
 
 // ===== Modal Component =====
 function Modal({ isOpen, onClose, children, maxWidth = "2xl", padding = "6" }) {
+  const modalRef = useRef(null);
+  const closeBtnRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const root = modalRef.current;
+      if (!root) return;
+      const focusable = root.querySelectorAll(
+        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    const prevActive = document.activeElement;
+    closeBtnRef.current?.focus();
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (prevActive && typeof prevActive.focus === "function") {
+        prevActive.focus();
+      }
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
   
   const maxWidthClass = {
@@ -1719,12 +1763,20 @@ function Modal({ isOpen, onClose, children, maxWidth = "2xl", padding = "6" }) {
   }[padding] || "p-6";
   
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/60" onClick={onClose}></div>
-      <div className={`relative bg-white text-black rounded-2xl ${maxWidthClass} w-full max-h-[80vh] overflow-y-auto`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
+      <div className="fixed inset-0 bg-black/60" onClick={onClose} aria-hidden="true"></div>
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        className={`relative bg-white text-black rounded-2xl ${maxWidthClass} w-full max-h-[80vh] overflow-y-auto`}
+      >
         <button
+          ref={closeBtnRef}
+          type="button"
           onClick={onClose}
           className="absolute top-4 right-4 text-2xl font-bold text-gray-500 hover:text-gray-700"
+          aria-label="Close modal"
         >
           ×
         </button>
@@ -2809,10 +2861,8 @@ export default function GamesHub() {
             {/* Navigation */}
             <div className="flex shrink-0 items-center justify-between mb-2 md:mb-6">
               <div className="flex items-center gap-2">
-                <Link href="/">
-                  <button className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-500/30 transition-colors">
-                    {text.back}
-                  </button>
+                <Link href="/" className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-500/30 transition-colors">
+                  {text.back}
                 </Link>
                 <button
                   onClick={handleLogout}
@@ -2850,12 +2900,12 @@ export default function GamesHub() {
                 </p>
               </header>
 
-              <div className="flex-1 min-h-0 flex -translate-y-7 flex-col justify-center py-2">
+              <div className="flex-1 min-h-0 flex -translate-y-5 flex-col justify-center py-2">
               <section className="grid grid-cols-2 gap-2 w-full shrink-0">
-                <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[160px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
                     <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{text.miners}</h2>
-                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                       {text.active}
                     </span>
                   </div>
@@ -2867,14 +2917,14 @@ export default function GamesHub() {
                       <button
                         type="button"
                         onClick={() => open("miners-how")}
-                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-1 py-1 rounded-md text-[9px] font-bold border border-blue-500/35 leading-tight"
+                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-2 py-1 rounded-md text-[10px] font-bold border border-blue-500/35 leading-none whitespace-nowrap"
                       >
-                        {text.howToPlay}
+                        HOW TO
                       </button>
                       <button
                         type="button"
                         onClick={() => open("terms")}
-                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-1 py-1 rounded-md text-[9px] font-bold border border-white/15 leading-tight"
+                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-2 py-1 rounded-md text-[10px] font-bold border border-white/15 leading-none"
                       >
                         {text.terms}
                       </button>
@@ -2887,10 +2937,10 @@ export default function GamesHub() {
                   </div>
                 </article>
 
-                <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[160px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
                     <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{questCard.title}</h2>
-                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
+                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
                       {questCard.badge}
                     </span>
                   </div>
@@ -2902,14 +2952,14 @@ export default function GamesHub() {
                       <button
                         type="button"
                         onClick={() => open("quest-how")}
-                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-1 py-1 rounded-md text-[9px] font-bold border border-blue-500/35 leading-tight"
+                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-2 py-1 rounded-md text-[10px] font-bold border border-blue-500/35 leading-none whitespace-nowrap"
                       >
-                        {text.howToPlay}
+                        HOW TO
                       </button>
                       <button
                         type="button"
                         onClick={() => open("terms")}
-                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-1 py-1 rounded-md text-[9px] font-bold border border-white/15 leading-tight"
+                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-2 py-1 rounded-md text-[10px] font-bold border border-white/15 leading-none"
                       >
                         {text.terms}
                       </button>
@@ -2922,12 +2972,12 @@ export default function GamesHub() {
                   </div>
                 </article>
 
-                <article className="rounded-xl border border-purple-500/35 bg-gradient-to-br from-purple-900/35 to-indigo-900/25 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                <article className="rounded-xl border border-purple-500/35 bg-gradient-to-br from-purple-900/35 to-indigo-900/25 backdrop-blur-sm p-2 flex flex-col min-h-[160px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
                     <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">
                       {text.arcadeRegularTitle || "MLEO — Arcade"}
                     </h2>
-                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-purple-500/25 text-purple-200 border border-purple-500/40">
+                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-purple-500/25 text-purple-200 border border-purple-500/40">
                       {text.arcadeBadgeLabel || "Arcade"}
                     </span>
                   </div>
@@ -2939,14 +2989,14 @@ export default function GamesHub() {
                       <button
                         type="button"
                         onClick={() => open("arcade-how")}
-                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-1 py-1 rounded-md text-[9px] font-bold border border-blue-500/35 leading-tight"
+                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-2 py-1 rounded-md text-[10px] font-bold border border-blue-500/35 leading-none whitespace-nowrap"
                       >
-                        {text.howToPlay}
+                        HOW TO
                       </button>
                       <button
                         type="button"
                         onClick={() => open("terms")}
-                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-1 py-1 rounded-md text-[9px] font-bold border border-white/15 leading-tight"
+                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-2 py-1 rounded-md text-[10px] font-bold border border-white/15 leading-none"
                       >
                         {text.terms}
                       </button>
@@ -2959,12 +3009,12 @@ export default function GamesHub() {
                   </div>
                 </article>
 
-                <article className="rounded-xl border border-pink-500/35 bg-gradient-to-br from-red-900/30 to-pink-900/20 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                <article className="rounded-xl border border-pink-500/35 bg-gradient-to-br from-red-900/30 to-pink-900/20 backdrop-blur-sm p-2 flex flex-col min-h-[160px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
                     <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">
                       {text.arcadeOnlineTitle || "MLEO — Arcade Online"}
                     </h2>
-                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-pink-500/20 text-pink-200 border border-pink-500/35">
+                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-pink-500/20 text-pink-200 border border-pink-500/35">
                       {text.onlineBadgeLabel || "Online"}
                     </span>
                   </div>
@@ -2976,14 +3026,14 @@ export default function GamesHub() {
                       <button
                         type="button"
                         onClick={() => open("arcade-online-how")}
-                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-1 py-1 rounded-md text-[9px] font-bold border border-blue-500/35 leading-tight"
+                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-2 py-1 rounded-md text-[10px] font-bold border border-blue-500/35 leading-none whitespace-nowrap"
                       >
-                        {text.howToPlay}
+                        HOW TO
                       </button>
                       <button
                         type="button"
                         onClick={() => open("terms")}
-                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-1 py-1 rounded-md text-[9px] font-bold border border-white/15 leading-tight"
+                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-2 py-1 rounded-md text-[10px] font-bold border border-white/15 leading-none"
                       >
                         {text.terms}
                       </button>
@@ -3066,10 +3116,8 @@ export default function GamesHub() {
                       </button>
                     </div>
 
-                    <Link href="/mleo-miners">
-                      <button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors">
-                        {text.playMiners}
-                      </button>
+                    <Link href="/mleo-miners" className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors text-center">
+                      {text.playMiners}
                     </Link>
                   </div>
                 </article>
@@ -3105,10 +3153,8 @@ export default function GamesHub() {
                     </div>
 
                     <div className="grid grid-cols-1 gap-2">
-                      <Link href="/mleo-base">
-                        <button className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
-                          BASE
-                        </button>
+                      <Link href="/mleo-base" className="block w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg text-center">
+                        BASE
                       </Link>
                     </div>
                   </div>
@@ -3145,15 +3191,11 @@ export default function GamesHub() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <Link href="/arcade">
-                        <button className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
-                          GAMES
-                        </button>
+                      <Link href="/arcade" className="block w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg text-center">
+                        GAMES
                       </Link>
-                      <Link href="/arcade-online">
-                        <button className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
-                          ONLINE
-                        </button>
+                      <Link href="/arcade-online" className="block w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg text-center">
+                        ONLINE
                       </Link>
                     </div>
                   </div>
