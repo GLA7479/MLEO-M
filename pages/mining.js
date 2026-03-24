@@ -1,5 +1,6 @@
 // pages/mining.js
 import { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
 import Link from "next/link";
@@ -2484,6 +2485,69 @@ function LanguageSelector({ currentLang, onLanguageChange }) {
   );
 }
 
+/** Top-bar language control: visual + dropdown pattern aligned with `pages/index.js` LanguageSelector; same `onLanguageChange` as in-menu selector. */
+function TopBarLanguageSelector({ currentLang, onLanguageChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const labelLang = TEXT[currentLang] ? currentLang : "en";
+
+  return (
+    <div className="relative flex shrink-0 items-center">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-2 py-1.5 text-xs leading-none transition hover:bg-white/15"
+        style={{ fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol" }}
+      >
+        <span className="flex shrink-0 items-center text-[15px] leading-none">{FLAGS[labelLang] || "🌐"}</span>
+        <span className="leading-none">{TEXT[labelLang].name}</span>
+        <svg
+          className={`h-3.5 w-3.5 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <>
+            <div className="fixed inset-0 bg-black/20" style={{ zIndex: 2147483646 }} onClick={() => setIsOpen(false)} />
+            <div
+              className="fixed right-4 top-16 max-h-[400px] w-52 overflow-y-auto overflow-hidden rounded-xl border border-white/20 bg-gray-900 text-white shadow-2xl"
+              style={{
+                fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol",
+                backdropFilter: "blur(10px)",
+                backgroundColor: "rgba(17, 24, 39, 0.95)",
+                zIndex: 2147483647,
+              }}
+            >
+              {ALL.map((opt) => (
+                <button
+                  key={opt.code}
+                  type="button"
+                  onClick={() => {
+                    onLanguageChange(opt.code);
+                    setIsOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-white/15 ${
+                    currentLang === opt.code ? "bg-white/25 font-bold" : ""
+                  }`}
+                >
+                  <span className="mr-2 text-lg">{FLAGS[opt.code] || "🌐"}</span>
+                  <span>{TEXT[opt.code].name}</span>
+                </button>
+              ))}
+            </div>
+          </>,
+          document.body
+        )}
+    </div>
+  );
+}
+
 // ===== GamesHub Component =====
 export default function GamesHub() {
   const router = useRouter();
@@ -2871,10 +2935,11 @@ export default function GamesHub() {
                   {text.logout}
                 </button>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <TopBarLanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} />
                 <button
                   onClick={() => setShowMenu(!showMenu)}
-                  className="p-2 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20 transition-all"
+                  className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 transition-all hover:bg-white/20"
                   title="Menu"
                 >
                   <div className="flex flex-col gap-1">
@@ -3087,20 +3152,20 @@ export default function GamesHub() {
               >
                 <article className="flex h-full min-h-0 flex-col rounded-2xl border border-white/15 bg-black/40 p-4 shadow-xl backdrop-blur-md">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 text-left">
-                      <div className="mb-0.5 text-2xl leading-none" aria-hidden>
+                    <div className="min-w-0 space-y-1 text-left">
+                      <div className="text-3xl leading-none lg:text-[2rem]" aria-hidden>
                         ⛏️
                       </div>
-                      <h2 className="text-lg font-extrabold leading-tight lg:text-xl">{text.miners}</h2>
+                      <h2 className="text-xl font-extrabold leading-snug tracking-tight lg:text-[1.3125rem]">{text.miners}</h2>
                     </div>
                     <span className="shrink-0 rounded-full border border-emerald-500/35 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-200">
                       {text.active}
                     </span>
                   </div>
-                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-xs leading-snug text-zinc-300 lg:text-[13px]">
+                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-[13px] font-medium leading-relaxed text-zinc-200/95 lg:text-sm">
                     {text.minersDescShort || text.minersDesc}
                   </p>
-                  <div className="mt-3 flex shrink-0 flex-col gap-2">
+                  <div className="mt-2.5 flex shrink-0 flex-col gap-2">
                     <div className="flex flex-wrap justify-center gap-2">
                       <button
                         type="button"
@@ -3128,20 +3193,20 @@ export default function GamesHub() {
 
                 <article className="flex h-full min-h-0 flex-col rounded-2xl border border-white/15 bg-black/40 p-4 shadow-xl backdrop-blur-md">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 text-left">
-                      <div className="mb-0.5 text-2xl leading-none" aria-hidden>
+                    <div className="min-w-0 space-y-1 text-left">
+                      <div className="text-3xl leading-none lg:text-[2rem]" aria-hidden>
                         🏗️
                       </div>
-                      <h2 className="text-lg font-extrabold leading-tight lg:text-xl">{questCard.title}</h2>
+                      <h2 className="text-xl font-extrabold leading-snug tracking-tight lg:text-[1.3125rem]">{questCard.title}</h2>
                     </div>
                     <span className="shrink-0 rounded-full border border-orange-500/35 bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold text-orange-200">
                       {questCard.badge}
                     </span>
                   </div>
-                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-xs leading-snug text-zinc-300 lg:text-[13px]">
+                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-[13px] font-medium leading-relaxed text-zinc-200/95 lg:text-sm">
                     {questCard.descShort || questCard.desc}
                   </p>
-                  <div className="mt-3 flex shrink-0 flex-col gap-2">
+                  <div className="mt-2.5 flex shrink-0 flex-col gap-2">
                     <div className="flex flex-wrap justify-center gap-2">
                       <button
                         type="button"
@@ -3169,11 +3234,11 @@ export default function GamesHub() {
 
                 <article className="flex h-full min-h-0 flex-col rounded-2xl border border-purple-500/40 bg-gradient-to-br from-purple-900/35 to-indigo-900/25 p-4 shadow-xl backdrop-blur-md">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 text-left">
-                      <div className="mb-0.5 text-2xl leading-none" aria-hidden>
+                    <div className="min-w-0 space-y-1 text-left">
+                      <div className="text-3xl leading-none lg:text-[2rem]" aria-hidden>
                         🎮
                       </div>
-                      <h2 className="text-lg font-extrabold leading-tight lg:text-xl">
+                      <h2 className="text-xl font-extrabold leading-snug tracking-tight lg:text-[1.3125rem]">
                         {text.arcadeRegularTitle || "MLEO — Arcade"}
                       </h2>
                     </div>
@@ -3181,10 +3246,10 @@ export default function GamesHub() {
                       {text.arcadeBadgeLabel || "Arcade"}
                     </span>
                   </div>
-                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-xs leading-snug text-zinc-200 lg:text-[13px]">
+                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-[13px] font-medium leading-relaxed text-zinc-100/90 lg:text-sm">
                     {text.arcadeDescShort || "Solo mini-games. Shared vault & session rewards."}
                   </p>
-                  <div className="mt-3 flex shrink-0 flex-col gap-2">
+                  <div className="mt-2.5 flex shrink-0 flex-col gap-2">
                     <div className="flex flex-wrap justify-center gap-2">
                       <button
                         type="button"
@@ -3212,11 +3277,11 @@ export default function GamesHub() {
 
                 <article className="flex h-full min-h-0 flex-col rounded-2xl border border-pink-500/40 bg-gradient-to-br from-red-900/30 to-pink-900/25 p-4 shadow-xl backdrop-blur-md">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 text-left">
-                      <div className="mb-0.5 text-2xl leading-none" aria-hidden>
+                    <div className="min-w-0 space-y-1 text-left">
+                      <div className="text-3xl leading-none lg:text-[2rem]" aria-hidden>
                         🌐
                       </div>
-                      <h2 className="text-lg font-extrabold leading-tight lg:text-xl">
+                      <h2 className="text-xl font-extrabold leading-snug tracking-tight lg:text-[1.3125rem]">
                         {text.arcadeOnlineTitle || "MLEO — Arcade Online"}
                       </h2>
                     </div>
@@ -3224,10 +3289,10 @@ export default function GamesHub() {
                       {text.onlineBadgeLabel || "Online"}
                     </span>
                   </div>
-                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-xs leading-snug text-zinc-200 lg:text-[13px]">
+                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-[13px] font-medium leading-relaxed text-zinc-100/90 lg:text-sm">
                     {text.arcadeOnlineDescShort || "Multiplayer & live modes. Same shared vault."}
                   </p>
-                  <div className="mt-3 flex shrink-0 flex-col gap-2">
+                  <div className="mt-2.5 flex shrink-0 flex-col gap-2">
                     <div className="flex flex-wrap justify-center gap-2">
                       <button
                         type="button"
