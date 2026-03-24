@@ -188,38 +188,59 @@ function hubGamesForPage(pageIndex) {
   return GAME_REGISTRY.slice(slice[0], slice[1]);
 }
 
-// GameCard component (כמו בדף Arcade)
-function GameCard({ game, onSelect }) {
+// GameCard — default = mobile hub; desktopHub = md-only grid (tighter title block, same colors/PLAY)
+function GameCard({ game, onSelect, variant = "default" }) {
+  const desktopHub = variant === "desktopHub";
   return (
     <article
-      className="relative flex cursor-pointer flex-col overflow-hidden rounded-lg border border-white/10 bg-transparent p-4 shadow-md backdrop-blur-md transition-all hover:scale-105 hover:border-white/25 hover:shadow-lg"
+      className={`relative flex cursor-pointer flex-col overflow-hidden rounded-lg border border-white/10 bg-transparent shadow-md backdrop-blur-md transition-all hover:scale-105 hover:border-white/25 hover:shadow-lg ${
+        desktopHub ? "p-3" : "p-4"
+      }`}
       style={{
         background:
           "linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)",
-        height: "187px",
+        height: desktopHub ? "172px" : "187px",
       }}
       onClick={() => onSelect(game.id)}
     >
       {game.isMultiplayer && (
-        <div className="absolute left-2 top-2 rounded-full border border-emerald-500/40 bg-emerald-500/20 px-2 py-0.5 text-[11px] font-extrabold text-emerald-200">
+        <div
+          className={`absolute left-2 top-2 rounded-full border border-emerald-500/40 bg-emerald-500/20 font-extrabold text-emerald-200 ${
+            desktopHub ? "px-1.5 py-px text-[10px]" : "px-2 py-0.5 text-[11px]"
+          }`}
+        >
           MP
         </div>
       )}
 
-      <div className="absolute left-0 right-0 text-center" style={{ top: "15px" }}>
-        <div className="text-5xl leading-none">{game.emoji}</div>
+      <div
+        className="absolute left-0 right-0 text-center"
+        style={{ top: desktopHub ? "10px" : "15px" }}
+      >
+        <div className={`leading-none ${desktopHub ? "text-4xl" : "text-5xl"}`}>{game.emoji}</div>
       </div>
 
       <div
         className="absolute left-0 right-0 flex items-center justify-center px-2 text-center"
-        style={{ top: "80px", height: "45px" }}
+        style={{
+          top: desktopHub ? "68px" : "80px",
+          height: desktopHub ? "38px" : "45px",
+        }}
       >
-        <h2 className="line-clamp-2 text-base font-bold leading-tight">{game.title}</h2>
+        <h2
+          className={`line-clamp-2 font-bold ${
+            desktopHub ? "text-sm leading-snug" : "text-base leading-tight"
+          }`}
+        >
+          {game.title}
+        </h2>
       </div>
 
-      <div className="absolute bottom-3 left-4 right-4">
+      <div className={`absolute ${desktopHub ? "bottom-2.5 left-3 right-3" : "bottom-3 left-4 right-4"}`}>
         <div
-          className="block w-full rounded-md px-4 py-2.5 text-center text-sm font-bold text-white shadow-lg transition-all hover:scale-105"
+          className={`block w-full rounded-md text-center font-bold text-white shadow-lg transition-all hover:scale-105 ${
+            desktopHub ? "px-3 py-2 text-sm" : "px-4 py-2.5 text-sm"
+          }`}
           style={{
             background: `linear-gradient(135deg, ${game.color} 0%, ${game.color}dd 100%)`,
           }}
@@ -625,9 +646,9 @@ useEffect(() => {
         }`}
         style={{ background: ARCADE_ONLINE_BG }}
       >
-        <header className="shrink-0 px-3 pb-2 pt-2.5 sm:px-4 md:px-5">
-          <div className="mx-auto max-w-7xl space-y-2 rounded-xl border border-white/20 bg-black/40 px-2.5 py-2 shadow-sm">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <header className="shrink-0 px-3 pb-2 pt-2.5 sm:px-4 md:px-5 md:pb-1.5 md:pt-2">
+          <div className="mx-auto max-w-7xl space-y-2 rounded-xl border border-white/20 bg-black/40 px-2.5 py-2 shadow-sm md:space-y-1.5 md:px-2 md:py-1.5">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 md:gap-1.5">
               <div className="flex justify-start">
                 <button
                   type="button"
@@ -647,17 +668,17 @@ useEffect(() => {
                         : "BACK"}
                 </button>
               </div>
-              <div className="min-w-0 max-w-[min(100%,22rem)] justify-self-center text-center">
-                <h1 className="text-xl font-extrabold leading-tight tracking-tight text-white sm:text-2xl">
+              <div className="min-w-0 max-w-[min(100%,22rem)] justify-self-center text-center md:max-w-[min(100%,20rem)]">
+                <h1 className="text-xl font-extrabold leading-tight tracking-tight text-white sm:text-2xl md:text-xl md:leading-snug">
                   MLEO Online
                 </h1>
-                <p className="mt-1 text-sm leading-snug text-white/75 sm:text-[15px]">
+                <p className="mt-1 text-sm leading-snug text-white/75 sm:text-[15px] md:mt-0.5 md:text-[13px] md:leading-snug">
                   {hubSubtitle}
                 </p>
               </div>
               <div className="flex justify-end">
                 <div
-                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/25 bg-white/10 px-2.5 py-1 text-[11px] font-semibold"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/25 bg-white/10 px-2.5 py-1 text-[11px] font-semibold md:px-2 md:py-0.5 md:text-[10px]"
                   title="Vault balance"
                 >
                   <span aria-hidden>💰</span>
@@ -667,12 +688,12 @@ useEffect(() => {
             </div>
 
             {!selectedGame && (
-              <div className="space-y-1.5 border-t border-white/15 pt-2">
+              <div className="space-y-1.5 border-t border-white/15 pt-2 md:space-y-1 md:pt-1.5">
                 <div className="text-center">
                   <label className="text-[11px] font-semibold text-white/90">
                     Player Registration
                   </label>
-                  <p className="mt-0.5 text-[10px] leading-snug text-white/65">
+                  <p className="mt-0.5 text-[10px] leading-snug text-white/65 md:leading-tight">
                     Enter your name to start playing
                   </p>
                 </div>
@@ -681,7 +702,7 @@ useEffect(() => {
                   placeholder="Enter your player name..."
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-center text-sm text-white placeholder-white/45 focus:border-amber-400/50 focus:outline-none focus:ring-2 focus:ring-amber-400/35"
+                  className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-center text-sm text-white placeholder-white/45 focus:border-amber-400/50 focus:outline-none focus:ring-2 focus:ring-amber-400/35 md:py-1.5 md:text-[13px]"
                   maxLength={20}
                 />
               </div>
@@ -768,10 +789,15 @@ useEffect(() => {
           </div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:block md:min-h-0 md:overflow-visible">
-            <section className="hidden px-3 pb-8 sm:px-4 md:block md:px-5">
-              <div className="mx-auto grid max-w-7xl grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 md:gap-2 lg:grid-cols-6 lg:gap-2">
+            <section className="hidden px-3 pb-8 md:block md:px-5">
+              <div className="mx-auto grid max-w-7xl grid-cols-5 gap-3">
                 {GAME_REGISTRY.map((game) => (
-                  <GameCard key={game.id} game={game} onSelect={selectGame} />
+                  <GameCard
+                    key={game.id}
+                    game={game}
+                    onSelect={selectGame}
+                    variant="desktopHub"
+                  />
                 ))}
               </div>
             </section>
