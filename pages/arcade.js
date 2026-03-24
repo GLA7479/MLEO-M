@@ -121,7 +121,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
                   <button
                     type="button"
                     disabled
-                    className="block w-full min-h-[30px] cursor-not-allowed rounded-md py-1.5 text-center text-[11px] font-bold leading-none text-white/50 opacity-50 shadow-inner"
+                    className="block w-full min-h-[33px] cursor-not-allowed rounded-md py-1.5 text-center text-[11px] font-bold leading-none text-white/50 opacity-50 shadow-inner"
                     style={{
                       background: `linear-gradient(135deg, ${color}40 0%, ${color}30 100%)`,
                     }}
@@ -131,7 +131,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
                 ) : (
                   <Link
                     href={href}
-                    className="flex min-h-[30px] w-full items-center justify-center rounded-md py-1.5 text-center text-[11px] font-bold leading-none text-white shadow-sm active:opacity-90"
+                    className="flex min-h-[33px] w-full items-center justify-center rounded-md py-1.5 text-center text-[11px] font-bold leading-none text-white shadow-sm active:opacity-90"
                     style={{
                       background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
                     }}
