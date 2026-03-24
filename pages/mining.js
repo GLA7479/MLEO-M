@@ -2838,19 +2838,20 @@ export default function GamesHub() {
 
             {/* Mobile: compact 2×2 mode lobby (md and below) */}
             <div className="md:hidden flex flex-col gap-2 min-h-[calc(100dvh-7rem)] max-h-[calc(100dvh-7rem)]">
-              <header className="text-center shrink-0 px-0.5">
-                <span className="text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/20 inline-block leading-tight">
+              <header className="text-center shrink-0 px-0.5 pt-0.5">
+                <span className="text-emerald-400 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/20 inline-block leading-tight">
                   {text.liveTestnet}
                 </span>
-                <h1 className="text-lg font-extrabold tracking-tight mt-1.5 leading-tight">
+                <h1 className="text-xl font-extrabold tracking-tight mt-2 leading-snug">
                   {text.chooseGame}
                 </h1>
-                <p className="text-zinc-400 text-[11px] mt-1 leading-snug line-clamp-2 mx-auto max-w-sm">
+                <p className="text-zinc-400 text-xs mt-1.5 leading-snug line-clamp-2 mx-auto max-w-sm">
                   {questCard.hubShort || text.chooseGameLobbyShort || questCard.hub}
                 </p>
               </header>
 
-              <section className="grid grid-cols-2 gap-2 flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] content-start pb-1">
+              <div className="flex-1 min-h-0 flex flex-col justify-center py-2">
+              <section className="grid grid-cols-2 gap-2 w-full shrink-0">
                 <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
                     <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{text.miners}</h2>
@@ -2995,8 +2996,9 @@ export default function GamesHub() {
                   </div>
                 </article>
               </section>
+              </div>
 
-              <footer className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-2 border-t border-white/10 text-[10px] text-white/55">
+              <footer className="shrink-0 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 pt-2 border-t border-white/10 text-[10px] text-white/55 leading-tight">
                 <span>© {new Date().getFullYear()} MLEO</span>
                 <button type="button" onClick={() => setPoolModalOpen(true)} className="underline hover:text-white/90">
                   {text.poolStatus || "Pool"}
@@ -3004,6 +3006,15 @@ export default function GamesHub() {
                 <Link href="/" className="underline hover:text-white/90">Home</Link>
                 <button type="button" onClick={() => setPolicyModal("terms")} className="underline hover:text-white/90">
                   {text.legalShort || "Legal"}
+                </button>
+                <button type="button" onClick={() => setPolicyModal("privacy")} className="underline hover:text-white/90">
+                  Privacy
+                </button>
+                <button type="button" onClick={() => setPolicyModal("cookies")} className="underline hover:text-white/90">
+                  Cookies
+                </button>
+                <button type="button" onClick={() => setPolicyModal("risk")} className="underline hover:text-white/90">
+                  Risk
                 </button>
               </footer>
             </div>
