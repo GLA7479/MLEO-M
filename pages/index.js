@@ -1005,21 +1005,23 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
           </div>
         </section>
 
-        {/* FOOTER — compact on mobile; policy links first on small screens so they stay in view */}
-        <footer className="relative z-10 max-w-6xl mx-auto px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-5 md:pb-10 text-xs text-white/50">
-          <div className="flex flex-col-reverse sm:flex-row items-start sm:items-center gap-2.5 sm:gap-6 justify-between">
-            <div className="shrink-0">© {new Date().getFullYear()} MLEO. All rights reserved.</div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 sm:gap-x-4">
-              <button type="button" onClick={() => setPolicyModal("terms")} className="hover:text-white/80">
+        {/* FOOTER — mobile: single horizontal row (scroll if needed); md+: spaced row */}
+        <footer className="relative z-10 max-w-6xl mx-auto px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-5 md:pb-10 text-[10px] md:text-xs text-white/50">
+          <div className="flex w-full min-w-0 flex-row flex-nowrap items-center gap-x-1.5 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] md:justify-between md:gap-6 md:overflow-visible">
+            <span className="shrink-0 whitespace-nowrap">
+              © {new Date().getFullYear()} MLEO. All rights reserved.
+            </span>
+            <div className="flex shrink-0 flex-row flex-nowrap items-center gap-x-1.5 md:gap-x-4">
+              <button type="button" onClick={() => setPolicyModal("terms")} className="shrink-0 whitespace-nowrap hover:text-white/80">
                 {t.footer.terms}
               </button>
-              <button type="button" onClick={() => setPolicyModal("privacy")} className="hover:text-white/80">
+              <button type="button" onClick={() => setPolicyModal("privacy")} className="shrink-0 whitespace-nowrap hover:text-white/80">
                 {t.footer.privacy}
               </button>
-              <button type="button" onClick={() => setPolicyModal("cookies")} className="hover:text-white/80">
+              <button type="button" onClick={() => setPolicyModal("cookies")} className="shrink-0 whitespace-nowrap hover:text-white/80">
                 Cookies
               </button>
-              <button type="button" onClick={() => setPolicyModal("risk")} className="hover:text-white/80">
+              <button type="button" onClick={() => setPolicyModal("risk")} className="shrink-0 whitespace-nowrap hover:text-white/80">
                 Risk
               </button>
             </div>
