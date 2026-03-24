@@ -81,7 +81,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
         <button
           onClick={() => setShowInfo(true)}
           type="button"
-          className={`absolute bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center transition-all z-10 leading-none ${compact ? 'top-1 right-1 h-6 w-6 min-h-[24px] min-w-[24px] rounded-md text-sm' : 'top-2 right-2 w-7 h-7 text-base rounded-full'}`}
+          className={`absolute bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center transition-all z-10 leading-none ${compact ? 'top-1 right-1 h-7 w-7 min-h-[28px] min-w-[28px] rounded-md text-base' : 'top-2 right-2 w-7 h-7 text-base rounded-full'}`}
           title="Info"
         >
           ℹ️
@@ -93,7 +93,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
             <div className="flex h-full min-h-0 flex-col px-1 pb-1 pl-1 pr-2.5 pt-1.5">
               <div className="mt-1 flex shrink-0 justify-center leading-none">
                 <span
-                  className="select-none text-[2.7rem] leading-none sm:text-5xl"
+                  className="inline-block translate-y-1 select-none text-[2.9rem] leading-none sm:text-[3.1rem]"
                   aria-hidden
                 >
                   {compactCardEmoji(emoji)}
