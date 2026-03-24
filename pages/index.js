@@ -773,9 +773,6 @@ function LanguageSelector({ lang, setLang }) {
   const [isOpen, setIsOpen] = useState(false);
   
   
-  // Debug: check if flags are loading
-  console.log('Current lang:', lang, 'Flag:', FLAGS[lang]);
-  
   return (
     <div className="relative">
       <button
@@ -894,14 +891,14 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
                style={{ background: "radial-gradient(1000px 600px at 50% -200px, rgba(250,204,21,.08), transparent)" }} />
         </div>
 
-        {/* NAV */}
-        <header className="relative z-10 max-w-6xl mx-auto px-5 pt-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/images/leo-coin-gold.png" alt="MLEO" className="w-10 h-10 rounded-full object-contain" />
-            <span className="text-xl font-bold tracking-wide">MLEO</span>
+        {/* NAV — compact on mobile */}
+        <header className="relative z-10 max-w-6xl mx-auto px-4 pt-4 md:px-5 md:pt-6 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
+            <img src="/images/leo-coin-gold.png" alt="MLEO" className="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-full object-contain" />
+            <span className="text-lg md:text-xl font-bold tracking-wide truncate">MLEO</span>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {/* Language select */}
             <LanguageSelector lang={lang} setLang={setLang} />
 
@@ -929,84 +926,108 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
           </div>
         </header>
 
-        {/* HERO */}
-        <section className="relative z-10 max-w-6xl mx-auto px-5 pt-10 pb-20 sm:pt-16 sm:pb-28 grid md:grid-cols-2 gap-10 items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/10 text-xs mb-5">
-              <span>{t.new}</span><span className="opacity-60">{t.early}</span>
+        {/* HERO + VIDEO — mobile: single column, order = hero → CTA → video → bullets; md+: two columns */}
+        <section className="relative z-10 max-w-6xl mx-auto px-4 pt-5 pb-10 md:px-5 md:pt-16 md:pb-28 grid grid-cols-1 md:grid-cols-2 md:gap-10 md:items-start">
+          <div className="flex flex-col gap-3 md:gap-6 min-w-0">
+            <div>
+              <div className="inline-flex items-center gap-1.5 md:gap-2 px-2.5 py-0.5 md:px-3 md:py-1 rounded-full bg-white/10 border border-white/10 text-[11px] md:text-xs mb-3 md:mb-5">
+                <span>{t.new}</span><span className="opacity-60">{t.early}</span>
+              </div>
+
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.08] sm:leading-tight">
+                {t.heroH1_1}<br /><span className="text-yellow-400">{t.heroH1_2}</span>
+              </h1>
+
+              <p className="mt-3 md:mt-5 text-sm sm:text-base md:text-lg text-white/85 max-w-xl min-h-[2.75rem] sm:min-h-0 leading-snug">
+                {(t.slogans && t.slogans[idx]) || ""}
+              </p>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-tight">
-              {t.heroH1_1}<br /><span className="text-yellow-400">{t.heroH1_2}</span>
-            </h1>
-
-            <p className="mt-5 text-base sm:text-lg text-white/80 max-w-xl">
-              {(t.slogans && t.slogans[idx]) || ""}
-            </p>
-
-            <div className={`mt-8 flex ${dir==='rtl' ? 'flex-col sm:flex-row-reverse' : 'flex-col sm:flex-row'} gap-3`}>
-            <button
-              onClick={async () => {
-                try {
-                  const remember = typeof window !== "undefined"
-                    ? window.localStorage?.getItem("mleo_remember_me")
-                    : "true";
-                  const { data } = await supabaseMP.auth.getSession();
-                  if (data?.session && remember !== "false") {
-                    router.push(GAME_ENTRY_URL);
-                    return;
-                  }
-                } catch {}
-                setShowAuth(true);
-              }}
-              className="px-6 py-3 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition"
-            >
-              {t.start}
-            </button>
-
-
-
+            <div className={`flex ${dir === "rtl" ? "flex-col sm:flex-row-reverse" : "flex-col sm:flex-row"} gap-2.5 md:gap-3`}>
+              <button
+                onClick={async () => {
+                  try {
+                    const remember = typeof window !== "undefined"
+                      ? window.localStorage?.getItem("mleo_remember_me")
+                      : "true";
+                    const { data } = await supabaseMP.auth.getSession();
+                    if (data?.session && remember !== "false") {
+                      router.push(GAME_ENTRY_URL);
+                      return;
+                    }
+                  } catch {}
+                  setShowAuth(true);
+                }}
+                className="px-6 py-2.5 md:py-3 rounded-xl bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition text-[15px] md:text-base shadow-md shadow-yellow-400/10"
+              >
+                {t.start}
+              </button>
               <button
                 onClick={() => setShowHow(true)}
-                className="px-6 py-3 rounded-2xl border border-white/20 font-semibold hover:bg-white/5 transition text-center"
+                className="px-6 py-2.5 md:py-3 rounded-2xl border border-white/20 font-semibold hover:bg-white/5 transition text-center text-[15px] md:text-base"
               >
                 {t.how}
               </button>
             </div>
 
-            <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm text-white/70">
+            {/* Bullets — desktop / tablet only (same layout as before) */}
+            <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-3 text-sm text-white/70">
               {t.bullets.map((b, i) => (
                 <div key={i} className="p-3 rounded-xl bg-white/5 border border-white/10">{b}</div>
               ))}
             </div>
           </div>
 
-          {/* VIDEO */}
-          <div className="relative">
-            <div className="absolute -inset-6 rounded-[32px] bg-yellow-400/10 blur-3xl" />
-            <div className="relative rounded-3xl border border-white/10 bg-white/5 p-4 shadow-xl backdrop-blur">
+          {/* VIDEO — main visual anchor; follows CTAs on mobile */}
+          <div className="relative mt-1 md:mt-0">
+            <div className="absolute -inset-4 md:-inset-6 rounded-[24px] md:rounded-[32px] bg-yellow-400/10 blur-2xl md:blur-3xl" />
+            <div className="relative rounded-2xl md:rounded-3xl border border-white/10 bg-white/5 p-3 md:p-4 shadow-xl backdrop-blur">
               <video
-                autoPlay loop muted playsInline
+                autoPlay
+                loop
+                muted
+                playsInline
                 poster="/images/mleo-hero-preview.png"
-                className="w-full h-auto rounded-2xl object-cover"
+                className="w-full h-auto rounded-xl md:rounded-2xl object-cover"
                 src="/videos/intro.mp4"
               />
-              <p className="mt-3 text-xs text-white/60 text-center">
+              <p className="mt-2 md:mt-3 text-[11px] md:text-xs text-white/60 text-center leading-snug px-0.5">
                 Teaser — the full experience starts when you hit {t.start}.
               </p>
             </div>
           </div>
+
+          {/* Bullets — mobile: compact stack below video */}
+          <div className="md:hidden flex flex-col gap-1.5 text-[11px] leading-tight text-white/75">
+            {t.bullets.map((b, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-white/[0.06] border border-white/10"
+              >
+                <span className="mt-0.5 shrink-0 text-emerald-400/90" aria-hidden>✓</span>
+                <span>{b}</span>
+              </div>
+            ))}
+          </div>
         </section>
 
-        {/* FOOTER */}
-        <footer className="relative z-10 max-w-6xl mx-auto px-5 pb-10 text-xs text-white/50">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 justify-between">
-            <div>© {new Date().getFullYear()} MLEO. All rights reserved.</div>
-            <div className="space-x-4">
-              <button onClick={() => setPolicyModal('terms')} className="hover:text-white/80">{t.footer.terms}</button>
-              <button onClick={() => setPolicyModal('privacy')} className="hover:text-white/80">{t.footer.privacy}</button>
-              <button onClick={() => setPolicyModal('cookies')} className="hover:text-white/80">Cookies</button>
-              <button onClick={() => setPolicyModal('risk')} className="hover:text-white/80">Risk</button>
+        {/* FOOTER — compact on mobile */}
+        <footer className="relative z-10 max-w-6xl mx-auto px-4 pb-6 md:px-5 md:pb-10 text-[11px] md:text-xs text-white/50">
+          <div className="flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-6 justify-between text-center sm:text-start">
+            <div className="leading-tight">© {new Date().getFullYear()} MLEO. All rights reserved.</div>
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-end sm:space-x-0 sm:gap-x-4">
+              <button type="button" onClick={() => setPolicyModal("terms")} className="hover:text-white/80 underline-offset-2 hover:underline">
+                {t.footer.terms}
+              </button>
+              <button type="button" onClick={() => setPolicyModal("privacy")} className="hover:text-white/80 underline-offset-2 hover:underline">
+                {t.footer.privacy}
+              </button>
+              <button type="button" onClick={() => setPolicyModal("cookies")} className="hover:text-white/80 underline-offset-2 hover:underline">
+                Cookies
+              </button>
+              <button type="button" onClick={() => setPolicyModal("risk")} className="hover:text-white/80 underline-offset-2 hover:underline">
+                Risk
+              </button>
             </div>
           </div>
         </footer>
