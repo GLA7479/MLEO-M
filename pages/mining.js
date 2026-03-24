@@ -2852,7 +2852,7 @@ export default function GamesHub() {
 
               <div className="flex-1 min-h-0 flex flex-col justify-center py-2">
               <section className="grid grid-cols-2 gap-2 w-full shrink-0">
-                <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                <article className="rounded-xl border border-white/12 bg-black/30 backdrop-blur-[2px] p-2 flex flex-col min-h-[152px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
                     <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{text.miners}</h2>
                     <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
@@ -2887,7 +2887,7 @@ export default function GamesHub() {
                   </div>
                 </article>
 
-                <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                <article className="rounded-xl border border-white/12 bg-black/30 backdrop-blur-[2px] p-2 flex flex-col min-h-[152px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
                     <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{questCard.title}</h2>
                     <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
@@ -2922,7 +2922,7 @@ export default function GamesHub() {
                   </div>
                 </article>
 
-                <article className="rounded-xl border border-purple-500/35 bg-gradient-to-br from-purple-900/35 to-indigo-900/25 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                <article className="rounded-xl border border-purple-500/35 bg-gradient-to-br from-purple-900/22 to-indigo-900/14 backdrop-blur-[2px] p-2 flex flex-col min-h-[152px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
                     <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">
                       {text.arcadeRegularTitle || "MLEO — Arcade"}
@@ -2959,7 +2959,7 @@ export default function GamesHub() {
                   </div>
                 </article>
 
-                <article className="rounded-xl border border-pink-500/35 bg-gradient-to-br from-red-900/30 to-pink-900/20 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                <article className="rounded-xl border border-pink-500/35 bg-gradient-to-br from-red-900/18 to-pink-900/12 backdrop-blur-[2px] p-2 flex flex-col min-h-[152px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
                     <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">
                       {text.arcadeOnlineTitle || "MLEO — Arcade Online"}
