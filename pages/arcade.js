@@ -76,7 +76,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
       <article 
         className={`relative overflow-hidden rounded-lg border border-white/10 shadow-md backdrop-blur-md transition-all duration-300 ease-out ${comingSoon ? "opacity-60" : ""} ${
           lobby
-            ? "flex h-full min-h-0 w-full min-w-0 flex-col rounded-xl p-2.5 shadow-lg hover:border-white/25 hover:shadow-xl"
+            ? "flex h-full min-h-0 w-full min-w-0 flex-col rounded-xl p-3.5 shadow-lg hover:border-white/25 hover:shadow-xl"
             : compact
               ? "h-full min-h-0 p-0"
               : "flex flex-col p-5 shadow-lg hover:scale-[1.02] hover:border-white/25 hover:shadow-xl"
@@ -94,7 +94,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
             compact
               ? "right-1 top-1 h-10 min-h-[40px] w-10 min-w-[40px] rounded-full border-white/10 bg-white/5 text-sm hover:bg-white/12"
               : lobby
-                ? "right-1.5 top-1.5 h-7 w-7 rounded-full text-sm"
+                ? "right-2 top-2 h-9 w-9 rounded-full text-base"
                 : "right-2 top-2 h-7 w-7 rounded-full text-sm"
           }`}
           title="Info"
@@ -104,20 +104,20 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
 
         {lobby ? (
           <>
-            <div className="pointer-events-none shrink-0 select-none pt-0.5 text-center text-3xl leading-none lg:text-4xl">
+            <div className="pointer-events-none shrink-0 select-none pb-1 pt-1 text-center text-4xl leading-none lg:text-5xl xl:text-[3.35rem]">
               {emoji}
             </div>
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-0.5 py-0.5 text-center">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-center">
               {comingSoon ? (
-                <h2 className="line-clamp-2 text-xs font-bold leading-tight text-amber-300 lg:text-sm">
+                <h2 className="line-clamp-2 text-sm font-extrabold leading-snug text-amber-300 lg:text-base">
                   COMING SOON
                 </h2>
               ) : (
-                <h2 className="line-clamp-2 text-xs font-bold leading-tight lg:text-sm">{title}</h2>
+                <h2 className="line-clamp-2 text-sm font-extrabold leading-snug lg:text-base">{title}</h2>
               )}
               {!comingSoon && reward ? (
                 <p
-                  className="mt-0.5 max-w-full truncate px-0.5 text-[9px] font-semibold leading-none text-amber-200/95 lg:text-[10px]"
+                  className="mt-0 max-w-full truncate px-1 text-[11px] font-semibold leading-snug text-amber-200/95 lg:text-xs"
                   title={reward}
                 >
                   {reward}
@@ -129,7 +129,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
                 <button
                   type="button"
                   disabled
-                  className="block w-full cursor-not-allowed rounded-lg py-1.5 text-center text-xs font-bold leading-none text-white/50 opacity-50 shadow-inner"
+                  className="block w-full cursor-not-allowed rounded-xl py-2.5 text-center text-sm font-extrabold leading-none text-white/50 opacity-50 shadow-inner"
                   style={{
                     background: `linear-gradient(135deg, ${color}40 0%, ${color}30 100%)`,
                   }}
@@ -139,7 +139,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
               ) : (
                 <Link
                   href={href}
-                  className="block w-full rounded-lg py-1.5 text-center text-xs font-bold leading-none text-white shadow-md transition-all duration-300 hover:scale-[1.02] hover:shadow-lg active:opacity-90 lg:py-2 lg:text-sm"
+                  className="block w-full rounded-xl py-2.5 text-center text-sm font-extrabold leading-none text-white shadow-md transition-all duration-300 hover:scale-[1.02] hover:shadow-lg active:opacity-90 lg:py-3 lg:text-[15px]"
                   style={{
                     background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
                   }}
