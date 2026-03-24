@@ -2793,7 +2793,7 @@ export default function GamesHub() {
   return (
     <Layout>
       <div 
-        className="min-h-screen bg-black/90 text-white relative overflow-hidden"
+        className="relative flex min-h-0 flex-col overflow-hidden bg-black/90 text-white max-md:h-[100dvh] max-md:max-h-[100dvh] md:min-h-screen"
         dir={dir}
         style={{
           backgroundImage: `url(${BG_URL})`,
@@ -2804,10 +2804,10 @@ export default function GamesHub() {
         }}
       >
         <div className="absolute inset-0 bg-black/30"></div>
-        <div className="relative z-10 container mx-auto px-3 py-4 md:px-4 md:py-8">
-          <div className="max-w-4xl mx-auto">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden container mx-auto px-3 py-2 md:px-4 md:py-8 md:flex-none md:overflow-visible">
+          <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col md:block md:flex-none md:min-h-0">
             {/* Navigation */}
-            <div className="flex items-center justify-between mb-3 md:mb-6">
+            <div className="flex shrink-0 items-center justify-between mb-2 md:mb-6">
               <div className="flex items-center gap-2">
                 <Link href="/">
                   <button className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-500/30 transition-colors">
@@ -2836,9 +2836,9 @@ export default function GamesHub() {
               </div>
             </div>
 
-            {/* Mobile: compact 2×2 mode lobby (md and below) */}
-            <div className="md:hidden flex flex-col gap-2 min-h-[calc(100dvh-7rem)] max-h-[calc(100dvh-7rem)]">
-              <header className="text-center shrink-0 px-0.5 pt-0.5">
+            {/* Mobile: shell + vertically centered card block (matches pre-shell placement); footer mt-auto */}
+            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden md:hidden">
+              <header className="shrink-0 px-0.5 pt-0.5 text-center">
                 <span className="text-emerald-400 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/20 inline-block leading-tight">
                   {text.liveTestnet}
                 </span>
@@ -2850,8 +2850,8 @@ export default function GamesHub() {
                 </p>
               </header>
 
-              <div className="flex-1 min-h-0 flex flex-col justify-center py-2">
-              <section className="grid grid-cols-2 gap-2 w-full shrink-0">
+              <div className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden py-2">
+              <section className="grid w-full shrink-0 grid-cols-2 gap-2">
                 <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
                     <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{text.miners}</h2>
@@ -2998,7 +2998,7 @@ export default function GamesHub() {
               </section>
               </div>
 
-              <footer className="shrink-0 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 pt-2 border-t border-white/10 text-[10px] text-white/55 leading-tight">
+              <footer className="mt-auto flex shrink-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-white/10 pt-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] text-[10px] leading-tight text-white/55">
                 <span>© {new Date().getFullYear()} MLEO</span>
                 <button type="button" onClick={() => setPoolModalOpen(true)} className="underline hover:text-white/90">
                   {text.poolStatus || "Pool"}
