@@ -1,5 +1,5 @@
 // pages/arcade.js - MLEO Arcade/Gaming Hub
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Layout from "../components/Layout";
 import Link from "next/link";
 import { ConnectButton, useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
@@ -15,6 +15,17 @@ import {
 } from "../lib/sharedVault";
 
 const ARCADE_BG = "linear-gradient(135deg, #1a1a1a 0%, #3a2a0a 50%, #1a1a1a 100%)";
+
+const MOBILE_PAGE_SIZE = 6;
+
+const ARCADE_CATEGORIES = [
+  { id: "featured", label: "Featured" },
+  { id: "cards", label: "Cards" },
+  { id: "picks", label: "Picks" },
+  { id: "action", label: "Action" },
+  { id: "classics", label: "Classics" },
+  { id: "soon", label: "Soon" },
+];
 
 // ==== On-chain Claim (TBNB) config ====
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
@@ -38,71 +49,106 @@ const ALLOW_TESTNET_WALLET_FLAG =
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "1" ||
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "true";
 
-function GameCard({ title, emoji, description, reward, href, color, freePlayStatus, comingSoon = false }) {
+function GameCard({ title, emoji, description, reward, href, color, freePlayStatus, comingSoon = false, compact = false }) {
   const [showInfo, setShowInfo] = useState(false);
   
   return (
     <>
       <article 
-        className={`rounded-lg border border-white/10 backdrop-blur-md shadow-lg p-4 flex flex-col transition-all hover:scale-105 hover:border-white/30 relative overflow-hidden ${comingSoon ? 'opacity-60' : ''}`}
+        className={`rounded-lg border border-white/10 backdrop-blur-md shadow-lg flex flex-col transition-all hover:scale-105 hover:border-white/30 relative overflow-hidden ${comingSoon ? 'opacity-60' : ''} ${compact ? 'p-2 h-full min-h-0' : 'p-4'}`}
         style={{
           background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
-          height: '187px',
+          ...(compact ? { minHeight: 0 } : { height: '187px' }),
         }}
       >
         {/* Info button - fixed position top right */}
         <button
           onClick={() => setShowInfo(true)}
-          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-base transition-all z-10"
+          className={`absolute rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center transition-all z-10 ${compact ? 'top-1 right-1 w-6 h-6 text-xs' : 'top-2 right-2 w-7 h-7 text-base'}`}
           title="Info"
         >
           ℹ️
         </button>
 
-        {/* Icon - fixed position */}
-        <div className="text-center absolute left-0 right-0" style={{ top: '15px' }}>
-          <div className="text-5xl leading-none">{emoji}</div>
-        </div>
-
-        {/* Title - fixed position with fixed height for 2 lines */}
-        <div 
-          className="text-center absolute left-0 right-0 px-2 flex items-center justify-center" 
-          style={{ 
-            top: '80px',
-            height: '45px'
-          }}
-        >
-          {comingSoon ? (
-            <h2 className="text-base font-bold line-clamp-2 leading-tight text-amber-300">COMING SOON</h2>
-          ) : (
-            <h2 className="text-base font-bold line-clamp-2 leading-tight">{title}</h2>
-          )}
-        </div>
-
-        {/* Play button - fixed position bottom */}
-        <div className="absolute left-4 right-4" style={{ bottom: '12px' }}>
-          {comingSoon ? (
-            <button
-              disabled
-              className="block w-full text-center px-4 py-2.5 rounded text-sm font-bold text-white/50 shadow-lg cursor-not-allowed opacity-50"
-              style={{
-                background: `linear-gradient(135deg, ${color}40 0%, ${color}30 100%)`,
-              }}
+        {compact ? (
+          <>
+            <div className="text-center pt-0.5 flex-shrink-0">
+              <div className="text-3xl leading-none">{emoji}</div>
+            </div>
+            <div className="text-center px-0.5 flex flex-col items-center justify-center gap-0.5 flex-shrink-0 py-0.5 min-h-0">
+              {comingSoon ? (
+                <h2 className="text-[11px] font-bold line-clamp-2 leading-tight text-amber-300">COMING SOON</h2>
+              ) : (
+                <h2 className="text-[11px] font-bold line-clamp-2 leading-tight">{title}</h2>
+              )}
+              {reward && (
+                <p className="text-[9px] leading-tight text-amber-200/90 font-semibold line-clamp-1">{reward}</p>
+              )}
+            </div>
+            <div className="mt-auto pt-0.5 px-0.5 flex-shrink-0">
+              {comingSoon ? (
+                <button
+                  disabled
+                  className="block w-full text-center px-1 py-1.5 rounded text-[10px] font-bold text-white/50 shadow-lg cursor-not-allowed opacity-50"
+                  style={{
+                    background: `linear-gradient(135deg, ${color}40 0%, ${color}30 100%)`,
+                  }}
+                >
+                  PLAY
+                </button>
+              ) : (
+                <Link
+                  href={href}
+                  className="block w-full text-center px-1 py-1.5 rounded text-[10px] font-bold text-white shadow-lg transition-all hover:scale-105"
+                  style={{
+                    background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
+                  }}
+                >
+                  PLAY
+                </Link>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-center absolute left-0 right-0" style={{ top: '15px' }}>
+              <div className="text-5xl leading-none">{emoji}</div>
+            </div>
+            <div
+              className="text-center absolute left-0 right-0 px-2 flex items-center justify-center"
+              style={{ top: '80px', height: '45px' }}
             >
-              PLAY
-            </button>
-          ) : (
-            <Link
-              href={href}
-              className="block w-full text-center px-4 py-2.5 rounded text-sm font-bold text-white shadow-lg transition-all hover:scale-105"
-              style={{
-                background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
-              }}
-            >
-              PLAY
-            </Link>
-          )}
-        </div>
+              {comingSoon ? (
+                <h2 className="text-base font-bold line-clamp-2 leading-tight text-amber-300">COMING SOON</h2>
+              ) : (
+                <h2 className="text-base font-bold line-clamp-2 leading-tight">{title}</h2>
+              )}
+            </div>
+            <div className="absolute left-4 right-4" style={{ bottom: '12px' }}>
+              {comingSoon ? (
+                <button
+                  disabled
+                  className="block w-full text-center px-4 py-2.5 rounded text-sm font-bold text-white/50 shadow-lg cursor-not-allowed opacity-50"
+                  style={{
+                    background: `linear-gradient(135deg, ${color}40 0%, ${color}30 100%)`,
+                  }}
+                >
+                  PLAY
+                </button>
+              ) : (
+                <Link
+                  href={href}
+                  className="block w-full text-center px-4 py-2.5 rounded text-sm font-bold text-white shadow-lg transition-all hover:scale-105"
+                  style={{
+                    background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
+                  }}
+                >
+                  PLAY
+                </Link>
+              )}
+            </div>
+          </>
+        )}
       </article>
       
       {/* Info Modal */}
@@ -138,7 +184,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
   );
 }
 
-function Modal({ open, onClose, children }) {
+function Modal({ open, onClose, children, title = "🎮 How to Play", sheetOnMobile = false }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[100]">
@@ -146,10 +192,20 @@ function Modal({ open, onClose, children }) {
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="absolute inset-0 flex items-center justify-center px-4">
-        <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl max-h-[85vh] overflow-auto">
+      <div
+        className={`absolute inset-0 flex justify-center px-0 sm:px-4 ${
+          sheetOnMobile ? "items-end pb-0 sm:items-center sm:pb-0" : "items-center"
+        }`}
+      >
+        <div
+          className={`w-full max-w-sm bg-zinc-900 border border-zinc-800 shadow-2xl overflow-auto ${
+            sheetOnMobile
+              ? "rounded-t-2xl sm:rounded-2xl max-h-[88dvh] sm:max-h-[85vh]"
+              : "rounded-2xl max-h-[85vh]"
+          }`}
+        >
           <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 sticky top-0 bg-zinc-900 z-10">
-            <h3 className="text-xl font-bold text-white">🎮 How to Play</h3>
+            <h3 className="text-lg sm:text-xl font-bold text-white pr-2">{title}</h3>
             <button
               onClick={onClose}
               className="rounded-lg px-3 py-1 text-zinc-300 hover:text-white hover:bg-zinc-800"
@@ -165,6 +221,301 @@ function Modal({ open, onClose, children }) {
     </div>
   );
 }
+
+/** category: featured | cards | picks | action | classics | soon — used for mobile lobby filters */
+const games = [
+  {
+    title: "Drop Run",
+    emoji: "🎯",
+    description: "Drop the ball through pegs and aim for high-value reward zones.",
+    reward: "UP TO ×40",
+    href: "/plinko",
+    color: "#3B82F6",
+    category: "featured",
+  },
+  {
+    title: "Sky Run",
+    emoji: "📈",
+    description: "Track the live boost curve and lock in your result before the run ends.",
+    reward: "UP TO ×10",
+    href: "/crash",
+    color: "#DC2626",
+    category: "featured",
+  },
+  {
+    title: "Diamonds",
+    emoji: "💎",
+    description: "Find diamonds, avoid bombs! 4 difficulty levels from Easy to Expert!",
+    reward: "UP TO ×17+",
+    href: "/diamonds",
+    color: "#0EA5E9",
+    category: "featured",
+  },
+  {
+    title: "21 Challenge",
+    emoji: "♠️",
+    description: "Reach 21 with smart card decisions in this fast card challenge.",
+    reward: "UP TO ×2.5",
+    href: "/blackjack",
+    color: "#10B981",
+    category: "cards",
+  },
+  {
+    title: "Card Arena",
+    emoji: "🎴",
+    description: "Build the strongest hand using your cards and the shared board.",
+    reward: "UP TO ×800",
+    href: "/poker",
+    color: "#8B5CF6",
+    category: "featured",
+  },
+  {
+    title: "Hi-Lo Cards",
+    emoji: "📊",
+    description: "Guess if the next card is higher or lower. Build streaks for huge multipliers!",
+    reward: "Unlimited",
+    href: "/hilo",
+    color: "#059669",
+    category: "cards",
+  },
+  {
+    title: "Triple Cards",
+    emoji: "♦️",
+    description: "Fast three-card challenge with quick round results.",
+    reward: "UP TO ×65",
+    href: "/three-card-poker",
+    color: "#EC4899",
+    category: "cards",
+  },
+  {
+    title: "Ultimate Cards",
+    emoji: "🃏",
+    description: "A strategy-focused card mode with staged decisions and stronger reward tiers.",
+    reward: "UP TO ×2",
+    href: "/ultimate-poker",
+    color: "#6366F1",
+    category: "cards",
+  },
+  {
+    title: "Card Rooms",
+    emoji: "🎰🎴",
+    description: "Join live multiplayer card tables with drop-in/drop-out play and session-based progression.",
+    reward: "Social",
+    href: "/tournament",
+    color: "#7C3AED",
+    category: "cards",
+  },
+  {
+    title: "Ladder",
+    emoji: "🪜",
+    description: "Climb the ladder! Choose left or right to climb higher - lock in result before you fall!",
+    reward: "UP TO ×12",
+    href: "/ladder",
+    color: "#9333EA",
+    category: "featured",
+  },
+  {
+    title: "Bomb Squad",
+    emoji: "💣",
+    description: "Defuse the bomb! Cut the correct wire at each level - wrong wire = BOOM!",
+    reward: "UP TO ×17",
+    href: "/bomb",
+    color: "#DC2626",
+    category: "action",
+  },
+  {
+    title: "Mystery Box",
+    emoji: "🎁",
+    description: "Choose 1 box from 10! Find the grand reward or walk away empty!",
+    reward: "UP TO ×3.49",
+    href: "/mystery",
+    color: "#F59E0B",
+    category: "picks",
+  },
+  {
+    title: "Mystery Chamber",
+    emoji: "🔫",
+    description: "Choose your path through 6 chambers and secure your progress before the danger appears.",
+    reward: "UP TO ×1.84",
+    href: "/chamber",
+    color: "#64748B",
+    category: "picks",
+  },
+  {
+    title: "Speed Track",
+    emoji: "🏇",
+    description: "Pick your racer and follow the track to see how your choice performs.",
+    reward: "UP TO ×3.25",
+    href: "/horse",
+    color: "#16A34A",
+    category: "action",
+  },
+  {
+    title: "Target Shooter",
+    emoji: "🏹",
+    description: "Hit all targets in 20 seconds! Fast clicks = big wins!",
+    reward: "UP TO ×2.00",
+    href: "/shooter",
+    color: "#EA580C",
+    category: "action",
+  },
+  {
+    title: "Triple Dice",
+    emoji: "🀄",
+    description: "A fast dice challenge based on totals, patterns, and bonus outcomes.",
+    reward: "UP TO ×50",
+    href: "/sicbo",
+    color: "#B91C1C",
+    category: "action",
+  },
+  {
+    title: "Gold Rush Digger",
+    emoji: "⛏️",
+    description: "Dig a 5×5 treasure map! Find gems and grand rewards - avoid 6 skulls!",
+    reward: "UP TO ×1.67",
+    href: "/goldrush",
+    color: "#D97706",
+    category: "picks",
+  },
+  {
+    title: "Limit Run",
+    emoji: "🔥",
+    description: "Set your target boost and see whether your run reaches it.",
+    reward: "UP TO ×100",
+    href: "/limbo",
+    color: "#6366F1",
+    category: "featured",
+  },
+  {
+    title: "Dice Pick",
+    emoji: "⚄",
+    description: "Choose your target range and roll for a result-based reward tier.",
+    reward: "UP TO ×99",
+    href: "/dice-over-under",
+    color: "#14B8A6",
+    category: "picks",
+  },
+  {
+    title: "Color Wheel",
+    emoji: "🔴",
+    description: "Spin the wheel and land on color-based reward zones with different outcomes.",
+    reward: "UP TO ×1.97",
+    href: "/roulette",
+    color: "#7C3AED",
+    category: "classics",
+  },
+  {
+    title: "Checkers",
+    emoji: "♟️",
+    description: "Classic checkers vs bot! Capture all pieces to win!",
+    reward: "UP TO ×1.92",
+    href: "/checkers",
+    color: "#DC2626",
+    category: "classics",
+  },
+  {
+    title: "Backgammon",
+    emoji: "🎲",
+    description: "Classic backgammon vs bot! Bear off all pieces first to win!",
+    reward: "UP TO ×1.92",
+    href: "/backgammon",
+    color: "#D97706",
+    category: "classics",
+  },
+  {
+    title: "Dragon Tower",
+    emoji: "🐉",
+    description: "Climb 10 floors through the dragon's lair! 3 difficulty modes!",
+    reward: "UP TO ×22",
+    href: "/dragon-tower",
+    color: "#DC2626",
+    category: "picks",
+  },
+  {
+    title: "Symbol Match",
+    emoji: "💰",
+    description: "Match symbols across 5 reels to unlock bonus reward patterns.",
+    reward: "UP TO ×492.5",
+    href: "/slots-upgraded",
+    color: "#FBBF24",
+    category: "picks",
+  },
+  {
+    title: "Mega Spin Board",
+    emoji: "🎡",
+    description: "Spin across 40 segments and land on different reward tiers and bonus events.",
+    reward: "UP TO ×2.12",
+    href: "/mega-wheel",
+    color: "#A855F7",
+    category: "action",
+  },
+  {
+    title: "Number Hunt",
+    emoji: "🎱",
+    description: "Choose your numbers and track how many matches you hit in each round.",
+    reward: "UP TO ×188",
+    href: "/keno",
+    color: "#6366F1",
+    category: "classics",
+  },
+  {
+    title: "Dice Arena",
+    emoji: "🎲",
+    description: "Roll the dice through different outcome zones and unlock score-based rewards.",
+    reward: "UP TO ×8.6",
+    href: "/craps",
+    color: "#16A34A",
+    category: "classics",
+  },
+  {
+    title: "Card Duel",
+    emoji: "♥️",
+    description: "Choose between card sides and follow the result in a fast head-to-head round.",
+    reward: "UP TO ×9.1",
+    href: "/baccarat",
+    color: "#9333EA",
+    category: "cards",
+  },
+  {
+    title: "Quick Flip",
+    emoji: "🪙",
+    description: "Choose a side and reveal the result in a quick one-tap challenge.",
+    reward: "UP TO ×1.92",
+    href: "/coin-flip",
+    color: "#F59E0B",
+    category: "action",
+  },
+  {
+    title: "Sky Run X",
+    emoji: "📈",
+    description: "Track the live boost curve and lock in your result before the run ends.",
+    reward: "×10",
+    href: "/crash2",
+    color: "#EF4444",
+    comingSoon: true,
+    category: "soon",
+  },
+  {
+    title: "Drop Run X",
+    emoji: "🎲",
+    description: "Enhanced Drop Run with 17 rows, wall penalty, and maximized play area!",
+    reward: "×10",
+    href: "/plinko2",
+    color: "#8B5CF6",
+    comingSoon: true,
+    category: "soon",
+  },
+  {
+    title: "Coming Soon",
+    emoji: "🚀",
+    description: "A new exciting game is coming soon! Stay tuned for updates.",
+    reward: "TBA",
+    href: "#",
+    color: "#6366F1",
+    comingSoon: true,
+    category: "soon",
+  },
+];
 
 export default function ArcadeHub() {
   const [vault, setVault] = useState(0);
@@ -187,6 +538,9 @@ export default function ArcadeHub() {
   const [devPassword, setDevPassword] = useState("");
   const [showDevButton, setShowDevButton] = useState(false);
   const [addingCoins, setAddingCoins] = useState(false);
+  const [mobileCategory, setMobileCategory] = useState("featured");
+  const [mobilePage, setMobilePage] = useState(0);
+  const [showArcadeInfoModal, setShowArcadeInfoModal] = useState(false);
 
   // Wagmi hooks
   const { openConnectModal } = useConnectModal();
@@ -380,304 +734,160 @@ export default function ArcadeHub() {
     };
   }, []);
 
-  const games = [
-    // 1. Plinko
-    {
-      title: "Drop Run",
-      emoji: "🎯",
-      description: "Drop the ball through pegs and aim for high-value reward zones.",
-      reward: "UP TO ×40",
-      href: "/plinko",
-      color: "#3B82F6",
-    },
-    // 2. Crash
-    {
-      title: "Sky Run",
-      emoji: "📈",
-      description: "Track the live boost curve and lock in your result before the run ends.",
-      reward: "UP TO ×10",
-      href: "/crash",
-      color: "#DC2626",
-    },
-    // 3. Diamonds (Upgraded Mines)
-    {
-      title: "Diamonds",
-      emoji: "💎",
-      description: "Find diamonds, avoid bombs! 4 difficulty levels from Easy to Expert!",
-      reward: "UP TO ×17+",
-      href: "/diamonds",
-      color: "#0EA5E9",
-    },
-    // 4. 21 Challenge
-    {
-      title: "21 Challenge",
-      emoji: "♠️",
-      description: "Reach 21 with smart card decisions in this fast card challenge.",
-      reward: "UP TO ×2.5",
-      href: "/blackjack",
-      color: "#10B981",
-    },
-    // 5. Card Arena
-    {
-      title: "Card Arena",
-      emoji: "🎴",
-      description: "Build the strongest hand using your cards and the shared board.",
-      reward: "UP TO ×800",
-      href: "/poker",
-      color: "#8B5CF6",
-    },
-    // 6. Hi-Lo Cards
-    {
-      title: "Hi-Lo Cards",
-      emoji: "📊",
-      description: "Guess if the next card is higher or lower. Build streaks for huge multipliers!",
-      reward: "Unlimited",
-      href: "/hilo",
-      color: "#059669",
-    },
-    // 7. Triple Cards
-    {
-      title: "Triple Cards",
-      emoji: "♦️",
-      description: "Fast three-card challenge with quick round results.",
-      reward: "UP TO ×65",
-      href: "/three-card-poker",
-      color: "#EC4899",
-    },
-    // 8. Ultimate Cards - NEW!
-    {
-      title: "Ultimate Cards",
-      emoji: "🃏",
-      description: "A strategy-focused card mode with staged decisions and stronger reward tiers.",
-      reward: "UP TO ×2",
-      href: "/ultimate-poker",
-      color: "#6366F1",
-    },
-    // 8.8. Card Rooms
-    {
-      title: "Card Rooms",
-      emoji: "🎰🎴",
-      description: "Join live multiplayer card tables with drop-in/drop-out play and session-based progression.",
-      reward: "Social",
-      href: "/tournament",
-      color: "#7C3AED",
-    },
-    // 9. Multiplier Ladder
-    {
-      title: "Ladder",
-      emoji: "🪜",
-      description: "Climb the ladder! Choose left or right to climb higher - lock in result before you fall!",
-      reward: "UP TO ×12",
-      href: "/ladder",
-      color: "#9333EA",
-    },
-    // 10. Bomb Squad - NEW!
-    {
-      title: "Bomb Squad",
-      emoji: "💣",
-      description: "Defuse the bomb! Cut the correct wire at each level - wrong wire = BOOM!",
-      reward: "UP TO ×17",
-      href: "/bomb",
-      color: "#DC2626",
-    },
-    // 11. Mystery Box - NEW!
-    {
-      title: "Mystery Box",
-      emoji: "🎁",
-      description: "Choose 1 box from 10! Find the grand reward or walk away empty!",
-      reward: "UP TO ×3.49",
-      href: "/mystery",
-      color: "#F59E0B",
-    },
-    // 12. Lucky Chamber - NEW!
-    {
-      title: "Mystery Chamber",
-      emoji: "🔫",
-      description: "Choose your path through 6 chambers and secure your progress before the danger appears.",
-      reward: "UP TO ×1.84",
-      href: "/chamber",
-      color: "#64748B",
-    },
-    // 13. Horse Racing - NEW!
-    {
-      title: "Speed Track",
-      emoji: "🏇",
-      description: "Pick your racer and follow the track to see how your choice performs.",
-      reward: "UP TO ×3.25",
-      href: "/horse",
-      color: "#16A34A",
-    },
-    // 14. Target Shooter - NEW!
-    {
-      title: "Target Shooter",
-      emoji: "🏹",
-      description: "Hit all targets in 20 seconds! Fast clicks = big wins!",
-      reward: "UP TO ×2.00",
-      href: "/shooter",
-      color: "#EA580C",
-    },
-    // 15. Sic Bo - NEW!
-    {
-      title: "Triple Dice",
-      emoji: "🀄",
-      description: "A fast dice challenge based on totals, patterns, and bonus outcomes.",
-      reward: "UP TO ×50",
-      href: "/sicbo",
-      color: "#B91C1C",
-    },
-    // 16. Gold Rush Digger - NEW!
-    {
-      title: "Gold Rush Digger",
-      emoji: "⛏️",
-      description: "Dig a 5×5 treasure map! Find gems and grand rewards - avoid 6 skulls!",
-      reward: "UP TO ×1.67",
-      href: "/goldrush",
-      color: "#D97706",
-    },
-    // 17. Limbo - NEW!
-    {
-      title: "Limit Run",
-      emoji: "🔥",
-      description: "Set your target boost and see whether your run reaches it.",
-      reward: "UP TO ×100",
-      href: "/limbo",
-      color: "#6366F1",
-    },
-    // 18. Dice Over/Under - NEW!
-    {
-      title: "Dice Pick",
-      emoji: "⚄",
-      description: "Choose your target range and roll for a result-based reward tier.",
-      reward: "UP TO ×99",
-      href: "/dice-over-under",
-      color: "#14B8A6",
-    },
-    // 18. Color Wheel
-    {
-      title: "Color Wheel",
-      emoji: "🔴",
-      description: "Spin the wheel and land on color-based reward zones with different outcomes.",
-      reward: "UP TO ×1.97",
-      href: "/roulette",
-      color: "#7C3AED",
-    },
-    // 19. Checkers - NEW!
-    {
-      title: "Checkers",
-      emoji: "♟️",
-      description: "Classic checkers vs bot! Capture all pieces to win!",
-      reward: "UP TO ×1.92",
-      href: "/checkers",
-      color: "#DC2626",
-    },
-    // 20. Backgammon - NEW!
-    {
-      title: "Backgammon",
-      emoji: "🎲",
-      description: "Classic backgammon vs bot! Bear off all pieces first to win!",
-      reward: "UP TO ×1.92",
-      href: "/backgammon",
-      color: "#D97706",
-    },
-    // Additional upgraded games
-    {
-      title: "Dragon Tower",
-      emoji: "🐉",
-      description: "Climb 10 floors through the dragon's lair! 3 difficulty modes!",
-      reward: "UP TO ×22",
-      href: "/dragon-tower",
-      color: "#DC2626",
-    },
-    {
-      title: "Symbol Match",
-      emoji: "💰",
-      description: "Match symbols across 5 reels to unlock bonus reward patterns.",
-      reward: "UP TO ×492.5",
-      href: "/slots-upgraded",
-      color: "#FBBF24",
-    },
-    {
-      title: "Mega Spin Board",
-      emoji: "🎡",
-      description: "Spin across 40 segments and land on different reward tiers and bonus events.",
-      reward: "UP TO ×2.12",
-      href: "/mega-wheel",
-      color: "#A855F7",
-    },
-    {
-      title: "Number Hunt",
-      emoji: "🎱",
-      description: "Choose your numbers and track how many matches you hit in each round.",
-      reward: "UP TO ×188",
-      href: "/keno",
-      color: "#6366F1",
-    },
-    {
-      title: "Dice Arena",
-      emoji: "🎲",
-      description: "Roll the dice through different outcome zones and unlock score-based rewards.",
-      reward: "UP TO ×8.6",
-      href: "/craps",
-      color: "#16A34A",
-    },
-    {
-      title: "Card Duel",
-      emoji: "♥️",
-      description: "Choose between card sides and follow the result in a fast head-to-head round.",
-      reward: "UP TO ×9.1",
-      href: "/baccarat",
-      color: "#9333EA",
-    },
-    // 25. Coin Flip - TEMPLATE GAME
-    {
-      title: "Quick Flip",
-      emoji: "🪙",
-      description: "Choose a side and reveal the result in a quick one-tap challenge.",
-      reward: "UP TO ×1.92",
-      href: "/coin-flip",
-      color: "#F59E0B",
-    },
-    // 26. Crash2 - COMING SOON
-    {
-      title: "Sky Run X",
-      emoji: "📈",
-      description: "Track the live boost curve and lock in your result before the run ends.",
-      reward: "×10",
-      href: "/crash2",
-      color: "#EF4444",
-      comingSoon: true,
-    },
-    // 27. Plinko2 - COMING SOON
-    {
-      title: "Drop Run X",
-      emoji: "🎲",
-      description: "Enhanced Drop Run with 17 rows, wall penalty, and maximized play area!",
-      reward: "×10",
-      href: "/plinko2",
-      color: "#8B5CF6",
-      comingSoon: true,
-    },
-    // 28. COMING SOON
-    {
-      title: "Coming Soon",
-      emoji: "🚀",
-      description: "A new exciting game is coming soon! Stay tuned for updates.",
-      reward: "TBA",
-      href: "#",
-      color: "#6366F1",
-      comingSoon: true,
-    },
-  ];
+  const mobileFilteredGames = useMemo(
+    () => games.filter((g) => g.category === mobileCategory),
+    [mobileCategory]
+  );
+
+  const mobileTotalPages = Math.max(1, Math.ceil(mobileFilteredGames.length / MOBILE_PAGE_SIZE));
+
+  const mobilePageClamped = Math.min(mobilePage, mobileTotalPages - 1);
+
+  const mobilePageGames = useMemo(() => {
+    const start = mobilePageClamped * MOBILE_PAGE_SIZE;
+    return mobileFilteredGames.slice(start, start + MOBILE_PAGE_SIZE);
+  }, [mobileFilteredGames, mobilePageClamped]);
+
+  useEffect(() => {
+    if (mobilePage > mobileTotalPages - 1) {
+      setMobilePage(Math.max(0, mobileTotalPages - 1));
+    }
+  }, [mobilePage, mobileTotalPages]);
 
   return (
     <Layout title="MLEO — Arcade Games">
       <main
-        className="min-h-screen relative text-white"
+        className="relative text-white max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:overflow-hidden md:min-h-screen"
         style={{
           background: ARCADE_BG,
         }}
       >
-        <div className="mx-auto max-w-7xl px-4 py-8">
+        {/* —— Mobile: fixed-screen lobby (md:hidden) —— */}
+        <div className="flex md:hidden flex-col h-[100dvh] max-h-[100dvh] min-h-0 overflow-hidden px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] gap-1.5">
+          <div className="flex-shrink-0 flex items-center justify-between gap-2">
+            <Link
+              href="/mining"
+              className="rounded-full px-2.5 py-1 text-[10px] font-bold bg-white/10 border border-white/20 hover:bg-white/20 whitespace-nowrap"
+            >
+              ← BACK
+            </Link>
+            <div className="flex-1 min-w-0 text-center">
+              <h1 className="text-sm font-extrabold tracking-tight truncate">🎮 MLEO Arcade</h1>
+              <p className="text-[9px] text-white/75 leading-tight line-clamp-1">Vault • free play • mini-games</p>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowArcadeInfoModal(true)}
+                className="rounded-lg px-2 py-1 text-[10px] font-bold bg-purple-500/25 border border-purple-400/40 text-purple-200"
+              >
+                Info
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSettingsModal(true)}
+                className="p-1.5 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20"
+                title="Settings"
+              >
+                <div className="flex flex-col gap-0.5">
+                  <div className="w-3.5 h-0.5 bg-white" />
+                  <div className="w-3.5 h-0.5 bg-white" />
+                  <div className="w-3.5 h-0.5 bg-white" />
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-shrink-0 flex items-center justify-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowVaultModal(true)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/10 border border-white/20 text-[10px] font-semibold"
+            >
+              <span>💰</span>
+              <span className="text-emerald-400">{fmt(vault)}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowFreePlayModal(true)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-gradient-to-r from-amber-600/25 to-orange-600/25 border border-amber-500/35 text-[10px] font-semibold"
+            >
+              <span>🎁</span>
+              <span className="text-amber-300">
+                {freePlayLoaded ? `${freePlayStatus.tokens}/${freePlayStatus.maxTokens}` : "…"}
+              </span>
+              {freePlayStatus.tokens === 0 && !freePlayStatus.isFull && freePlayCountdown > 0 && (
+                <span className="text-[9px] text-amber-400/80">{formatTimeRemaining(freePlayCountdown)}</span>
+              )}
+            </button>
+          </div>
+
+          <div className="flex-shrink-0 -mx-1 overflow-x-auto pb-0.5">
+            <div className="flex gap-1.5 px-1 min-w-min">
+              {ARCADE_CATEGORIES.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setMobileCategory(c.id);
+                    setMobilePage(0);
+                  }}
+                  className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
+                    mobileCategory === c.id
+                      ? "bg-amber-500/35 border-amber-400/60 text-amber-100"
+                      : "bg-white/5 border-white/15 text-white/80"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <section className="flex-1 min-h-0 grid grid-cols-2 grid-rows-3 gap-1.5">
+            {mobilePageGames.map((game, idx) => (
+              <GameCard
+                key={`${game.href}-${idx}`}
+                {...game}
+                freePlayStatus={freePlayStatus}
+                comingSoon={game.comingSoon}
+                compact
+              />
+            ))}
+            {Array.from({ length: Math.max(0, MOBILE_PAGE_SIZE - mobilePageGames.length) }).map((_, i) => (
+              <div
+                key={`pad-${i}`}
+                className="rounded-lg border border-white/5 bg-white/[0.02] min-h-0"
+                aria-hidden
+              />
+            ))}
+          </section>
+
+          <div className="flex-shrink-0 flex items-center justify-between gap-2 pt-1 border-t border-white/10">
+            <button
+              type="button"
+              disabled={mobilePageClamped <= 0}
+              onClick={() => setMobilePage((p) => Math.max(0, p - 1))}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-white/10 border border-white/20 disabled:opacity-35 disabled:cursor-not-allowed"
+            >
+              Prev
+            </button>
+            <span className="text-[10px] text-white/70 font-semibold tabular-nums">
+              {mobilePageClamped + 1} / {mobileTotalPages}
+            </span>
+            <button
+              type="button"
+              disabled={mobilePageClamped >= mobileTotalPages - 1}
+              onClick={() => setMobilePage((p) => Math.min(mobileTotalPages - 1, p + 1))}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-white/10 border border-white/20 disabled:opacity-35 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+
+        {/* —— Desktop / tablet —— */}
+        <div className="hidden md:block mx-auto max-w-7xl px-4 py-8">
           {/* Top bar */}
           <div className="flex justify-between items-center mb-8">
             <div className="flex items-center gap-3">
@@ -757,7 +967,7 @@ export default function ArcadeHub() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-500/40">
               <span className="text-2xl">🎮</span>
-              <span className="font-bold text-purple-300">29 Exciting Games to Play!</span>
+              <span className="font-bold text-purple-300">{games.length} Exciting Games to Play!</span>
             </div>
           </div>
 
@@ -845,6 +1055,42 @@ export default function ArcadeHub() {
           </div>
         </div>
       </main>
+
+      {/* Mobile: long-form arcade info (Important + Play Responsibly) */}
+      {showArcadeInfoModal && (
+        <Modal
+          open={showArcadeInfoModal}
+          onClose={() => setShowArcadeInfoModal(false)}
+          title="ℹ️ Arcade Info"
+          sheetOnMobile
+        >
+          <div className="max-w-4xl mx-auto rounded-2xl bg-yellow-500/10 border-2 border-yellow-500/30 p-4 sm:p-6">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="text-2xl sm:text-3xl shrink-0">⚠️</div>
+              <div>
+                <h3 className="text-lg sm:text-xl font-bold text-yellow-300 mb-2">Important Information</h3>
+                <ul className="text-xs sm:text-sm text-white/90 space-y-2">
+                  <li>• <strong>🎁 Free Play:</strong> Receive 1 free play token every hour (up to 5 stored). Use tokens on any game without using vault MLEO!</li>
+                  <li>• <strong>Session Cost:</strong> Each game session uses at least 100 MLEO from your in-app vault. Some modes may use a different session cost.</li>
+                  <li>• <strong>Vault Usage:</strong> MLEO is taken from your in-app vault when you start a session (free play sessions do not use vault MLEO).</li>
+                  <li>• <strong>Rewards:</strong> Session rewards are added automatically to your vault, including rewards earned from free play sessions.</li>
+                  <li>• <strong>Game Info:</strong> Click the ℹ️ button on each game card to view the rules, controls, and reward structure.</li>
+                  <li>• <strong>Game Logic:</strong> Some games use randomized events, while others focus on timing, reaction, memory, or decision-making.</li>
+                  <li>• <strong>Statistics:</strong> Each game tracks your activity, completed sessions, best score, streaks, and progress milestones.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div className="max-w-4xl mx-auto rounded-2xl bg-black/30 border border-white/10 p-6 sm:p-8 text-center mt-4">
+            <h3 className="text-xl font-bold mb-3">🏆 Play Responsibly</h3>
+            <p className="text-white/80 text-sm leading-relaxed max-w-2xl mx-auto">
+              These arcade mini-games are designed for entertainment, progression, and in-app rewards.
+              MLEO used here is earned inside the platform and stored in your in-app vault.
+              Focus on fun, strategy, timing, and progression as you explore different game modes.
+            </p>
+          </div>
+        </Modal>
+      )}
 
       {/* Vault Modal */}
       {showVaultModal && (

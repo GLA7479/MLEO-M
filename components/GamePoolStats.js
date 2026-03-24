@@ -1,5 +1,4 @@
 // components/GamePoolStats.js
-import { useState, useEffect } from 'react';
 import { useGamePoolData } from '../hooks/useGamePoolData';
 import styles from './GamePoolStats.module.css';
 
@@ -26,17 +25,8 @@ const formatLargeNumber = (value) => {
 };
 
 export default function GamePoolStats() {
-  const { data, loading, error } = useGamePoolData();
-  const [isLiveData, setIsLiveData] = useState(true);
-
-  // Check if we're using fallback data
-  useEffect(() => {
-    if (error && data) {
-      setIsLiveData(false);
-    } else {
-      setIsLiveData(true);
-    }
-  }, [error, data]);
+  const { data, loading } = useGamePoolData();
+  const isLiveData = data?._source === 'live';
 
   // Copy token address function
   const copyTokenAddress = () => {
@@ -65,14 +55,6 @@ export default function GamePoolStats() {
     );
   }
 
-  if (error) {
-    return (
-      <div className={styles.gamePoolStats}>
-        <div className={styles.error}>Error loading data: {error}</div>
-      </div>
-    );
-  }
-
   if (!data) {
     return (
       <div className={styles.gamePoolStats}>
@@ -88,13 +70,8 @@ export default function GamePoolStats() {
       {/* Data source indicator */}
       <div className={styles.dataSource}>
         <span className={`${styles.indicator} ${isLiveData ? styles.live : styles.fallback}`}>
-          {isLiveData ? '🟢 Live Contract Data' : '🟡 Fallback Data'}
+          {isLiveData ? '🟢 Live Contract Data' : '🟡 Fallback / offline estimate'}
         </span>
-        {error && (
-          <span className={styles.errorMsg}>
-            Contract error: {error}
-          </span>
-        )}
       </div>
       
       <div className={styles.statsGrid}>
