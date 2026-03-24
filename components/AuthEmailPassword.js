@@ -1,8 +1,10 @@
 // components/AuthEmailPassword.js
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { supabaseMP } from "../lib/supabaseClients";
 import { playAsGuest } from "../lib/authGuest";
+
+const TITLE_ID = "auth-email-dialog-title";
 
 export default function AuthEmailPassword({ onClose, onSuccess }) {
   const [mode, setMode] = useState("signin"); // signin | signup | reset
@@ -21,6 +23,8 @@ export default function AuthEmailPassword({ onClose, onSuccess }) {
     return stored !== "false";
   });
   const router = useRouter();
+  const dialogRef = useRef(null);
+  const previousFocusRef = useRef(null);
 
   useEffect(() => {
     setMsg("");
@@ -30,6 +34,38 @@ export default function AuthEmailPassword({ onClose, onSuccess }) {
     setUsername("");
     setConfirmPassword("");
   }, [mode]);
+
+  useEffect(() => {
+    previousFocusRef.current = typeof document !== "undefined" ? document.activeElement : null;
+    const t = requestAnimationFrame(() => {
+      dialogRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(t);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  useEffect(() => {
+    return () => {
+      const prev = previousFocusRef.current;
+      if (prev && typeof prev.focus === "function" && document.contains(prev)) {
+        try {
+          prev.focus();
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, []);
 
   async function doSignup() {
     if (signupStep === "form") {
@@ -130,170 +166,211 @@ export default function AuthEmailPassword({ onClose, onSuccess }) {
     setMsg("Password reset email sent.");
   }
 
+  const titleText =
+    mode === "signin"
+      ? "Sign in"
+      : mode === "signup"
+        ? signupStep === "form"
+          ? "Create account"
+          : "Verify email"
+        : "Reset password";
+
   return (
-    <div className="fixed inset-0 z-[1000] bg-black/70 backdrop-blur">
-      <div className="mx-auto mt-[10vh] w-[92%] max-w-md bg-white text-gray-900 rounded-2xl border border-black/10 shadow-2xl">
-        <div className="p-4 border-b border-black/10 flex items-center justify-between rounded-t-2xl">
-          <div className="font-extrabold">
-            {mode === "signin"
-              ? "Sign in"
-              : mode === "signup"
-              ? signupStep === "form"
-                ? "Create account"
-                : "Verify email"
-              : "Reset password"}
+    <div className="fixed inset-0 z-[1000] overflow-y-auto overflow-x-hidden bg-black/70 backdrop-blur">
+      <div className="flex min-h-full items-start justify-center px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={TITLE_ID}
+          tabIndex={-1}
+          className="my-4 flex w-[92%] max-h-[min(90dvh,calc(100dvh-1.5rem))] max-w-md flex-col overflow-hidden rounded-2xl border border-black/10 bg-white text-gray-900 shadow-2xl outline-none"
+        >
+          <div className="flex shrink-0 items-center justify-between rounded-t-2xl border-b border-black/10 p-4">
+            <h2 id={TITLE_ID} className="font-extrabold">
+              {titleText}
+            </h2>
+            <button
+              type="button"
+              onClick={() => onClose?.()}
+              className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded bg-black/5 px-2 py-1 hover:bg-black/10"
+              aria-label="Close"
+            >
+              ✕
+            </button>
           </div>
-          <button onClick={() => onClose?.()} className="px-2 py-1 rounded bg-black/5 hover:bg-black/10">
-            ✕
-          </button>
-        </div>
 
-        <div className="p-5 space-y-3">
-          <label className="block text-sm font-medium">
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value.trim())}
-              className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-            />
-          </label>
-
-          {mode === "signup" && signupStep === "form" ? (
-            <>
-              <label className="block text-sm font-medium">
-                Username
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value.trim())}
-                  className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                />
-              </label>
-              <label className="block text-sm font-medium">
-                Password
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                />
-              </label>
-              <label className="block text-sm font-medium">
-                Confirm password
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                />
-              </label>
-            </>
-          ) : (
-            mode !== "reset" && (
-              <label className="block text-sm font-medium">
-                Password
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                />
-              </label>
-            )
-          )}
-
-          {mode === "signup" && signupStep === "otp" && (
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-5">
             <label className="block text-sm font-medium">
-              Verification code
+              Email
               <input
-                type="tel"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={otp}
-                onChange={(e) =>
-                  setOtp(e.target.value.replace(/[^\d]/g, "").slice(0, 8))
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value.trim())}
+                className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                autoComplete="email"
+              />
+            </label>
+
+            {mode === "signup" && signupStep === "form" ? (
+              <>
+                <label className="block text-sm font-medium">
+                  Username
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.trim())}
+                    className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    autoComplete="username"
+                  />
+                </label>
+                <label className="block text-sm font-medium">
+                  Password
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label className="block text-sm font-medium">
+                  Confirm password
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    autoComplete="new-password"
+                  />
+                </label>
+              </>
+            ) : (
+              mode !== "reset" && (
+                <label className="block text-sm font-medium">
+                  Password
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    autoComplete="current-password"
+                  />
+                </label>
+              )
+            )}
+
+            {mode === "signup" && signupStep === "otp" && (
+              <label className="block text-sm font-medium">
+                Verification code
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={otp}
+                  onChange={(e) =>
+                    setOtp(e.target.value.replace(/[^\d]/g, "").slice(0, 8))
+                  }
+                  placeholder="Enter the code you received"
+                  className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  autoComplete="one-time-code"
+                />
+              </label>
+            )}
+
+            {msg ? (
+              <div className="text-sm text-gray-600" role="status" aria-live="polite">
+                {msg}
+              </div>
+            ) : null}
+
+            {mode === "signin" && (
+              <label className="inline-flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                />
+                Stay signed in on this device
+              </label>
+            )}
+
+            {mode === "signup" && (
+              <button
+                type="button"
+                onClick={doSignup}
+                disabled={loading || verifying}
+                className="w-full rounded-xl bg-yellow-400 px-4 py-3 font-extrabold text-black hover:bg-yellow-300 disabled:opacity-60"
+              >
+                {signupStep === "form"
+                  ? loading
+                    ? "Sending code…"
+                    : "Create account"
+                  : verifying
+                    ? "Verifying…"
+                    : "Verify code"}
+              </button>
+            )}
+            {mode === "signin" && (
+              <button
+                type="button"
+                onClick={doSignin}
+                disabled={loading}
+                className="w-full rounded-xl bg-yellow-400 px-4 py-3 font-extrabold text-black hover:bg-yellow-300 disabled:opacity-60"
+              >
+                {loading ? "Signing in…" : "Sign in"}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await playAsGuest();
+                  setMsg("");
+                  onClose?.();
+                  router.push("/mining");
+                } catch (e) {
+                  setMsg(e.message || "Could not start guest session.");
                 }
-                placeholder="Enter the code you received"
-                className="mt-1 w-full border border-black/10 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-              />
-            </label>
-          )}
-
-          {msg && <div className="text-sm text-gray-600">{msg}</div>}
-
-          {mode === "signin" && (
-            <label className="inline-flex items-center gap-2 text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-              />
-              Stay signed in on this device
-            </label>
-          )}
-
-          {mode === "signup" && (
-            <button
-              onClick={doSignup}
-              disabled={loading || verifying}
-              className="w-full px-4 py-3 rounded-xl bg-yellow-400 text-black font-extrabold hover:bg-yellow-300 disabled:opacity-60"
+              }}
+              className="w-full rounded-xl border border-black/10 px-4 py-3 text-sm font-semibold text-gray-800 transition hover:bg-black/5"
             >
-              {signupStep === "form"
-                ? loading
-                  ? "Sending code…"
-                  : "Create account"
-                : verifying
-                ? "Verifying…"
-                : "Verify code"}
+              Continue as Guest
             </button>
-          )}
-          {mode === "signin" && (
-            <button
-              onClick={doSignin}
-              disabled={loading}
-              className="w-full px-4 py-3 rounded-xl bg-yellow-400 text-black font-extrabold hover:bg-yellow-300 disabled:opacity-60"
-            >
-              {loading ? "Signing in…" : "Sign in"}
-            </button>
-          )}
 
-          <button
-            onClick={async () => {
-              try {
-                const { username } = await playAsGuest();
-                setMsg("");
-                onClose?.();
-                router.push("/mining");
-              } catch (e) {
-                setMsg(e.message || "Could not start guest session.");
-              }
-            }}
-            className="w-full px-4 py-3 rounded-xl border border-black/10 text-sm font-semibold text-gray-800 hover:bg-black/5 transition"
-          >
-            Continue as Guest
-          </button>
-
-          <div className="text-xs text-gray-600 pt-2 flex flex-wrap gap-2 justify-between">
-            {mode !== "signin" && (
-              <button onClick={() => setMode("signin")} className="underline hover:text-yellow-600">
-                Have an account? Sign in
-              </button>
-            )}
-            {mode !== "signup" && (
-              <button onClick={() => setMode("signup")} className="underline hover:text-yellow-600">
-                Create account
-              </button>
-            )}
-            {mode !== "reset" && (
-              <button onClick={() => setMode("reset")} className="underline hover:text-yellow-600">
-                Forgot password?
-              </button>
-            )}
+            <div className="flex flex-wrap justify-between gap-2 pt-2 text-xs text-gray-600">
+              {mode !== "signin" && (
+                <button
+                  type="button"
+                  onClick={() => setMode("signin")}
+                  className="underline hover:text-yellow-600"
+                >
+                  Have an account? Sign in
+                </button>
+              )}
+              {mode !== "signup" && (
+                <button
+                  type="button"
+                  onClick={() => setMode("signup")}
+                  className="underline hover:text-yellow-600"
+                >
+                  Create account
+                </button>
+              )}
+              {mode !== "reset" && (
+                <button
+                  type="button"
+                  onClick={() => setMode("reset")}
+                  className="underline hover:text-yellow-600"
+                >
+                  Forgot password?
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
-

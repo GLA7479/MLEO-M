@@ -23,31 +23,51 @@ export default function ResetPassword() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-black text-white">
-      <div className="w-[92%] max-w-md bg-neutral-900 p-6 rounded-xl border border-white/10 shadow-lg space-y-4">
+    <main className="flex min-h-screen items-center justify-center bg-black px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] text-white">
+      <form
+        className="w-[92%] max-w-md space-y-4 rounded-xl border border-white/10 bg-neutral-900 p-6 shadow-lg"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+        noValidate
+      >
         <div>
-          <h1 className="text-2xl font-bold mb-1">Set a new password</h1>
+          <h1 className="mb-1 text-2xl font-bold">Set a new password</h1>
           <p className="text-sm text-white/70">
             Enter a new password to secure your account.
           </p>
         </div>
+        <label htmlFor="mleo-reset-password" className="sr-only">
+          New password
+        </label>
         <input
+          id="mleo-reset-password"
+          name="password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="New password"
-          className="w-full border border-white/10 rounded-lg px-3 py-2 bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+          autoComplete="new-password"
+          className="w-full rounded-lg border border-white/10 bg-neutral-800 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400"
         />
         <button
-          onClick={submit}
+          type="submit"
           disabled={loading}
-          className="w-full px-4 py-2 bg-yellow-400 text-black rounded-xl font-bold hover:bg-yellow-300 disabled:opacity-60"
+          className="w-full rounded-xl bg-yellow-400 px-4 py-2 font-bold text-black hover:bg-yellow-300 disabled:opacity-60"
         >
           {loading ? "Saving…" : "Save"}
         </button>
-        {msg && <div className="text-sm text-red-400">{msg}</div>}
-      </div>
+        {msg ? (
+          <div
+            className="text-sm text-red-400"
+            role="alert"
+            aria-live="assertive"
+          >
+            {msg}
+          </div>
+        ) : null}
+      </form>
     </main>
   );
 }
-

@@ -910,7 +910,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
         </div>
 
         {/* NAV — compact on mobile */}
-        <header className="relative z-10 shrink-0 w-full px-4 pt-4 md:px-5 md:pt-6">
+        <header className="relative z-10 shrink-0 w-full px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-5 md:pt-6">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2 md:gap-3">
               <img src="/images/leo-coin-gold.png" alt="MLEO" className="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-full object-contain" />
@@ -1015,7 +1015,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
           </div>
 
           {/* Bullets — mobile: compact stack below video */}
-          <div className="md:hidden flex min-h-0 shrink-0 flex-col gap-1.5 text-[11px] leading-tight text-white/75">
+          <div className="md:hidden flex min-h-0 shrink-0 flex-col gap-1.5 text-[12px] leading-snug text-white/75">
             {t.bullets.map((b, i) => (
               <div
                 key={i}
@@ -1039,22 +1039,22 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
         </section>
 
         {/* FOOTER — shrink-0; mobile shell pins row to bottom of viewport */}
-        <footer className="relative z-10 shrink-0 w-full max-w-6xl mx-auto px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 md:px-5 md:pb-4 md:pt-0 text-[10px] md:text-xs text-white/50">
+        <footer className="relative z-10 shrink-0 w-full max-w-6xl mx-auto px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 md:px-5 md:pb-4 md:pt-0 text-[11px] md:text-xs text-white/50">
           <div className="flex w-full min-w-0 flex-row flex-nowrap items-center gap-x-1.5 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] md:justify-between md:gap-6 md:overflow-visible">
             <span className="shrink-0 whitespace-nowrap">
               © {new Date().getFullYear()} MLEO. All rights reserved.
             </span>
             <div className="flex shrink-0 flex-row flex-nowrap items-center gap-x-1.5 md:gap-x-4">
-              <button type="button" onClick={() => setPolicyModal("terms")} className="shrink-0 whitespace-nowrap hover:text-white/80">
+              <button type="button" onClick={() => setPolicyModal("terms")} className="inline-flex shrink-0 items-center whitespace-nowrap px-1.5 py-1.5 min-h-[40px] hover:text-white/80 md:min-h-0 md:px-0 md:py-0">
                 {t.footer.terms}
               </button>
-              <button type="button" onClick={() => setPolicyModal("privacy")} className="shrink-0 whitespace-nowrap hover:text-white/80">
+              <button type="button" onClick={() => setPolicyModal("privacy")} className="inline-flex shrink-0 items-center whitespace-nowrap px-1.5 py-1.5 min-h-[40px] hover:text-white/80 md:min-h-0 md:px-0 md:py-0">
                 {t.footer.privacy}
               </button>
-              <button type="button" onClick={() => setPolicyModal("cookies")} className="shrink-0 whitespace-nowrap hover:text-white/80">
+              <button type="button" onClick={() => setPolicyModal("cookies")} className="inline-flex shrink-0 items-center whitespace-nowrap px-1.5 py-1.5 min-h-[40px] hover:text-white/80 md:min-h-0 md:px-0 md:py-0">
                 Cookies
               </button>
-              <button type="button" onClick={() => setPolicyModal("risk")} className="shrink-0 whitespace-nowrap hover:text-white/80">
+              <button type="button" onClick={() => setPolicyModal("risk")} className="inline-flex shrink-0 items-center whitespace-nowrap px-1.5 py-1.5 min-h-[40px] hover:text-white/80 md:min-h-0 md:px-0 md:py-0">
                 Risk
               </button>
             </div>

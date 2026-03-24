@@ -50,10 +50,19 @@ export default function AuthCallback() {
         minHeight: "100vh",
         display: "grid",
         placeItems: "center",
+        paddingLeft: "max(1rem, env(safe-area-inset-left))",
+        paddingRight: "max(1rem, env(safe-area-inset-right))",
+        paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
       }}
     >
-      <p>Signing you in…</p>
+      <p
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        className="text-center text-base"
+      >
+        Signing you in…
+      </p>
     </main>
   );
 }
-
