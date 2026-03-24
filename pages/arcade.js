@@ -89,9 +89,9 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
 
         {compact ? (
           <>
-            {/* 3×3 mobile: tight vertical stack; mt-auto on PLAY eats slack (less dead space) */}
-            <div className="flex h-full min-h-0 flex-col px-1 pb-0.5 pl-1 pr-2.5 pt-1">
-              <div className="flex shrink-0 justify-center leading-none pt-0.5">
+            {/* 3×3 mobile: inner layout fixed — outer tile height comes from grid only */}
+            <div className="flex h-full min-h-0 flex-col px-1 pb-1 pl-1 pr-2.5 pt-1.5">
+              <div className="mt-1 flex shrink-0 justify-center leading-none">
                 <span
                   className="select-none text-[2.7rem] leading-none sm:text-5xl"
                   aria-hidden
@@ -99,7 +99,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
                   {compactCardEmoji(emoji)}
                 </span>
               </div>
-              <div className="mt-0.5 shrink-0 px-0.5 text-center">
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-px px-0.5 text-center">
                 {comingSoon ? (
                   <h2 className="text-[11px] font-bold leading-snug line-clamp-2 text-amber-300">
                     COMING SOON
@@ -109,14 +109,14 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
                 )}
                 {reward ? (
                   <p
-                    className="mt-px max-w-full text-[9px] font-semibold leading-tight text-amber-200/95 line-clamp-1"
+                    className="mt-0.5 max-w-full text-[9px] font-semibold leading-tight text-amber-200/95 line-clamp-1"
                     title={reward}
                   >
                     {reward}
                   </p>
                 ) : null}
               </div>
-              <div className="mt-auto shrink-0 pt-0.5">
+              <div className="shrink-0 pt-0.5">
                 {comingSoon ? (
                   <button
                     type="button"
@@ -864,28 +864,34 @@ export default function ArcadeHub() {
             ))}
           </div>
 
-          {/* Middle zone: 3×3 grid — tighter row gap + margin before footer for breathing room */}
-          <section
-            className="mb-3 grid min-h-0 flex-1 grid-cols-3 grid-rows-3 gap-x-0.5 gap-y-px"
-            aria-label="Games"
-          >
-            {mobileGroupGames.map((game, idx) => (
-              <GameCard
-                key={`${mobileGroupIndex}-${game.href}-${idx}`}
-                {...game}
-                freePlayStatus={freePlayStatus}
-                comingSoon={game.comingSoon}
-                compact
-              />
-            ))}
-            {Array.from({ length: Math.max(0, MOBILE_GAMES_PER_GROUP - mobileGroupGames.length) }).map((_, i) => (
-              <div
-                key={`pad-${i}`}
-                className="rounded-md border border-white/5 bg-white/[0.02] min-h-0 min-w-0"
-                aria-hidden
-              />
-            ))}
-          </section>
+          {/* Middle zone: grid uses 90% of flex slot (~10% shorter rows); spacer below = fixed empty strip before footer */}
+          <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+            <section
+              className="grid h-[90%] min-h-0 w-full shrink-0 grid-cols-3 grid-rows-3 gap-x-0.5 gap-y-px"
+              aria-label="Games"
+            >
+              {mobileGroupGames.map((game, idx) => (
+                <GameCard
+                  key={`${mobileGroupIndex}-${game.href}-${idx}`}
+                  {...game}
+                  freePlayStatus={freePlayStatus}
+                  comingSoon={game.comingSoon}
+                  compact
+                />
+              ))}
+              {Array.from({ length: Math.max(0, MOBILE_GAMES_PER_GROUP - mobileGroupGames.length) }).map((_, i) => (
+                <div
+                  key={`pad-${i}`}
+                  className="rounded-md border border-white/5 bg-white/[0.02] min-h-0 min-w-0"
+                  aria-hidden
+                />
+              ))}
+            </section>
+            <div
+              className="mobile-arcade-grid-undergap min-h-3 flex-1 shrink-0 basis-0"
+              aria-hidden
+            />
+          </div>
 
           {/* Bottom zone: replaceable footer actions (Back to Home + dev — temporary) */}
           <footer className="mobile-arcade-footer flex-shrink-0 flex flex-col gap-1 pt-1 border-t border-white/20">
