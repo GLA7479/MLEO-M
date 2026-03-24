@@ -1,6 +1,6 @@
 // pages/arcade-online.js - MLEO Arcade Online Hub
 // בסגנון דף Arcade הקיים עם GameCard components
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Layout from "../components/Layout";
 import { useRouter } from "next/router";
 import { useAccount } from "wagmi";
@@ -70,7 +70,22 @@ function fmt(n) {
   return String(n);
 }
 
+/** Same warm gradient family as pages/arcade.js (local duplicate — do not import arcade). */
+const ARCADE_ONLINE_BG =
+  "linear-gradient(135deg, #1a1a1a 0%, #3a2a0a 50%, #1a1a1a 100%)";
+
 const TIERED_GAMES = ['poker', 'backgammon', 'roulette', 'blackjack', 'war', 'ludo', 'bingo', 'checkers'];
+
+/** Mobile hub: 3 pages — 4 + 4 + 2 games from GAME_REGISTRY order (no reorder). */
+const HUB_PAGE_SLICES = [
+  [0, 4],
+  [4, 8],
+  [8, 10],
+];
+const HUB_PAGE_COUNT = HUB_PAGE_SLICES.length;
+
+const SWIPE_THRESHOLD_PX = 40;
+const SWIPE_INTENT_RATIO = 1.2;
 
 // Game Registry with lazy loading
 const GAME_REGISTRY = [
@@ -167,44 +182,44 @@ const GAME_REGISTRY = [
   },
 ];
 
+function hubGamesForPage(pageIndex) {
+  const slice = HUB_PAGE_SLICES[pageIndex];
+  if (!slice) return [];
+  return GAME_REGISTRY.slice(slice[0], slice[1]);
+}
+
 // GameCard component (כמו בדף Arcade)
 function GameCard({ game, onSelect }) {
   return (
-    <article 
-      className="rounded-lg border border-white/10 backdrop-blur-md shadow-lg p-4 flex flex-col transition-all hover:scale-105 hover:border-white/30 relative overflow-hidden cursor-pointer"
+    <article
+      className="relative flex cursor-pointer flex-col overflow-hidden rounded-lg border border-white/10 bg-transparent p-4 shadow-md backdrop-blur-md transition-all hover:scale-105 hover:border-white/25 hover:shadow-lg"
       style={{
-        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
-        height: '187px',
+        background:
+          "linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)",
+        height: "187px",
       }}
       onClick={() => onSelect(game.id)}
     >
-      {/* Multiplayer Badge */}
       {game.isMultiplayer && (
-        <div className="absolute top-2 left-2 px-2 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-xs font-bold text-emerald-300">
+        <div className="absolute left-2 top-2 rounded-full border border-emerald-500/40 bg-emerald-500/20 px-2 py-0.5 text-[11px] font-extrabold text-emerald-200">
           MP
         </div>
       )}
 
-      {/* Icon */}
-      <div className="text-center absolute left-0 right-0" style={{ top: '15px' }}>
+      <div className="absolute left-0 right-0 text-center" style={{ top: "15px" }}>
         <div className="text-5xl leading-none">{game.emoji}</div>
       </div>
 
-      {/* Title */}
-      <div 
-        className="text-center absolute left-0 right-0 px-2 flex items-center justify-center" 
-        style={{ 
-          top: '80px',
-          height: '45px'
-        }}
+      <div
+        className="absolute left-0 right-0 flex items-center justify-center px-2 text-center"
+        style={{ top: "80px", height: "45px" }}
       >
-        <h2 className="text-base font-bold line-clamp-2 leading-tight">{game.title}</h2>
+        <h2 className="line-clamp-2 text-base font-bold leading-tight">{game.title}</h2>
       </div>
 
-      {/* Play button */}
-      <div className="absolute left-4 right-4" style={{ bottom: '12px' }}>
+      <div className="absolute bottom-3 left-4 right-4">
         <div
-          className="block w-full text-center px-4 py-2.5 rounded text-sm font-bold text-white shadow-lg transition-all hover:scale-105"
+          className="block w-full rounded-md px-4 py-2.5 text-center text-sm font-bold text-white shadow-lg transition-all hover:scale-105"
           style={{
             background: `linear-gradient(135deg, ${game.color} 0%, ${game.color}dd 100%)`,
           }}
@@ -309,6 +324,14 @@ const [selectedTier, setSelectedTier] = useState(null);
 const [showRoomBrowser, setShowRoomBrowser] = useState(false);
 const [showLudoModePicker, setShowLudoModePicker] = useState(false);
 const [selectedMode, setSelectedMode] = useState(null); // 'online' | 'bot' | 'local'
+  /** Mobile hub pager (hub view only; 0..HUB_PAGE_COUNT-1). */
+  const [hubPageIndex, setHubPageIndex] = useState(0);
+  const hubTouchStartRef = useRef({
+    x: 0,
+    y: 0,
+    active: false,
+    blocked: false,
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -519,117 +542,202 @@ useEffect(() => {
     }
   }
 
+  const setHubPageIndexClamped = useCallback((nextIndexOrUpdater) => {
+    setHubPageIndex((prev) => {
+      const next =
+        typeof nextIndexOrUpdater === "function"
+          ? nextIndexOrUpdater(prev)
+          : nextIndexOrUpdater;
+      return Math.max(0, Math.min(HUB_PAGE_COUNT - 1, next));
+    });
+  }, []);
+
+  function handleHubTouchStart(e) {
+    const t = e.touches?.[0];
+    if (!t) return;
+    const interactiveStart = e.target?.closest?.(
+      "button, a, input, textarea, select, [role='button']"
+    );
+    hubTouchStartRef.current = {
+      x: t.clientX,
+      y: t.clientY,
+      active: true,
+      blocked: Boolean(interactiveStart),
+    };
+  }
+
+  function handleHubTouchEnd(e) {
+    const start = hubTouchStartRef.current;
+    hubTouchStartRef.current = {
+      x: 0,
+      y: 0,
+      active: false,
+      blocked: false,
+    };
+    if (!start.active || start.blocked) return;
+    const t = e.changedTouches?.[0];
+    if (!t) return;
+
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+
+    if (adx < SWIPE_THRESHOLD_PX) return;
+    if (adx <= ady * SWIPE_INTENT_RATIO) return;
+
+    if (dx < 0) {
+      setHubPageIndexClamped((prev) => prev + 1);
+    } else {
+      setHubPageIndexClamped((prev) => prev - 1);
+    }
+  }
+
   if (!mounted) {
     return (
       <Layout address={address} isConnected={isConnected} vaultAmount={0}>
-        <div className="flex items-center justify-center h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-          <div className="text-white text-xl">Loading…</div>
+        <div
+          className="flex h-screen items-center justify-center text-white"
+          style={{ background: ARCADE_ONLINE_BG }}
+        >
+          <div className="text-lg font-semibold">Loading…</div>
         </div>
       </Layout>
     );
   }
 
+  const hubSubtitle = showRoomBrowser
+    ? `Choose Room for ${GAME_REGISTRY.find((g) => g.id === selectedGame)?.title || "Game"}`
+    : selectedGame
+      ? `Playing ${GAME_REGISTRY.find((g) => g.id === selectedGame)?.title || "Game"}`
+      : "Multiplayer & Single Player Games";
+
+  const backIsLeave = Boolean(selectedGame && selectedRoomId);
+  const isHubView = !selectedGame && !showRoomBrowser;
+
   return (
     <Layout address={address} isConnected={isConnected} vaultAmount={vaultAmt}>
       <div
-        className="relative w-full min-h-[var(--app-100vh,100svh)] flex flex-col overflow-y-auto bg-gradient-to-br from-indigo-900 via-black to-purple-900"
+        className={`relative flex w-full flex-col text-white ${
+          isHubView
+            ? "max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:min-h-0 max-md:overflow-hidden md:min-h-[var(--app-100vh,100svh)] md:overflow-y-auto"
+            : "min-h-[var(--app-100vh,100svh)] overflow-y-auto"
+        }`}
+        style={{ background: ARCADE_ONLINE_BG }}
       >
-        {/* Header */}
-        <header className="relative px-4 py-6 text-center">
-          <div className="flex items-center justify-between mb-6">
-            <button 
-              onClick={selectedGame && selectedRoomId ? leaveTable : goBack}
-              className={`px-3 py-1.5 rounded-lg border text-sm font-semibold ${
-                selectedGame && selectedRoomId 
-                  ? 'bg-red-600/20 border-red-500/40 hover:bg-red-600/30 text-red-300' 
-                  : 'bg-white/5 border-white/10 hover:bg-white/10 text-white'
-              }`}
-            >
-              {showRoomBrowser ? 'BACK' : 
-               selectedGame && selectedRoomId ? 'LEAVE' : 
-               selectedGame ? 'BACK' : 'BACK'}
-            </button>
-            <div className="text-center">
-              <h1 className="text-3xl font-extrabold text-white mb-2">MLEO Online</h1>
-              <p className="text-white/60">
-                {showRoomBrowser ? `Choose Room for ${GAME_REGISTRY.find(g => g.id === selectedGame)?.title || 'Game'}` : 
-                 selectedGame ? `Playing ${GAME_REGISTRY.find(g => g.id === selectedGame)?.title || 'Game'}` : 
-                 'Multiplayer & Single Player Games'}
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-white/60 text-xs">Vault</div>
-              <div className="text-emerald-400 text-sm font-bold">{fmt(vaultAmt)} MLEO</div>
-            </div>
-          </div>
-
-          {/* Player Name Input - Only show when no game is selected */}
-          {!selectedGame && (
-            <div className="max-w-sm mx-auto mb-4">
-              <div className="text-center mb-2">
-                <label className="text-white/80 text-sm font-medium">Player Registration</label>
-                <p className="text-white/60 text-xs mt-1">Enter your name to start playing</p>
+        <header className="shrink-0 px-3 pb-2 pt-3 sm:px-4 md:px-5">
+          <div className="mx-auto max-w-7xl space-y-2 rounded-xl border border-white/20 bg-black/40 px-2.5 py-2 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={backIsLeave ? leaveTable : goBack}
+                className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                  backIsLeave
+                    ? "border border-red-500/45 bg-red-600/25 text-red-200 hover:bg-red-600/35"
+                    : "border border-white/25 bg-white/10 text-white hover:bg-white/20"
+                }`}
+              >
+                {showRoomBrowser
+                  ? "BACK"
+                  : backIsLeave
+                    ? "LEAVE"
+                    : selectedGame
+                      ? "BACK"
+                      : "BACK"}
+              </button>
+              <div className="min-w-0 flex-1 px-1 text-center">
+                <h1 className="truncate text-[15px] font-extrabold leading-tight tracking-tight sm:text-base">
+                  MLEO Online
+                </h1>
+                <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/75">
+                  {hubSubtitle}
+                </p>
               </div>
-              <input
-                type="text"
-                placeholder="Enter your player name..."
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-emerald-400 text-center text-sm"
-                maxLength={20}
-              />
+              <div
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/25 bg-white/10 px-2.5 py-1 text-[11px] font-semibold"
+                title="Vault balance"
+              >
+                <span aria-hidden>💰</span>
+                <span className="tabular-nums text-emerald-400">{fmt(vaultAmt)}</span>
+                <span className="text-white/80">MLEO</span>
+              </div>
             </div>
-          )}
+
+            {!selectedGame && (
+              <div className="space-y-1.5 border-t border-white/15 pt-2">
+                <div className="text-center">
+                  <label className="text-[11px] font-semibold text-white/90">
+                    Player Registration
+                  </label>
+                  <p className="mt-0.5 text-[10px] text-white/65">
+                    Enter your name to start playing
+                  </p>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Enter your player name..."
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-center text-[11px] text-white placeholder-white/45 focus:border-amber-400/50 focus:outline-none focus:ring-2 focus:ring-amber-400/35 sm:text-sm"
+                  maxLength={20}
+                />
+              </div>
+            )}
+          </div>
         </header>
 
-        {/* Content */}
-{showLudoModePicker && selectedGame === "ludo" && !selectedMode ? (
-          <div className="flex-1 px-4 pb-8">
-            <div className="max-w-md mx-auto h-full flex items-center">
-              <div className="w-full bg-white/5 border border-white/10 rounded-2xl p-6">
-                <div className="text-center mb-6">
-                  <div className="text-4xl mb-2">🎲</div>
-                  <h2 className="text-2xl font-bold text-white mb-1">Ludo</h2>
-                  <p className="text-white/60 text-sm">Choose how you want to play</p>
+        {showLudoModePicker && selectedGame === "ludo" && !selectedMode ? (
+          <div className="flex-1 px-3 pb-8 sm:px-4 md:px-5">
+            <div className="mx-auto flex h-full max-w-md items-center">
+              <div className="w-full rounded-xl border border-white/20 bg-black/35 p-5 shadow-sm md:p-6">
+                <div className="mb-6 text-center">
+                  <div className="mb-2 text-4xl">🎲</div>
+                  <h2 className="mb-1 text-2xl font-bold text-white">Ludo</h2>
+                  <p className="text-sm text-white/70">Choose how you want to play</p>
                 </div>
                 <div className="flex flex-col gap-3">
                   <button
+                    type="button"
                     onClick={() => chooseLudoMode("online")}
-                    className="w-full px-4 py-2.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-sm font-semibold text-white"
+                    className="w-full rounded-xl bg-emerald-600/90 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
                   >
                     Online Multiplayer (Rooms)
                   </button>
                   <button
+                    type="button"
                     onClick={() => chooseLudoMode("bot")}
-                    className="w-full px-4 py-2.5 rounded-xl bg-sky-600/90 hover:bg-sky-500 text-sm font-semibold text-white"
+                    className="w-full rounded-xl bg-sky-600/90 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-500"
                   >
                     Vs Bot (offline)
                   </button>
                   <button
+                    type="button"
                     onClick={() => chooseLudoMode("local")}
-                    className="w-full px-4 py-2.5 rounded-xl bg-purple-600/90 hover:bg-purple-500 text-sm font-semibold text-white"
+                    className="w-full rounded-xl bg-purple-600/90 px-4 py-2.5 text-sm font-semibold text-white hover:bg-purple-500"
                   >
                     Local 2–4 players (offline)
                   </button>
                 </div>
-                <p className="mt-4 text-xs text-white/50 text-center">
+                <p className="mt-4 text-center text-xs text-white/50">
                   Bot & Local modes do not require rooms or internet connection.
                 </p>
               </div>
             </div>
           </div>
         ) : showRoomBrowser ? (
-          /* Room Browser for Multiplayer Games */
-          <div className="flex-1 px-4 pb-8">
-            <div className="max-w-4xl mx-auto h-full">
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-6 h-full">
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-bold text-white mb-2">
-                    {GAME_REGISTRY.find(g => g.id === selectedGame)?.emoji} {GAME_REGISTRY.find(g => g.id === selectedGame)?.title}
+          <div className="flex-1 px-3 pb-8 sm:px-4 md:px-5">
+            <div className="mx-auto h-full max-w-4xl">
+              <div className="h-full rounded-xl border border-white/20 bg-black/35 p-5 shadow-sm md:p-6">
+                <div className="mb-6 text-center">
+                  <h2 className="mb-2 text-2xl font-bold text-white">
+                    {GAME_REGISTRY.find((g) => g.id === selectedGame)?.emoji}{" "}
+                    {GAME_REGISTRY.find((g) => g.id === selectedGame)?.title}
                   </h2>
-                  <p className="text-white/60">Choose a room to join or create a new one</p>
+                  <p className="text-sm text-white/70">
+                    Choose a room to join or create a new one
+                  </p>
                 </div>
-                <RoomBrowser 
+                <RoomBrowser
                   gameId={selectedGame}
                   playerName={playerName}
                   onJoinRoom={handleJoinRoom}
@@ -638,29 +746,71 @@ useEffect(() => {
             </div>
           </div>
         ) : selectedGame ? (
-          /* Game Viewport */
-          <div className="flex-1 px-4 pb-8 -mt-2">
-            <div className="max-w-6xl mx-auto h-full">
-              <GameViewport 
+          <div className="flex-1 px-3 pb-8 sm:px-4 md:px-5">
+            <div className="mx-auto h-full max-w-6xl">
+              <GameViewport
                 gameId={selectedGame}
                 vault={vaultAmt}
                 setVaultBoth={setVaultBoth}
                 playerName={playerName}
                 roomId={selectedRoomId}
-                tierCode={TIERED_GAMES.includes(selectedGame) ? (selectedTier || '10K') : undefined}
+                tierCode={
+                  TIERED_GAMES.includes(selectedGame)
+                    ? selectedTier || "10K"
+                    : undefined
+                }
                 mode={selectedMode}
               />
             </div>
           </div>
         ) : (
-          /* Games Grid */
-          <section className="px-4 pb-8">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto">
-              {GAME_REGISTRY.map((game, idx) => (
-                <GameCard key={idx} game={game} onSelect={selectGame} />
-              ))}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:block md:min-h-0 md:overflow-visible">
+            <section className="hidden px-3 pb-8 sm:px-4 md:block md:px-5">
+              <div className="mx-auto grid max-w-7xl grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 md:gap-2 lg:grid-cols-6 lg:gap-2">
+                {GAME_REGISTRY.map((game) => (
+                  <GameCard key={game.id} game={game} onSelect={selectGame} />
+                ))}
+              </div>
+            </section>
+
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-[max(0.2rem,env(safe-area-inset-bottom))] pt-1 md:hidden">
+              <div className="mb-1 mt-1 flex shrink-0 justify-center gap-1 px-0.5">
+                {[0, 1, 2].map((i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-label={`Games page ${i + 1}`}
+                    onClick={() => setHubPageIndexClamped(i)}
+                    className={`max-w-[4.5rem] flex-1 rounded-lg border py-1 text-[11px] font-extrabold transition-all ${
+                      hubPageIndex === i
+                        ? "border-amber-400/70 bg-amber-500/40 text-amber-50 shadow-sm"
+                        : "border-white/15 bg-white/5 text-white/85"
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+              <div
+                className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden"
+                onTouchStart={handleHubTouchStart}
+                onTouchEnd={handleHubTouchEnd}
+              >
+                <div
+                  className={`mx-auto grid min-h-0 w-full min-w-0 flex-1 gap-2 px-0.5 ${
+                    hubPageIndex === 2
+                      ? "grid-cols-2 grid-rows-1 content-start"
+                      : "grid-cols-2 grid-rows-2 content-center"
+                  }`}
+                  aria-label="Games"
+                >
+                  {hubGamesForPage(hubPageIndex).map((game) => (
+                    <GameCard key={game.id} game={game} onSelect={selectGame} />
+                  ))}
+                </div>
+              </div>
             </div>
-          </section>
+          </div>
         )}
       </div>
     </Layout>
