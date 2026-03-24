@@ -946,7 +946,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
         </header>
 
         {/* HERO + VIDEO — mobile: top-stacked flow (no flex-1 centering on video); md+: two-column grid */}
-        <section className="relative z-10 flex min-h-0 flex-1 flex-col justify-start gap-3 overflow-hidden max-w-6xl mx-auto w-full px-4 pt-3 pb-0 md:grid md:flex-none md:min-h-0 md:overflow-visible md:grid-cols-2 md:gap-10 md:px-5 md:pt-16 md:pb-8 md:items-start">
+        <section className="relative z-10 flex min-h-0 flex-1 flex-col justify-start gap-3 overflow-x-hidden overflow-y-auto max-w-6xl mx-auto w-full px-4 pt-3 pb-0 md:grid md:flex-none md:min-h-0 md:overflow-visible md:grid-cols-2 md:gap-10 md:px-5 md:pt-16 md:pb-8 md:items-start">
           <div className="flex min-h-0 shrink-0 flex-col gap-3 md:gap-6 min-w-0">
             <div className="min-h-0">
               <div className="inline-flex items-center gap-1.5 md:gap-2 px-2.5 py-0.5 md:px-3 md:py-1 rounded-full bg-white/10 border border-white/10 text-[11px] md:text-xs mb-2.5 md:mb-5">
