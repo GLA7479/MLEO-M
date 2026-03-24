@@ -817,9 +817,13 @@ export default function ArcadeHub() {
   const SWIPE_THRESHOLD_PX = 40;
   const SWIPE_INTENT_RATIO = 1.2;
 
-  function setMobileGroupIndexClamped(nextIndex) {
+  function setMobileGroupIndexClamped(nextIndexOrUpdater) {
     const maxIndex = MOBILE_ARCADE_GROUPS.length - 1;
-    setMobileGroupIndex(Math.max(0, Math.min(maxIndex, nextIndex)));
+    setMobileGroupIndex((prev) => {
+      const nextIndex =
+        typeof nextIndexOrUpdater === "function" ? nextIndexOrUpdater(prev) : nextIndexOrUpdater;
+      return Math.max(0, Math.min(maxIndex, nextIndex));
+    });
   }
 
   function handlePagerTouchStart(e) {
@@ -851,9 +855,9 @@ export default function ArcadeHub() {
 
     // Left swipe -> next page, right swipe -> previous page
     if (dx < 0) {
-      setMobileGroupIndexClamped(mobileGroupIndex + 1);
+      setMobileGroupIndexClamped((prev) => prev + 1);
     } else {
-      setMobileGroupIndexClamped(mobileGroupIndex - 1);
+      setMobileGroupIndexClamped((prev) => prev - 1);
     }
   }
 
