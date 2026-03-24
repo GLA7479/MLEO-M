@@ -927,8 +927,8 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
         </header>
 
         {/* HERO + VIDEO — mobile: single column, order = hero → CTA → video → bullets; md+: two columns */}
-        <section className="relative z-10 max-w-6xl mx-auto px-4 pt-5 pb-10 md:px-5 md:pt-16 md:pb-28 grid grid-cols-1 md:grid-cols-2 md:gap-10 md:items-start">
-          <div className="flex flex-col gap-3 md:gap-6 min-w-0">
+        <section className="relative z-10 max-w-6xl mx-auto px-4 pt-4 pb-6 md:px-5 md:pt-16 md:pb-28 grid grid-cols-1 md:grid-cols-2 md:gap-10 md:items-start">
+          <div className="flex flex-col gap-2.5 md:gap-6 min-w-0">
             <div>
               <div className="inline-flex items-center gap-1.5 md:gap-2 px-2.5 py-0.5 md:px-3 md:py-1 rounded-full bg-white/10 border border-white/10 text-[11px] md:text-xs mb-3 md:mb-5">
                 <span>{t.new}</span><span className="opacity-60">{t.early}</span>
@@ -938,7 +938,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
                 {t.heroH1_1}<br /><span className="text-yellow-400">{t.heroH1_2}</span>
               </h1>
 
-              <p className="mt-3 md:mt-5 text-sm sm:text-base md:text-lg text-white/85 max-w-xl min-h-[2.75rem] sm:min-h-0 leading-snug">
+              <p className="mt-3 md:mt-5 text-sm sm:text-base md:text-lg text-white/85 max-w-xl min-h-0 sm:min-h-[2.75rem] leading-snug">
                 {(t.slogans && t.slogans[idx]) || ""}
               </p>
             </div>
@@ -981,24 +981,21 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
           {/* VIDEO — main visual anchor; follows CTAs on mobile */}
           <div className="relative mt-1 md:mt-0">
             <div className="absolute -inset-4 md:-inset-6 rounded-[24px] md:rounded-[32px] bg-yellow-400/10 blur-2xl md:blur-3xl" />
-            <div className="relative rounded-2xl md:rounded-3xl border border-white/10 bg-white/5 p-3 md:p-4 shadow-xl backdrop-blur">
+            <div className="relative rounded-2xl md:rounded-3xl border border-white/10 bg-white/5 p-2.5 md:p-3 shadow-xl backdrop-blur overflow-hidden">
               <video
                 autoPlay
                 loop
                 muted
                 playsInline
                 poster="/images/mleo-hero-preview.png"
-                className="w-full h-auto rounded-xl md:rounded-2xl object-cover"
+                className="w-full max-h-[min(220px,38vh)] sm:max-h-[min(260px,42vh)] md:max-h-[min(300px,48vh)] h-auto rounded-xl md:rounded-2xl object-cover object-center"
                 src="/videos/intro.mp4"
               />
-              <p className="mt-2 md:mt-3 text-[11px] md:text-xs text-white/60 text-center leading-snug px-0.5">
-                Teaser — the full experience starts when you hit {t.start}.
-              </p>
             </div>
           </div>
 
           {/* Bullets — mobile: compact stack below video */}
-          <div className="md:hidden flex flex-col gap-1.5 text-[11px] leading-tight text-white/75">
+          <div className="md:hidden mt-4 flex flex-col gap-1.5 text-[11px] leading-tight text-white/75">
             {t.bullets.map((b, i) => (
               <div
                 key={i}
@@ -1011,21 +1008,21 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
           </div>
         </section>
 
-        {/* FOOTER — compact on mobile */}
-        <footer className="relative z-10 max-w-6xl mx-auto px-4 pb-6 md:px-5 md:pb-10 text-[11px] md:text-xs text-white/50">
-          <div className="flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-6 justify-between text-center sm:text-start">
-            <div className="leading-tight">© {new Date().getFullYear()} MLEO. All rights reserved.</div>
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 sm:justify-end sm:space-x-0 sm:gap-x-4">
-              <button type="button" onClick={() => setPolicyModal("terms")} className="hover:text-white/80 underline-offset-2 hover:underline">
+        {/* FOOTER — compact on mobile; policy links first on small screens so they stay in view */}
+        <footer className="relative z-10 max-w-6xl mx-auto px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-5 md:pb-10 text-xs text-white/50">
+          <div className="flex flex-col-reverse sm:flex-row items-start sm:items-center gap-2.5 sm:gap-6 justify-between">
+            <div className="shrink-0">© {new Date().getFullYear()} MLEO. All rights reserved.</div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 sm:gap-x-4">
+              <button type="button" onClick={() => setPolicyModal("terms")} className="hover:text-white/80">
                 {t.footer.terms}
               </button>
-              <button type="button" onClick={() => setPolicyModal("privacy")} className="hover:text-white/80 underline-offset-2 hover:underline">
+              <button type="button" onClick={() => setPolicyModal("privacy")} className="hover:text-white/80">
                 {t.footer.privacy}
               </button>
-              <button type="button" onClick={() => setPolicyModal("cookies")} className="hover:text-white/80 underline-offset-2 hover:underline">
+              <button type="button" onClick={() => setPolicyModal("cookies")} className="hover:text-white/80">
                 Cookies
               </button>
-              <button type="button" onClick={() => setPolicyModal("risk")} className="hover:text-white/80 underline-offset-2 hover:underline">
+              <button type="button" onClick={() => setPolicyModal("risk")} className="hover:text-white/80">
                 Risk
               </button>
             </div>
