@@ -1,7 +1,7 @@
 // pages/index.js
 import Head from "next/head";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import PWAInstall from "../components/PWAInstall";
 import { useRouter } from "next/router";
@@ -833,6 +833,8 @@ export default function Home() {
   const [lang, setLang] = useState("en");
   const [mounted, setMounted] = useState(false);
   const [showHow, setShowHow] = useState(false);
+  const howTriggerRef = useRef(null);
+  const howCloseBtnRef = useRef(null);
 const router = useRouter();
 const [showAuth, setShowAuth] = useState(false);
 const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'cookies', 'risk', or null
@@ -843,6 +845,20 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
     const init = pickInitialLang();
     setLang(init);
   }, []);
+
+  useEffect(() => {
+    if (!showHow || !mounted) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setShowHow(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    howCloseBtnRef.current?.focus();
+    const trigger = howTriggerRef.current;
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (trigger && typeof trigger.focus === "function") trigger.focus();
+    };
+  }, [showHow, mounted]);
 
   // Persist + set URL & dir
   useEffect(() => {
@@ -961,8 +977,10 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
                 {t.start}
               </button>
               <button
+                ref={howTriggerRef}
+                type="button"
                 onClick={() => setShowHow(true)}
-                className="px-6 py-3 md:py-3 rounded-2xl border border-white/20 font-semibold hover:bg-white/5 transition text-center text-[15px] md:text-base"
+                className="max-md:w-fit max-md:self-start rounded-2xl border text-center transition md:px-6 md:py-3 md:border-white/20 md:font-semibold md:text-base md:hover:bg-white/5 max-md:rounded-lg max-md:border-white/12 max-md:px-3 max-md:py-1.5 max-md:text-xs max-md:font-medium max-md:text-white/65 max-md:hover:bg-white/[0.06] max-md:hover:text-white/85"
               >
                 {t.how}
               </button>
@@ -1041,13 +1059,18 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
           }}
           role="dialog"
           aria-modal="true"
+          aria-labelledby="mleo-how-modal-title"
           dir={dir}
         >
           <div className="mx-auto max-w-2xl w-[92%] max-h-[88vh] overflow-auto bg-neutral-900 text-white rounded-2xl border border-white/10 shadow-2xl relative">
             {/* Sticky header */}
             <div className="sticky top-0 z-10 bg-neutral-900/95 backdrop-blur p-4 border-b border-white/10 rounded-t-2xl flex items-center justify-between">
-              <h2 className="text-2xl font-bold">{t.modal.title}</h2>
+              <h2 id="mleo-how-modal-title" className="text-2xl font-bold">
+                {t.modal.title}
+              </h2>
               <button
+                ref={howCloseBtnRef}
+                type="button"
                 onClick={() => setShowHow(false)}
                 className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20"
                 aria-label="Close"
