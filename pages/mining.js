@@ -122,7 +122,20 @@ const TEXT = {
       "Each game tracks your activity, completed sessions, best score, streaks, and progress milestones",
       "Some games use randomized events, while others focus on timing, reaction, memory, or decision-making",
       "Click the ℹ️ button on each game card to view the rules, controls, and reward structure"
-    ]
+    ],
+    chooseGameLobbyShort: "Four modes, one Vault. Pick where to play.",
+    minersDescShort: "Idle & upgrades. Vault + on-chain claim.",
+    poolStatus: "Pool",
+    arcadeGames: "Arcade Games",
+    arcadeOnline: "Arcade Online",
+    arcadeRegularTitle: "MLEO — Arcade",
+    arcadeOnlineTitle: "MLEO — Arcade Online",
+    arcadeBadgeLabel: "Arcade",
+    onlineBadgeLabel: "Online",
+    arcadeDescShort: "Solo mini-games. Shared vault & session rewards.",
+    arcadeOnlineDescShort: "Multiplayer & live modes. Same shared vault.",
+    arcadeOnlineHowIntro: "Live and online arcade modes use the same shared vault and ecosystem rules as solo arcade. Session costs and rewards may differ per mode.",
+    legalShort: "Legal"
   },
   ar: {
     name: "العربية", dir: "rtl", code: "ar",
@@ -1801,10 +1814,17 @@ function HowToPlay({ lang, onClose, gameType = "miners" }) {
     );
   }
   
-  if (gameType === "arcade") {
+  if (gameType === "arcade" || gameType === "arcade-online") {
+    const isOnline = gameType === "arcade-online";
     return (
       <div>
-        <h2 className="text-2xl font-bold mb-4">{text.howToPlayTitle} - Arcade</h2>
+        <h2 className="text-2xl font-bold mb-4">
+          {text.howToPlayTitle}
+          {isOnline ? " — Arcade Online" : " — Arcade"}
+        </h2>
+        {isOnline && text.arcadeOnlineHowIntro && (
+          <p className="text-gray-600 mb-4 text-sm leading-relaxed">{text.arcadeOnlineHowIntro}</p>
+        )}
         
         <section className="mb-6">
           <h3 className="font-bold text-lg mb-2">{text.arcadeWhat}</h3>
@@ -2417,6 +2437,7 @@ export default function GamesHub() {
   const router = useRouter();
   const [modal, setModal] = useState(null);
   const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'cookies', 'risk', or null
+  const [poolModalOpen, setPoolModalOpen] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [lang, setLang] = useState("en");
@@ -2722,16 +2743,20 @@ export default function GamesHub() {
     ? {
         title: "MLEO — BASE",
         desc: "בסיס ניהול תומך שמחבר בין Miners, Arcade וה-Vault המשותף עם משימות, DATA, משלחות ושדרוגי בסיס.",
+        descShort: "בסיס תומך: משימות, DATA ומשלחות ל-Vault המשותף.",
         badge: "Support",
         play: "שחק MLEO BASE",
         hub: "שני מצבים, Vault אחד. שחק באופן פעיל ב-Miners, או נהל את MLEO BASE כדי להזין ולשפר את ה-Vault המשותף.",
+        hubShort: "ארבעה מצבים, Vault אחד. בחר איפה לשחק.",
       }
     : {
         title: "MLEO — BASE",
         desc: "A support-management base that links Miners, Arcade and the shared vault with missions, DATA, expeditions and structural upgrades.",
+        descShort: "Support hub: missions, DATA & expeditions for the shared vault.",
         badge: "Support",
         play: "Play MLEO BASE",
         hub: "Two modes, one Vault. Play actively with Miners or run MLEO BASE to feed and upgrade the shared vault ecosystem.",
+        hubShort: "Four modes, one Vault. Pick where to play.",
       };
 
   if (!mounted) {
@@ -2779,10 +2804,10 @@ export default function GamesHub() {
         }}
       >
         <div className="absolute inset-0 bg-black/30"></div>
-        <div className="relative z-10 container mx-auto px-4 py-8">
+        <div className="relative z-10 container mx-auto px-3 py-4 md:px-4 md:py-8">
           <div className="max-w-4xl mx-auto">
             {/* Navigation */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-3 md:mb-6">
               <div className="flex items-center gap-2">
                 <Link href="/">
                   <button className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-500/30 transition-colors">
@@ -2811,114 +2836,286 @@ export default function GamesHub() {
               </div>
             </div>
 
-          {/* Header */}
-            <header className="text-center mb-8">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="text-emerald-400 text-sm font-bold px-2 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/20">
+            {/* Mobile: compact 2×2 mode lobby (md and below) */}
+            <div className="md:hidden flex flex-col gap-2 min-h-[calc(100dvh-7rem)] max-h-[calc(100dvh-7rem)]">
+              <header className="text-center shrink-0 px-0.5">
+                <span className="text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/20 inline-block leading-tight">
                   {text.liveTestnet}
                 </span>
+                <h1 className="text-lg font-extrabold tracking-tight mt-1.5 leading-tight">
+                  {text.chooseGame}
+                </h1>
+                <p className="text-zinc-400 text-[11px] mt-1 leading-snug line-clamp-2 mx-auto max-w-sm">
+                  {questCard.hubShort || text.chooseGameLobbyShort || questCard.hub}
+                </p>
+              </header>
+
+              <section className="grid grid-cols-2 gap-2 flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] content-start pb-1">
+                <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                  <div className="flex items-start justify-between gap-1">
+                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{text.miners}</h2>
+                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      {text.active}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 mt-1 leading-snug line-clamp-3 flex-1">
+                    {text.minersDescShort || text.minersDesc}
+                  </p>
+                  <div className="mt-auto pt-1 flex flex-col gap-1">
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => open("miners-how")}
+                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-1 py-1 rounded-md text-[9px] font-bold border border-blue-500/35 leading-tight"
+                      >
+                        {text.howToPlay}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => open("terms")}
+                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-1 py-1 rounded-md text-[9px] font-bold border border-white/15 leading-tight"
+                      >
+                        {text.terms}
+                      </button>
+                    </div>
+                    <Link href="/mleo-miners" className="block">
+                      <span className="flex w-full items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg text-[11px] font-bold active:opacity-90">
+                        {text.playMiners}
+                      </span>
+                    </Link>
+                  </div>
+                </article>
+
+                <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                  <div className="flex items-start justify-between gap-1">
+                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{questCard.title}</h2>
+                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
+                      {questCard.badge}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 mt-1 leading-snug line-clamp-3 flex-1">
+                    {questCard.descShort || questCard.desc}
+                  </p>
+                  <div className="mt-auto pt-1 flex flex-col gap-1">
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => open("quest-how")}
+                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-1 py-1 rounded-md text-[9px] font-bold border border-blue-500/35 leading-tight"
+                      >
+                        {text.howToPlay}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => open("terms")}
+                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-1 py-1 rounded-md text-[9px] font-bold border border-white/15 leading-tight"
+                      >
+                        {text.terms}
+                      </button>
+                    </div>
+                    <Link href="/mleo-base" className="block">
+                      <span className="flex w-full items-center justify-center bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white py-2 rounded-lg text-[11px] font-bold shadow-md active:opacity-90">
+                        {questCard.play}
+                      </span>
+                    </Link>
+                  </div>
+                </article>
+
+                <article className="rounded-xl border border-purple-500/35 bg-gradient-to-br from-purple-900/35 to-indigo-900/25 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                  <div className="flex items-start justify-between gap-1">
+                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">
+                      {text.arcadeRegularTitle || "MLEO — Arcade"}
+                    </h2>
+                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-purple-500/25 text-purple-200 border border-purple-500/40">
+                      {text.arcadeBadgeLabel || "Arcade"}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-zinc-300 mt-1 leading-snug line-clamp-3 flex-1">
+                    {text.arcadeDescShort || "Solo mini-games. Shared vault & session rewards."}
+                  </p>
+                  <div className="mt-auto pt-1 flex flex-col gap-1">
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => open("arcade-how")}
+                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-1 py-1 rounded-md text-[9px] font-bold border border-blue-500/35 leading-tight"
+                      >
+                        {text.howToPlay}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => open("terms")}
+                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-1 py-1 rounded-md text-[9px] font-bold border border-white/15 leading-tight"
+                      >
+                        {text.terms}
+                      </button>
+                    </div>
+                    <Link href="/arcade" className="block">
+                      <span className="flex w-full items-center justify-center bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-2 rounded-lg text-[11px] font-bold shadow-md active:opacity-90">
+                        {text.arcadeGames || "Arcade Games"}
+                      </span>
+                    </Link>
+                  </div>
+                </article>
+
+                <article className="rounded-xl border border-pink-500/35 bg-gradient-to-br from-red-900/30 to-pink-900/20 backdrop-blur-sm p-2 flex flex-col min-h-[152px] shadow-md">
+                  <div className="flex items-start justify-between gap-1">
+                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">
+                      {text.arcadeOnlineTitle || "MLEO — Arcade Online"}
+                    </h2>
+                    <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold bg-pink-500/20 text-pink-200 border border-pink-500/35">
+                      {text.onlineBadgeLabel || "Online"}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-zinc-300 mt-1 leading-snug line-clamp-3 flex-1">
+                    {text.arcadeOnlineDescShort || "Multiplayer & live modes. Same shared vault."}
+                  </p>
+                  <div className="mt-auto pt-1 flex flex-col gap-1">
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => open("arcade-online-how")}
+                        className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-1 py-1 rounded-md text-[9px] font-bold border border-blue-500/35 leading-tight"
+                      >
+                        {text.howToPlay}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => open("terms")}
+                        className="flex-1 bg-white/10 hover:bg-white/15 text-zinc-200 px-1 py-1 rounded-md text-[9px] font-bold border border-white/15 leading-tight"
+                      >
+                        {text.terms}
+                      </button>
+                    </div>
+                    <Link href="/arcade-online" className="block">
+                      <span className="flex w-full items-center justify-center bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white py-2 rounded-lg text-[11px] font-bold shadow-md active:opacity-90">
+                        {text.arcadeOnline || "Arcade Online"}
+                      </span>
+                    </Link>
+                  </div>
+                </article>
+              </section>
+
+              <footer className="shrink-0 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 pt-2 border-t border-white/10 text-[10px] text-white/55">
+                <span>© {new Date().getFullYear()} MLEO</span>
+                <button type="button" onClick={() => setPoolModalOpen(true)} className="underline hover:text-white/90">
+                  {text.poolStatus || "Pool"}
+                </button>
+                <Link href="/" className="underline hover:text-white/90">Home</Link>
+                <button type="button" onClick={() => setPolicyModal("terms")} className="underline hover:text-white/90">
+                  {text.legalShort || "Legal"}
+                </button>
+              </footer>
             </div>
-            <h1 className="text-[28px] md:text-[40px] font-extrabold tracking-tight mt-3">
-                {text.chooseGame}
-            </h1>
-            <p className="text-zinc-300 mt-2 max-w-2xl mx-auto">
-                {questCard.hub}
-            </p>
-          </header>
 
-            {/* Cards */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch max-w-[1100px] mx-auto justify-items-center">
-  {/* MINERS */}
-              <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
-    <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
-                  <div>
-                    <h2 className="text-[20px] sm:text-2xl font-extrabold">{text.miners}</h2>
-                    <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
-                      {text.minersDesc}
-        </p>
-      </div>
-                  <span className="rounded-full px-2 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                    {text.active}
-      </span>
-    </div>
+            {/* Tablet / desktop: existing 3-column hub */}
+            <div className="hidden md:block">
+              <header className="text-center mb-8">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <span className="text-emerald-400 text-sm font-bold px-2 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/20">
+                    {text.liveTestnet}
+                  </span>
+                </div>
+                <h1 className="text-[28px] md:text-[40px] font-extrabold tracking-tight mt-3">
+                  {text.chooseGame}
+                </h1>
+                <p className="text-zinc-300 mt-2 max-w-2xl mx-auto">
+                  {questCard.hub}
+                </p>
+              </header>
 
-    <div className="mt-auto">
-      <div className="flex flex-wrap gap-2 mb-3 justify-center">
-        <button
-          onClick={() => open("miners-how")}
-                      className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-4 py-2 rounded-lg text-sm font-bold border border-blue-500/30 transition-colors"
-        >
-                      {text.howToPlay}
-        </button>
-        <button
-                      onClick={() => open("terms")}
-                      className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 px-4 py-2 rounded-lg text-sm font-bold border border-gray-500/30 transition-colors"
-        >
-                      {text.terms}
-        </button>
-      </div>
+              <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch max-w-[1100px] mx-auto justify-items-center">
+                {/* MINERS */}
+                <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
+                  <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
+                    <div>
+                      <h2 className="text-[20px] sm:text-2xl font-extrabold">{text.miners}</h2>
+                      <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
+                        {text.minersDesc}
+                      </p>
+                    </div>
+                    <span className="rounded-full px-2 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      {text.active}
+                    </span>
+                  </div>
 
-                  <Link href="/mleo-miners">
-                    <button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors">
-                      {text.playMiners}
-          </button>
-                  </Link>
-    </div>
-  </article>
+                  <div className="mt-auto">
+                    <div className="flex flex-wrap gap-2 mb-3 justify-center">
+                      <button
+                        onClick={() => open("miners-how")}
+                        className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-4 py-2 rounded-lg text-sm font-bold border border-blue-500/30 transition-colors"
+                      >
+                        {text.howToPlay}
+                      </button>
+                      <button
+                        onClick={() => open("terms")}
+                        className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 px-4 py-2 rounded-lg text-sm font-bold border border-gray-500/30 transition-colors"
+                      >
+                        {text.terms}
+                      </button>
+                    </div>
 
-  {/* QUEST ARCADE */}
-              <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
-    <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
-                  <div>
-                    <h2 className="text-[20px] sm:text-2xl font-extrabold">{questCard.title}</h2>
-                    <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
-                      {questCard.desc}
-        </p>
-      </div>
-                  <span className="rounded-full px-2 py-1 text-xs font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
-                    {questCard.badge}
-      </span>
-    </div>
-
-    <div className="mt-auto">
-      <div className="flex flex-wrap gap-2 mb-3 justify-center">
-        <button
-          onClick={() => open("quest-how")}
-                      className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-4 py-2 rounded-lg text-sm font-bold border border-blue-500/30 transition-colors"
-        >
-                      {text.howToPlay}
-        </button>
-        <button
-                      onClick={() => open("terms")}
-                      className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 px-4 py-2 rounded-lg text-sm font-bold border border-gray-500/30 transition-colors"
-        >
-                      {text.terms}
-        </button>
-      </div>
-
-                  <div className="grid grid-cols-1 gap-2">
-                    <Link href="/mleo-base">
-                      <button className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
-                        BASE
+                    <Link href="/mleo-miners">
+                      <button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors">
+                        {text.playMiners}
                       </button>
                     </Link>
                   </div>
-    </div>
-  </article>
+                </article>
 
-  {/* ARCADE GAMES */}
-              <article className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/20 to-indigo-900/20 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
-    <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
-                  <div>
-                    <h2 className="text-[20px] sm:text-2xl font-extrabold">🎮 MLEO Arcade</h2>
-                    <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
-                      Mini-games arcade! Play Symbol Match, Dice, Wheel & Scratch cards. 100 MLEO per session with rewards up to 10,000 MLEO!
-        </p>
+                {/* BASE */}
+                <article className="rounded-2xl border border-white/10 bg-black/5 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
+                  <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
+                    <div>
+                      <h2 className="text-[20px] sm:text-2xl font-extrabold">{questCard.title}</h2>
+                      <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
+                        {questCard.desc}
+                      </p>
+                    </div>
+                    <span className="rounded-full px-2 py-1 text-xs font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
+                      {questCard.badge}
+                    </span>
                   </div>
-                  <span className="rounded-full px-2.5 py-1 text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 whitespace-nowrap">
-                    Fun
-      </span>
-    </div>
+
+                  <div className="mt-auto">
+                    <div className="flex flex-wrap gap-2 mb-3 justify-center">
+                      <button
+                        onClick={() => open("quest-how")}
+                        className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 px-4 py-2 rounded-lg text-sm font-bold border border-blue-500/30 transition-colors"
+                      >
+                        {text.howToPlay}
+                      </button>
+                      <button
+                        onClick={() => open("terms")}
+                        className="bg-gray-600/20 hover:bg-gray-600/30 text-gray-300 px-4 py-2 rounded-lg text-sm font-bold border border-gray-500/30 transition-colors"
+                      >
+                        {text.terms}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2">
+                      <Link href="/mleo-base">
+                        <button className="w-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
+                          BASE
+                        </button>
+                      </Link>
+                    </div>
+                  </div>
+                </article>
+
+                {/* ARCADE (solo + online entry) */}
+                <article className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/20 to-indigo-900/20 backdrop-blur-md shadow-xl p-6 flex flex-col w-full max-w-[350px] min-h-[320px]">
+                  <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
+                    <div>
+                      <h2 className="text-[20px] sm:text-2xl font-extrabold">🎮 MLEO Arcade</h2>
+                      <p className="text-[13px] sm:text-sm text-zinc-300 mt-2 leading-6 break-words hyphens-auto">
+                        Mini-games arcade! Play Symbol Match, Dice, Wheel & Scratch cards. 100 MLEO per session with rewards up to 10,000 MLEO!
+                      </p>
+                    </div>
+                    <span className="rounded-full px-2.5 py-1 text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 whitespace-nowrap">
+                      Fun
+                    </span>
+                  </div>
 
                   <div className="mt-auto">
                     <div className="flex flex-wrap gap-2 mb-3 justify-center">
@@ -2936,40 +3133,39 @@ export default function GamesHub() {
                       </button>
                     </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <Link href="/arcade">
-                      <button className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
-                        GAMES
-                      </button>
-                    </Link>
-                    <Link href="/arcade-online">
-                      <button className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
-                        ONLINE
-                      </button>
-                    </Link>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Link href="/arcade">
+                        <button className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
+                          GAMES
+                        </button>
+                      </Link>
+                      <Link href="/arcade-online">
+                        <button className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
+                          ONLINE
+                        </button>
+                      </Link>
+                    </div>
                   </div>
-    </div>
-  </article>
-</section>
+                </article>
+              </section>
 
-            {/* Game Pool Stats */}
-            <div className="mb-8 max-w-4xl mx-auto">
-              <GamePoolStats />
-            </div>
-
-            {/* Footer */}
-            <footer className="mt-8 pt-6 border-t border-white/10 text-xs text-white/50">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 justify-between">
-                <div>© {new Date().getFullYear()} MLEO. All rights reserved.</div>
-                <div className="flex flex-wrap gap-4">
-                  <Link href="/" className="hover:text-white/80">Home</Link>
-                  <button onClick={() => setPolicyModal('terms')} className="hover:text-white/80">{text.terms}</button>
-                  <button onClick={() => setPolicyModal('privacy')} className="hover:text-white/80">Privacy</button>
-                  <button onClick={() => setPolicyModal('cookies')} className="hover:text-white/80">Cookies</button>
-                  <button onClick={() => setPolicyModal('risk')} className="hover:text-white/80">Risk</button>
-                </div>
+              <div className="mb-8 max-w-4xl mx-auto">
+                <GamePoolStats />
               </div>
-            </footer>
+
+              <footer className="mt-8 pt-6 border-t border-white/10 text-xs text-white/50">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 justify-between">
+                  <div>© {new Date().getFullYear()} MLEO. All rights reserved.</div>
+                  <div className="flex flex-wrap gap-4">
+                    <Link href="/" className="hover:text-white/80">Home</Link>
+                    <button onClick={() => setPolicyModal("terms")} className="hover:text-white/80">{text.terms}</button>
+                    <button onClick={() => setPolicyModal("privacy")} className="hover:text-white/80">Privacy</button>
+                    <button onClick={() => setPolicyModal("cookies")} className="hover:text-white/80">Cookies</button>
+                    <button onClick={() => setPolicyModal("risk")} className="hover:text-white/80">Risk</button>
+                  </div>
+                </div>
+              </footer>
+            </div>
 
           </div>
         </div>
@@ -2987,6 +3183,17 @@ export default function GamesHub() {
       <Modal isOpen={modal === "arcade-how"} onClose={close}>
         <HowToPlay lang={lang} onClose={close} gameType="arcade" />
         </Modal>
+
+      <Modal isOpen={modal === "arcade-online-how"} onClose={close}>
+        <HowToPlay lang={lang} onClose={close} gameType="arcade-online" />
+      </Modal>
+
+      <Modal isOpen={poolModalOpen} onClose={() => setPoolModalOpen(false)} maxWidth="2xl">
+        <div className="rounded-xl bg-zinc-900 p-2 -m-1">
+          <p className="text-center text-sm font-bold text-white/90 mb-2">{text.poolStatus || "Pool"}</p>
+          <GamePoolStats />
+        </div>
+      </Modal>
 
       <Modal isOpen={modal === "terms"} onClose={close}>
         <Terms onAccept={handleAcceptTerms} onDecline={() => setModal(null)} />
