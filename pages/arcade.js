@@ -47,6 +47,24 @@ const ALLOW_TESTNET_WALLET_FLAG =
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "1" ||
   (process.env.NEXT_PUBLIC_ALLOW_TESTNET_WALLET || "").toLowerCase() === "true";
 
+/** One grapheme for mobile tiles — avoids stacked multi-emoji (e.g. 🎰🎴) */
+function compactCardEmoji(emoji) {
+  if (emoji == null || typeof emoji !== "string") return "🎮";
+  const t = emoji.trim();
+  if (!t) return "🎮";
+  try {
+    const Seg = Intl.Segmenter;
+    if (typeof Seg === "function") {
+      for (const { segment } of new Seg("en", { granularity: "grapheme" }).segment(t)) {
+        return segment;
+      }
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  return Array.from(t)[0] ?? "🎮";
+}
+
 function GameCard({ title, emoji, description, reward, href, color, freePlayStatus, comingSoon = false, compact = false }) {
   const [showInfo, setShowInfo] = useState(false);
   
@@ -63,7 +81,7 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
         <button
           onClick={() => setShowInfo(true)}
           type="button"
-          className={`absolute rounded bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center transition-all z-10 leading-none ${compact ? 'top-0 right-0 h-3.5 w-3.5 text-[7px] rounded-sm' : 'top-2 right-2 w-7 h-7 text-base rounded-full'}`}
+          className={`absolute bg-white/10 hover:bg-white/20 border border-white/15 flex items-center justify-center transition-all z-10 leading-none ${compact ? 'top-1 right-1 h-6 w-6 min-h-[24px] min-w-[24px] rounded-md text-sm' : 'top-2 right-2 w-7 h-7 text-base rounded-full'}`}
           title="Info"
         >
           ℹ️
@@ -71,43 +89,57 @@ function GameCard({ title, emoji, description, reward, href, color, freePlayStat
 
         {compact ? (
           <>
-            {/* 3×3 mobile grid: minimal vertical stack */}
-            <div className="absolute inset-x-0 top-0.5 text-center pointer-events-none leading-none">
-              <span className="text-lg leading-none select-none inline-block scale-100">{emoji}</span>
-            </div>
-            <div
-              className="absolute inset-x-0.5 flex items-center justify-center text-center px-px"
-              style={{ top: "22px", height: "20px" }}
-            >
-              {comingSoon ? (
-                <h2 className="text-[7px] font-bold leading-[1.05] line-clamp-2 text-amber-300">COMING SOON</h2>
-              ) : (
-                <h2 className="text-[7px] font-bold leading-[1.05] line-clamp-2">{title}</h2>
-              )}
-            </div>
-            <div className="absolute inset-x-0.5 bottom-0.5">
-              {comingSoon ? (
-                <button
-                  type="button"
-                  disabled
-                  className="block w-full text-center rounded-sm py-px leading-none text-[7px] font-bold text-white/50 cursor-not-allowed opacity-50"
-                  style={{
-                    background: `linear-gradient(135deg, ${color}40 0%, ${color}30 100%)`,
-                  }}
+            {/* 3×3 mobile: tight vertical stack; mt-auto on PLAY eats slack (less dead space) */}
+            <div className="flex h-full min-h-0 flex-col px-1 pb-0.5 pl-1 pr-2.5 pt-1">
+              <div className="flex shrink-0 justify-center leading-none pt-0.5">
+                <span
+                  className="select-none text-[2.7rem] leading-none sm:text-5xl"
+                  aria-hidden
                 >
-                  PLAY
-                </button>
-              ) : (
-                <Link
-                  href={href}
-                  className="block w-full text-center rounded-sm py-px leading-none text-[7px] font-bold text-white transition-colors"
-                  style={{
-                    background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
-                  }}
-                >
-                  PLAY
-                </Link>
-              )}
+                  {compactCardEmoji(emoji)}
+                </span>
+              </div>
+              <div className="mt-0.5 shrink-0 px-0.5 text-center">
+                {comingSoon ? (
+                  <h2 className="text-[11px] font-bold leading-snug line-clamp-2 text-amber-300">
+                    COMING SOON
+                  </h2>
+                ) : (
+                  <h2 className="text-[11px] font-bold leading-snug line-clamp-2">{title}</h2>
+                )}
+                {reward ? (
+                  <p
+                    className="mt-px max-w-full text-[9px] font-semibold leading-tight text-amber-200/95 line-clamp-1"
+                    title={reward}
+                  >
+                    {reward}
+                  </p>
+                ) : null}
+              </div>
+              <div className="mt-auto shrink-0 pt-0.5">
+                {comingSoon ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="block w-full min-h-[30px] cursor-not-allowed rounded-md py-1.5 text-center text-[11px] font-bold leading-none text-white/50 opacity-50 shadow-inner"
+                    style={{
+                      background: `linear-gradient(135deg, ${color}40 0%, ${color}30 100%)`,
+                    }}
+                  >
+                    PLAY
+                  </button>
+                ) : (
+                  <Link
+                    href={href}
+                    className="flex min-h-[30px] w-full items-center justify-center rounded-md py-1.5 text-center text-[11px] font-bold leading-none text-white shadow-sm active:opacity-90"
+                    style={{
+                      background: `linear-gradient(135deg, ${color} 0%, ${color}dd 100%)`,
+                    }}
+                  >
+                    PLAY
+                  </Link>
+                )}
+              </div>
             </div>
           </>
         ) : (
@@ -299,7 +331,7 @@ const games = [
   },
   {
     title: "Card Rooms",
-    emoji: "🎰🎴",
+    emoji: "🎰",
     description: "Join live multiplayer card tables with drop-in/drop-out play and session-based progression.",
     reward: "Social",
     href: "/tournament",
@@ -832,8 +864,11 @@ export default function ArcadeHub() {
             ))}
           </div>
 
-          {/* Middle zone: 3×3 dense grid */}
-          <section className="flex-1 min-h-0 grid grid-cols-3 grid-rows-3 gap-0.5" aria-label="Games">
+          {/* Middle zone: 3×3 grid — tighter row gap + margin before footer for breathing room */}
+          <section
+            className="mb-3 grid min-h-0 flex-1 grid-cols-3 grid-rows-3 gap-x-0.5 gap-y-px"
+            aria-label="Games"
+          >
             {mobileGroupGames.map((game, idx) => (
               <GameCard
                 key={`${mobileGroupIndex}-${game.href}-${idx}`}
