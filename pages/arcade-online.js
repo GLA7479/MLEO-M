@@ -625,41 +625,44 @@ useEffect(() => {
         }`}
         style={{ background: ARCADE_ONLINE_BG }}
       >
-        <header className="shrink-0 px-3 pb-2 pt-3 sm:px-4 md:px-5">
+        <header className="shrink-0 px-3 pb-2 pt-2.5 sm:px-4 md:px-5">
           <div className="mx-auto max-w-7xl space-y-2 rounded-xl border border-white/20 bg-black/40 px-2.5 py-2 shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={backIsLeave ? leaveTable : goBack}
-                className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
-                  backIsLeave
-                    ? "border border-red-500/45 bg-red-600/25 text-red-200 hover:bg-red-600/35"
-                    : "border border-white/25 bg-white/10 text-white hover:bg-white/20"
-                }`}
-              >
-                {showRoomBrowser
-                  ? "BACK"
-                  : backIsLeave
-                    ? "LEAVE"
-                    : selectedGame
-                      ? "BACK"
-                      : "BACK"}
-              </button>
-              <div className="min-w-0 flex-1 px-1 text-center">
-                <h1 className="truncate text-[15px] font-extrabold leading-tight tracking-tight sm:text-base">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <div className="flex justify-start">
+                <button
+                  type="button"
+                  onClick={backIsLeave ? leaveTable : goBack}
+                  className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                    backIsLeave
+                      ? "border border-red-500/45 bg-red-600/25 text-red-200 hover:bg-red-600/35"
+                      : "border border-white/25 bg-white/10 text-white hover:bg-white/20"
+                  }`}
+                >
+                  {showRoomBrowser
+                    ? "BACK"
+                    : backIsLeave
+                      ? "LEAVE"
+                      : selectedGame
+                        ? "BACK"
+                        : "BACK"}
+                </button>
+              </div>
+              <div className="min-w-0 max-w-[min(100%,22rem)] justify-self-center text-center">
+                <h1 className="text-xl font-extrabold leading-tight tracking-tight text-white sm:text-2xl">
                   MLEO Online
                 </h1>
-                <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/75">
+                <p className="mt-1 text-sm leading-snug text-white/75 sm:text-[15px]">
                   {hubSubtitle}
                 </p>
               </div>
-              <div
-                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/25 bg-white/10 px-2.5 py-1 text-[11px] font-semibold"
-                title="Vault balance"
-              >
-                <span aria-hidden>💰</span>
-                <span className="tabular-nums text-emerald-400">{fmt(vaultAmt)}</span>
-                <span className="text-white/80">MLEO</span>
+              <div className="flex justify-end">
+                <div
+                  className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-white/25 bg-white/10 px-2.5 py-1 text-[11px] font-semibold"
+                  title="Vault balance"
+                >
+                  <span aria-hidden>💰</span>
+                  <span className="tabular-nums text-emerald-400">{fmt(vaultAmt)}</span>
+                </div>
               </div>
             </div>
 
@@ -669,7 +672,7 @@ useEffect(() => {
                   <label className="text-[11px] font-semibold text-white/90">
                     Player Registration
                   </label>
-                  <p className="mt-0.5 text-[10px] text-white/65">
+                  <p className="mt-0.5 text-[10px] leading-snug text-white/65">
                     Enter your name to start playing
                   </p>
                 </div>
@@ -678,7 +681,7 @@ useEffect(() => {
                   placeholder="Enter your player name..."
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
-                  className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-center text-[11px] text-white placeholder-white/45 focus:border-amber-400/50 focus:outline-none focus:ring-2 focus:ring-amber-400/35 sm:text-sm"
+                  className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-center text-sm text-white placeholder-white/45 focus:border-amber-400/50 focus:outline-none focus:ring-2 focus:ring-amber-400/35"
                   maxLength={20}
                 />
               </div>
@@ -773,8 +776,8 @@ useEffect(() => {
               </div>
             </section>
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-[max(0.2rem,env(safe-area-inset-bottom))] pt-1 md:hidden">
-              <div className="mb-1 mt-1 flex shrink-0 justify-center gap-1 px-0.5">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-2 pb-[max(0.2rem,env(safe-area-inset-bottom))] pt-1.5 md:hidden">
+              <div className="mb-3 flex shrink-0 justify-center gap-1 px-0.5">
                 {[0, 1, 2].map((i) => (
                   <button
                     key={i}
@@ -792,15 +795,15 @@ useEffect(() => {
                 ))}
               </div>
               <div
-                className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden"
+                className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden"
                 onTouchStart={handleHubTouchStart}
                 onTouchEnd={handleHubTouchEnd}
               >
                 <div
-                  className={`mx-auto grid min-h-0 w-full min-w-0 flex-1 gap-2 px-0.5 ${
+                  className={`mx-auto w-full self-start px-0.5 ${
                     hubPageIndex === 2
-                      ? "grid-cols-2 grid-rows-1 content-start"
-                      : "grid-cols-2 grid-rows-2 content-center"
+                      ? "grid grid-cols-2 grid-rows-1 gap-x-2 gap-y-0 content-start justify-items-stretch"
+                      : "grid grid-cols-2 grid-rows-[auto_auto] gap-x-2 gap-y-2 content-start justify-items-stretch"
                   }`}
                   aria-label="Games"
                 >
