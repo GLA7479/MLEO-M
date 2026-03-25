@@ -3348,13 +3348,21 @@ function BankedQuickPanel({
           Banked MLEO = stored accumulated output inside BASE, not today&apos;s production.
         </div>
         <div className="text-[12px] leading-5 text-white/72">
-          Rate / hr = current live refinery snapshot.
+          Rate / hr = current live BASE production rate under current conditions.
         </div>
         <div className="text-[12px] leading-5 text-white/72">
-          Per day = projected remaining daily output estimate (not simply Rate / hr × 24).
+          Per day = projected remaining output for today under current conditions and daily cap
+          limits (not simply Rate / hr × 24).
         </div>
         <div className="text-[12px] leading-5 text-white/72">
-          Daily prod. cap limits today&apos;s production only, not total banked stock.
+          Today = how much BASE production has already been produced today.
+        </div>
+        <div className="text-[12px] leading-5 text-white/72">
+          Daily prod. cap = today&apos;s maximum BASE production limit, not the total banked stock
+          limit.
+        </div>
+        <div className="text-[12px] leading-5 text-white/72">
+          Cap ETA = estimated time until today&apos;s production cap is reached at the current rate.
         </div>
         <div className="text-[12px] leading-5 text-white/72">
           Shipping moves banked MLEO to the shared vault; it does not increase production rate.
