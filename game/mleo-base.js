@@ -903,6 +903,14 @@ function formatBankedBadgeCompact(value) {
   return `${sign}${formatted}${suffixes[tier]}`;
 }
 
+/** Banked snapshot: `softcutFactorNow` is 0–1 (effective / raw); show as whole percent for UI. */
+function formatBankedSoftcutPercent(multiplier) {
+  const n = Number(multiplier);
+  if (!Number.isFinite(n)) return "—";
+  const pct = Math.round(clamp(n, 0, 1) * 100);
+  return `${pct}%`;
+}
+
 function costTone(current, needed) {
   return Number(current || 0) >= Number(needed || 0)
     ? "text-emerald-300"
@@ -3216,7 +3224,7 @@ function BankedQuickPanel({
       bodyScrollRef={bodyScrollRef}
     >
       <div className="space-y-2">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-2.5 py-2">
             <div className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/65">
               Rate / hr
@@ -3243,24 +3251,31 @@ function BankedQuickPanel({
               {fmtRate(s.mleoProducedToday)}
             </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
+          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-              Daily prod. cap
+              Daily
             </div>
             <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
               {fmt(s.dailyMleoCap ?? s.shipCap)}
             </div>
           </div>
 
-          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
+          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
               Cap ETA
             </div>
             <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
               {s.etaHours == null ? "—" : `${fmtRate(s.etaHours, 1)}h`}
+            </div>
+          </div>
+
+          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+              Softcut
+            </div>
+            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+              {formatBankedSoftcutPercent(s.softcutFactorNow)}
             </div>
           </div>
         </div>
@@ -3342,7 +3357,7 @@ function BankedQuickPanel({
         </div>
         <div>
           Red means this is the reason output stopped. Orange means this is the best
-          improvement lane right now. Green means this lane is currently balanced.
+          improvement lane. Green means this lane is currently balanced.
         </div>
         <div className="border-t border-white/10 pt-2 text-[12px] leading-5 text-white/72">
           Banked MLEO = stored accumulated output inside BASE, not today&apos;s production.
@@ -3358,8 +3373,7 @@ function BankedQuickPanel({
           Today = how much BASE production has already been produced today.
         </div>
         <div className="text-[12px] leading-5 text-white/72">
-          Daily prod. cap = today&apos;s maximum BASE production limit, not the total banked stock
-          limit.
+          Daily = today&apos;s maximum BASE production limit, not the total banked stock limit.
         </div>
         <div className="text-[12px] leading-5 text-white/72">
           Cap ETA = estimated time until today&apos;s production cap is reached at the current rate.
