@@ -1,7 +1,7 @@
 // components/PolicyModal.js
 import { useEffect } from "react";
 
-export default function PolicyModal({ isOpen, onClose, title, children }) {
+export default function PolicyModal({ isOpen, onClose, title, children, closeAriaLabel = "Close" }) {
   
   useEffect(() => {
     if (isOpen) {
@@ -54,7 +54,7 @@ export default function PolicyModal({ isOpen, onClose, title, children }) {
           <button
             onClick={onClose}
             className="text-2xl font-bold text-gray-400 hover:text-white transition-colors p-2 -mr-2"
-            aria-label="Close"
+            aria-label={closeAriaLabel}
           >
             ×
           </button>

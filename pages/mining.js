@@ -144,6 +144,84 @@ const TEXT = {
     playBase: "Play MLEO BASE",
     baseHub: "Four destinations, one shared vault: Miners, MLEO BASE, solo Arcade, and Arcade Online.",
     baseHubShort: "Four destinations, one vault: Miners, BASE, Arcade, and Arcade Online.",
+    closeModalAria: "Close dialog",
+    loading: "Loading...",
+    termsGateTitle: "Welcome to MLEO Games",
+    termsGateSubtitle: "Please accept our terms and conditions to continue",
+    termsGateViewTerms: "View Terms",
+    footerHome: "Home",
+    footerPrivacy: "Privacy",
+    footerCookies: "Cookies",
+    footerRisk: "Risk",
+    menuTitle: "User Menu",
+    menuUserInfo: "User Information",
+    menuUsername: "Username:",
+    menuEmail: "Email:",
+    menuStatus: "Status:",
+    menuGuest: "Guest",
+    menuConnected: "Connected",
+    menuNotProvided: "Not provided",
+    menuLanguage: "Language",
+    menuWallet: "Wallet",
+    menuConnectWallet: "Connect Wallet",
+    menuLogout: "Logout",
+    menuLogin: "Login",
+    menuSignUp: "Sign Up",
+    menuCreateAccount: "Create Account",
+    menuWalletSection: "Wallet Connection",
+    menuWalletStatus: "Wallet Status:",
+    menuWalletNotConnected: "Not Connected",
+    menuAddress: "Address:",
+    menuAccount: "Account",
+    menuDisconnect: "Disconnect",
+    menuPlayerVaultTitle: "Player Vault",
+    menuYourVault: "Your MLEO Vault",
+    menuPlayerInfo: "Player Information",
+    menuWalletInfo: "Wallet Information",
+    menuVaultLine: "VAULT: {{amount}} MLEO",
+    connectButtonLabel: "CONNECT",
+    authErrorInvalidCredentials: "Please enter a valid email and password (8+ characters).",
+    authErrorUsernameShort: "Username must be at least 3 characters long.",
+    authErrorPasswordMismatch: "Passwords do not match.",
+    authLoginFailed: "Login failed. Please try again.",
+    authSignupFailed: "Signup failed. Please try again.",
+    authLabelUsername: "Username",
+    authLabelPassword: "Password",
+    authLabelConfirmPassword: "Confirm Password",
+    authPlaceholderUsername: "Choose a username (3+ characters)",
+    authPlaceholderEmail: "your@email.com",
+    authPlaceholderPassword: "8+ characters",
+    authPlaceholderConfirmPassword: "Confirm password",
+    authProcessing: "Processing...",
+    alertSwitchChain: "Switch to BSC Testnet (TBNB)",
+    alertMissingClaim: "Missing CLAIM address",
+    alertInvalidAmount: "Invalid amount!",
+    alertClaimSuccess: "✅ Sent {{amount}} MLEO to wallet!",
+    alertClaimFailed: "Claim failed or rejected",
+    policyTitleTerms: "Terms & Conditions",
+    policyTitlePrivacy: "Privacy Policy",
+    policyTitleCookies: "Cookie Notice",
+    policyTitleRisk: "Risk / Testnet Disclaimer",
+    policyLastUpdatedStub: "Last Updated: [Insert Date]",
+    vaultCollectTitle: "Collect to Wallet",
+    vaultAmountPlaceholder: "Amount",
+    vaultMax: "MAX",
+    vaultAvailable: "Available: {{amount}} MLEO",
+    vaultClaiming: "Claiming...",
+    vaultClaimCta: "CLAIM {{amount}} MLEO",
+    vaultNeedWalletClaim: "Connect your wallet to claim MLEO tokens",
+    vaultAboutTitle: "💡 About Your Vault:",
+    vaultAboutList: [
+      "Your vault is shared between all MLEO games",
+      "Play games to earn more MLEO tokens",
+      "All rewards are automatically added to your vault",
+      "Use free play tokens to play without using vault MLEO",
+      "Connect your wallet and claim MLEO tokens on-chain",
+    ],
+    menuButtonTitle: "Menu",
+    menuUsernameFallback: "User",
+    termsAccept: "Accept",
+    termsDecline: "Decline",
   },
   ar: {
     name: "العربية", dir: "rtl", code: "ar",
@@ -257,6 +335,275 @@ const TEXT = {
     playBase: "العب قاعدة MLEO",
     baseHub: "أربع وجهات، خزنة واحدة مشتركة: المنقبون، قاعدة MLEO، الأركيد الفردي، وأركيد أونلاين.",
     baseHubShort: "أربع وجهات، خزنة واحدة: المنقبون، القاعدة، الأركيد، وأركيد أونلاين.",
+    closeModalAria: "إغلاق النافذة",
+    loading: "جارٍ التحميل...",
+    termsGateTitle: "مرحبًا بك في ألعاب MLEO",
+    termsGateSubtitle: "يرجى قبول الشروط والأحكام للمتابعة",
+    termsGateViewTerms: "عرض الشروط",
+    footerHome: "الرئيسية",
+    footerPrivacy: "الخصوصية",
+    footerCookies: "ملفات تعريف الارتباط",
+    footerRisk: "المخاطر",
+    menuTitle: "قائمة المستخدم",
+    menuUserInfo: "معلومات المستخدم",
+    menuUsername: "اسم المستخدم:",
+    menuEmail: "البريد الإلكتروني:",
+    menuStatus: "الحالة:",
+    menuGuest: "ضيف",
+    menuConnected: "متصل",
+    menuNotProvided: "غير متوفر",
+    menuLanguage: "اللغة",
+    menuWallet: "المحفظة",
+    menuConnectWallet: "ربط المحفظة",
+    menuLogout: "تسجيل الخروج",
+    menuLogin: "تسجيل الدخول",
+    menuSignUp: "إنشاء حساب",
+    menuCreateAccount: "إنشاء حساب",
+    menuWalletSection: "اتصال المحفظة",
+    menuWalletStatus: "حالة المحفظة:",
+    menuWalletNotConnected: "غير متصل",
+    menuAddress: "العنوان:",
+    menuAccount: "الحساب",
+    menuDisconnect: "قطع الاتصال",
+    menuPlayerVaultTitle: "خزنة اللاعب",
+    menuYourVault: "خزنة MLEO الخاصة بك",
+    menuPlayerInfo: "معلومات اللاعب",
+    menuWalletInfo: "معلومات المحفظة",
+    menuVaultLine: "الخزنة: {{amount}} MLEO",
+    connectButtonLabel: "اتصال",
+    authErrorInvalidCredentials: "يرجى إدخال بريد إلكتروني وكلمة مرور صالحة (8 أحرف على الأقل).",
+    authErrorUsernameShort: "يجب أن يكون اسم المستخدم 3 أحرف على الأقل.",
+    authErrorPasswordMismatch: "كلمتا المرور غير متطابقتين.",
+    authLoginFailed: "فشل تسجيل الدخول. حاول مرة أخرى.",
+    authSignupFailed: "فشل إنشاء الحساب. حاول مرة أخرى.",
+    authLabelUsername: "اسم المستخدم",
+    authLabelPassword: "كلمة المرور",
+    authLabelConfirmPassword: "تأكيد كلمة المرور",
+    authPlaceholderUsername: "اختر اسم مستخدم (3 أحرف على الأقل)",
+    authPlaceholderEmail: "your@email.com",
+    authPlaceholderPassword: "8 أحرف على الأقل",
+    authPlaceholderConfirmPassword: "أكد كلمة المرور",
+    authProcessing: "جارٍ المعالجة...",
+    alertSwitchChain: "انتقل إلى شبكة BSC التجريبية (TBNB)",
+    alertMissingClaim: "عنوان المطالبة غير متوفر",
+    alertInvalidAmount: "مبلغ غير صالح!",
+    alertClaimSuccess: "✅ تم إرسال {{amount}} MLEO إلى المحفظة!",
+    alertClaimFailed: "فشلت المطالبة أو رُفضت",
+    policyTitleTerms: "الشروط والأحكام",
+    policyTitlePrivacy: "سياسة الخصوصية",
+    policyTitleCookies: "إشعار ملفات تعريف الارتباط",
+    policyTitleRisk: "إخلاء مسؤولية المخاطر / الشبكة التجريبية",
+    policyLastUpdatedStub: "آخر تحديث: [أدخل التاريخ]",
+    vaultCollectTitle: "سحب إلى المحفظة",
+    vaultAmountPlaceholder: "المبلغ",
+    vaultMax: "الحد الأقصى",
+    vaultAvailable: "المتاح: {{amount}} MLEO",
+    vaultClaiming: "جاري المطالبة...",
+    vaultClaimCta: "مطالبة {{amount}} MLEO",
+    vaultNeedWalletClaim: "اربط محفظتك لمطالبة رموز MLEO",
+    vaultAboutTitle: "💡 عن خزنتك:",
+    vaultAboutList: [
+      "خزنتك مشتركة بين جميع ألعاب MLEO",
+      "العب لربح المزيد من رموز MLEO",
+      "تُضاف جميع المكافآت تلقائيًا إلى خزنتك",
+      "استخدم رموز اللعب المجاني للعب دون استخدام MLEO من الخزنة",
+      "اربط محفظتك واطلب رموز MLEO على السلسلة",
+    ],
+    menuButtonTitle: "القائمة",
+    menuUsernameFallback: "مستخدم",
+    termsAccept: "قبول",
+    termsDecline: "رفض",
+  },
+  ru: {
+    name: "Русский", dir: "ltr", code: "ru",
+    back: "← Назад",
+    logout: "Выйти",
+    liveTestnet: "Тестовая сеть • Зарабатывайте MLEO в игре",
+    chooseGame: "Выберите игру",
+    miners: "MLEO — Шахтёры",
+    minersDesc: "Idle-игра и улучшения с подарками за тапы и бустами. Интеграция с хранилищем + on-chain CLAIM для стабильного прогресса.",
+    active: "Активно",
+    howToPlay: "КАК ИГРАТЬ",
+    terms: "УСЛОВИЯ",
+    playMiners: "Играть в Шахтёры",
+    howToPlayTitle: "Как играть",
+    goal: "Цель",
+    goalDesc: "Объединяйте собак (шахтёров), ломайте камни и зарабатывайте монеты. Монеты — внутриигровой ресурс для улучшений и покупки шахтёров. Часть активности также может приносить MLEO (см. раздел «Майнинг и токены» ниже).",
+    boardMerging: "Поле и слияние",
+    boardSteps: [
+      "Нажмите ADD на пустой ячейке, чтобы поставить собаку. Со временем стоимость растёт.",
+      "Перетащите двух собак одного уровня друг к другу, чтобы объединить их в более высокий уровень.",
+      "Каждая собака добавляет урон в секунду (DPS) в свой ряд. Когда камень ломается, вы получаете монеты."
+    ],
+    upgradesBonuses: "Улучшения и бонусы",
+    upgradesList: [
+      "Улучшения DPS ускоряют ломание камней.",
+      "Улучшения GOLD увеличивают монеты с каждого камня на 10% за уровень.",
+      "Подарки, авто-собаки и другие бонусы могут появляться время от времени. Точные тайминги и дроп динамичны и могут меняться без уведомления.",
+      "Алмазы можно собирать и тратить на особые награды. Доступность не гарантируется."
+    ],
+    miningTokens: "Майнинг и токены (MLEO)",
+    miningList: [
+      "Как копится MLEO: только ломая камни, можно получать MLEO. Часть монет с камней может конвертироваться в MLEO по переменному курсу с учётом баланса игры, дневных лимитов и защиты от злоупотреблений.",
+      "Дневные лимиты: по мере приближения к личному лимиту начисление может снижаться. Лимиты внутренние и могут меняться.",
+      "Офлайн-прогресс: ограниченный прогресс вне игры с пониженной эффективностью.",
+      "CLAIM: накопленный MLEO отображается как баланс. Claim переводит его во внутриигровое хранилище. При появлении on-chain claim могут действовать дополнительные окна и ограничения.",
+      "Нет гарантии стоимости: MLEO — утилитарный токен для развлечения, без гарантированной денежной стоимости."
+    ],
+    goodToKnow: "Полезно знать",
+    goodToKnowList: [
+      "Баланс, дроп, лимиты и расписания динамичны и могут меняться, приостанавливаться или сбрасываться.",
+      "Прогресс может корректироваться из-за багов, эксплойтов или злоупотреблений.",
+      "Это тестовая сеть; данные могут быть сброшены.",
+      "Подключите кошелёк, чтобы получать MLEO on-chain, когда это доступно."
+    ],
+    arcadeWhat: "Что такое мини-игры MLEO?",
+    arcadeWhatDesc: "Мини-игры MLEO — это коллекция из 24 мини-игр, где можно собирать награды MLEO в приложении. У каждой игры своя механика и множители.",
+    arcadeHowToPlay: "Как играть",
+    arcadeSteps: [
+      "Выберите любую мини-игру из списка",
+      "Каждая сессия использует минимум 100 MLEO из хранилища в приложении. В некоторых режимах стоимость сессии может отличаться",
+      "Следуйте инструкциям конкретной игры",
+      "Завершайте раунды, достигайте вех и получайте бусты наград",
+      "Награды сессии автоматически добавляются в хранилище, включая бесплатные сессии"
+    ],
+    arcadeFreePlay: "Токены бесплатной игры",
+    arcadeFreePlayList: [
+      "Получайте 1 токен бесплатной игры каждый час (до 5 в запасе)",
+      "Используйте токены, чтобы начать сессию мини-игр без расхода MLEO из хранилища",
+      "Награды бесплатных сессий начисляются как обычные награды сессий"
+    ],
+    arcadeGoodToKnow: "Полезно знать",
+    arcadeGoodToKnowList: [
+      "Хранилище общее для всех игр MLEO",
+      "Каждая игра отслеживает активность, сессии, рекорды, серии и вехи",
+      "В играх бывают случайные события или упор на тайминг, реакцию, память и решения",
+      "Нажмите ℹ️ на карточке игры, чтобы открыть правила и награды"
+    ],
+    chooseGameLobbyShort: "Четыре направления, одно общее хранилище: шахтёры, база MLEO, мини-игры и мини-игры онлайн.",
+    minersDescShort: "Idle и улучшения. Хранилище + on-chain claim.",
+    poolStatus: "Пул",
+    arcadeGames: "Мини-игры",
+    arcadeOnline: "Мини-игры онлайн",
+    arcadeRegularTitle: "MLEO — Мини-игры",
+    arcadeOnlineTitle: "MLEO — Мини-игры онлайн",
+    arcadeBadgeLabel: "Мини-игры",
+    onlineBadgeLabel: "Онлайн",
+    arcadeDescShort: "Соло мини-игры. Общее хранилище и награды сессий.",
+    arcadeOnlineDescShort: "Мультиплеер и живые режимы. То же хранилище.",
+    arcadeOnlineHowIntro: "Живые и онлайн-режимы мини-игр используют то же хранилище и правила, что и соло. Стоимость сессии и награды могут отличаться.",
+    legalShort: "Правовая информация",
+    howToPlayArcadeTitle: "Как играть — Мини-игры",
+    howToPlayArcadeOnlineTitle: "Как играть — Мини-игры онлайн",
+    howToPlayMinersTitle: "Как играть — Шахтёры",
+    questHow: {
+      title: "Как играть — база MLEO",
+      goal: "Цель",
+      goalDesc: "База MLEO — стратегический центр экосистемы. Стройте и улучшайте базу, управляйте энергией и стабильностью, производите ресурсы, запускайте экспедиции, перерабатывайте материалы в забанкованный MLEO и отправляйте часть в общее хранилище.",
+      gameplay: "Ваша миссия",
+      gameplaySteps: [
+        "Улучшайте здания",
+        "Управляйте энергией и стабильностью базы",
+        "Добывайте руду, золото, лом и данные",
+        "Используйте данные для продвинутых операций",
+        "Перерабатывайте ресурсы в забанкованный MLEO",
+        "Запускайте экспедиции ради прогресса и материалов",
+        "Отправляйте MLEO в общее хранилище с хорошим таймингом",
+        "Поддерживайте экосистему в долгую"
+      ],
+      features: "Полезно знать",
+      featuresList: [
+        "Забанкованный MLEO остаётся на базе, пока не отправите в общее хранилище.",
+        "Отправка ограничена дневными лимитами и давлением эффективности.",
+        "Режим дополняет шахтёров и мини-игры для долгосрочного прогресса.",
+        "Стройте с умом, держите стабильность, укрепляйте базу."
+      ]
+    },
+    baseTitle: "MLEO — База",
+    baseDesc: "База поддержки и управления, связывающая шахтёров, мини-игры и общее хранилище миссиями, данными, экспедициями и улучшениями.",
+    baseDescShort: "Центр поддержки: миссии, данные и экспедиции для общего хранилища.",
+    baseBadgeLabel: "Поддержка",
+    playBase: "Играть в базу MLEO",
+    baseHub: "Четыре направления, одно хранилище: шахтёры, база MLEO, соло мини-игры и мини-игры онлайн.",
+    baseHubShort: "Четыре направления, одно хранилище: шахтёры, база, мини-игры и мини-игры онлайн.",
+    closeModalAria: "Закрыть окно",
+    loading: "Загрузка...",
+    termsGateTitle: "Добро пожаловать в игры MLEO",
+    termsGateSubtitle: "Примите условия использования, чтобы продолжить",
+    termsGateViewTerms: "Показать условия",
+    footerHome: "Главная",
+    footerPrivacy: "Конфиденциальность",
+    footerCookies: "Файлы cookie",
+    footerRisk: "Риски",
+    menuTitle: "Меню пользователя",
+    menuUserInfo: "Информация о пользователе",
+    menuUsername: "Имя пользователя:",
+    menuEmail: "Email:",
+    menuStatus: "Статус:",
+    menuGuest: "Гость",
+    menuConnected: "Подключено",
+    menuNotProvided: "Не указано",
+    menuLanguage: "Язык",
+    menuWallet: "Кошелёк",
+    menuConnectWallet: "Подключить кошелёк",
+    menuLogout: "Выйти",
+    menuLogin: "Вход",
+    menuSignUp: "Регистрация",
+    menuCreateAccount: "Создать аккаунт",
+    menuWalletSection: "Подключение кошелька",
+    menuWalletStatus: "Статус кошелька:",
+    menuWalletNotConnected: "Не подключено",
+    menuAddress: "Адрес:",
+    menuAccount: "Аккаунт",
+    menuDisconnect: "Отключить",
+    menuPlayerVaultTitle: "Хранилище игрока",
+    menuYourVault: "Ваше хранилище MLEO",
+    menuPlayerInfo: "Информация об игроке",
+    menuWalletInfo: "Информация о кошельке",
+    menuVaultLine: "ХРАНИЛИЩЕ: {{amount}} MLEO",
+    connectButtonLabel: "ПОДКЛЮЧИТЬ",
+    authErrorInvalidCredentials: "Введите корректный email и пароль (не менее 8 символов).",
+    authErrorUsernameShort: "Имя пользователя — не менее 3 символов.",
+    authErrorPasswordMismatch: "Пароли не совпадают.",
+    authLoginFailed: "Не удалось войти. Попробуйте снова.",
+    authSignupFailed: "Не удалось зарегистрироваться. Попробуйте снова.",
+    authLabelUsername: "Имя пользователя",
+    authLabelPassword: "Пароль",
+    authLabelConfirmPassword: "Подтвердите пароль",
+    authPlaceholderUsername: "Выберите имя (от 3 символов)",
+    authPlaceholderEmail: "your@email.com",
+    authPlaceholderPassword: "от 8 символов",
+    authPlaceholderConfirmPassword: "Повторите пароль",
+    authProcessing: "Обработка...",
+    alertSwitchChain: "Переключитесь на BSC Testnet (TBNB)",
+    alertMissingClaim: "Не задан адрес CLAIM",
+    alertInvalidAmount: "Неверная сумма!",
+    alertClaimSuccess: "✅ Отправлено {{amount}} MLEO на кошелёк!",
+    alertClaimFailed: "Claim отклонён или не выполнен",
+    policyTitleTerms: "Условия использования",
+    policyTitlePrivacy: "Политика конфиденциальности",
+    policyTitleCookies: "Уведомление о cookie",
+    policyTitleRisk: "Предупреждение о рисках / тестовая сеть",
+    policyLastUpdatedStub: "Последнее обновление: [укажите дату]",
+    vaultCollectTitle: "Вывести в кошелёк",
+    vaultAmountPlaceholder: "Сумма",
+    vaultMax: "МАКС",
+    vaultAvailable: "Доступно: {{amount}} MLEO",
+    vaultClaiming: "Получение...",
+    vaultClaimCta: "ПОЛУЧИТЬ {{amount}} MLEO",
+    vaultNeedWalletClaim: "Подключите кошелёк, чтобы получить токены MLEO",
+    vaultAboutTitle: "💡 О вашем хранилище:",
+    vaultAboutList: [
+      "Хранилище общее для всех игр MLEO",
+      "Играйте, чтобы заработать больше токенов MLEO",
+      "Все награды автоматически зачисляются в хранилище",
+      "Используйте бесплатные жетоны, чтобы играть без списания MLEO из хранилища",
+      "Подключите кошелёк и получайте MLEO в сети",
+    ],
+    menuButtonTitle: "Меню",
+    menuUsernameFallback: "Пользователь",
+    termsAccept: "Принять",
+    termsDecline: "Отклонить",
   },
   es: {
     name: "Español", dir: "ltr", code: "es",
@@ -370,7 +717,85 @@ const TEXT = {
       "Cada juego rastrea tu actividad, sesiones completadas, mejor puntuación, rachas y hitos de progreso",
       "Algunos juegos usan eventos aleatorios, mientras que otros se enfocan en tiempo, reacción, memoria o toma de decisiones",
       "Haz clic en el botón ℹ️ en cada tarjeta de juego para ver las reglas, controles y estructura de recompensas"
-    ]
+    ],
+    closeModalAria: "Cerrar ventana",
+    loading: "Cargando...",
+    termsGateTitle: "Bienvenido a los juegos MLEO",
+    termsGateSubtitle: "Acepta los términos y condiciones para continuar",
+    termsGateViewTerms: "Ver términos",
+    footerHome: "Inicio",
+    footerPrivacy: "Privacidad",
+    footerCookies: "Cookies",
+    footerRisk: "Riesgos",
+    menuTitle: "Menú de usuario",
+    menuUserInfo: "Información del usuario",
+    menuUsername: "Usuario:",
+    menuEmail: "Correo:",
+    menuStatus: "Estado:",
+    menuGuest: "Invitado",
+    menuConnected: "Conectado",
+    menuNotProvided: "No indicado",
+    menuLanguage: "Idioma",
+    menuWallet: "Cartera",
+    menuConnectWallet: "Conectar cartera",
+    menuLogout: "Cerrar sesión",
+    menuLogin: "Iniciar sesión",
+    menuSignUp: "Registrarse",
+    menuCreateAccount: "Crear cuenta",
+    menuWalletSection: "Conexión de cartera",
+    menuWalletStatus: "Estado de la cartera:",
+    menuWalletNotConnected: "No conectado",
+    menuAddress: "Dirección:",
+    menuAccount: "Cuenta",
+    menuDisconnect: "Desconectar",
+    menuPlayerVaultTitle: "Bóveda del jugador",
+    menuYourVault: "Tu bóveda MLEO",
+    menuPlayerInfo: "Información del jugador",
+    menuWalletInfo: "Información de la cartera",
+    menuVaultLine: "BÓVEDA: {{amount}} MLEO",
+    connectButtonLabel: "CONECTAR",
+    authErrorInvalidCredentials: "Introduce un correo y una contraseña válidos (8+ caracteres).",
+    authErrorUsernameShort: "El usuario debe tener al menos 3 caracteres.",
+    authErrorPasswordMismatch: "Las contraseñas no coinciden.",
+    authLoginFailed: "Error al iniciar sesión. Inténtalo de nuevo.",
+    authSignupFailed: "Error al registrarse. Inténtalo de nuevo.",
+    authLabelUsername: "Usuario",
+    authLabelPassword: "Contraseña",
+    authLabelConfirmPassword: "Confirmar contraseña",
+    authPlaceholderUsername: "Elige un usuario (3+ caracteres)",
+    authPlaceholderEmail: "tu@correo.com",
+    authPlaceholderPassword: "8+ caracteres",
+    authPlaceholderConfirmPassword: "Confirma la contraseña",
+    authProcessing: "Procesando...",
+    alertSwitchChain: "Cambia a BSC Testnet (TBNB)",
+    alertMissingClaim: "Falta la dirección de reclamación",
+    alertInvalidAmount: "¡Cantidad no válida!",
+    alertClaimSuccess: "✅ ¡Enviados {{amount}} MLEO a la cartera!",
+    alertClaimFailed: "Reclamación fallida o rechazada",
+    policyTitleTerms: "Términos y condiciones",
+    policyTitlePrivacy: "Política de privacidad",
+    policyTitleCookies: "Aviso de cookies",
+    policyTitleRisk: "Aviso de riesgos / testnet",
+    policyLastUpdatedStub: "Última actualización: [Insertar fecha]",
+    vaultCollectTitle: "Recoger en la cartera",
+    vaultAmountPlaceholder: "Cantidad",
+    vaultMax: "MÁX",
+    vaultAvailable: "Disponible: {{amount}} MLEO",
+    vaultClaiming: "Reclamando...",
+    vaultClaimCta: "RECLAMAR {{amount}} MLEO",
+    vaultNeedWalletClaim: "Conecta tu cartera para reclamar tokens MLEO",
+    vaultAboutTitle: "💡 Sobre tu bóveda:",
+    vaultAboutList: [
+      "Tu bóveda se comparte entre todos los juegos MLEO",
+      "Juega para ganar más tokens MLEO",
+      "Todas las recompensas se añaden automáticamente a tu bóveda",
+      "Usa fichas de juego gratis para jugar sin gastar MLEO de la bóveda",
+      "Conecta tu cartera y reclama tokens MLEO on-chain",
+    ],
+    menuButtonTitle: "Menú",
+    menuUsernameFallback: "Usuario",
+    termsAccept: "Aceptar",
+    termsDecline: "Rechazar",
   },
   fr: {
     name: "Français", dir: "ltr", code: "fr",
@@ -484,7 +909,85 @@ const TEXT = {
       "Chaque jeu suit votre activité, sessions complétées, meilleur score, séries et jalons de progression",
       "Certains jeux utilisent des événements aléatoires, tandis que d'autres se concentrent sur le timing, la réaction, la mémoire ou la prise de décision",
       "Cliquez sur le bouton ℹ️ sur chaque carte de jeu pour voir les règles, contrôles et structure de récompenses"
-    ]
+    ],
+    closeModalAria: "Fermer la fenêtre",
+    loading: "Chargement...",
+    termsGateTitle: "Bienvenue sur les jeux MLEO",
+    termsGateSubtitle: "Veuillez accepter les conditions générales pour continuer",
+    termsGateViewTerms: "Voir les conditions",
+    footerHome: "Accueil",
+    footerPrivacy: "Confidentialité",
+    footerCookies: "Cookies",
+    footerRisk: "Risques",
+    menuTitle: "Menu utilisateur",
+    menuUserInfo: "Informations utilisateur",
+    menuUsername: "Nom d’utilisateur :",
+    menuEmail: "E-mail :",
+    menuStatus: "Statut :",
+    menuGuest: "Invité",
+    menuConnected: "Connecté",
+    menuNotProvided: "Non renseigné",
+    menuLanguage: "Langue",
+    menuWallet: "Portefeuille",
+    menuConnectWallet: "Connecter le portefeuille",
+    menuLogout: "Se déconnecter",
+    menuLogin: "Connexion",
+    menuSignUp: "S’inscrire",
+    menuCreateAccount: "Créer un compte",
+    menuWalletSection: "Connexion portefeuille",
+    menuWalletStatus: "État du portefeuille :",
+    menuWalletNotConnected: "Non connecté",
+    menuAddress: "Adresse :",
+    menuAccount: "Compte",
+    menuDisconnect: "Déconnecter",
+    menuPlayerVaultTitle: "Coffre du joueur",
+    menuYourVault: "Votre coffre MLEO",
+    menuPlayerInfo: "Informations du joueur",
+    menuWalletInfo: "Informations portefeuille",
+    menuVaultLine: "COFFRE : {{amount}} MLEO",
+    connectButtonLabel: "CONNECTER",
+    authErrorInvalidCredentials: "Entrez un e-mail et un mot de passe valides (8+ caractères).",
+    authErrorUsernameShort: "Le nom d’utilisateur doit faire au moins 3 caractères.",
+    authErrorPasswordMismatch: "Les mots de passe ne correspondent pas.",
+    authLoginFailed: "Échec de la connexion. Réessayez.",
+    authSignupFailed: "Échec de l’inscription. Réessayez.",
+    authLabelUsername: "Nom d’utilisateur",
+    authLabelPassword: "Mot de passe",
+    authLabelConfirmPassword: "Confirmer le mot de passe",
+    authPlaceholderUsername: "Choisissez un nom (3+ caractères)",
+    authPlaceholderEmail: "vous@email.com",
+    authPlaceholderPassword: "8+ caractères",
+    authPlaceholderConfirmPassword: "Confirmez le mot de passe",
+    authProcessing: "Traitement...",
+    alertSwitchChain: "Passez au BSC Testnet (TBNB)",
+    alertMissingClaim: "Adresse de réclamation manquante",
+    alertInvalidAmount: "Montant invalide !",
+    alertClaimSuccess: "✅ {{amount}} MLEO envoyés au portefeuille !",
+    alertClaimFailed: "Réclamation échouée ou refusée",
+    policyTitleTerms: "Conditions générales",
+    policyTitlePrivacy: "Politique de confidentialité",
+    policyTitleCookies: "Avis sur les cookies",
+    policyTitleRisk: "Avertissement risques / testnet",
+    policyLastUpdatedStub: "Dernière mise à jour : [Insérer la date]",
+    vaultCollectTitle: "Collecter vers le portefeuille",
+    vaultAmountPlaceholder: "Montant",
+    vaultMax: "MAX",
+    vaultAvailable: "Disponible : {{amount}} MLEO",
+    vaultClaiming: "Réclamation...",
+    vaultClaimCta: "RÉCLAMER {{amount}} MLEO",
+    vaultNeedWalletClaim: "Connectez votre portefeuille pour réclamer des jetons MLEO",
+    vaultAboutTitle: "💡 À propos de votre coffre :",
+    vaultAboutList: [
+      "Votre coffre est partagé entre tous les jeux MLEO",
+      "Jouez pour gagner plus de jetons MLEO",
+      "Toutes les récompenses sont ajoutées automatiquement à votre coffre",
+      "Utilisez des jetons gratuits pour jouer sans utiliser le MLEO du coffre",
+      "Connectez votre portefeuille et réclamez des jetons MLEO on-chain",
+    ],
+    menuButtonTitle: "Menu",
+    menuUsernameFallback: "Utilisateur",
+    termsAccept: "Accepter",
+    termsDecline: "Refuser",
   },
   de: {
     name: "Deutsch", dir: "ltr", code: "de",
@@ -598,7 +1101,85 @@ const TEXT = {
       "Jedes Spiel verfolgt Ihre Aktivität, abgeschlossene Sitzungen, beste Punktzahl, Serien und Fortschrittsmeilensteine",
       "Einige Spiele verwenden zufällige Ereignisse, während andere sich auf Timing, Reaktion, Gedächtnis oder Entscheidungsfindung konzentrieren",
       "Klicken Sie auf die ℹ️-Schaltfläche auf jeder Spielkarte, um die Regeln, Steuerungen und Belohnungsstruktur anzuzeigen"
-    ]
+    ],
+    closeModalAria: "Dialog schließen",
+    loading: "Wird geladen...",
+    termsGateTitle: "Willkommen bei MLEO Games",
+    termsGateSubtitle: "Bitte akzeptieren Sie die Nutzungsbedingungen, um fortzufahren",
+    termsGateViewTerms: "Bedingungen anzeigen",
+    footerHome: "Start",
+    footerPrivacy: "Datenschutz",
+    footerCookies: "Cookies",
+    footerRisk: "Risiken",
+    menuTitle: "Benutzermenü",
+    menuUserInfo: "Benutzerinformationen",
+    menuUsername: "Benutzername:",
+    menuEmail: "E-Mail:",
+    menuStatus: "Status:",
+    menuGuest: "Gast",
+    menuConnected: "Verbunden",
+    menuNotProvided: "Nicht angegeben",
+    menuLanguage: "Sprache",
+    menuWallet: "Wallet",
+    menuConnectWallet: "Wallet verbinden",
+    menuLogout: "Abmelden",
+    menuLogin: "Anmelden",
+    menuSignUp: "Registrieren",
+    menuCreateAccount: "Konto erstellen",
+    menuWalletSection: "Wallet-Verbindung",
+    menuWalletStatus: "Wallet-Status:",
+    menuWalletNotConnected: "Nicht verbunden",
+    menuAddress: "Adresse:",
+    menuAccount: "Konto",
+    menuDisconnect: "Trennen",
+    menuPlayerVaultTitle: "Spieler-Tresor",
+    menuYourVault: "Ihr MLEO-Tresor",
+    menuPlayerInfo: "Spielerinformationen",
+    menuWalletInfo: "Wallet-Informationen",
+    menuVaultLine: "TRESOR: {{amount}} MLEO",
+    connectButtonLabel: "VERBINDEN",
+    authErrorInvalidCredentials: "Bitte gültige E-Mail und Passwort eingeben (8+ Zeichen).",
+    authErrorUsernameShort: "Benutzername mindestens 3 Zeichen.",
+    authErrorPasswordMismatch: "Passwörter stimmen nicht überein.",
+    authLoginFailed: "Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
+    authSignupFailed: "Registrierung fehlgeschlagen. Bitte erneut versuchen.",
+    authLabelUsername: "Benutzername",
+    authLabelPassword: "Passwort",
+    authLabelConfirmPassword: "Passwort bestätigen",
+    authPlaceholderUsername: "Benutzername wählen (3+ Zeichen)",
+    authPlaceholderEmail: "ihre@email.de",
+    authPlaceholderPassword: "8+ Zeichen",
+    authPlaceholderConfirmPassword: "Passwort wiederholen",
+    authProcessing: "Wird verarbeitet...",
+    alertSwitchChain: "Bitte zu BSC Testnet (TBNB) wechseln",
+    alertMissingClaim: "CLAIM-Adresse fehlt",
+    alertInvalidAmount: "Ungültiger Betrag!",
+    alertClaimSuccess: "✅ {{amount}} MLEO an Wallet gesendet!",
+    alertClaimFailed: "Claim fehlgeschlagen oder abgelehnt",
+    policyTitleTerms: "Allgemeine Geschäftsbedingungen",
+    policyTitlePrivacy: "Datenschutzrichtlinie",
+    policyTitleCookies: "Cookie-Hinweis",
+    policyTitleRisk: "Risikohinweis / Testnet",
+    policyLastUpdatedStub: "Zuletzt aktualisiert: [Datum einfügen]",
+    vaultCollectTitle: "In Wallet auszahlen",
+    vaultAmountPlaceholder: "Betrag",
+    vaultMax: "MAX",
+    vaultAvailable: "Verfügbar: {{amount}} MLEO",
+    vaultClaiming: "Wird ausgezahlt...",
+    vaultClaimCta: "{{amount}} MLEO AUSZAHLEN",
+    vaultNeedWalletClaim: "Verbinden Sie Ihre Wallet, um MLEO-Token zu beanspruchen",
+    vaultAboutTitle: "💡 Über Ihren Tresor:",
+    vaultAboutList: [
+      "Ihr Tresor ist in allen MLEO-Spielen gemeinsam",
+      "Spielen Sie, um mehr MLEO-Token zu verdienen",
+      "Alle Belohnungen werden automatisch Ihrem Tresor gutgeschrieben",
+      "Nutzen Sie Gratis-Spielmarken, ohne MLEO aus dem Tresor zu verwenden",
+      "Verbinden Sie Ihre Wallet und beanspruchen Sie MLEO on-chain",
+    ],
+    menuButtonTitle: "Menü",
+    menuUsernameFallback: "Benutzer",
+    termsAccept: "Akzeptieren",
+    termsDecline: "Ablehnen",
   },
   zh: {
     name: "中文", dir: "ltr", code: "zh",
@@ -712,7 +1293,85 @@ const TEXT = {
       "每款游戏跟踪您的活动、完成的会话、最佳分数、连胜和进度里程碑",
       "一些游戏使用随机事件，而其他游戏则专注于时间、反应、记忆或决策",
       "点击每款游戏卡上的ℹ️按钮查看规则、控制和奖励结构"
-    ]
+    ],
+    closeModalAria: "关闭对话框",
+    loading: "加载中...",
+    termsGateTitle: "欢迎来到 MLEO 游戏",
+    termsGateSubtitle: "请接受条款和条件以继续",
+    termsGateViewTerms: "查看条款",
+    footerHome: "首页",
+    footerPrivacy: "隐私",
+    footerCookies: "Cookie",
+    footerRisk: "风险",
+    menuTitle: "用户菜单",
+    menuUserInfo: "用户信息",
+    menuUsername: "用户名：",
+    menuEmail: "邮箱：",
+    menuStatus: "状态：",
+    menuGuest: "访客",
+    menuConnected: "已连接",
+    menuNotProvided: "未提供",
+    menuLanguage: "语言",
+    menuWallet: "钱包",
+    menuConnectWallet: "连接钱包",
+    menuLogout: "退出登录",
+    menuLogin: "登录",
+    menuSignUp: "注册",
+    menuCreateAccount: "创建账户",
+    menuWalletSection: "钱包连接",
+    menuWalletStatus: "钱包状态：",
+    menuWalletNotConnected: "未连接",
+    menuAddress: "地址：",
+    menuAccount: "账户",
+    menuDisconnect: "断开连接",
+    menuPlayerVaultTitle: "玩家金库",
+    menuYourVault: "您的 MLEO 金库",
+    menuPlayerInfo: "玩家信息",
+    menuWalletInfo: "钱包信息",
+    menuVaultLine: "金库：{{amount}} MLEO",
+    connectButtonLabel: "连接",
+    authErrorInvalidCredentials: "请输入有效的邮箱和密码（至少 8 个字符）。",
+    authErrorUsernameShort: "用户名至少 3 个字符。",
+    authErrorPasswordMismatch: "两次密码不一致。",
+    authLoginFailed: "登录失败，请重试。",
+    authSignupFailed: "注册失败，请重试。",
+    authLabelUsername: "用户名",
+    authLabelPassword: "密码",
+    authLabelConfirmPassword: "确认密码",
+    authPlaceholderUsername: "选择用户名（3 个以上字符）",
+    authPlaceholderEmail: "your@email.com",
+    authPlaceholderPassword: "至少 8 个字符",
+    authPlaceholderConfirmPassword: "再次输入密码",
+    authProcessing: "处理中...",
+    alertSwitchChain: "请切换到 BSC 测试网 (TBNB)",
+    alertMissingClaim: "缺少领取合约地址",
+    alertInvalidAmount: "金额无效！",
+    alertClaimSuccess: "✅ 已向钱包发送 {{amount}} MLEO！",
+    alertClaimFailed: "领取失败或被拒绝",
+    policyTitleTerms: "条款与条件",
+    policyTitlePrivacy: "隐私政策",
+    policyTitleCookies: "Cookie 说明",
+    policyTitleRisk: "风险 / 测试网免责声明",
+    policyLastUpdatedStub: "最后更新：[插入日期]",
+    vaultCollectTitle: "提取到钱包",
+    vaultAmountPlaceholder: "数量",
+    vaultMax: "最大",
+    vaultAvailable: "可用：{{amount}} MLEO",
+    vaultClaiming: "领取中...",
+    vaultClaimCta: "领取 {{amount}} MLEO",
+    vaultNeedWalletClaim: "连接钱包以领取 MLEO 代币",
+    vaultAboutTitle: "💡 关于您的金库：",
+    vaultAboutList: [
+      "您的金库在所有 MLEO 游戏间共享",
+      "玩游戏赚取更多 MLEO",
+      "所有奖励会自动加入金库",
+      "使用免费游玩代币可在不消耗金库 MLEO 的情况下游戏",
+      "连接钱包并在链上领取 MLEO",
+    ],
+    menuButtonTitle: "菜单",
+    menuUsernameFallback: "用户",
+    termsAccept: "接受",
+    termsDecline: "拒绝",
   },
   ja: {
     name: "日本語", dir: "ltr", code: "ja",
@@ -826,7 +1485,85 @@ const TEXT = {
       "各ゲームは、アクティビティ、完了したセッション、ベストスコア、連勝、進捗マイルストーンを追跡します",
       "一部のゲームはランダムイベントを使用し、他のゲームはタイミング、反応、記憶、または意思決定に焦点を当てています",
       "各ゲームカードのℹ️ボタンをクリックして、ルール、コントロール、報酬構造を表示"
-    ]
+    ],
+    closeModalAria: "ダイアログを閉じる",
+    loading: "読み込み中...",
+    termsGateTitle: "MLEOゲームへようこそ",
+    termsGateSubtitle: "続行するには利用規約に同意してください",
+    termsGateViewTerms: "規約を見る",
+    footerHome: "ホーム",
+    footerPrivacy: "プライバシー",
+    footerCookies: "Cookie",
+    footerRisk: "リスク",
+    menuTitle: "ユーザーメニュー",
+    menuUserInfo: "ユーザー情報",
+    menuUsername: "ユーザー名：",
+    menuEmail: "メール：",
+    menuStatus: "ステータス：",
+    menuGuest: "ゲスト",
+    menuConnected: "接続済み",
+    menuNotProvided: "未入力",
+    menuLanguage: "言語",
+    menuWallet: "ウォレット",
+    menuConnectWallet: "ウォレット接続",
+    menuLogout: "ログアウト",
+    menuLogin: "ログイン",
+    menuSignUp: "新規登録",
+    menuCreateAccount: "アカウント作成",
+    menuWalletSection: "ウォレット接続",
+    menuWalletStatus: "ウォレット状態：",
+    menuWalletNotConnected: "未接続",
+    menuAddress: "アドレス：",
+    menuAccount: "アカウント",
+    menuDisconnect: "切断",
+    menuPlayerVaultTitle: "プレイヤー金庫",
+    menuYourVault: "あなたのMLEO金庫",
+    menuPlayerInfo: "プレイヤー情報",
+    menuWalletInfo: "ウォレット情報",
+    menuVaultLine: "金庫: {{amount}} MLEO",
+    connectButtonLabel: "接続",
+    authErrorInvalidCredentials: "有効なメールとパスワード（8文字以上）を入力してください。",
+    authErrorUsernameShort: "ユーザー名は3文字以上にしてください。",
+    authErrorPasswordMismatch: "パスワードが一致しません。",
+    authLoginFailed: "ログインに失敗しました。再試行してください。",
+    authSignupFailed: "登録に失敗しました。再試行してください。",
+    authLabelUsername: "ユーザー名",
+    authLabelPassword: "パスワード",
+    authLabelConfirmPassword: "パスワード確認",
+    authPlaceholderUsername: "ユーザー名を選択（3文字以上）",
+    authPlaceholderEmail: "your@email.com",
+    authPlaceholderPassword: "8文字以上",
+    authPlaceholderConfirmPassword: "パスワードを再入力",
+    authProcessing: "処理中...",
+    alertSwitchChain: "BSCテストネット（TBNB）に切り替えてください",
+    alertMissingClaim: "CLAIMアドレスがありません",
+    alertInvalidAmount: "無効な金額です！",
+    alertClaimSuccess: "✅ {{amount}} MLEOをウォレットに送りました！",
+    alertClaimFailed: "CLAIMに失敗したか拒否されました",
+    policyTitleTerms: "利用規約",
+    policyTitlePrivacy: "プライバシーポリシー",
+    policyTitleCookies: "Cookieに関する通知",
+    policyTitleRisk: "リスク / テストネット免責",
+    policyLastUpdatedStub: "最終更新：[日付を入力]",
+    vaultCollectTitle: "ウォレットへ送金",
+    vaultAmountPlaceholder: "数量",
+    vaultMax: "最大",
+    vaultAvailable: "利用可能: {{amount}} MLEO",
+    vaultClaiming: "請求中...",
+    vaultClaimCta: "{{amount}} MLEO を請求",
+    vaultNeedWalletClaim: "ウォレットを接続して MLEO を請求してください",
+    vaultAboutTitle: "💡 ボールトについて:",
+    vaultAboutList: [
+      "ボールトはすべての MLEO ゲームで共有されます",
+      "プレイしてより多くの MLEO を獲得",
+      "報酬はすべて自動でボールトに追加されます",
+      "無料プレイトークンでボールトの MLEO を使わずにプレイできます",
+      "ウォレットを接続してオンチェーンで MLEO を請求",
+    ],
+    menuButtonTitle: "メニュー",
+    menuUsernameFallback: "ユーザー",
+    termsAccept: "同意する",
+    termsDecline: "拒否する",
   },
   ko: {
     name: "한국어", dir: "ltr", code: "ko",
@@ -940,7 +1677,85 @@ const TEXT = {
       "각 게임은 활동, 완료된 세션, 최고 점수, 연승 및 진행 마일스톤을 추적합니다",
       "일부 게임은 무작위 이벤트를 사용하고 다른 게임은 타이밍, 반응, 기억 또는 의사 결정에 중점을 둡니다",
       "각 게임 카드의 ℹ️ 버튼을 클릭하여 규칙, 컨트롤 및 보상 구조 보기"
-    ]
+    ],
+    closeModalAria: "대화상자 닫기",
+    loading: "로딩 중...",
+    termsGateTitle: "MLEO 게임에 오신 것을 환영합니다",
+    termsGateSubtitle: "계속하려면 약관에 동의해 주세요",
+    termsGateViewTerms: "약관 보기",
+    footerHome: "홈",
+    footerPrivacy: "개인정보",
+    footerCookies: "쿠키",
+    footerRisk: "위험",
+    menuTitle: "사용자 메뉴",
+    menuUserInfo: "사용자 정보",
+    menuUsername: "사용자 이름:",
+    menuEmail: "이메일:",
+    menuStatus: "상태:",
+    menuGuest: "게스트",
+    menuConnected: "연결됨",
+    menuNotProvided: "없음",
+    menuLanguage: "언어",
+    menuWallet: "지갑",
+    menuConnectWallet: "지갑 연결",
+    menuLogout: "로그아웃",
+    menuLogin: "로그인",
+    menuSignUp: "가입",
+    menuCreateAccount: "계정 만들기",
+    menuWalletSection: "지갑 연결",
+    menuWalletStatus: "지갑 상태:",
+    menuWalletNotConnected: "연결 안 됨",
+    menuAddress: "주소:",
+    menuAccount: "계정",
+    menuDisconnect: "연결 끊기",
+    menuPlayerVaultTitle: "플레이어 금고",
+    menuYourVault: "내 MLEO 금고",
+    menuPlayerInfo: "플레이어 정보",
+    menuWalletInfo: "지갑 정보",
+    menuVaultLine: "금고: {{amount}} MLEO",
+    connectButtonLabel: "연결",
+    authErrorInvalidCredentials: "유효한 이메일과 비밀번호(8자 이상)를 입력하세요.",
+    authErrorUsernameShort: "사용자 이름은 3자 이상이어야 합니다.",
+    authErrorPasswordMismatch: "비밀번호가 일치하지 않습니다.",
+    authLoginFailed: "로그인에 실패했습니다. 다시 시도하세요.",
+    authSignupFailed: "가입에 실패했습니다. 다시 시도하세요.",
+    authLabelUsername: "사용자 이름",
+    authLabelPassword: "비밀번호",
+    authLabelConfirmPassword: "비밀번호 확인",
+    authPlaceholderUsername: "사용자 이름 선택(3자 이상)",
+    authPlaceholderEmail: "your@email.com",
+    authPlaceholderPassword: "8자 이상",
+    authPlaceholderConfirmPassword: "비밀번호 재입력",
+    authProcessing: "처리 중...",
+    alertSwitchChain: "BSC 테스트넷(TBNB)으로 전환하세요",
+    alertMissingClaim: "CLAIM 주소가 없습니다",
+    alertInvalidAmount: "잘못된 금액입니다!",
+    alertClaimSuccess: "✅ {{amount}} MLEO를 지갑으로 보냈습니다!",
+    alertClaimFailed: "CLAIM 실패 또는 거부됨",
+    policyTitleTerms: "이용약관",
+    policyTitlePrivacy: "개인정보 처리방침",
+    policyTitleCookies: "쿠키 안내",
+    policyTitleRisk: "위험 / 테스트넷 면책",
+    policyLastUpdatedStub: "최종 업데이트: [날짜 입력]",
+    vaultCollectTitle: "지갑으로 수령",
+    vaultAmountPlaceholder: "금액",
+    vaultMax: "최대",
+    vaultAvailable: "사용 가능: {{amount}} MLEO",
+    vaultClaiming: "수령 중...",
+    vaultClaimCta: "{{amount}} MLEO 수령",
+    vaultNeedWalletClaim: "지갑을 연결하여 MLEO 토큰을 수령하세요",
+    vaultAboutTitle: "💡 금고 정보:",
+    vaultAboutList: [
+      "금고는 모든 MLEO 게임에서 공유됩니다",
+      "게임을 플레이하여 더 많은 MLEO 획득",
+      "모든 보상은 자동으로 금고에 적립됩니다",
+      "무료 플레이 토큰으로 금고 MLEO 없이 플레이할 수 있습니다",
+      "지갑을 연결하고 온체인에서 MLEO를 수령하세요",
+    ],
+    menuButtonTitle: "메뉴",
+    menuUsernameFallback: "사용자",
+    termsAccept: "동의",
+    termsDecline: "거절",
   },
   tr: {
     name: "Türkçe", dir: "ltr", code: "tr",
@@ -1054,7 +1869,85 @@ const TEXT = {
       "Her oyun aktivitenizi, tamamlanan oturumları, en iyi skoru, serileri ve ilerleme kilometre taşlarını takip eder",
       "Bazı oyunlar rastgele olaylar kullanırken, diğerleri zamanlama, tepki, hafıza veya karar vermeye odaklanır",
       "Kuralları, kontrolleri ve ödül yapısını görüntülemek için her oyun kartındaki ℹ️ düğmesine tıklayın"
-    ]
+    ],
+    closeModalAria: "Pencereyi kapat",
+    loading: "Yükleniyor...",
+    termsGateTitle: "MLEO Oyunlarına hoş geldiniz",
+    termsGateSubtitle: "Devam etmek için şartları kabul edin",
+    termsGateViewTerms: "Şartları görüntüle",
+    footerHome: "Ana sayfa",
+    footerPrivacy: "Gizlilik",
+    footerCookies: "Çerezler",
+    footerRisk: "Risk",
+    menuTitle: "Kullanıcı menüsü",
+    menuUserInfo: "Kullanıcı bilgisi",
+    menuUsername: "Kullanıcı adı:",
+    menuEmail: "E-posta:",
+    menuStatus: "Durum:",
+    menuGuest: "Misafir",
+    menuConnected: "Bağlı",
+    menuNotProvided: "Yok",
+    menuLanguage: "Dil",
+    menuWallet: "Cüzdan",
+    menuConnectWallet: "Cüzdanı bağla",
+    menuLogout: "Çıkış",
+    menuLogin: "Giriş",
+    menuSignUp: "Kayıt ol",
+    menuCreateAccount: "Hesap oluştur",
+    menuWalletSection: "Cüzdan bağlantısı",
+    menuWalletStatus: "Cüzdan durumu:",
+    menuWalletNotConnected: "Bağlı değil",
+    menuAddress: "Adres:",
+    menuAccount: "Hesap",
+    menuDisconnect: "Bağlantıyı kes",
+    menuPlayerVaultTitle: "Oyuncu kasası",
+    menuYourVault: "MLEO kasanız",
+    menuPlayerInfo: "Oyuncu bilgisi",
+    menuWalletInfo: "Cüzdan bilgisi",
+    menuVaultLine: "KASA: {{amount}} MLEO",
+    connectButtonLabel: "BAĞLAN",
+    authErrorInvalidCredentials: "Geçerli e-posta ve şifre girin (8+ karakter).",
+    authErrorUsernameShort: "Kullanıcı adı en az 3 karakter olmalı.",
+    authErrorPasswordMismatch: "Şifreler eşleşmiyor.",
+    authLoginFailed: "Giriş başarısız. Tekrar deneyin.",
+    authSignupFailed: "Kayıt başarısız. Tekrar deneyin.",
+    authLabelUsername: "Kullanıcı adı",
+    authLabelPassword: "Şifre",
+    authLabelConfirmPassword: "Şifreyi onayla",
+    authPlaceholderUsername: "Kullanıcı adı seçin (3+ karakter)",
+    authPlaceholderEmail: "siz@email.com",
+    authPlaceholderPassword: "8+ karakter",
+    authPlaceholderConfirmPassword: "Şifreyi tekrar girin",
+    authProcessing: "İşleniyor...",
+    alertSwitchChain: "BSC Testnet’e (TBNB) geçin",
+    alertMissingClaim: "CLAIM adresi eksik",
+    alertInvalidAmount: "Geçersiz tutar!",
+    alertClaimSuccess: "✅ {{amount}} MLEO cüzdana gönderildi!",
+    alertClaimFailed: "CLAIM başarısız veya reddedildi",
+    policyTitleTerms: "Şartlar ve koşullar",
+    policyTitlePrivacy: "Gizlilik politikası",
+    policyTitleCookies: "Çerez bildirimi",
+    policyTitleRisk: "Risk / testnet uyarısı",
+    policyLastUpdatedStub: "Son güncelleme: [Tarih ekleyin]",
+    vaultCollectTitle: "Cüzdana aktar",
+    vaultAmountPlaceholder: "Miktar",
+    vaultMax: "MAKS",
+    vaultAvailable: "Kullanılabilir: {{amount}} MLEO",
+    vaultClaiming: "Talep ediliyor...",
+    vaultClaimCta: "{{amount}} MLEO TALEP ET",
+    vaultNeedWalletClaim: "MLEO token talep etmek için cüzdanınızı bağlayın",
+    vaultAboutTitle: "💡 Kasanız hakkında:",
+    vaultAboutList: [
+      "Kasanız tüm MLEO oyunları arasında paylaşılır",
+      "Daha fazla MLEO kazanmak için oynayın",
+      "Tüm ödüller otomatik olarak kasanıza eklenir",
+      "Kasa MLEO kullanmadan oynamak için ücretsiz oyun jetonlarını kullanın",
+      "Cüzdanınızı bağlayın ve zincir üzerinde MLEO talep edin",
+    ],
+    menuButtonTitle: "Menü",
+    menuUsernameFallback: "Kullanıcı",
+    termsAccept: "Kabul et",
+    termsDecline: "Reddet",
   },
   it: {
     name: "Italiano", dir: "ltr", code: "it",
@@ -1168,7 +2061,85 @@ const TEXT = {
       "Ogni gioco traccia la tua attività, sessioni completate, miglior punteggio, serie e traguardi di progresso",
       "Alcuni giochi utilizzano eventi casuali, mentre altri si concentrano su tempismo, reazione, memoria o decision making",
       "Clicca il pulsante ℹ️ su ogni scheda del gioco per visualizzare regole, controlli e struttura delle ricompense"
-    ]
+    ],
+    closeModalAria: "Chiudi finestra",
+    loading: "Caricamento...",
+    termsGateTitle: "Benvenuto nei giochi MLEO",
+    termsGateSubtitle: "Accetta i termini e le condizioni per continuare",
+    termsGateViewTerms: "Vedi termini",
+    footerHome: "Home",
+    footerPrivacy: "Privacy",
+    footerCookies: "Cookie",
+    footerRisk: "Rischi",
+    menuTitle: "Menu utente",
+    menuUserInfo: "Informazioni utente",
+    menuUsername: "Nome utente:",
+    menuEmail: "Email:",
+    menuStatus: "Stato:",
+    menuGuest: "Ospite",
+    menuConnected: "Connesso",
+    menuNotProvided: "Non fornito",
+    menuLanguage: "Lingua",
+    menuWallet: "Portafoglio",
+    menuConnectWallet: "Collega portafoglio",
+    menuLogout: "Esci",
+    menuLogin: "Accedi",
+    menuSignUp: "Registrati",
+    menuCreateAccount: "Crea account",
+    menuWalletSection: "Connessione portafoglio",
+    menuWalletStatus: "Stato portafoglio:",
+    menuWalletNotConnected: "Non connesso",
+    menuAddress: "Indirizzo:",
+    menuAccount: "Account",
+    menuDisconnect: "Disconnetti",
+    menuPlayerVaultTitle: "Vault giocatore",
+    menuYourVault: "Il tuo vault MLEO",
+    menuPlayerInfo: "Informazioni giocatore",
+    menuWalletInfo: "Informazioni portafoglio",
+    menuVaultLine: "VAULT: {{amount}} MLEO",
+    connectButtonLabel: "COLLEGA",
+    authErrorInvalidCredentials: "Inserisci email e password valide (8+ caratteri).",
+    authErrorUsernameShort: "Il nome utente deve avere almeno 3 caratteri.",
+    authErrorPasswordMismatch: "Le password non coincidono.",
+    authLoginFailed: "Accesso non riuscito. Riprova.",
+    authSignupFailed: "Registrazione non riuscita. Riprova.",
+    authLabelUsername: "Nome utente",
+    authLabelPassword: "Password",
+    authLabelConfirmPassword: "Conferma password",
+    authPlaceholderUsername: "Scegli un nome utente (3+ caratteri)",
+    authPlaceholderEmail: "tua@email.com",
+    authPlaceholderPassword: "8+ caratteri",
+    authPlaceholderConfirmPassword: "Ripeti la password",
+    authProcessing: "Elaborazione...",
+    alertSwitchChain: "Passa a BSC Testnet (TBNB)",
+    alertMissingClaim: "Indirizzo CLAIM mancante",
+    alertInvalidAmount: "Importo non valido!",
+    alertClaimSuccess: "✅ Inviati {{amount}} MLEO al portafoglio!",
+    alertClaimFailed: "Claim fallito o rifiutato",
+    policyTitleTerms: "Termini e condizioni",
+    policyTitlePrivacy: "Informativa sulla privacy",
+    policyTitleCookies: "Informativa sui cookie",
+    policyTitleRisk: "Rischi / disclaimer testnet",
+    policyLastUpdatedStub: "Ultimo aggiornamento: [Inserisci data]",
+    vaultCollectTitle: "Riscuoti nel wallet",
+    vaultAmountPlaceholder: "Importo",
+    vaultMax: "MAX",
+    vaultAvailable: "Disponibile: {{amount}} MLEO",
+    vaultClaiming: "Riscossione...",
+    vaultClaimCta: "RISCUOTI {{amount}} MLEO",
+    vaultNeedWalletClaim: "Collega il wallet per riscuotere i token MLEO",
+    vaultAboutTitle: "💡 Il tuo caveau:",
+    vaultAboutList: [
+      "Il caveau è condiviso tra tutti i giochi MLEO",
+      "Gioca per guadagnare più token MLEO",
+      "Tutte le ricompense vengono aggiunte automaticamente al caveau",
+      "Usa i gettoni free play per giocare senza usare MLEO dal caveau",
+      "Collega il wallet e riscuoti MLEO on-chain",
+    ],
+    menuButtonTitle: "Menu",
+    menuUsernameFallback: "Utente",
+    termsAccept: "Accetta",
+    termsDecline: "Rifiuta",
   },
   ka: {
     name: "ქართული", dir: "ltr", code: "ka",
@@ -1282,7 +2253,85 @@ const TEXT = {
       "თითოეული თამაში ადევნებს თვალს თქვენს აქტივობას, დასრულებულ სესიებს, საუკეთესო ქულას, სერიებსა და პროგრესის მილიენისტონებს",
       "ზოგიერთი თამაში იყენებს შემთხვევით მოვლენებს, ხოლო სხვები ფოკუსირდება დროზე, რეაქციაზე, მეხსენებაზე ან გადაწყვეტილების მიღებაზე",
       "დააწკაპუნეთ ℹ️ ღილაკზე თითოეულ თამაშის ბარათზე წესების, კონტროლებისა და ჯილდოს სტრუქტურის სანახავად"
-    ]
+    ],
+    closeModalAria: "დიალოგის დახურვა",
+    loading: "იტვირთება...",
+    termsGateTitle: "კეთილი იყოს თქვენი მობრძანება MLEO თამაშებში",
+    termsGateSubtitle: "გასაგრძელებლად მიიღეთ წესები და პირობები",
+    termsGateViewTerms: "წესების ნახვა",
+    footerHome: "მთავარი",
+    footerPrivacy: "კონფიდენციალურობა",
+    footerCookies: "ქუქიები",
+    footerRisk: "რისკები",
+    menuTitle: "მომხმარებლის მენიუ",
+    menuUserInfo: "მომხმარებლის ინფორმაცია",
+    menuUsername: "სახელი:",
+    menuEmail: "ელფოსტა:",
+    menuStatus: "სტატუსი:",
+    menuGuest: "სტუმარი",
+    menuConnected: "დაკავშირებული",
+    menuNotProvided: "არ არის მითითებული",
+    menuLanguage: "ენა",
+    menuWallet: "საფულე",
+    menuConnectWallet: "საფულის დაკავშირება",
+    menuLogout: "გასვლა",
+    menuLogin: "შესვლა",
+    menuSignUp: "რეგისტრაცია",
+    menuCreateAccount: "ანგარიშის შექმნა",
+    menuWalletSection: "საფულის კავშირი",
+    menuWalletStatus: "საფულის სტატუსი:",
+    menuWalletNotConnected: "არ არის დაკავშირებული",
+    menuAddress: "მისამართი:",
+    menuAccount: "ანგარიში",
+    menuDisconnect: "გათიშვა",
+    menuPlayerVaultTitle: "მოთამაშის საცავი",
+    menuYourVault: "თქვენი MLEO საცავი",
+    menuPlayerInfo: "მოთამაშის ინფორმაცია",
+    menuWalletInfo: "საფულის ინფორმაცია",
+    menuVaultLine: "საცავი: {{amount}} MLEO",
+    connectButtonLabel: "დაკავშირება",
+    authErrorInvalidCredentials: "შეიყვანეთ სწორი ელფოსტა და პაროლი (8+ სიმბოლო).",
+    authErrorUsernameShort: "მომხმარებლის სახელი მინიმუმ 3 სიმბოლო.",
+    authErrorPasswordMismatch: "პაროლები არ ემთხვევა.",
+    authLoginFailed: "შესვლა ვერ მოხერხდა. სცადეთ ხელახლა.",
+    authSignupFailed: "რეგისტრაცია ვერ მოხერხდა. სცადეთ ხელახლა.",
+    authLabelUsername: "მომხმარებლის სახელი",
+    authLabelPassword: "პაროლი",
+    authLabelConfirmPassword: "პაროლის დადასტურება",
+    authPlaceholderUsername: "აირჩიეთ სახელი (3+ სიმბოლო)",
+    authPlaceholderEmail: "your@email.com",
+    authPlaceholderPassword: "8+ სიმბოლო",
+    authPlaceholderConfirmPassword: "გაიმეორეთ პაროლი",
+    authProcessing: "მუშავდება...",
+    alertSwitchChain: "გადადით BSC Testnet-ზე (TBNB)",
+    alertMissingClaim: "CLAIM მისამართი აკლია",
+    alertInvalidAmount: "არასწორი თანხა!",
+    alertClaimSuccess: "✅ {{amount}} MLEO გაიგზავნა საფულეში!",
+    alertClaimFailed: "CLAIM ვერ მოხერხდა ან უარყოფილია",
+    policyTitleTerms: "წესები და პირობები",
+    policyTitlePrivacy: "კონფიდენციალურობის პოლიტიკა",
+    policyTitleCookies: "ქუქიების შეტყობინება",
+    policyTitleRisk: "რისკები / ტესტნეტის განცხადება",
+    policyLastUpdatedStub: "ბოლო განახლება: [თარიღი]",
+    vaultCollectTitle: "საფულეში გადარიცხვა",
+    vaultAmountPlaceholder: "თანხა",
+    vaultMax: "მაქს",
+    vaultAvailable: "ხელმისაწვდომი: {{amount}} MLEO",
+    vaultClaiming: "მოთხოვნა...",
+    vaultClaimCta: "მოითხოვე {{amount}} MLEO",
+    vaultNeedWalletClaim: "დაუკავშირდით საფულეს MLEO ტოკენების მოსათხოვნად",
+    vaultAboutTitle: "💡 თქვენი საცავის შესახებ:",
+    vaultAboutList: [
+      "საცავი გაზიარებულია ყველა MLEO თამაშში",
+      "ითამაშეთ მეტი MLEO-ს მოსაპოვებლად",
+      "ყველა ჯილდო ავტომატურად ემატება საცავს",
+      "გამოიყენეთ უფასო თამაშის ტოკენები საცავის MLEO-ს გარეშე",
+      "დაუკავშირდით საფულეს და მოითხოვეთ MLEO ჯაჭვზე",
+    ],
+    menuButtonTitle: "მენიუ",
+    menuUsernameFallback: "მომხმარებელი",
+    termsAccept: "დადასტურება",
+    termsDecline: "უარყოფა",
   },
   pl: {
     name: "Polski", dir: "ltr", code: "pl",
@@ -1396,7 +2445,85 @@ const TEXT = {
       "Każda gra śledzi twoją aktywność, ukończone sesje, najlepszy wynik, serie i kamienie milowe postępu",
       "Niektóre gry używają losowych wydarzeń, podczas gdy inne skupiają się na czasie, reakcji, pamięci lub podejmowaniu decyzji",
       "Kliknij przycisk ℹ️ na każdej karcie gry, aby wyświetlić zasady, kontrolki i strukturę nagród"
-    ]
+    ],
+    closeModalAria: "Zamknij okno",
+    loading: "Ładowanie...",
+    termsGateTitle: "Witaj w grach MLEO",
+    termsGateSubtitle: "Zaakceptuj regulamin, aby kontynuować",
+    termsGateViewTerms: "Zobacz regulamin",
+    footerHome: "Strona główna",
+    footerPrivacy: "Prywatność",
+    footerCookies: "Pliki cookie",
+    footerRisk: "Ryzyko",
+    menuTitle: "Menu użytkownika",
+    menuUserInfo: "Informacje o użytkowniku",
+    menuUsername: "Nazwa użytkownika:",
+    menuEmail: "E-mail:",
+    menuStatus: "Status:",
+    menuGuest: "Gość",
+    menuConnected: "Połączono",
+    menuNotProvided: "Brak danych",
+    menuLanguage: "Język",
+    menuWallet: "Portfel",
+    menuConnectWallet: "Połącz portfel",
+    menuLogout: "Wyloguj",
+    menuLogin: "Logowanie",
+    menuSignUp: "Rejestracja",
+    menuCreateAccount: "Utwórz konto",
+    menuWalletSection: "Połączenie portfela",
+    menuWalletStatus: "Status portfela:",
+    menuWalletNotConnected: "Nie połączono",
+    menuAddress: "Adres:",
+    menuAccount: "Konto",
+    menuDisconnect: "Rozłącz",
+    menuPlayerVaultTitle: "Skarbiec gracza",
+    menuYourVault: "Twój skarbiec MLEO",
+    menuPlayerInfo: "Informacje o graczu",
+    menuWalletInfo: "Informacje o portfelu",
+    menuVaultLine: "SKARBIEC: {{amount}} MLEO",
+    connectButtonLabel: "POŁĄCZ",
+    authErrorInvalidCredentials: "Podaj prawidłowy e-mail i hasło (8+ znaków).",
+    authErrorUsernameShort: "Nazwa użytkownika musi mieć co najmniej 3 znaki.",
+    authErrorPasswordMismatch: "Hasła nie są takie same.",
+    authLoginFailed: "Logowanie nie powiodło się. Spróbuj ponownie.",
+    authSignupFailed: "Rejestracja nie powiodła się. Spróbuj ponownie.",
+    authLabelUsername: "Nazwa użytkownika",
+    authLabelPassword: "Hasło",
+    authLabelConfirmPassword: "Potwierdź hasło",
+    authPlaceholderUsername: "Wybierz nazwę (3+ znaki)",
+    authPlaceholderEmail: "twoj@email.pl",
+    authPlaceholderPassword: "8+ znaków",
+    authPlaceholderConfirmPassword: "Powtórz hasło",
+    authProcessing: "Przetwarzanie...",
+    alertSwitchChain: "Przełącz na BSC Testnet (TBNB)",
+    alertMissingClaim: "Brak adresu CLAIM",
+    alertInvalidAmount: "Nieprawidłowa kwota!",
+    alertClaimSuccess: "✅ Wysłano {{amount}} MLEO do portfela!",
+    alertClaimFailed: "CLAIM nieudany lub odrzucony",
+    policyTitleTerms: "Regulamin",
+    policyTitlePrivacy: "Polityka prywatności",
+    policyTitleCookies: "Informacja o plikach cookie",
+    policyTitleRisk: "Ryzyko / zastrzeżenie testnet",
+    policyLastUpdatedStub: "Ostatnia aktualizacja: [Wstaw datę]",
+    vaultCollectTitle: "Wypłać do portfela",
+    vaultAmountPlaceholder: "Kwota",
+    vaultMax: "MAX",
+    vaultAvailable: "Dostępne: {{amount}} MLEO",
+    vaultClaiming: "Odbieranie...",
+    vaultClaimCta: "ODBIERZ {{amount}} MLEO",
+    vaultNeedWalletClaim: "Połącz portfel, aby odebrać tokeny MLEO",
+    vaultAboutTitle: "💡 O twoim skarbcu:",
+    vaultAboutList: [
+      "Skarbiec jest wspólny dla wszystkich gier MLEO",
+      "Graj, aby zdobywać więcej tokenów MLEO",
+      "Wszystkie nagrody są automatycznie dodawane do skarbca",
+      "Używaj darmowych żetonów, by grać bez MLEO ze skarbca",
+      "Połącz portfel i odbieraj MLEO on-chain",
+    ],
+    menuButtonTitle: "Menu",
+    menuUsernameFallback: "Użytkownik",
+    termsAccept: "Akceptuj",
+    termsDecline: "Odrzuć",
   },
   ro: {
     name: "Română", dir: "ltr", code: "ro",
@@ -1510,7 +2637,85 @@ const TEXT = {
       "Fiecare joc urmărește activitatea ta, sesiunile finalizate, cel mai bun scor, seriile și obiectivele de progres",
       "Unele jocuri folosesc evenimente aleatoare, în timp ce altele se concentrează pe sincronizare, reacție, memorie sau luarea deciziilor",
       "Apasă butonul ℹ️ pe fiecare carte de joc pentru a vedea regulile, controalele și structura recompenselor"
-    ]
+    ],
+    closeModalAria: "Închide fereastra",
+    loading: "Se încarcă...",
+    termsGateTitle: "Bine ai venit la jocurile MLEO",
+    termsGateSubtitle: "Acceptă termenii și condițiile pentru a continua",
+    termsGateViewTerms: "Vezi termenii",
+    footerHome: "Acasă",
+    footerPrivacy: "Confidențialitate",
+    footerCookies: "Cookie-uri",
+    footerRisk: "Riscuri",
+    menuTitle: "Meniu utilizator",
+    menuUserInfo: "Informații utilizator",
+    menuUsername: "Nume utilizator:",
+    menuEmail: "E-mail:",
+    menuStatus: "Stare:",
+    menuGuest: "Oaspete",
+    menuConnected: "Conectat",
+    menuNotProvided: "Nu este furnizat",
+    menuLanguage: "Limbă",
+    menuWallet: "Portofel",
+    menuConnectWallet: "Conectează portofelul",
+    menuLogout: "Deconectare",
+    menuLogin: "Autentificare",
+    menuSignUp: "Înregistrare",
+    menuCreateAccount: "Creează cont",
+    menuWalletSection: "Conexiune portofel",
+    menuWalletStatus: "Stare portofel:",
+    menuWalletNotConnected: "Neconectat",
+    menuAddress: "Adresă:",
+    menuAccount: "Cont",
+    menuDisconnect: "Deconectează",
+    menuPlayerVaultTitle: "Seif jucător",
+    menuYourVault: "Seiful tău MLEO",
+    menuPlayerInfo: "Informații jucător",
+    menuWalletInfo: "Informații portofel",
+    menuVaultLine: "SEIF: {{amount}} MLEO",
+    connectButtonLabel: "CONECTARE",
+    authErrorInvalidCredentials: "Introdu un e-mail și o parolă valide (8+ caractere).",
+    authErrorUsernameShort: "Numele de utilizator trebuie să aibă cel puțin 3 caractere.",
+    authErrorPasswordMismatch: "Parolele nu coincid.",
+    authLoginFailed: "Autentificarea a eșuat. Încearcă din nou.",
+    authSignupFailed: "Înregistrarea a eșuat. Încearcă din nou.",
+    authLabelUsername: "Nume utilizator",
+    authLabelPassword: "Parolă",
+    authLabelConfirmPassword: "Confirmă parola",
+    authPlaceholderUsername: "Alege un nume (3+ caractere)",
+    authPlaceholderEmail: "tu@email.com",
+    authPlaceholderPassword: "8+ caractere",
+    authPlaceholderConfirmPassword: "Repetă parola",
+    authProcessing: "Se procesează...",
+    alertSwitchChain: "Treci la BSC Testnet (TBNB)",
+    alertMissingClaim: "Lipsește adresa CLAIM",
+    alertInvalidAmount: "Sumă invalidă!",
+    alertClaimSuccess: "✅ Trimise {{amount}} MLEO în portofel!",
+    alertClaimFailed: "CLAIM eșuat sau respins",
+    policyTitleTerms: "Termeni și condiții",
+    policyTitlePrivacy: "Politica de confidențialitate",
+    policyTitleCookies: "Notificare cookie-uri",
+    policyTitleRisk: "Riscuri / declinare testnet",
+    policyLastUpdatedStub: "Ultima actualizare: [Introduceți data]",
+    vaultCollectTitle: "Colectează în portofel",
+    vaultAmountPlaceholder: "Sumă",
+    vaultMax: "MAX",
+    vaultAvailable: "Disponibil: {{amount}} MLEO",
+    vaultClaiming: "Se revendică...",
+    vaultClaimCta: "REVENDICĂ {{amount}} MLEO",
+    vaultNeedWalletClaim: "Conectează portofelul pentru a revendica tokenuri MLEO",
+    vaultAboutTitle: "💡 Despre seiful tău:",
+    vaultAboutList: [
+      "Seiful este partajat între toate jocurile MLEO",
+      "Joacă pentru a câștiga mai multe tokenuri MLEO",
+      "Toate recompensele sunt adăugate automat în seif",
+      "Folosește jetoane free play fără să folosești MLEO din seif",
+      "Conectează portofelul și revendică MLEO on-chain",
+    ],
+    menuButtonTitle: "Meniu",
+    menuUsernameFallback: "Utilizator",
+    termsAccept: "Acceptă",
+    termsDecline: "Respinge",
   },
   cs: {
     name: "Čeština", dir: "ltr", code: "cs",
@@ -1624,7 +2829,85 @@ const TEXT = {
       "Každá hra sleduje vaši aktivitu, dokončené relace, nejlepší skóre, série a milníky pokroku",
       "Některé hry používají náhodné události, zatímco jiné se zaměřují na načasování, reakci, paměť nebo rozhodování",
       "Klikněte na tlačítko ℹ️ na každé herní kartě pro zobrazení pravidel, ovládacích prvků a struktury odměn"
-    ]
+    ],
+    closeModalAria: "Zavřít dialog",
+    loading: "Načítání...",
+    termsGateTitle: "Vítejte ve hrách MLEO",
+    termsGateSubtitle: "Pro pokračování přijměte obchodní podmínky",
+    termsGateViewTerms: "Zobrazit podmínky",
+    footerHome: "Domů",
+    footerPrivacy: "Soukromí",
+    footerCookies: "Cookies",
+    footerRisk: "Rizika",
+    menuTitle: "Uživatelské menu",
+    menuUserInfo: "Informace o uživateli",
+    menuUsername: "Uživatelské jméno:",
+    menuEmail: "E-mail:",
+    menuStatus: "Stav:",
+    menuGuest: "Host",
+    menuConnected: "Připojeno",
+    menuNotProvided: "Neuvedeno",
+    menuLanguage: "Jazyk",
+    menuWallet: "Peněženka",
+    menuConnectWallet: "Připojit peněženku",
+    menuLogout: "Odhlásit se",
+    menuLogin: "Přihlášení",
+    menuSignUp: "Registrace",
+    menuCreateAccount: "Vytvořit účet",
+    menuWalletSection: "Připojení peněženky",
+    menuWalletStatus: "Stav peněženky:",
+    menuWalletNotConnected: "Nepřipojeno",
+    menuAddress: "Adresa:",
+    menuAccount: "Účet",
+    menuDisconnect: "Odpojit",
+    menuPlayerVaultTitle: "Herní trezor",
+    menuYourVault: "Váš trezor MLEO",
+    menuPlayerInfo: "Informace o hráči",
+    menuWalletInfo: "Informace o peněžence",
+    menuVaultLine: "TREZOR: {{amount}} MLEO",
+    connectButtonLabel: "PŘIPOJIT",
+    authErrorInvalidCredentials: "Zadejte platný e-mail a heslo (8+ znaků).",
+    authErrorUsernameShort: "Uživatelské jméno musí mít alespoň 3 znaky.",
+    authErrorPasswordMismatch: "Hesla se neshodují.",
+    authLoginFailed: "Přihlášení se nezdařilo. Zkuste to znovu.",
+    authSignupFailed: "Registrace se nezdařila. Zkuste to znovu.",
+    authLabelUsername: "Uživatelské jméno",
+    authLabelPassword: "Heslo",
+    authLabelConfirmPassword: "Potvrzení hesla",
+    authPlaceholderUsername: "Zvolte jméno (3+ znaků)",
+    authPlaceholderEmail: "vas@email.cz",
+    authPlaceholderPassword: "8+ znaků",
+    authPlaceholderConfirmPassword: "Zopakujte heslo",
+    authProcessing: "Zpracování...",
+    alertSwitchChain: "Přepněte na BSC Testnet (TBNB)",
+    alertMissingClaim: "Chybí adresa CLAIM",
+    alertInvalidAmount: "Neplatná částka!",
+    alertClaimSuccess: "✅ Odesláno {{amount}} MLEO do peněženky!",
+    alertClaimFailed: "CLAIM selhal nebo byl zamítnut",
+    policyTitleTerms: "Obchodní podmínky",
+    policyTitlePrivacy: "Zásady ochrany osobních údajů",
+    policyTitleCookies: "Informace o cookies",
+    policyTitleRisk: "Rizika / testnet prohlášení",
+    policyLastUpdatedStub: "Naposledy aktualizováno: [Vložte datum]",
+    vaultCollectTitle: "Vybrat do peněženky",
+    vaultAmountPlaceholder: "Částka",
+    vaultMax: "MAX",
+    vaultAvailable: "K dispozici: {{amount}} MLEO",
+    vaultClaiming: "Probíhá výběr...",
+    vaultClaimCta: "VYBRAT {{amount}} MLEO",
+    vaultNeedWalletClaim: "Připojte peněženku pro výběr tokenů MLEO",
+    vaultAboutTitle: "💡 O vašem trezoru:",
+    vaultAboutList: [
+      "Trezor je sdílený mezi všemi hrami MLEO",
+      "Hrajte a získejte více tokenů MLEO",
+      "Všechny odměny se přidávají automaticky do trezoru",
+      "Použijte žetony zdarma a hrajte bez MLEO z trezoru",
+      "Připojte peněženku a vyzvedněte si MLEO on-chain",
+    ],
+    menuButtonTitle: "Menu",
+    menuUsernameFallback: "Uživatel",
+    termsAccept: "Přijmout",
+    termsDecline: "Odmítnout",
   },
   nl: {
     name: "Nederlands", dir: "ltr", code: "nl",
@@ -1738,7 +3021,85 @@ const TEXT = {
       "Elke game volgt je activiteit, voltooide sessies, beste score, reeksen en voortgangsmijlpalen",
       "Sommige games gebruiken willekeurige gebeurtenissen, terwijl andere zich richten op timing, reactie, geheugen of besluitvorming",
       "Klik op de ℹ️-knop op elke gamekaart om de regels, bedieningselementen en beloningsstructuur te bekijken"
-    ]
+    ],
+    closeModalAria: "Dialoog sluiten",
+    loading: "Laden...",
+    termsGateTitle: "Welkom bij MLEO Games",
+    termsGateSubtitle: "Accepteer de algemene voorwaarden om door te gaan",
+    termsGateViewTerms: "Voorwaarden bekijken",
+    footerHome: "Home",
+    footerPrivacy: "Privacy",
+    footerCookies: "Cookies",
+    footerRisk: "Risico",
+    menuTitle: "Gebruikersmenu",
+    menuUserInfo: "Gebruikersinformatie",
+    menuUsername: "Gebruikersnaam:",
+    menuEmail: "E-mail:",
+    menuStatus: "Status:",
+    menuGuest: "Gast",
+    menuConnected: "Verbonden",
+    menuNotProvided: "Niet opgegeven",
+    menuLanguage: "Taal",
+    menuWallet: "Wallet",
+    menuConnectWallet: "Wallet verbinden",
+    menuLogout: "Uitloggen",
+    menuLogin: "Inloggen",
+    menuSignUp: "Registreren",
+    menuCreateAccount: "Account aanmaken",
+    menuWalletSection: "Walletverbinding",
+    menuWalletStatus: "Walletstatus:",
+    menuWalletNotConnected: "Niet verbonden",
+    menuAddress: "Adres:",
+    menuAccount: "Account",
+    menuDisconnect: "Verbreken",
+    menuPlayerVaultTitle: "Spelerskluis",
+    menuYourVault: "Jouw MLEO-kluis",
+    menuPlayerInfo: "Spelersinformatie",
+    menuWalletInfo: "Walletinformatie",
+    menuVaultLine: "KLUIS: {{amount}} MLEO",
+    connectButtonLabel: "VERBINDEN",
+    authErrorInvalidCredentials: "Voer een geldig e-mailadres en wachtwoord in (8+ tekens).",
+    authErrorUsernameShort: "Gebruikersnaam minimaal 3 tekens.",
+    authErrorPasswordMismatch: "Wachtwoorden komen niet overeen.",
+    authLoginFailed: "Inloggen mislukt. Probeer opnieuw.",
+    authSignupFailed: "Registratie mislukt. Probeer opnieuw.",
+    authLabelUsername: "Gebruikersnaam",
+    authLabelPassword: "Wachtwoord",
+    authLabelConfirmPassword: "Bevestig wachtwoord",
+    authPlaceholderUsername: "Kies een naam (3+ tekens)",
+    authPlaceholderEmail: "jij@email.nl",
+    authPlaceholderPassword: "8+ tekens",
+    authPlaceholderConfirmPassword: "Herhaal wachtwoord",
+    authProcessing: "Bezig...",
+    alertSwitchChain: "Schakel over naar BSC Testnet (TBNB)",
+    alertMissingClaim: "CLAIM-adres ontbreekt",
+    alertInvalidAmount: "Ongeldig bedrag!",
+    alertClaimSuccess: "✅ {{amount}} MLEO naar wallet gestuurd!",
+    alertClaimFailed: "CLAIM mislukt of geweigerd",
+    policyTitleTerms: "Algemene voorwaarden",
+    policyTitlePrivacy: "Privacybeleid",
+    policyTitleCookies: "Cookieverklaring",
+    policyTitleRisk: "Risico / testnet-disclaimer",
+    policyLastUpdatedStub: "Laatst bijgewerkt: [Voer datum in]",
+    vaultCollectTitle: "Naar wallet overmaken",
+    vaultAmountPlaceholder: "Bedrag",
+    vaultMax: "MAX",
+    vaultAvailable: "Beschikbaar: {{amount}} MLEO",
+    vaultClaiming: "Bezig met claimen...",
+    vaultClaimCta: "CLAIM {{amount}} MLEO",
+    vaultNeedWalletClaim: "Verbind je wallet om MLEO-tokens te claimen",
+    vaultAboutTitle: "💡 Over je kluis:",
+    vaultAboutList: [
+      "Je kluis wordt gedeeld tussen alle MLEO-spelen",
+      "Speel om meer MLEO-tokens te verdienen",
+      "Alle beloningen worden automatisch aan je kluis toegevoegd",
+      "Gebruik gratis speeltokens om te spelen zonder MLEO uit de kluis",
+      "Verbind je wallet en claim MLEO on-chain",
+    ],
+    menuButtonTitle: "Menu",
+    menuUsernameFallback: "Gebruiker",
+    termsAccept: "Accepteren",
+    termsDecline: "Weigeren",
   },
   el: {
     name: "Ελληνικά", dir: "ltr", code: "el",
@@ -1852,6 +3213,84 @@ const TEXT = {
     playBase: "Παίξε MLEO Βάση",
     baseHub: "Τέσσερις προορισμοί, ένα κοινό χρηματοκιβώτιο: εξορυκτές, MLEO Βάση, μονό αρκέιντ και αρκέιντ online.",
     baseHubShort: "Τέσσερις προορισμοί, ένα χρηματοκιβώτιο: εξορυκτές, Βάση, αρκέιντ και αρκέιντ online.",
+    closeModalAria: "Κλείσιμο διαλόγου",
+    loading: "Φόρτωση...",
+    termsGateTitle: "Καλώς ήρθατε στα παιχνίδια MLEO",
+    termsGateSubtitle: "Αποδεχτείτε τους όρους για να συνεχίσετε",
+    termsGateViewTerms: "Προβολή όρων",
+    footerHome: "Αρχική",
+    footerPrivacy: "Απόρρητο",
+    footerCookies: "Cookies",
+    footerRisk: "Κίνδυνοι",
+    menuTitle: "Μενού χρήστη",
+    menuUserInfo: "Στοιχεία χρήστη",
+    menuUsername: "Όνομα χρήστη:",
+    menuEmail: "Email:",
+    menuStatus: "Κατάσταση:",
+    menuGuest: "Επισκέπτης",
+    menuConnected: "Συνδεδεμένος",
+    menuNotProvided: "Δεν δόθηκε",
+    menuLanguage: "Γλώσσα",
+    menuWallet: "Πορτοφόλι",
+    menuConnectWallet: "Σύνδεση πορτοφολιού",
+    menuLogout: "Αποσύνδεση",
+    menuLogin: "Σύνδεση",
+    menuSignUp: "Εγγραφή",
+    menuCreateAccount: "Δημιουργία λογαριασμού",
+    menuWalletSection: "Σύνδεση πορτοφολιού",
+    menuWalletStatus: "Κατάσταση πορτοφολιού:",
+    menuWalletNotConnected: "Μη συνδεδεμένο",
+    menuAddress: "Διεύθυνση:",
+    menuAccount: "Λογαριασμός",
+    menuDisconnect: "Αποσύνδεση πορτοφολιού",
+    menuPlayerVaultTitle: "Θησαυροφυλάκιο παίκτη",
+    menuYourVault: "Το θησαυροφυλάκιο MLEO σας",
+    menuPlayerInfo: "Στοιχεία παίκτη",
+    menuWalletInfo: "Στοιχεία πορτοφολιού",
+    menuVaultLine: "ΘΗΣΑΥΡΟΦΥΛΑΚΙΟ: {{amount}} MLEO",
+    connectButtonLabel: "ΣΥΝΔΕΣΗ",
+    authErrorInvalidCredentials: "Εισάγετε έγκυρο email και κωδικό (8+ χαρακτήρες).",
+    authErrorUsernameShort: "Το όνομα χρήστη πρέπει να έχει τουλάχιστον 3 χαρακτήρες.",
+    authErrorPasswordMismatch: "Οι κωδικοί δεν ταιριάζουν.",
+    authLoginFailed: "Η σύνδεση απέτυχε. Δοκιμάστε ξανά.",
+    authSignupFailed: "Η εγγραφή απέτυχε. Δοκιμάστε ξανά.",
+    authLabelUsername: "Όνομα χρήστη",
+    authLabelPassword: "Κωδικός",
+    authLabelConfirmPassword: "Επιβεβαίωση κωδικού",
+    authPlaceholderUsername: "Επιλέξτε όνομα (3+ χαρακτήρες)",
+    authPlaceholderEmail: "you@email.com",
+    authPlaceholderPassword: "8+ χαρακτήρες",
+    authPlaceholderConfirmPassword: "Επαναλάβετε τον κωδικό",
+    authProcessing: "Επεξεργασία...",
+    alertSwitchChain: "Αλλάξτε σε BSC Testnet (TBNB)",
+    alertMissingClaim: "Λείπει διεύθυνση CLAIM",
+    alertInvalidAmount: "Μη έγκυρο ποσό!",
+    alertClaimSuccess: "✅ Στάλθηκαν {{amount}} MLEO στο πορτοφόλι!",
+    alertClaimFailed: "Το CLAIM απέτυχε ή απορρίφθηκε",
+    policyTitleTerms: "Όροι και προϋποθέσεις",
+    policyTitlePrivacy: "Πολιτική απορρήτου",
+    policyTitleCookies: "Ειδοποίηση cookies",
+    policyTitleRisk: "Κίνδυνοι / αποποίηση testnet",
+    policyLastUpdatedStub: "Τελευταία ενημέρωση: [Εισάγετε ημερομηνία]",
+    vaultCollectTitle: "Λήψη στο πορτοφόλι",
+    vaultAmountPlaceholder: "Ποσό",
+    vaultMax: "ΜΑΞ",
+    vaultAvailable: "Διαθέσιμο: {{amount}} MLEO",
+    vaultClaiming: "Γίνεται αξίωση...",
+    vaultClaimCta: "ΑΞΙΩΣΗ {{amount}} MLEO",
+    vaultNeedWalletClaim: "Συνδέστε το πορτοφόλι σας για να αξιώσετε MLEO",
+    vaultAboutTitle: "💡 Σχετικά με το χρηματοκιβώτιό σας:",
+    vaultAboutList: [
+      "Το χρηματοκιβώτιο είναι κοινό σε όλα τα παιχνίδια MLEO",
+      "Παίξτε για να κερδίσετε περισσότερα MLEO",
+      "Όλες οι ανταμοιβές προστίθενται αυτόματα στο χρηματοκιβώτιο",
+      "Χρησιμοποιήστε δωρεάν μάρκες χωρίς να ξοδέψετε MLEO από το χρηματοκιβώτιο",
+      "Συνδέστε το πορτοφόλι και αξιώστε MLEO on-chain",
+    ],
+    menuButtonTitle: "Μενού",
+    menuUsernameFallback: "Χρήστης",
+    termsAccept: "Αποδοχή",
+    termsDecline: "Απόρριψη",
   },
   he: {
     name: "עברית", dir: "rtl", code: "he",
@@ -1961,7 +3400,85 @@ const TEXT = {
       "כל משחק עוקב אחר הפעילות שלכם, סשנים שהושלמו, הציון הטוב ביותר, רצפים ואבני דרך התקדמות",
       "חלק מהמשחקים משתמשים באירועים אקראיים, בעוד שאחרים מתמקדים בתזמון, תגובה, זיכרון או קבלת החלטות",
       "לחצו על כפתור ℹ️ בכל כרטיס משחק כדי לראות את הכללים, הבקרות ומבנה הפרסים"
-    ]
+    ],
+    closeModalAria: "סגירת חלון",
+    loading: "טוען...",
+    termsGateTitle: "ברוכים הבאים למשחקי MLEO",
+    termsGateSubtitle: "אשרו את התנאים כדי להמשיך",
+    termsGateViewTerms: "הצגת תנאים",
+    footerHome: "בית",
+    footerPrivacy: "פרטיות",
+    footerCookies: "עוגיות",
+    footerRisk: "סיכונים",
+    menuTitle: "תפריט משתמש",
+    menuUserInfo: "פרטי משתמש",
+    menuUsername: "שם משתמש:",
+    menuEmail: "אימייל:",
+    menuStatus: "סטטוס:",
+    menuGuest: "אורח",
+    menuConnected: "מחובר",
+    menuNotProvided: "לא צוין",
+    menuLanguage: "שפה",
+    menuWallet: "ארנק",
+    menuConnectWallet: "חבר ארנק",
+    menuLogout: "התנתק",
+    menuLogin: "התחברות",
+    menuSignUp: "הרשמה",
+    menuCreateAccount: "צור חשבון",
+    menuWalletSection: "חיבור ארנק",
+    menuWalletStatus: "סטטוס ארנק:",
+    menuWalletNotConnected: "לא מחובר",
+    menuAddress: "כתובת:",
+    menuAccount: "חשבון",
+    menuDisconnect: "נתק",
+    menuPlayerVaultTitle: "כספת שחקן",
+    menuYourVault: "כספת ה-MLEO שלך",
+    menuPlayerInfo: "פרטי שחקן",
+    menuWalletInfo: "פרטי ארנק",
+    menuVaultLine: "כספת: {{amount}} MLEO",
+    connectButtonLabel: "חיבור",
+    authErrorInvalidCredentials: "הזינו אימייל וסיסמה תקינים (8+ תווים).",
+    authErrorUsernameShort: "שם המשתמש חייב להכיל לפחות 3 תווים.",
+    authErrorPasswordMismatch: "הסיסמאות אינן תואמות.",
+    authLoginFailed: "ההתחברות נכשלה. נסו שוב.",
+    authSignupFailed: "ההרשמה נכשלה. נסו שוב.",
+    authLabelUsername: "שם משתמש",
+    authLabelPassword: "סיסמה",
+    authLabelConfirmPassword: "אישור סיסמה",
+    authPlaceholderUsername: "בחרו שם משתמש (3+ תווים)",
+    authPlaceholderEmail: "your@email.com",
+    authPlaceholderPassword: "8+ תווים",
+    authPlaceholderConfirmPassword: "חזרו על הסיסמה",
+    authProcessing: "מעבד...",
+    alertSwitchChain: "עברו ל-BSC Testnet (TBNB)",
+    alertMissingClaim: "חסרה כתובת CLAIM",
+    alertInvalidAmount: "סכום לא חוקי!",
+    alertClaimSuccess: "✅ נשלחו {{amount}} MLEO לארנק!",
+    alertClaimFailed: "ה-CLAIM נכשל או נדחה",
+    policyTitleTerms: "תנאים והגבלות",
+    policyTitlePrivacy: "מדיניות פרטיות",
+    policyTitleCookies: "הודעת עוגיות",
+    policyTitleRisk: "סיכונים / כתב ויתור רשת בדיקה",
+    policyLastUpdatedStub: "עודכן לאחרונה: [הזינו תאריך]",
+    vaultCollectTitle: "משיכה לארנק",
+    vaultAmountPlaceholder: "סכום",
+    vaultMax: "מקס׳",
+    vaultAvailable: "זמין: {{amount}} MLEO",
+    vaultClaiming: "מבצעים תביעה...",
+    vaultClaimCta: "תביעת {{amount}} MLEO",
+    vaultNeedWalletClaim: "חברו ארנק כדי לתבוע MLEO",
+    vaultAboutTitle: "💡 על הכספת שלכם:",
+    vaultAboutList: [
+      "הכספת משותפת לכל משחקי MLEO",
+      "שחקו כדי להרוויח עוד MLEO",
+      "כל הפרסים מתווספים אוטומטית לכספת",
+      "השתמשו באסימוני משחק חינם בלי לבזבז MLEO מהכספת",
+      "חברו ארנק ותבעו MLEO על השרשרת",
+    ],
+    menuButtonTitle: "תפריט",
+    menuUsernameFallback: "משתמש",
+    termsAccept: "אישור",
+    termsDecline: "דחייה",
   }
 };
 
@@ -1977,7 +3494,7 @@ function acceptTerms() {
 }
 
 // ===== Modal Component =====
-function Modal({ isOpen, onClose, children, maxWidth = "2xl", padding = "6" }) {
+function Modal({ isOpen, onClose, children, maxWidth = "2xl", padding = "6", closeAriaLabel = "Close dialog", dir = "ltr" }) {
   const modalRef = useRef(null);
   const closeBtnRef = useRef(null);
 
@@ -2047,13 +3564,14 @@ function Modal({ isOpen, onClose, children, maxWidth = "2xl", padding = "6" }) {
         role="dialog"
         aria-modal="true"
         className={`relative bg-white text-black rounded-2xl ${maxWidthClass} w-full max-h-[80vh] overflow-y-auto`}
+        dir={dir}
       >
         <button
           ref={closeBtnRef}
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 text-2xl font-bold text-gray-500 hover:text-gray-700"
-          aria-label="Close modal"
+          className={`absolute top-4 text-2xl font-bold text-gray-500 hover:text-gray-700 ${dir === "rtl" ? "left-4" : "right-4"}`}
+          aria-label={closeAriaLabel}
         >
           ×
         </button>
@@ -2067,8 +3585,9 @@ function Modal({ isOpen, onClose, children, maxWidth = "2xl", padding = "6" }) {
 
 // ===== How to Play Component =====
 function HowToPlay({ lang, onClose, gameType = "miners" }) {
-  const text = TEXT[lang] || TEXT.en;
-  const qh = text.questHow || TEXT.en.questHow;
+  const safeLang = SUPPORTED_LOCALES.has(lang) ? lang : "en";
+  const text = TEXT[safeLang];
+  const qh = text.questHow;
 
   if (gameType === "quest") {
     return (
@@ -2103,9 +3622,7 @@ function HowToPlay({ lang, onClose, gameType = "miners" }) {
 
   if (gameType === "arcade" || gameType === "arcade-online") {
     const isOnline = gameType === "arcade-online";
-    const arcadeHeading = isOnline
-      ? (text.howToPlayArcadeOnlineTitle || TEXT.en.howToPlayArcadeOnlineTitle)
-      : (text.howToPlayArcadeTitle || TEXT.en.howToPlayArcadeTitle);
+    const arcadeHeading = isOnline ? text.howToPlayArcadeOnlineTitle : text.howToPlayArcadeTitle;
     return (
       <div>
         <h2 className="text-2xl font-bold mb-4">{arcadeHeading}</h2>
@@ -2150,7 +3667,7 @@ function HowToPlay({ lang, onClose, gameType = "miners" }) {
   
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4">{text.howToPlayMinersTitle || TEXT.en.howToPlayMinersTitle}</h2>
+      <h2 className="text-2xl font-bold mb-4">{text.howToPlayMinersTitle}</h2>
       
       <section className="mb-6">
         <h3 className="font-bold text-lg mb-2">{text.goal}</h3>
@@ -2197,11 +3714,11 @@ function HowToPlay({ lang, onClose, gameType = "miners" }) {
 }
 
 // ===== Terms Component =====
-function Terms({ onAccept, onDecline }) {
+function Terms({ onAccept, onDecline, text }) {
   return (
     <div className="max-h-[80vh] overflow-y-auto">
-      <h2 className="text-2xl font-bold mb-4">Terms & Conditions</h2>
-      <p className="text-xs text-gray-500 mb-4">Last Updated: [Insert Date]</p>
+      <h2 className="text-2xl font-bold mb-4">{text.policyTitleTerms}</h2>
+      <p className="text-xs text-gray-500 mb-4">{text.policyLastUpdatedStub}</p>
       
       <div className="space-y-4 text-sm">
         <section>
@@ -2611,13 +4128,13 @@ function Terms({ onAccept, onDecline }) {
           onClick={onAccept}
           className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold"
         >
-          Accept
+          {text.termsAccept}
         </button>
         <button
           onClick={onDecline}
           className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold"
         >
-          Decline
+          {text.termsDecline}
         </button>
       </div>
     </div>
@@ -2650,6 +4167,7 @@ const FLAGS = {
 // ===== Helpers =====
 const ALL = Object.values(TEXT).map(x => ({ code: x.code, name: x.name }));
 const RTL_CODES = new Set(Object.values(TEXT).filter(x => x.dir === "rtl").map(x => x.code));
+const SUPPORTED_LOCALES = new Set(Object.keys(TEXT));
 
 function pickInitialLang() {
   try {
@@ -2670,8 +4188,11 @@ function pickInitialLang() {
 }
 
 // ===== Language Selector =====
-function LanguageSelector({ currentLang, onLanguageChange }) {
+function LanguageSelector({ currentLang, onLanguageChange, pageDir = "ltr" }) {
   const [isOpen, setIsOpen] = useState(false);
+  const panelAlign = pageDir === "rtl" ? "left-0" : "right-0";
+  const itemText = pageDir === "rtl" ? "text-right" : "text-left";
+  const flagMargin = pageDir === "rtl" ? "ml-2" : "mr-2";
   
   return (
     <div className="relative">
@@ -2680,7 +4201,7 @@ function LanguageSelector({ currentLang, onLanguageChange }) {
         className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/15 transition text-sm flex items-center gap-2"
         style={{ fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol" }}
       >
-        <span className="mr-1">{FLAGS[currentLang] || '🌐'}</span>
+        <span className={pageDir === "rtl" ? "ml-1" : "mr-1"}>{FLAGS[currentLang] || '🌐'}</span>
         <span>{TEXT[currentLang].name}</span>
         <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -2691,7 +4212,7 @@ function LanguageSelector({ currentLang, onLanguageChange }) {
         <>
           <div className="fixed inset-0 z-[100]" onClick={() => setIsOpen(false)} />
           <div 
-            className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-300 rounded-xl shadow-2xl overflow-hidden z-[110] max-h-[400px] overflow-y-auto"
+            className={`absolute ${panelAlign} top-full mt-2 w-52 bg-white border border-gray-300 rounded-xl shadow-2xl overflow-hidden z-[110] max-h-[400px] overflow-y-auto`}
             style={{ 
               fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol",
               backgroundColor: "white"
@@ -2704,11 +4225,11 @@ function LanguageSelector({ currentLang, onLanguageChange }) {
                   onLanguageChange(opt.code);
                   setIsOpen(false);
                 }}
-                className={`w-full px-4 py-3 text-left hover:bg-gray-100 transition flex items-center gap-3 text-sm text-gray-900 ${
+                className={`w-full px-4 py-3 ${itemText} hover:bg-gray-100 transition flex items-center gap-3 text-sm text-gray-900 ${
                   currentLang === opt.code ? 'bg-blue-100 font-bold' : ''
                 }`}
               >
-                <span className="text-lg mr-2">{FLAGS[opt.code] || '🌐'}</span>
+                <span className={`text-lg ${flagMargin}`}>{FLAGS[opt.code] || '🌐'}</span>
                 <span>{TEXT[opt.code].name}</span>
               </button>
             ))}
@@ -2720,9 +4241,11 @@ function LanguageSelector({ currentLang, onLanguageChange }) {
 }
 
 /** Top-bar language control: visual + dropdown pattern aligned with `pages/index.js` LanguageSelector; same `onLanguageChange` as in-menu selector. */
-function TopBarLanguageSelector({ currentLang, onLanguageChange }) {
+function TopBarLanguageSelector({ currentLang, onLanguageChange, pageDir = "ltr" }) {
   const [isOpen, setIsOpen] = useState(false);
   const labelLang = TEXT[currentLang] ? currentLang : "en";
+  const panelSide = pageDir === "rtl" ? "left-4" : "right-4";
+  const itemAlign = pageDir === "rtl" ? "text-right" : "text-left";
 
   return (
     <div className="relative flex shrink-0 items-center">
@@ -2750,7 +4273,7 @@ function TopBarLanguageSelector({ currentLang, onLanguageChange }) {
           <>
             <div className="fixed inset-0 bg-black/20" style={{ zIndex: 2147483646 }} onClick={() => setIsOpen(false)} />
             <div
-              className="fixed right-4 top-16 max-h-[400px] w-52 overflow-y-auto overflow-hidden rounded-xl border border-white/20 bg-gray-900 text-white shadow-2xl"
+              className={`fixed top-16 max-h-[400px] w-52 overflow-y-auto overflow-hidden rounded-xl border border-white/20 bg-gray-900 text-white shadow-2xl ${panelSide}`}
               style={{
                 fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol",
                 backdropFilter: "blur(10px)",
@@ -2766,11 +4289,11 @@ function TopBarLanguageSelector({ currentLang, onLanguageChange }) {
                     onLanguageChange(opt.code);
                     setIsOpen(false);
                   }}
-                  className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-white/15 ${
+                  className={`flex w-full items-center gap-3 px-4 py-3 text-sm transition hover:bg-white/15 ${itemAlign} ${
                     currentLang === opt.code ? "bg-white/25 font-bold" : ""
                   }`}
                 >
-                  <span className="mr-2 text-lg">{FLAGS[opt.code] || "🌐"}</span>
+                  <span className={`text-lg ${pageDir === "rtl" ? "ml-2" : "mr-2"}`}>{FLAGS[opt.code] || "🌐"}</span>
                   <span>{TEXT[opt.code].name}</span>
                 </button>
               ))}
@@ -2790,7 +4313,14 @@ export default function GamesHub() {
   const [poolModalOpen, setPoolModalOpen] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(() => {
+    if (typeof window === "undefined") return "en";
+    try {
+      return pickInitialLang();
+    } catch {
+      return "en";
+    }
+  });
   const [showMenu, setShowMenu] = useState(false);
   const [userInfo, setUserInfo] = useState({ email: null, username: null, isGuest: true });
   const [vault, setVault] = useState(0);
@@ -2816,6 +4346,10 @@ export default function GamesHub() {
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const chainId = useChainId();
+
+  const safeLang = useMemo(() => (SUPPORTED_LOCALES.has(lang) ? lang : "en"), [lang]);
+  const text = useMemo(() => TEXT[safeLang], [safeLang]);
+  const dir = text.dir || "ltr";
   
   const open = (id) => setModal(id);
   const close = () => setModal(null);
@@ -2834,14 +4368,14 @@ export default function GamesHub() {
   useEffect(() => {
     if (!mounted) return;
     try {
-      localStorage.setItem("mleo_lang", lang);
+      localStorage.setItem("mleo_lang", safeLang);
       const url = new URL(window.location.href);
-      url.searchParams.set("lang", lang);
+      url.searchParams.set("lang", safeLang);
       window.history.replaceState({}, "", url.toString());
-      document.documentElement.setAttribute("lang", lang);
-      document.documentElement.setAttribute("dir", RTL_CODES.has(lang) ? "rtl" : "ltr");
+      document.documentElement.setAttribute("lang", safeLang);
+      document.documentElement.setAttribute("dir", RTL_CODES.has(safeLang) ? "rtl" : "ltr");
     } catch {}
-  }, [lang, mounted]);
+  }, [safeLang, mounted]);
 
   // Load user info from Supabase
   useEffect(() => {
@@ -2853,7 +4387,7 @@ export default function GamesHub() {
           const user = data.session.user;
           setUserInfo({
             email: user.email || null,
-            username: user.user_metadata?.username || user.email?.split('@')[0] || 'User',
+            username: user.user_metadata?.username || user.email?.split('@')[0] || null,
             isGuest: false
           });
         } else {
@@ -2873,7 +4407,7 @@ export default function GamesHub() {
         const user = session.user;
         setUserInfo({
           email: user.email || null,
-          username: user.user_metadata?.username || user.email?.split('@')[0] || 'User',
+          username: user.user_metadata?.username || user.email?.split('@')[0] || null,
           isGuest: false
         });
       } else {
@@ -2934,7 +4468,7 @@ export default function GamesHub() {
     setAuthError("");
     
     if (!EMAIL_RE.test(authEmail) || authPassword.length < 8) {
-      setAuthError("Please enter a valid email and password (8+ characters).");
+      setAuthError(text.authErrorInvalidCredentials);
       return;
     }
 
@@ -2952,7 +4486,7 @@ export default function GamesHub() {
       setAuthError("");
       setAuthMode("login");
     } catch (e) {
-      setAuthError(e?.message || "Login failed. Please try again.");
+      setAuthError(e?.message || text.authLoginFailed);
     } finally {
       setAuthSubmitting(false);
     }
@@ -2963,17 +4497,17 @@ export default function GamesHub() {
     
     // Validate username
     if (!authUsername || authUsername.trim().length < 3) {
-      setAuthError("Username must be at least 3 characters long.");
+      setAuthError(text.authErrorUsernameShort);
       return;
     }
     
     if (!EMAIL_RE.test(authEmail) || authPassword.length < 8) {
-      setAuthError("Please enter a valid email and password (8+ characters).");
+      setAuthError(text.authErrorInvalidCredentials);
       return;
     }
     
     if (authPassword !== authConfirmPassword) {
-      setAuthError("Passwords do not match.");
+      setAuthError(text.authErrorPasswordMismatch);
       return;
     }
 
@@ -2999,7 +4533,7 @@ export default function GamesHub() {
       setAuthError("");
       setAuthMode("login");
     } catch (e) {
-      setAuthError(e?.message || "Signup failed. Please try again.");
+      setAuthError(e?.message || text.authSignupFailed);
     } finally {
       setAuthSubmitting(false);
     }
@@ -3016,18 +4550,18 @@ export default function GamesHub() {
       try {
         await switchChain?.({ chainId: CLAIM_CHAIN_ID });
       } catch {
-        alert("Switch to BSC Testnet (TBNB)");
+        alert(text.alertSwitchChain);
         return;
       }
     }
 
     if (!CLAIM_ADDRESS) {
-      alert("Missing CLAIM address");
+      alert(text.alertMissingClaim);
       return;
     }
 
     if (collectAmount <= 0 || collectAmount > vault) {
-      alert("Invalid amount!");
+      alert(text.alertInvalidAmount);
       return;
     }
 
@@ -3065,11 +4599,11 @@ export default function GamesHub() {
         console.error("Failed to update RUSH vault:", e);
       }
 
-      alert(`✅ Sent ${fmt(collectAmount)} MLEO to wallet!`);
+      alert(text.alertClaimSuccess.replace("{{amount}}", fmt(collectAmount)));
       setCollectAmount(1000);
     } catch (err) {
       console.error(err);
-      alert("Claim failed or rejected");
+      alert(text.alertClaimFailed);
     } finally {
       setClaiming(false);
     }
@@ -3087,13 +4621,10 @@ export default function GamesHub() {
     router.push("/");
   };
 
-  const text = useMemo(() => TEXT[lang] || TEXT.en, [lang]);
-  const dir = text.dir || "ltr";
-
   if (!mounted) {
   return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+        <div className="text-white text-xl">{text.loading}</div>
       </div>
     );
   }
@@ -3101,21 +4632,21 @@ export default function GamesHub() {
   if (!termsAccepted) {
     return (
       <Layout>
-        <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="min-h-screen bg-black flex items-center justify-center" dir={dir}>
           <div className="text-center text-white">
-            <h1 className="text-3xl font-bold mb-4">Welcome to MLEO Games</h1>
-            <p className="text-gray-300 mb-6">Please accept our terms and conditions to continue</p>
+            <h1 className="text-3xl font-bold mb-4">{text.termsGateTitle}</h1>
+            <p className="text-gray-300 mb-6">{text.termsGateSubtitle}</p>
             <button
               onClick={() => setModal("terms")}
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold"
             >
-              View Terms
+              {text.termsGateViewTerms}
             </button>
           </div>
         </div>
         
-        <Modal isOpen={modal === "terms"} onClose={close}>
-          <Terms onAccept={handleAcceptTerms} onDecline={() => setModal(null)} />
+        <Modal isOpen={modal === "terms"} onClose={close} closeAriaLabel={text.closeModalAria} dir={dir}>
+          <Terms onAccept={handleAcceptTerms} onDecline={() => setModal(null)} text={text} />
         </Modal>
       </Layout>
     );
@@ -3151,11 +4682,11 @@ export default function GamesHub() {
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <TopBarLanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} />
+                <TopBarLanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} pageDir={dir} />
                 <button
                   onClick={() => setShowMenu(!showMenu)}
                   className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 transition-all hover:bg-white/20"
-                  title="Menu"
+                  title={text.menuButtonTitle}
                 >
                   <div className="flex flex-col gap-1">
                     <div className="w-5 h-0.5 bg-white"></div>
@@ -3184,7 +4715,7 @@ export default function GamesHub() {
               <section className="grid grid-cols-2 gap-2 w-full shrink-0">
                 <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[160px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
-                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{text.miners}</h2>
+                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-start">{text.miners}</h2>
                     <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                       {text.active}
                     </span>
@@ -3219,7 +4750,7 @@ export default function GamesHub() {
 
                 <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[160px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
-                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{text.baseTitle}</h2>
+                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-start">{text.baseTitle}</h2>
                     <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
                       {text.baseBadgeLabel}
                     </span>
@@ -3254,15 +4785,15 @@ export default function GamesHub() {
 
                 <article className="rounded-xl border border-purple-500/35 bg-gradient-to-br from-purple-900/35 to-indigo-900/25 backdrop-blur-sm p-2 flex flex-col min-h-[160px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
-                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">
-                      {text.arcadeRegularTitle || "MLEO — Arcade"}
+                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-start">
+                      {text.arcadeRegularTitle}
                     </h2>
                     <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-purple-500/25 text-purple-200 border border-purple-500/40">
-                      {text.arcadeBadgeLabel || "Arcade"}
+                      {text.arcadeBadgeLabel}
                     </span>
                   </div>
                   <p className="text-[10px] text-zinc-300 mt-1 leading-snug line-clamp-3 flex-1">
-                    {text.arcadeDescShort || "Solo mini-games. Shared vault & session rewards."}
+                    {text.arcadeDescShort}
                   </p>
                   <div className="mt-auto pt-1 flex flex-col gap-1">
                     <div className="flex gap-1">
@@ -3283,7 +4814,7 @@ export default function GamesHub() {
                     </div>
                     <Link href="/arcade" className="block">
                       <span className="flex w-full items-center justify-center bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-2 rounded-lg text-[11px] font-bold shadow-md active:opacity-90">
-                        {text.arcadeGames || "Arcade Games"}
+                        {text.arcadeGames}
                       </span>
                     </Link>
                   </div>
@@ -3291,15 +4822,15 @@ export default function GamesHub() {
 
                 <article className="rounded-xl border border-pink-500/35 bg-gradient-to-br from-red-900/30 to-pink-900/20 backdrop-blur-sm p-2 flex flex-col min-h-[160px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
-                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">
-                      {text.arcadeOnlineTitle || "MLEO — Arcade Online"}
+                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-start">
+                      {text.arcadeOnlineTitle}
                     </h2>
                     <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-pink-500/20 text-pink-200 border border-pink-500/35">
-                      {text.onlineBadgeLabel || "Online"}
+                      {text.onlineBadgeLabel}
                     </span>
                   </div>
                   <p className="text-[10px] text-zinc-300 mt-1 leading-snug line-clamp-3 flex-1">
-                    {text.arcadeOnlineDescShort || "Multiplayer & live modes. Same shared vault."}
+                    {text.arcadeOnlineDescShort}
                   </p>
                   <div className="mt-auto pt-1 flex flex-col gap-1">
                     <div className="flex gap-1">
@@ -3320,7 +4851,7 @@ export default function GamesHub() {
                     </div>
                     <Link href="/arcade-online" className="block">
                       <span className="flex w-full items-center justify-center bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white py-2 rounded-lg text-[11px] font-bold shadow-md active:opacity-90">
-                        {text.arcadeOnline || "Arcade Online"}
+                        {text.arcadeOnline}
                       </span>
                     </Link>
                   </div>
@@ -3331,20 +4862,20 @@ export default function GamesHub() {
               <footer className="mt-auto flex shrink-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-white/10 pt-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] text-[10px] leading-tight text-white/55">
                 <span>© {new Date().getFullYear()} MLEO</span>
                 <button type="button" onClick={() => setPoolModalOpen(true)} className="underline hover:text-white/90">
-                  {text.poolStatus || "Pool"}
+                  {text.poolStatus}
                 </button>
-                <Link href="/" className="underline hover:text-white/90">Home</Link>
+                <Link href="/" className="underline hover:text-white/90">{text.footerHome}</Link>
                 <button type="button" onClick={() => setPolicyModal("terms")} className="underline hover:text-white/90">
-                  {text.legalShort || "Legal"}
+                  {text.legalShort}
                 </button>
                 <button type="button" onClick={() => setPolicyModal("privacy")} className="underline hover:text-white/90">
-                  Privacy
+                  {text.footerPrivacy}
                 </button>
                 <button type="button" onClick={() => setPolicyModal("cookies")} className="underline hover:text-white/90">
-                  Cookies
+                  {text.footerCookies}
                 </button>
                 <button type="button" onClick={() => setPolicyModal("risk")} className="underline hover:text-white/90">
-                  Risk
+                  {text.footerRisk}
                 </button>
               </footer>
             </div>
@@ -3363,11 +4894,11 @@ export default function GamesHub() {
 
               <section
                 className="grid min-h-0 w-full flex-1 grid-cols-2 gap-3 [grid-template-rows:repeat(2,minmax(0,1fr))] lg:gap-4"
-                aria-label="Game destinations"
+                aria-label={text.chooseGame}
               >
                 <article className="flex h-full min-h-0 flex-col rounded-2xl border border-white/15 bg-black/40 p-4 shadow-xl backdrop-blur-md">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 space-y-1 text-left">
+                    <div className="min-w-0 space-y-1 text-start">
                       <div className="text-3xl leading-none lg:text-[2rem]" aria-hidden>
                         ⛏️
                       </div>
@@ -3377,7 +4908,7 @@ export default function GamesHub() {
                       {text.active}
                     </span>
                   </div>
-                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-[13px] font-medium leading-relaxed text-zinc-200/95 lg:text-sm">
+                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-start text-[13px] font-medium leading-relaxed text-zinc-200/95 lg:text-sm">
                     {text.minersDescShort || text.minersDesc}
                   </p>
                   <div className="mt-2.5 flex shrink-0 flex-col gap-2">
@@ -3408,7 +4939,7 @@ export default function GamesHub() {
 
                 <article className="flex h-full min-h-0 flex-col rounded-2xl border border-white/15 bg-black/40 p-4 shadow-xl backdrop-blur-md">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 space-y-1 text-left">
+                    <div className="min-w-0 space-y-1 text-start">
                       <div className="text-3xl leading-none lg:text-[2rem]" aria-hidden>
                         🏗️
                       </div>
@@ -3418,7 +4949,7 @@ export default function GamesHub() {
                       {text.baseBadgeLabel}
                     </span>
                   </div>
-                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-[13px] font-medium leading-relaxed text-zinc-200/95 lg:text-sm">
+                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-start text-[13px] font-medium leading-relaxed text-zinc-200/95 lg:text-sm">
                     {text.baseDescShort || text.baseDesc}
                   </p>
                   <div className="mt-2.5 flex shrink-0 flex-col gap-2">
@@ -3449,20 +4980,20 @@ export default function GamesHub() {
 
                 <article className="flex h-full min-h-0 flex-col rounded-2xl border border-purple-500/40 bg-gradient-to-br from-purple-900/35 to-indigo-900/25 p-4 shadow-xl backdrop-blur-md">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 space-y-1 text-left">
+                    <div className="min-w-0 space-y-1 text-start">
                       <div className="text-3xl leading-none lg:text-[2rem]" aria-hidden>
                         🎮
                       </div>
                       <h2 className="text-xl font-extrabold leading-snug tracking-tight lg:text-[1.3125rem]">
-                        {text.arcadeRegularTitle || "MLEO — Arcade"}
+                        {text.arcadeRegularTitle}
                       </h2>
                     </div>
                     <span className="shrink-0 rounded-full border border-purple-500/45 bg-purple-500/25 px-2 py-0.5 text-[10px] font-bold text-purple-200">
-                      {text.arcadeBadgeLabel || "Arcade"}
+                      {text.arcadeBadgeLabel}
                     </span>
                   </div>
-                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-[13px] font-medium leading-relaxed text-zinc-100/90 lg:text-sm">
-                    {text.arcadeDescShort || "Solo mini-games. Shared vault & session rewards."}
+                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-start text-[13px] font-medium leading-relaxed text-zinc-100/90 lg:text-sm">
+                    {text.arcadeDescShort}
                   </p>
                   <div className="mt-2.5 flex shrink-0 flex-col gap-2">
                     <div className="flex flex-wrap justify-center gap-2">
@@ -3485,27 +5016,27 @@ export default function GamesHub() {
                       href="/arcade"
                       className="block w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-2.5 text-center text-sm font-bold text-white shadow-lg hover:from-purple-700 hover:to-indigo-700 lg:py-3"
                     >
-                      {text.arcadeGames || "Arcade Games"}
+                      {text.arcadeGames}
                     </Link>
                   </div>
                 </article>
 
                 <article className="flex h-full min-h-0 flex-col rounded-2xl border border-pink-500/40 bg-gradient-to-br from-red-900/30 to-pink-900/25 p-4 shadow-xl backdrop-blur-md">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 space-y-1 text-left">
+                    <div className="min-w-0 space-y-1 text-start">
                       <div className="text-3xl leading-none lg:text-[2rem]" aria-hidden>
                         🌐
                       </div>
                       <h2 className="text-xl font-extrabold leading-snug tracking-tight lg:text-[1.3125rem]">
-                        {text.arcadeOnlineTitle || "MLEO — Arcade Online"}
+                        {text.arcadeOnlineTitle}
                       </h2>
                     </div>
                     <span className="shrink-0 rounded-full border border-pink-500/40 bg-pink-500/25 px-2 py-0.5 text-[10px] font-bold text-pink-200">
-                      {text.onlineBadgeLabel || "Online"}
+                      {text.onlineBadgeLabel}
                     </span>
                   </div>
-                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-[13px] font-medium leading-relaxed text-zinc-100/90 lg:text-sm">
-                    {text.arcadeOnlineDescShort || "Multiplayer & live modes. Same shared vault."}
+                  <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-start text-[13px] font-medium leading-relaxed text-zinc-100/90 lg:text-sm">
+                    {text.arcadeOnlineDescShort}
                   </p>
                   <div className="mt-2.5 flex shrink-0 flex-col gap-2">
                     <div className="flex flex-wrap justify-center gap-2">
@@ -3528,7 +5059,7 @@ export default function GamesHub() {
                       href="/arcade-online"
                       className="block w-full rounded-xl bg-gradient-to-r from-red-600 to-pink-600 py-2.5 text-center text-sm font-bold text-white shadow-lg hover:from-red-700 hover:to-pink-700 lg:py-3"
                     >
-                      {text.arcadeOnline || "Arcade Online"}
+                      {text.arcadeOnline}
                     </Link>
                   </div>
                 </article>
@@ -3537,22 +5068,22 @@ export default function GamesHub() {
               <footer className="mt-2 flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-white/10 pt-2 text-[11px] leading-tight text-white/55">
                 <span>© {new Date().getFullYear()} MLEO</span>
                 <button type="button" onClick={() => setPoolModalOpen(true)} className="underline hover:text-white/90">
-                  {text.poolStatus || "Pool"}
+                  {text.poolStatus}
                 </button>
                 <Link href="/" className="underline hover:text-white/90">
-                  Home
+                  {text.footerHome}
                 </Link>
                 <button type="button" onClick={() => setPolicyModal("terms")} className="underline hover:text-white/90">
-                  {text.legalShort || text.terms}
+                  {text.legalShort}
                 </button>
                 <button type="button" onClick={() => setPolicyModal("privacy")} className="underline hover:text-white/90">
-                  Privacy
+                  {text.footerPrivacy}
                 </button>
                 <button type="button" onClick={() => setPolicyModal("cookies")} className="underline hover:text-white/90">
-                  Cookies
+                  {text.footerCookies}
                 </button>
                 <button type="button" onClick={() => setPolicyModal("risk")} className="underline hover:text-white/90">
-                  Risk
+                  {text.footerRisk}
                 </button>
               </footer>
             </div>
@@ -3562,84 +5093,87 @@ export default function GamesHub() {
       </div>
 
       {/* Modals */}
-      <Modal isOpen={modal === "miners-how"} onClose={close}>
-        <HowToPlay lang={lang} onClose={close} />
-        </Modal>
-
-      <Modal isOpen={modal === "quest-how"} onClose={close}>
-        <HowToPlay lang={lang} onClose={close} gameType="quest" />
-        </Modal>
-
-      <Modal isOpen={modal === "arcade-how"} onClose={close}>
-        <HowToPlay lang={lang} onClose={close} gameType="arcade" />
-        </Modal>
-
-      <Modal isOpen={modal === "arcade-online-how"} onClose={close}>
-        <HowToPlay lang={lang} onClose={close} gameType="arcade-online" />
+      <Modal isOpen={modal === "miners-how"} onClose={close} closeAriaLabel={text.closeModalAria} dir={dir}>
+        <HowToPlay lang={safeLang} onClose={close} />
       </Modal>
 
-      <Modal isOpen={poolModalOpen} onClose={() => setPoolModalOpen(false)} maxWidth="2xl">
+      <Modal isOpen={modal === "quest-how"} onClose={close} closeAriaLabel={text.closeModalAria} dir={dir}>
+        <HowToPlay lang={safeLang} onClose={close} gameType="quest" />
+      </Modal>
+
+      <Modal isOpen={modal === "arcade-how"} onClose={close} closeAriaLabel={text.closeModalAria} dir={dir}>
+        <HowToPlay lang={safeLang} onClose={close} gameType="arcade" />
+      </Modal>
+
+      <Modal isOpen={modal === "arcade-online-how"} onClose={close} closeAriaLabel={text.closeModalAria} dir={dir}>
+        <HowToPlay lang={safeLang} onClose={close} gameType="arcade-online" />
+      </Modal>
+
+      <Modal isOpen={poolModalOpen} onClose={() => setPoolModalOpen(false)} maxWidth="2xl" closeAriaLabel={text.closeModalAria} dir={dir}>
         <div className="rounded-xl bg-zinc-900 p-2 -m-1">
-          <p className="text-center text-sm font-bold text-white/90 mb-2">{text.poolStatus || "Pool"}</p>
+          <p className="text-center text-sm font-bold text-white/90 mb-2">{text.poolStatus}</p>
           <GamePoolStats />
         </div>
       </Modal>
 
-      <Modal isOpen={modal === "terms"} onClose={close}>
-        <Terms onAccept={handleAcceptTerms} onDecline={() => setModal(null)} />
+      <Modal isOpen={modal === "terms"} onClose={close} closeAriaLabel={text.closeModalAria} dir={dir}>
+        <Terms onAccept={handleAcceptTerms} onDecline={() => setModal(null)} text={text} />
       </Modal>
 
       {/* Menu Modal */}
-      <Modal isOpen={showMenu} onClose={() => setShowMenu(false)} maxWidth="md" padding="3">
+      <Modal isOpen={showMenu} onClose={() => setShowMenu(false)} maxWidth="md" padding="3" closeAriaLabel={text.closeModalAria} dir={dir}>
         <div className="space-y-2">
-          <h2 className="text-lg font-bold text-center mb-2">User Menu</h2>
+          <h2 className="text-lg font-bold text-center mb-2">{text.menuTitle}</h2>
           
           {/* User Info Section */}
           <div className="space-y-1.5">
             <div className="bg-gray-100 rounded-lg p-2">
-              <h3 className="font-bold text-sm mb-1.5">User Information</h3>
+              <h3 className="font-bold text-sm mb-1.5">{text.menuUserInfo}</h3>
               <div className="space-y-1 text-gray-700 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">Username:</span>
-                  <span>{userInfo.username || 'Guest'}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold shrink-0">{text.menuUsername}</span>
+                  <span className="text-end">
+                    {userInfo.isGuest ? text.menuGuest : (userInfo.username || text.menuUsernameFallback)}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">Email:</span>
-                  <span>{userInfo.email || 'Not provided'}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold shrink-0">{text.menuEmail}</span>
+                  <span className="text-end">{userInfo.email || text.menuNotProvided}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">Status:</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold shrink-0">{text.menuStatus}</span>
                   <span className={`px-2 py-1 rounded text-sm font-bold ${
                     userInfo.isGuest 
                       ? 'bg-gray-300 text-gray-700' 
                       : 'bg-green-300 text-green-700'
                   }`}>
-                    {userInfo.isGuest ? 'Guest' : 'Connected'}
+                    {userInfo.isGuest ? text.menuGuest : text.menuConnected}
                   </span>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setShowVaultModal(true)}
                 className="w-full mt-2 bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
               >
-                VAULT: {fmt(vault)} MLEO
+                {text.menuVaultLine.replace("{{amount}}", fmt(vault))}
               </button>
             </div>
 
             {/* Language & Wallet - Same Row */}
             <div className="grid grid-cols-2 gap-2">
               <div className="bg-gray-100 rounded-lg p-2">
-                <h3 className="font-bold text-xs mb-1">Language</h3>
-                <LanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} />
+                <h3 className="font-bold text-xs mb-1">{text.menuLanguage}</h3>
+                <LanguageSelector currentLang={lang} onLanguageChange={handleLanguageChange} pageDir={dir} />
               </div>
               <div className="bg-gray-100 rounded-lg p-2">
-                <h3 className="font-bold text-xs mb-1">Wallet</h3>
+                <h3 className="font-bold text-xs mb-1">{text.menuWallet}</h3>
                 <div style={{ transform: 'scale(0.85)' }}>
                   <ConnectButton 
                     chainStatus="none"
                     accountStatus="avatar"
                     showBalance={false}
-                    label="CONNECT"
+                    label={text.connectButtonLabel}
                   />
                 </div>
               </div>
@@ -3649,13 +5183,14 @@ export default function GamesHub() {
             {!userInfo.isGuest && (
               <div className="bg-gray-100 rounded-lg p-2">
                 <button
+                  type="button"
                   onClick={async () => {
                     await handleLogout();
                     setShowMenu(false);
                   }}
                   className="w-full bg-red-600 hover:bg-red-700 text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
                 >
-                  Logout
+                  {text.menuLogout}
                 </button>
               </div>
             )}
@@ -3664,12 +5199,13 @@ export default function GamesHub() {
             {userInfo.isGuest && (
               <div className="bg-gray-100 rounded-lg p-2">
                 <h3 className="font-bold text-sm mb-1.5">
-                  {authMode === "login" ? "Login" : "Create Account"}
+                  {authMode === "login" ? text.menuLogin : text.menuCreateAccount}
                 </h3>
                 
                 {/* Mode Toggle */}
                 <div className="flex gap-2 mb-2">
                   <button
+                    type="button"
                     onClick={() => {
                       setAuthMode("login");
                       setAuthError("");
@@ -3682,9 +5218,10 @@ export default function GamesHub() {
                         : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                     }`}
                   >
-                    Login
+                    {text.menuLogin}
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
                       setAuthMode("signup");
                       setAuthError("");
@@ -3695,7 +5232,7 @@ export default function GamesHub() {
                         : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                     }`}
                   >
-                    Sign Up
+                    {text.menuSignUp}
                   </button>
                 </div>
 
@@ -3711,13 +5248,13 @@ export default function GamesHub() {
                   {authMode === "signup" && (
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-0.5">
-                        Username
+                        {text.authLabelUsername}
                       </label>
                       <input
                         type="text"
                         value={authUsername}
                         onChange={(e) => setAuthUsername(e.target.value)}
-                        placeholder="Choose a username (3+ characters)"
+                        placeholder={text.authPlaceholderUsername}
                         className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                         disabled={authSubmitting}
                         minLength={3}
@@ -3728,13 +5265,13 @@ export default function GamesHub() {
                   
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-0.5">
-                      Email
+                      {text.menuEmail.replace(/:\s*$/, "")}
                     </label>
                     <input
                       type="email"
                       value={authEmail}
                       onChange={(e) => setAuthEmail(e.target.value)}
-                      placeholder="your@email.com"
+                      placeholder={text.authPlaceholderEmail}
                       className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                       disabled={authSubmitting}
                     />
@@ -3742,13 +5279,13 @@ export default function GamesHub() {
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-700 mb-0.5">
-                      Password
+                      {text.authLabelPassword}
                     </label>
                     <input
                       type="password"
                       value={authPassword}
                       onChange={(e) => setAuthPassword(e.target.value)}
-                      placeholder="8+ characters"
+                      placeholder={text.authPlaceholderPassword}
                       className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                       disabled={authSubmitting}
                     />
@@ -3757,13 +5294,13 @@ export default function GamesHub() {
                   {authMode === "signup" && (
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-0.5">
-                        Confirm Password
+                        {text.authLabelConfirmPassword}
                       </label>
                       <input
                         type="password"
                         value={authConfirmPassword}
                         onChange={(e) => setAuthConfirmPassword(e.target.value)}
-                        placeholder="Confirm password"
+                        placeholder={text.authPlaceholderConfirmPassword}
                         className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                         disabled={authSubmitting}
                       />
@@ -3771,15 +5308,16 @@ export default function GamesHub() {
                   )}
 
                   <button
+                    type="button"
                     onClick={authMode === "login" ? handleLogin : handleSignup}
                     disabled={authSubmitting}
                     className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
                   >
                     {authSubmitting
-                      ? "Processing..."
+                      ? text.authProcessing
                       : authMode === "login"
-                      ? "Login"
-                      : "Create Account"}
+                      ? text.menuLogin
+                      : text.menuCreateAccount}
                   </button>
                 </div>
               </div>
@@ -3787,53 +5325,56 @@ export default function GamesHub() {
 
             {/* Wallet Connection Section */}
             <div className="bg-gray-100 rounded-lg p-2">
-              <h3 className="font-bold text-sm mb-1.5">Wallet Connection</h3>
+              <h3 className="font-bold text-sm mb-1.5">{text.menuWalletSection}</h3>
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-gray-700 text-xs">Wallet Status:</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-gray-700 text-xs shrink-0">{text.menuWalletStatus}</span>
                   <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${
                     isConnected 
                       ? 'bg-green-300 text-green-700' 
                       : 'bg-red-300 text-red-700'
                   }`}>
-                    {isConnected ? 'Connected' : 'Not Connected'}
+                    {isConnected ? text.menuConnected : text.menuWalletNotConnected}
                   </span>
                 </div>
                 {isConnected && address && (
                   <div className="text-xs text-gray-600 break-all">
-                    <span className="font-semibold">Address:</span> {address}
+                    <span className="font-semibold">{text.menuAddress}</span> {address}
                   </div>
                 )}
                 <div className="flex gap-2 mt-1.5">
                   {!isConnected ? (
                     <button
+                      type="button"
                       onClick={() => {
                         openConnectModal?.();
                         setShowMenu(false);
                       }}
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
                     >
-                      Connect Wallet
+                      {text.menuConnectWallet}
                     </button>
                   ) : (
                     <>
                       <button
+                        type="button"
                         onClick={() => {
                           openAccountModal?.();
                           setShowMenu(false);
                         }}
                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
                       >
-                        Account
+                        {text.menuAccount}
                       </button>
                       <button
+                        type="button"
                         onClick={() => {
                           disconnect();
                           setShowMenu(false);
                         }}
                         className="flex-1 bg-red-600 hover:bg-red-700 text-white px-2 py-1.5 rounded text-xs font-bold transition-colors"
                       >
-                        Disconnect
+                        {text.menuDisconnect}
                       </button>
                     </>
                   )}
@@ -3845,14 +5386,14 @@ export default function GamesHub() {
       </Modal>
 
       {/* Vault Modal */}
-      <Modal isOpen={showVaultModal} onClose={() => setShowVaultModal(false)} maxWidth="md" padding="4">
+      <Modal isOpen={showVaultModal} onClose={() => setShowVaultModal(false)} maxWidth="md" padding="4" closeAriaLabel={text.closeModalAria} dir={dir}>
         <div className="space-y-3">
-          <h2 className="text-lg font-bold text-center mb-2">Player Vault</h2>
+          <h2 className="text-lg font-bold text-center mb-2">{text.menuPlayerVaultTitle}</h2>
           
           {/* Vault Balance */}
           <div className="bg-emerald-100 rounded-lg p-3 border-2 border-emerald-300">
             <div className="text-center">
-              <div className="text-sm font-semibold text-gray-700 mb-1">Your MLEO Vault</div>
+              <div className="text-sm font-semibold text-gray-700 mb-1">{text.menuYourVault}</div>
               <div className="flex items-center justify-center gap-2">
                 <span className="text-2xl">💰</span>
                 <span className="text-2xl font-bold text-emerald-700">{fmt(vault)} MLEO</span>
@@ -3862,24 +5403,26 @@ export default function GamesHub() {
 
           {/* Player Information */}
           <div className="bg-gray-100 rounded-lg p-3">
-            <h3 className="font-bold text-sm mb-2">Player Information</h3>
+            <h3 className="font-bold text-sm mb-2">{text.menuPlayerInfo}</h3>
             <div className="space-y-1.5 text-gray-700 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold">Username:</span>
-                <span>{userInfo.username || 'Guest'}</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold shrink-0">{text.menuUsername}</span>
+                <span className="text-end">
+                  {userInfo.isGuest ? text.menuGuest : (userInfo.username || text.menuUsernameFallback)}
+                </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold">Email:</span>
-                <span className="break-all text-right">{userInfo.email || 'Not provided'}</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold shrink-0">{text.menuEmail}</span>
+                <span className="break-all text-end">{userInfo.email || text.menuNotProvided}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold">Status:</span>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold shrink-0">{text.menuStatus}</span>
                 <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                   userInfo.isGuest 
                     ? 'bg-gray-300 text-gray-700' 
                     : 'bg-green-300 text-green-700'
                 }`}>
-                  {userInfo.isGuest ? 'Guest' : 'Connected'}
+                  {userInfo.isGuest ? text.menuGuest : text.menuConnected}
                 </span>
               </div>
             </div>
@@ -3888,16 +5431,16 @@ export default function GamesHub() {
           {/* Wallet Information */}
           {isConnected && address && (
             <div className="bg-gray-100 rounded-lg p-3">
-              <h3 className="font-bold text-sm mb-2">Wallet Information</h3>
+              <h3 className="font-bold text-sm mb-2">{text.menuWalletInfo}</h3>
               <div className="space-y-1.5 text-gray-700 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">Status:</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold shrink-0">{text.menuStatus}</span>
                   <span className="px-2 py-0.5 rounded text-xs font-bold bg-green-300 text-green-700">
-                    Connected
+                    {text.menuConnected}
                   </span>
                 </div>
                 <div className="break-all">
-                  <span className="font-semibold">Address:</span> {address}
+                  <span className="font-semibold">{text.menuAddress}</span> {address}
                 </div>
               </div>
             </div>
@@ -3905,7 +5448,7 @@ export default function GamesHub() {
 
           {/* Collect to Wallet Section */}
           <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
-            <h3 className="font-bold text-sm mb-2">Collect to Wallet</h3>
+            <h3 className="font-bold text-sm mb-2">{text.vaultCollectTitle}</h3>
             <div className="space-y-2">
               <div className="flex gap-2">
                 <input
@@ -3913,32 +5456,34 @@ export default function GamesHub() {
                   value={collectAmount}
                   onChange={(e) => setCollectAmount(Number(e.target.value))}
                   className="flex-1 px-2 py-1.5 text-xs rounded border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  placeholder="Amount"
+                  placeholder={text.vaultAmountPlaceholder}
                   min="1"
                   max={vault}
                   disabled={claiming}
                 />
                 <button
+                  type="button"
                   onClick={() => setCollectAmount(vault)}
                   className="px-3 py-1.5 text-xs rounded bg-amber-500/20 border border-amber-500/30 text-amber-700 hover:bg-amber-500/30 font-semibold"
                   disabled={claiming}
                 >
-                  MAX
+                  {text.vaultMax}
                 </button>
               </div>
               <div className="text-xs text-gray-600">
-                Available: {fmt(vault)} MLEO
+                {text.vaultAvailable.replace("{{amount}}", fmt(vault))}
               </div>
               <button
+                type="button"
                 onClick={collectToWallet}
                 disabled={collectAmount <= 0 || collectAmount > vault || claiming || !isConnected}
                 className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-3 py-2 rounded text-sm font-bold transition-colors"
               >
-                {claiming ? "Claiming..." : `CLAIM ${fmt(collectAmount)} MLEO`}
+                {claiming ? text.vaultClaiming : text.vaultClaimCta.replace("{{amount}}", fmt(collectAmount))}
               </button>
               {!isConnected && (
                 <p className="text-xs text-amber-700 text-center">
-                  Connect your wallet to claim MLEO tokens
+                  {text.vaultNeedWalletClaim}
                 </p>
               )}
             </div>
@@ -3947,13 +5492,11 @@ export default function GamesHub() {
           {/* Info Section */}
           <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
             <div className="text-xs text-blue-800">
-              <p className="font-semibold mb-1">💡 About Your Vault:</p>
+              <p className="font-semibold mb-1">{text.vaultAboutTitle}</p>
               <ul className="space-y-0.5 list-disc list-inside">
-                <li>Your vault is shared between all MLEO games</li>
-                <li>Play games to earn more MLEO tokens</li>
-                <li>All rewards are automatically added to your vault</li>
-                <li>Use free play tokens to play without using vault MLEO</li>
-                <li>Connect your wallet and claim MLEO tokens on-chain</li>
+                {text.vaultAboutList.map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
               </ul>
             </div>
           </div>
@@ -3962,9 +5505,9 @@ export default function GamesHub() {
 
       {/* Policy Modals */}
       {policyModal === 'terms' && (
-        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Terms & Conditions">
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title={text.policyTitleTerms} closeAriaLabel={text.closeModalAria}>
           <div className="prose prose-invert max-w-none">
-            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <p className="text-xs text-gray-400 mb-4">{text.policyLastUpdatedStub}</p>
             <div className="bg-white text-black rounded-lg p-6 md:p-8 space-y-4 text-sm">
               <section>
                 <p className="mb-4">Welcome to the MLEO game platform (the "<strong>Platform</strong>", "<strong>we</strong>", "<strong>us</strong>", or "<strong>our</strong>"). These Terms & Conditions ("<strong>Terms</strong>") govern your access to and use of the Platform, including our websites, games, applications, features, wallet-related integrations, testnet functionality, community features, promotional campaigns, and any related services.</p>
@@ -4371,9 +5914,9 @@ export default function GamesHub() {
       )}
 
       {policyModal === 'privacy' && (
-        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Privacy Policy">
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title={text.policyTitlePrivacy} closeAriaLabel={text.closeModalAria}>
           <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
-            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <p className="text-xs text-gray-400 mb-4">{text.policyLastUpdatedStub}</p>
             <section>
               <p>This Privacy Policy ("<strong>Policy</strong>") explains how MLEO and/or the operator of the MLEO Platform ("<strong>we</strong>", "<strong>us</strong>", or "<strong>our</strong>") collects, uses, stores, shares, and protects personal data when you access or use our websites, games, applications, wallet-related features, testnet features, support channels, community tools, and related services (collectively, the "<strong>Platform</strong>").</p>
               <p>By accessing or using the Platform, you acknowledge that you have read and understood this Policy.</p>
@@ -4730,9 +6273,9 @@ export default function GamesHub() {
       )}
 
       {policyModal === 'cookies' && (
-        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Cookie Notice">
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title={text.policyTitleCookies} closeAriaLabel={text.closeModalAria}>
           <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
-            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <p className="text-xs text-gray-400 mb-4">{text.policyLastUpdatedStub}</p>
             <section>
               <p>This Cookie Notice explains how MLEO and/or the operator of the MLEO Platform ("<strong>we</strong>", "<strong>us</strong>", or "<strong>our</strong>") uses cookies, local storage, session storage, pixels, SDKs, and similar technologies ("<strong>Cookies</strong>") when you access or use our websites, games, apps, wallet-related features, and related services (collectively, the "<strong>Platform</strong>").</p>
               <p>This Cookie Notice should be read together with our Privacy Policy and Terms & Conditions.</p>
@@ -4915,9 +6458,9 @@ export default function GamesHub() {
       )}
 
       {policyModal === 'risk' && (
-        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Risk / Testnet Disclaimer">
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title={text.policyTitleRisk} closeAriaLabel={text.closeModalAria}>
           <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
-            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <p className="text-xs text-gray-400 mb-4">{text.policyLastUpdatedStub}</p>
             <div className="bg-red-900/30 border-2 border-red-700/50 p-4 rounded-lg mb-6">
               <p className="font-bold text-lg mb-2">⚠️ Important Warning</p>
               <p>This Risk / Testnet Disclaimer explains important risks, limitations, and warnings relating to the use of the MLEO Platform, including any wallet-related, reward-related, blockchain-related, or testnet-related features.</p>

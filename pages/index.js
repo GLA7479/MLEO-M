@@ -70,7 +70,37 @@ const TEXT = {
       cta: "START NOW",
       close: "Close",
     },
-    footer: { terms: "Terms", privacy: "Privacy", docs: "Docs" },
+    pageTitle: "MLEO — Mine. Merge. Earn.",
+    pageDescription: "MLEO is a playful crypto-mining experience.",
+    policyTitleTerms: "Terms & Conditions",
+    policyTitlePrivacy: "Privacy Policy",
+    policyTitleCookies: "Cookie Notice",
+    policyTitleRisk: "Risk / Testnet Disclaimer",
+    policyLastUpdatedStub: "Last Updated: [Insert Date]",
+    pwa: {
+      button: "Install App",
+      title: "Install MLEO App",
+      intro:
+        "Install MLEO to your device for a fast, full-screen experience. The app opens directly on the Home page with all animations enabled.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Tap Install below (or the install icon in the address bar).",
+        "Confirm the prompt.",
+      ],
+      install: "Install",
+      installDisabledTitle: "Install not available yet",
+      chromeHint: "If you don’t see the prompt yet, reload the page and try again.",
+      iosTitle: "iOS Safari",
+      iosSteps: [
+        "Tap the Share icon.",
+        "Choose Add to Home Screen.",
+        "Confirm. The app will appear on your Home Screen.",
+      ],
+      iosTip: "Tip: If you don’t see “Add to Home Screen”, scroll the sheet up.",
+      footnote:
+        "Installing creates a lightweight offline-capable app (PWA). You can remove it anytime from your device.",
+    },
+    footer: { terms: "Terms", privacy: "Privacy", docs: "Docs", cookies: "Cookies", risk: "Risk", rights: "All rights reserved." },
   },
 
 
@@ -101,13 +131,41 @@ const TEXT = {
         { t: "2) التحويل (نظرة عامة)", p: "تتأهّل إجراءات محدّدة فقط. الصيغ الدقيقة غير معلنة وقد تتغيّر." },
         { t: "3) النطاق اليومي والعدالة", p: "‏يقلّ الاكتساب تدريجيًا كلما اقتربت من نطاقك اليومي الشخصي لمنع الإساءة والحفاظ على وتيرة صحية." },
         { t: "4) الخزنة و«المطالبة»", p: "يمكنك «المطالبة» برصيدك إلى خزنتك داخل التطبيق. إن فُتح السحب على السلسلة لاحقًا فقد توجد نوافذ فتح إضافية ومتطلبات أهلية." },
-        { t: "5) أثناء غيابك", p: "يتحقق تقدّم محدود خارج الاتصال بكفاءةٍ أقل. الغرض منه دفعة خفيفة—not بديلًا عن اللعب النشط." },
+        { t: "5) أثناء غيابك", p: "يتحقق تقدّم محدود خارج الاتصال بكفاءةٍ أقل. الغرض منه دفعة خفيفة وليس بديلاً عن اللعب النشط." },
         { t: "6) ملاحظات مهمّة", p: "قد تتغيّر/تتوقّف/تُعاد المعدّلات والحدود. ليست نصيحة مالية؛ لا قيمة مضمونة لـ MLEO." },
       ],
       cta: "ابدأ الآن",
       close: "إغلاق",
     },
-    footer: { terms: "الشروط", privacy: "الخصوصية", docs: "المستندات" },
+    pageTitle: "MLEO — عدِّن. ادمج. اربح.",
+    pageDescription: "تجربة تعدين لعبية مع MLEO.",
+    policyTitleTerms: "الشروط والأحكام",
+    policyTitlePrivacy: "سياسة الخصوصية",
+    policyTitleCookies: "إشعار ملفات تعريف الارتباط",
+    policyTitleRisk: "إخلاء مسؤولية المخاطر / الشبكة التجريبية",
+    policyLastUpdatedStub: "آخر تحديث: [أدخل التاريخ]",
+    pwa: {
+      button: "تثبيت التطبيق",
+      title: "تثبيت تطبيق MLEO",
+      intro: "ثبّت MLEO على جهازك لتجربة سريعة بملء الشاشة. يفتح التطبيق مباشرة على الصفحة الرئيسية مع تفعيل كل الرسوم المتحركة.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "اضغط «تثبيت» أدناه (أو أيقونة التثبيت في شريط العنوان).",
+        "أكد المطالبة.",
+      ],
+      install: "تثبيت",
+      installDisabledTitle: "التثبيت غير متاح بعد",
+      chromeHint: "إذا لم تظهر المطالبة، أعد تحميل الصفحة وحاول مرة أخرى.",
+      iosTitle: "Safari على iOS",
+      iosSteps: [
+        "اضغط أيقونة المشاركة.",
+        "اختر «إضافة إلى الشاشة الرئيسية».",
+        "أكد. سيظهر التطبيق على الشاشة الرئيسية.",
+      ],
+      iosTip: "نصيحة: إذا لم ترَ «إضافة إلى الشاشة الرئيسية»، مرّر الورقة للأعلى.",
+      footnote: "التثبيت ينشئ تطبيقاً خفيفاً يعمل دون اتصال (PWA). يمكنك إزالته من جهازك في أي وقت.",
+    },
+    footer: { terms: "الشروط", privacy: "الخصوصية", docs: "المستندات", cookies: "ملفات تعريف الارتباط", risk: "المخاطر", rights: "جميع الحقوق محفوظة." },
   },
 
   ru: {
@@ -143,7 +201,35 @@ const TEXT = {
       cta: "НАЧАТЬ",
       close: "Закрыть",
     },
-    footer: { terms: "Условия", privacy: "Конфиденциальность", docs: "Документация" },
+    pageTitle: "MLEO — Майни. Объединяй. Зарабатывай.",
+    pageDescription: "MLEO — игровой опыт крипто-майнинга.",
+    policyTitleTerms: "Условия использования",
+    policyTitlePrivacy: "Политика конфиденциальности",
+    policyTitleCookies: "Уведомление о cookie",
+    policyTitleRisk: "Предупреждение о рисках / тестовая сеть",
+    policyLastUpdatedStub: "Последнее обновление: [укажите дату]",
+    pwa: {
+      button: "Установить приложение",
+      title: "Установить MLEO",
+      intro: "Установите MLEO на устройство для быстрого полноэкранного режима. Приложение открывается сразу на главной странице со всеми анимациями.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Нажмите «Установить» ниже (или иконку установки в адресной строке).",
+        "Подтвердите запрос.",
+      ],
+      install: "Установить",
+      installDisabledTitle: "Установка пока недоступна",
+      chromeHint: "Если запрос не появился, перезагрузите страницу и попробуйте снова.",
+      iosTitle: "Safari на iOS",
+      iosSteps: [
+        "Нажмите «Поделиться».",
+        "Выберите «На экран Домой».",
+        "Подтвердите. Приложение появится на главном экране.",
+      ],
+      iosTip: "Совет: если нет пункта «На экран Домой», прокрутите меню вверх.",
+      footnote: "Установка создаёт лёгкое офлайн-приложение (PWA). Его можно удалить в любой момент.",
+    },
+    footer: { terms: "Условия", privacy: "Конфиденциальность", docs: "Документация", cookies: "Файлы cookie", risk: "Риски", rights: "Все права защищены." },
   },
 
   es: {
@@ -179,7 +265,35 @@ const TEXT = {
       cta: "EMPEZAR",
       close: "Cerrar",
     },
-    footer: { terms: "Términos", privacy: "Privacidad", docs: "Docs" },
+    pageTitle: "MLEO — Minar. Fusionar. Ganar.",
+    pageDescription: "MLEO es una experiencia lúdica de minería cripto.",
+    policyTitleTerms: "Términos y condiciones",
+    policyTitlePrivacy: "Política de privacidad",
+    policyTitleCookies: "Aviso de cookies",
+    policyTitleRisk: "Aviso de riesgos / testnet",
+    policyLastUpdatedStub: "Última actualización: [Insertar fecha]",
+    pwa: {
+      button: "Instalar app",
+      title: "Instalar la app MLEO",
+      intro: "Instala MLEO en tu dispositivo para una experiencia rápida a pantalla completa. La app abre directamente en inicio con todas las animaciones.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Pulsa Instalar abajo (o el icono de instalación en la barra de direcciones).",
+        "Confirma el aviso.",
+      ],
+      install: "Instalar",
+      installDisabledTitle: "Instalación aún no disponible",
+      chromeHint: "Si no ves el aviso, recarga la página e inténtalo de nuevo.",
+      iosTitle: "Safari en iOS",
+      iosSteps: [
+        "Pulsa el icono Compartir.",
+        "Elige Añadir a la pantalla de inicio.",
+        "Confirma. La app aparecerá en tu inicio.",
+      ],
+      iosTip: "Consejo: si no ves «Añadir a la pantalla de inicio», desplaza el panel hacia arriba.",
+      footnote: "La instalación crea una app ligera sin conexión (PWA). Puedes quitarla cuando quieras.",
+    },
+    footer: { terms: "Términos", privacy: "Privacidad", docs: "Documentación", cookies: "Cookies", risk: "Riesgos", rights: "Todos los derechos reservados." },
   },
 
   fr: {
@@ -215,7 +329,35 @@ const TEXT = {
       cta: "COMMENCER",
       close: "Fermer",
     },
-    footer: { terms: "Conditions", privacy: "Confidentialité", docs: "Docs" },
+    pageTitle: "MLEO — Miner. Fusionner. Gagner.",
+    pageDescription: "MLEO est une expérience ludique de mining crypto.",
+    policyTitleTerms: "Conditions générales",
+    policyTitlePrivacy: "Politique de confidentialité",
+    policyTitleCookies: "Avis sur les cookies",
+    policyTitleRisk: "Avertissement risques / testnet",
+    policyLastUpdatedStub: "Dernière mise à jour : [Insérer la date]",
+    pwa: {
+      button: "Installer l’app",
+      title: "Installer l’app MLEO",
+      intro: "Installez MLEO sur votre appareil pour une expérience rapide plein écran. L’app s’ouvre sur l’accueil avec toutes les animations.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Appuyez sur Installer ci-dessous (ou l’icône dans la barre d’adresse).",
+        "Confirmez l’invite.",
+      ],
+      install: "Installer",
+      installDisabledTitle: "Installation pas encore disponible",
+      chromeHint: "Si l’invite n’apparaît pas, rechargez la page et réessayez.",
+      iosTitle: "Safari sur iOS",
+      iosSteps: [
+        "Appuyez sur Partager.",
+        "Choisissez Sur l’écran d’accueil.",
+        "Confirmez. L’app apparaîtra sur l’accueil.",
+      ],
+      iosTip: "Astuce : si « Sur l’écran d’accueil » manque, faites défiler la feuille vers le haut.",
+      footnote: "L’installation crée une app légère hors ligne (PWA). Vous pouvez la supprimer à tout moment.",
+    },
+    footer: { terms: "Conditions", privacy: "Confidentialité", docs: "Documentation", cookies: "Cookies", risk: "Risques", rights: "Tous droits réservés." },
   },
 
   de: {
@@ -251,7 +393,35 @@ const TEXT = {
       cta: "JETZT STARTEN",
       close: "Schließen",
     },
-    footer: { terms: "Bedingungen", privacy: "Datenschutz", docs: "Doku" },
+    pageTitle: "MLEO — Minen. Kombinieren. Verdienen.",
+    pageDescription: "MLEO ist ein spielerisches Crypto-Mining-Erlebnis.",
+    policyTitleTerms: "Allgemeine Geschäftsbedingungen",
+    policyTitlePrivacy: "Datenschutzrichtlinie",
+    policyTitleCookies: "Cookie-Hinweis",
+    policyTitleRisk: "Risikohinweis / Testnet",
+    policyLastUpdatedStub: "Zuletzt aktualisiert: [Datum einfügen]",
+    pwa: {
+      button: "App installieren",
+      title: "MLEO-App installieren",
+      intro: "Installiere MLEO auf deinem Gerät für ein schnelles Vollbild-Erlebnis. Die App startet direkt auf der Startseite mit allen Animationen.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Tippe unten auf Installieren (oder das Symbol in der Adressleiste).",
+        "Bestätige die Aufforderung.",
+      ],
+      install: "Installieren",
+      installDisabledTitle: "Installation noch nicht verfügbar",
+      chromeHint: "Wenn kein Dialog erscheint, Seite neu laden und erneut versuchen.",
+      iosTitle: "Safari auf iOS",
+      iosSteps: [
+        "Tippe auf Teilen.",
+        "Wähle Zum Home-Bildschirm.",
+        "Bestätigen. Die App erscheint auf dem Home-Bildschirm.",
+      ],
+      iosTip: "Tipp: Wenn «Zum Home-Bildschirm» fehlt, Blatt nach oben scrollen.",
+      footnote: "Die Installation erstellt eine schlanke Offline-App (PWA). Du kannst sie jederzeit entfernen.",
+    },
+    footer: { terms: "Bedingungen", privacy: "Datenschutz", docs: "Doku", cookies: "Cookies", risk: "Risiken", rights: "Alle Rechte vorbehalten." },
   },
 
 pt: {
@@ -287,7 +457,35 @@ pt: {
     cta: "COMEÇAR AGORA",
     close: "Fechar",
   },
-  footer: { terms: "Termos", privacy: "Privacidade", docs: "Documentação" },
+  pageTitle: "MLEO — Minerar. Mesclar. Ganhar.",
+  pageDescription: "MLEO é uma experiência lúdica de mineração cripto.",
+  policyTitleTerms: "Termos e condições",
+  policyTitlePrivacy: "Política de privacidade",
+  policyTitleCookies: "Aviso de cookies",
+  policyTitleRisk: "Riscos / aviso de testnet",
+  policyLastUpdatedStub: "Última atualização: [Inserir data]",
+  pwa: {
+    button: "Instalar app",
+    title: "Instalar o app MLEO",
+    intro: "Instale o MLEO no dispositivo para uma experiência rápida em tela cheia. O app abre direto na página inicial com todas as animações.",
+    chromeTitle: "Chrome / Android",
+    chromeSteps: [
+      "Toque em Instalar abaixo (ou no ícone da barra de endereços).",
+      "Confirme o prompt.",
+    ],
+    install: "Instalar",
+    installDisabledTitle: "Instalação ainda indisponível",
+    chromeHint: "Se o prompt não aparecer, recarregue a página e tente de novo.",
+    iosTitle: "Safari no iOS",
+    iosSteps: [
+      "Toque em Compartilhar.",
+      "Escolha Adicionar à Tela de Início.",
+      "Confirme. O app aparecerá na sua tela inicial.",
+    ],
+    iosTip: "Dica: se não vir «Adicionar à Tela de Início», role o painel para cima.",
+    footnote: "A instalação cria um app leve offline (PWA). Você pode removê-lo a qualquer momento.",
+  },
+  footer: { terms: "Termos", privacy: "Privacidade", docs: "Documentação", cookies: "Cookies", risk: "Riscos", rights: "Todos os direitos reservados." },
 },
 
 
@@ -324,7 +522,28 @@ pt: {
       cta: "立即开始",
       close: "关闭",
     },
-    footer: { terms: "条款", privacy: "隐私", docs: "文档" },
+    pageTitle: "MLEO — 挖矿·合成·赚取",
+    pageDescription: "MLEO 是轻松的加密挖矿体验。",
+    policyTitleTerms: "条款与条件",
+    policyTitlePrivacy: "隐私政策",
+    policyTitleCookies: "Cookie 说明",
+    policyTitleRisk: "风险 / 测试网免责声明",
+    policyLastUpdatedStub: "最后更新：[插入日期]",
+    pwa: {
+      button: "安装应用",
+      title: "安装 MLEO 应用",
+      intro: "将 MLEO 安装到设备上，获得快速全屏体验。应用会直接在首页打开并启用全部动画。",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: ["点击下方安装（或地址栏中的安装图标）。", "确认提示。"],
+      install: "安装",
+      installDisabledTitle: "暂无法安装",
+      chromeHint: "若未出现提示，请刷新页面后重试。",
+      iosTitle: "iOS Safari",
+      iosSteps: ["轻点分享图标。", "选择“添加到主屏幕”。", "确认后应用会出现在主屏幕。"],
+      iosTip: "提示：若看不到“添加到主屏幕”，请向上滑动面板。",
+      footnote: "安装会创建轻量离线应用（PWA），可随时从设备移除。",
+    },
+    footer: { terms: "条款", privacy: "隐私", docs: "文档", cookies: "Cookie", risk: "风险", rights: "保留所有权利。" },
   },
 
   ja: {
@@ -360,7 +579,35 @@ pt: {
       cta: "今すぐ開始",
       close: "閉じる",
     },
-    footer: { terms: "利用規約", privacy: "プライバシー", docs: "ドキュメント" },
+    pageTitle: "MLEO — マイニング・マージ・獲得",
+    pageDescription: "MLEO は遊び心のある暗号マイニング体験です。",
+    policyTitleTerms: "利用規約",
+    policyTitlePrivacy: "プライバシーポリシー",
+    policyTitleCookies: "Cookieに関する通知",
+    policyTitleRisk: "リスク / テストネット免責",
+    policyLastUpdatedStub: "最終更新：[日付を入力]",
+    pwa: {
+      button: "アプリをインストール",
+      title: "MLEO アプリをインストール",
+      intro: "MLEO を端末にインストールすると、高速な全画面体験が可能です。ホームから直接開き、すべてのアニメーションが有効になります。",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "下のインストール（またはアドレスバーのアイコン）をタップ。",
+        "プロンプトを確認。",
+      ],
+      install: "インストール",
+      installDisabledTitle: "まだインストールできません",
+      chromeHint: "表示されない場合はページを再読み込みしてください。",
+      iosTitle: "iOS の Safari",
+      iosSteps: [
+        "共有アイコンをタップ。",
+        "「ホーム画面に追加」を選択。",
+        "確認するとホーム画面に表示されます。",
+      ],
+      iosTip: "ヒント:「ホーム画面に追加」が見えない場合はシートを上にスクロール。",
+      footnote: "インストールで軽量のオフライン対応アプリ（PWA）が作成されます。いつでも削除できます。",
+    },
+    footer: { terms: "利用規約", privacy: "プライバシー", docs: "ドキュメント", cookies: "Cookie", risk: "リスク", rights: "無断転載を禁じます。" },
   },
 
   ko: {
@@ -396,7 +643,35 @@ pt: {
       cta: "지금 시작",
       close: "닫기",
     },
-    footer: { terms: "이용약관", privacy: "개인정보", docs: "문서" },
+    pageTitle: "MLEO — 채굴·합성·수익",
+    pageDescription: "MLEO는 가볍게 즐기는 크립토 채굴 경험입니다.",
+    policyTitleTerms: "이용약관",
+    policyTitlePrivacy: "개인정보 처리방침",
+    policyTitleCookies: "쿠키 안내",
+    policyTitleRisk: "위험 / 테스트넷 면책",
+    policyLastUpdatedStub: "최종 업데이트: [날짜 입력]",
+    pwa: {
+      button: "앱 설치",
+      title: "MLEO 앱 설치",
+      intro: "기기에 MLEO를 설치하면 빠른 전체 화면 경험을 쓸 수 있습니다. 홈에서 바로 열리며 모든 애니메이션이 켜집니다.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "아래 설치(또는 주소창 아이콘)를 누릅니다.",
+        "프롬프트를 확인합니다.",
+      ],
+      install: "설치",
+      installDisabledTitle: "아직 설치할 수 없음",
+      chromeHint: "프롬프트가 없으면 페이지를 새로고침하세요.",
+      iosTitle: "iOS Safari",
+      iosSteps: [
+        "공유 아이콘을 누릅니다.",
+        "‘홈 화면에 추가’를 선택합니다.",
+        "확인하면 홈 화면에 나타납니다.",
+      ],
+      iosTip: "팁: ‘홈 화면에 추가’가 안 보이면 시트를 위로 스크롤하세요.",
+      footnote: "설치 시 가벼운 오프라인 앱(PWA)이 만들어지며 언제든 제거할 수 있습니다.",
+    },
+    footer: { terms: "이용약관", privacy: "개인정보", docs: "문서", cookies: "쿠키", risk: "위험", rights: "모든 권리 보유." },
   },
 
   tr: {
@@ -432,7 +707,35 @@ pt: {
       cta: "HEMEN BAŞLA",
       close: "Kapat",
     },
-    footer: { terms: "Şartlar", privacy: "Gizlilik", docs: "Belgeler" },
+    pageTitle: "MLEO — Kaz. Birleştir. Kazan.",
+    pageDescription: "MLEO eğlenceli bir kripto madencilik deneyimidir.",
+    policyTitleTerms: "Şartlar ve koşullar",
+    policyTitlePrivacy: "Gizlilik politikası",
+    policyTitleCookies: "Çerez bildirimi",
+    policyTitleRisk: "Risk / testnet uyarısı",
+    policyLastUpdatedStub: "Son güncelleme: [Tarih ekleyin]",
+    pwa: {
+      button: "Uygulamayı yükle",
+      title: "MLEO uygulamasını yükle",
+      intro: "MLEO’yu cihazınıza yükleyerek hızlı tam ekran deneyimi alın. Uygulama doğrudan ana sayfada açılır ve tüm animasyonlar etkindir.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Aşağıdan Yükle’ye basın (veya adres çubuğundaki simgeye).",
+        "İstemi onaylayın.",
+      ],
+      install: "Yükle",
+      installDisabledTitle: "Yükleme henüz yok",
+      chromeHint: "İstem görünmüyorsa sayfayı yenileyin.",
+      iosTitle: "iOS Safari",
+      iosSteps: [
+        "Paylaş simgesine dokunun.",
+        "Ana Ekrana Ekle’yi seçin.",
+        "Onaylayın; uygulama ana ekranda görünür.",
+      ],
+      iosTip: "İpucu: «Ana Ekrana Ekle» yoksa sayfayı yukarı kaydırın.",
+      footnote: "Yükleme hafif bir çevrimdışı uygulama (PWA) oluşturur; istediğiniz zaman kaldırabilirsiniz.",
+    },
+    footer: { terms: "Şartlar", privacy: "Gizlilik", docs: "Belgeler", cookies: "Çerezler", risk: "Risk", rights: "Tüm hakları saklıdır." },
   },
 
   it: {
@@ -468,7 +771,35 @@ pt: {
       cta: "INIZIA ORA",
       close: "Chiudi",
     },
-    footer: { terms: "Termini", privacy: "Privacy", docs: "Documenti" },
+    pageTitle: "MLEO — Minare. Unire. Guadagnare.",
+    pageDescription: "MLEO è un’esperienza ludica di mining crypto.",
+    policyTitleTerms: "Termini e condizioni",
+    policyTitlePrivacy: "Informativa sulla privacy",
+    policyTitleCookies: "Informativa sui cookie",
+    policyTitleRisk: "Rischi / disclaimer testnet",
+    policyLastUpdatedStub: "Ultimo aggiornamento: [Inserisci data]",
+    pwa: {
+      button: "Installa app",
+      title: "Installa l’app MLEO",
+      intro: "Installa MLEO sul dispositivo per un’esperienza veloce a schermo intero. L’app si apre sulla Home con tutte le animazioni attive.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Tocca Installa qui sotto (o l’icona nella barra degli indirizzi).",
+        "Conferma il prompt.",
+      ],
+      install: "Installa",
+      installDisabledTitle: "Installazione non ancora disponibile",
+      chromeHint: "Se non vedi il prompt, ricarica la pagina.",
+      iosTitle: "Safari su iOS",
+      iosSteps: [
+        "Tocca Condividi.",
+        "Scegli Aggiungi a Home.",
+        "Conferma: l’app apparirà sulla Home.",
+      ],
+      iosTip: "Suggerimento: se manca «Aggiungi a Home», scorri il foglio verso l’alto.",
+      footnote: "L’installazione crea un’app leggera offline (PWA). Puoi rimuoverla in qualsiasi momento.",
+    },
+    footer: { terms: "Termini", privacy: "Privacy", docs: "Documenti", cookies: "Cookie", risk: "Rischi", rights: "Tutti i diritti riservati." },
   },
 
   ka: {
@@ -504,7 +835,35 @@ pt: {
       cta: "დაიწყე ახლა",
       close: "დახურვა",
     },
-    footer: { terms: "პირობები", privacy: "კონფიდენციალურობა", docs: "დოკუმენტები" },
+    pageTitle: "MLEO — მაინინგი. შერწყმა. მოგება.",
+    pageDescription: "MLEO არის მსუბუქი კრიპტო-მაინინგის გამოცდილება.",
+    policyTitleTerms: "წესები და პირობები",
+    policyTitlePrivacy: "კონფიდენციალურობის პოლიტიკა",
+    policyTitleCookies: "ქუქიების შეტყობინება",
+    policyTitleRisk: "რისკები / ტესტნეტის განცხადება",
+    policyLastUpdatedStub: "ბოლო განახლება: [თარიღი]",
+    pwa: {
+      button: "აპის ინსტალაცია",
+      title: "MLEO აპის ინსტალაცია",
+      intro: "დააინსტალირეთ MLEO მოწყობილობაზე სწრაფი სრულეკრანიანი გამოცდილებისთვის. აპი იხსნება მთავარ გვერდზე ყველა ანიმაციით.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "დააჭირეთ «დააინსტალირე» ქვემოთ (ან ხაზზე ხატულას).",
+        "დაადასტურეთ მოთხოვნა.",
+      ],
+      install: "ინსტალაცია",
+      installDisabledTitle: "ინსტალაცია ჯერ არაა ხელმისაწვდომი",
+      chromeHint: "თუ ფანჯარა არ ჩანს, განაახლეთ გვერდი.",
+      iosTitle: "iOS Safari",
+      iosSteps: [
+        "დააჭირეთ გაზიარების ხატულას.",
+        "აირჩიეთ «მთავარ ეკრანზე დამატება».",
+        "დაადასტურეთ — აპი გამოჩნდება მთავარ ეკრანზე.",
+      ],
+      iosTip: "რჩევა: თუ პუნქტი არ ჩანს, გადაიფურცლეთ ზემოთ.",
+      footnote: "ინსტალაცია ქმნის მსუბუქ ოფლაინ აპს (PWA). წაშლა ნებისმიერ დროს შეგიძლიათ.",
+    },
+    footer: { terms: "პირობები", privacy: "კონფიდენციალურობა", docs: "დოკუმენტები", cookies: "ქუქიები", risk: "რისკები", rights: "ყველა უფლება დაცულია." },
   },
 
   pl: {
@@ -540,7 +899,35 @@ pt: {
       cta: "ZACZNIJ TERAZ",
       close: "Zamknij",
     },
-    footer: { terms: "Zasady", privacy: "Prywatność", docs: "Dokumenty" },
+    pageTitle: "MLEO — Kop. Łącz. Zarabiaj.",
+    pageDescription: "MLEO to lekka, zabawna gra o kopaniu krypto.",
+    policyTitleTerms: "Regulamin",
+    policyTitlePrivacy: "Polityka prywatności",
+    policyTitleCookies: "Informacja o plikach cookie",
+    policyTitleRisk: "Ryzyko / zastrzeżenie testnet",
+    policyLastUpdatedStub: "Ostatnia aktualizacja: [Wstaw datę]",
+    pwa: {
+      button: "Zainstaluj aplikację",
+      title: "Zainstaluj aplikację MLEO",
+      intro: "Zainstaluj MLEO na urządzeniu, aby korzystać z szybkiego trybu pełnoekranowego. Aplikacja otwiera się od razu na stronie głównej ze wszystkimi animacjami.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Dotknij Zainstaluj poniżej (lub ikony na pasku adresu).",
+        "Potwierdź monit.",
+      ],
+      install: "Zainstaluj",
+      installDisabledTitle: "Instalacja jeszcze niedostępna",
+      chromeHint: "Jeśli nie ma monitu, odśwież stronę.",
+      iosTitle: "Safari na iOS",
+      iosSteps: [
+        "Dotknij Udostępnij.",
+        "Wybierz Dodaj do ekranu głównego.",
+        "Potwierdź — aplikacja pojawi się na ekranie głównym.",
+      ],
+      iosTip: "Wskazówka: brak opcji? przewiń panel w górę.",
+      footnote: "Instalacja tworzy lekką aplikację PWA offline. Możesz ją usunąć w dowolnym momencie.",
+    },
+    footer: { terms: "Zasady", privacy: "Prywatność", docs: "Dokumenty", cookies: "Pliki cookie", risk: "Ryzyko", rights: "Wszelkie prawa zastrzeżone." },
   },
 
   ro: {
@@ -566,17 +953,45 @@ pt: {
     modal: {
       title: "Cum se acumulează MLEO",
       sections: [
-        { t: "1) Ce câștigi de fapt", p: "MLEO este un token utilitar câștigat prin joc. Rezultatele eligibile se prizePool converti în MLEO. Ratele sunt variabile pentru echitate și stabilitate." },
-        { t: "2) Conversie (nivel înalt)", p: "Numai anumite acțiuni se califică. Formulele exacte nu sunt publice și prizePool fi schimbate." },
+        { t: "1) Ce câștigi de fapt", p: "MLEO este un token utilitar câștigat prin joc. Rezultatele eligibile pot fi convertite în MLEO. Ratele sunt variabile pentru echitate și stabilitate." },
+        { t: "2) Conversie (nivel înalt)", p: "Numai anumite acțiuni se califică. Formulele exacte nu sunt publice și pot fi schimbate." },
         { t: "3) Plajă zilnică & echitate", p: "Pe măsură ce te apropii de plaja ta zilnică, acumularea scade treptat pentru a preveni abuzurile." },
-        { t: "4) Vault & CLAIM", p: "Poți CREA (CLAIM) soldul în Vault-ul din aplicație. Dacă se deschide claim on-chain, prizePool exista ferestre de deblocare și verificări." },
+        { t: "4) Vault & CLAIM", p: "Poți revendica (CLAIM) soldul în Vault-ul din aplicație. Dacă se deschide claim on-chain, pot exista ferestre de deblocare și verificări." },
         { t: "5) Când ești plecat", p: "Progres offline limitat la o eficiență redusă." },
-        { t: "6) Note importante", p: "Disponibilitatea, ratele și plafoanele se prizePool schimba/opri/reseta. Nu este sfat financiar; valoarea MLEO nu este garantată." },
+        { t: "6) Note importante", p: "Disponibilitatea, ratele și plafoanele pot fi schimbate/oprite/resetate. Nu este sfat financiar; valoarea MLEO nu este garantată." },
       ],
       cta: "ÎNCEPE ACUM",
       close: "Închide",
     },
-    footer: { terms: "Termeni", privacy: "Confidențialitate", docs: "Documentație" },
+    pageTitle: "MLEO — Minează. Fuzionează. Câștigă.",
+    pageDescription: "MLEO este o experiență ludică de mining cripto.",
+    policyTitleTerms: "Termeni și condiții",
+    policyTitlePrivacy: "Politica de confidențialitate",
+    policyTitleCookies: "Notificare cookie-uri",
+    policyTitleRisk: "Riscuri / declinare testnet",
+    policyLastUpdatedStub: "Ultima actualizare: [Introduceți data]",
+    pwa: {
+      button: "Instalează aplicația",
+      title: "Instalează aplicația MLEO",
+      intro: "Instalează MLEO pe dispozitiv pentru o experiență rapidă pe tot ecranul. Aplicația se deschide direct pe pagina principală cu toate animațiile.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Atinge Instalează mai jos (sau pictograma din bara de adrese).",
+        "Confirmă solicitarea.",
+      ],
+      install: "Instalează",
+      installDisabledTitle: "Instalarea nu e încă disponibilă",
+      chromeHint: "Dacă nu apare solicitarea, reîncarcă pagina.",
+      iosTitle: "Safari pe iOS",
+      iosSteps: [
+        "Atinge pictograma Partajare.",
+        "Alege Adaugă pe ecranul de pornire.",
+        "Confirmă — aplicația va apărea pe ecranul de pornire.",
+      ],
+      iosTip: "Sfat: dacă lipsește opțiunea, derulează foaia în sus.",
+      footnote: "Instalarea creează o aplicație PWA ușoară offline. O poți șterge oricând.",
+    },
+    footer: { terms: "Termeni", privacy: "Confidențialitate", docs: "Documentație", cookies: "Cookie-uri", risk: "Riscuri", rights: "Toate drepturile rezervate." },
   },
 
   cs: {
@@ -612,7 +1027,35 @@ pt: {
       cta: "ZAČÍT TEĎ",
       close: "Zavřít",
     },
-    footer: { terms: "Podmínky", privacy: "Soukromí", docs: "Dokumentace" },
+    pageTitle: "MLEO — Těž. Slučuj. Vydělávej.",
+    pageDescription: "MLEO je hravý zážitek krypto těžby.",
+    policyTitleTerms: "Obchodní podmínky",
+    policyTitlePrivacy: "Zásady ochrany osobních údajů",
+    policyTitleCookies: "Informace o cookies",
+    policyTitleRisk: "Rizika / testnet prohlášení",
+    policyLastUpdatedStub: "Naposledy aktualizováno: [Vložte datum]",
+    pwa: {
+      button: "Nainstalovat aplikaci",
+      title: "Nainstalovat aplikaci MLEO",
+      intro: "Nainstalujte MLEO do zařízení pro rychlý režim na celou obrazovku. Aplikace se otevře přímo na domovské stránce se všemi animacemi.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Klepněte na Instalovat níže (nebo na ikonu v adresním řádku).",
+        "Potvrďte výzvu.",
+      ],
+      install: "Instalovat",
+      installDisabledTitle: "Instalace zatím není k dispozici",
+      chromeHint: "Pokud se výzva neobjeví, obnovte stránku.",
+      iosTitle: "Safari na iOS",
+      iosSteps: [
+        "Klepněte na Sdílet.",
+        "Zvolte Přidat na plochu.",
+        "Potvrďte — aplikace se objeví na ploše.",
+      ],
+      iosTip: "Tip: chybí položka? posuňte list nahoru.",
+      footnote: "Instalace vytvoří lehkou offline aplikaci (PWA). Kdykoli ji můžete odstranit.",
+    },
+    footer: { terms: "Podmínky", privacy: "Soukromí", docs: "Dokumentace", cookies: "Cookies", risk: "Rizika", rights: "Všechna práva vyhrazena." },
   },
 
   nl: {
@@ -629,8 +1072,8 @@ pt: {
     ],
     slogans: [
       "Had je Bitcoin graag op dag één gemined? Begin vandaag met MLEO.",
-      "Tik. Merge. Verdien. Maak van je spel MLEO.",
-      "Van meme naar machine — mijn de toekomst met Leo.",
+      "Tik. Voeg samen. Verdien. Maak van je spel MLEO.",
+      "Van meme naar machine — ontgin de toekomst met Leo.",
       "Eerlijke emissie. Echte competitie. Pure fun.",
       "Geen gas, geen gedoe (demo). Gewoon minen en stijgen.",
       "Sluit je aan bij de early miners. Claim jouw deel van het MLEO-tijdperk.",
@@ -648,12 +1091,40 @@ pt: {
       cta: "NU STARTEN",
       close: "Sluiten",
     },
-    footer: { terms: "Voorwaarden", privacy: "Privacy", docs: "Docs" },
+    pageTitle: "MLEO — Minen. Samenvoegen. Verdienen.",
+    pageDescription: "MLEO is een speelse crypto-miningervaring.",
+    policyTitleTerms: "Algemene voorwaarden",
+    policyTitlePrivacy: "Privacybeleid",
+    policyTitleCookies: "Cookieverklaring",
+    policyTitleRisk: "Risico / testnet-disclaimer",
+    policyLastUpdatedStub: "Laatst bijgewerkt: [Voer datum in]",
+    pwa: {
+      button: "App installeren",
+      title: "MLEO-app installeren",
+      intro: "Installeer MLEO op je apparaat voor een snelle volledig scherm-ervaring. De app opent direct op de startpagina met alle animaties.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Tik hieronder op Installeren (of het pictogram in de adresbalk).",
+        "Bevestig de prompt.",
+      ],
+      install: "Installeren",
+      installDisabledTitle: "Installatie nog niet beschikbaar",
+      chromeHint: "Zie je geen prompt? Vernieuw de pagina.",
+      iosTitle: "Safari op iOS",
+      iosSteps: [
+        "Tik op Delen.",
+        "Kies Zet op beginscherm.",
+        "Bevestig — de app verschijnt op je beginscherm.",
+      ],
+      iosTip: "Tip: zie je «Zet op beginscherm» niet? Scroll het paneel omhoog.",
+      footnote: "Installatie maakt een lichte offline app (PWA). Je kunt die altijd verwijderen.",
+    },
+    footer: { terms: "Voorwaarden", privacy: "Privacy", docs: "Documentatie", cookies: "Cookies", risk: "Risico", rights: "Alle rechten voorbehouden." },
   },
 
   el: {
     name: "Ελληνικά", dir: "ltr", code: "el",
-    new: "Νέο", early: "Καλωσορίζουμε τους πρώτους miners",
+    new: "Νέο", early: "Καλωσορίζουμε τους πρώτους εξορυκτές",
     heroH1_1: "Mining. Συνένωση. Κέρδος.",
     heroH1_2: "Καλώς ήρθες στο MLEO.",
     start: "ΞΕΚΙΝΑ ΤΩΡΑ",
@@ -684,7 +1155,35 @@ pt: {
       cta: "ΞΕΚΙΝΑ ΤΩΡΑ",
       close: "Κλείσιμο",
     },
-    footer: { terms: "Όροι", privacy: "Απόρρητο", docs: "Έγγραφα" },
+    pageTitle: "MLEO — Εξόρυξη. Συγχώνευση. Κέρδος.",
+    pageDescription: "Το MLEO είναι μια παιχνιδιάρικη εμπειρία crypto mining.",
+    policyTitleTerms: "Όροι και προϋποθέσεις",
+    policyTitlePrivacy: "Πολιτική απορρήτου",
+    policyTitleCookies: "Ειδοποίηση cookies",
+    policyTitleRisk: "Κίνδυνοι / αποποίηση testnet",
+    policyLastUpdatedStub: "Τελευταία ενημέρωση: [Εισάγετε ημερομηνία]",
+    pwa: {
+      button: "Εγκατάσταση εφαρμογής",
+      title: "Εγκατάσταση εφαρμογής MLEO",
+      intro: "Εγκαταστήστε το MLEO στη συσκευή σας για γρήγορη εμπειρία πλήρους οθόνης. Η εφαρμογή ανοίγει απευθείας στην αρχική με όλες τις κινήσεις.",
+      chromeTitle: "Chrome / Android",
+      chromeSteps: [
+        "Πατήστε Εγκατάσταση παρακάτω (ή το εικονίδιο στη γραμμή διευθύνσεων).",
+        "Επιβεβαιώστε την προτροπή.",
+      ],
+      install: "Εγκατάσταση",
+      installDisabledTitle: "Η εγκατάσταση δεν είναι ακόμη διαθέσιμη",
+      chromeHint: "Αν δεν εμφανίζεται προτροπή, ανανεώστε τη σελίδα.",
+      iosTitle: "Safari σε iOS",
+      iosSteps: [
+        "Πατήστε το εικονίδιο Κοινή χρήση.",
+        "Επιλέξτε Προσθήκη στην αρχική οθόνη.",
+        "Επιβεβαιώστε — η εφαρμογή θα εμφανιστεί στην αρχική οθόνη.",
+      ],
+      iosTip: "Συμβουλή: αν λείπει η επιλογή, κάντε κύλιση προς τα πάνω.",
+      footnote: "Η εγκατάσταση δημιουργεί ελαφρύ offline PWA. Μπορείτε να την αφαιρέσετε οποτεδήποτε.",
+    },
+    footer: { terms: "Όροι", privacy: "Απόρρητο", docs: "Έγγραφα", cookies: "Cookies", risk: "Κίνδυνοι", rights: "Με την επιφύλαξη παντός δικαιώματος." },
   },
 
 he: {
@@ -720,7 +1219,35 @@ he: {
     cta: "התחל עכשיו",
     close: "סגור",
   },
-  footer: { terms: "תנאים", privacy: "פרטיות", docs: "מסמכים" },
+  pageTitle: "MLEO — כרה. איחד. הרווח.",
+  pageDescription: "MLEO הוא חוויית כריית קריפטו קלילה.",
+  policyTitleTerms: "תנאים והגבלות",
+  policyTitlePrivacy: "מדיניות פרטיות",
+  policyTitleCookies: "הודעת עוגיות",
+  policyTitleRisk: "סיכונים / כתב ויתור רשת בדיקה",
+  policyLastUpdatedStub: "עודכן לאחרונה: [הזינו תאריך]",
+  pwa: {
+    button: "התקנת אפליקציה",
+    title: "התקנת אפליקציית MLEO",
+    intro: "התקינו את MLEO במכשיר לחוויה מהירה במסך מלא. האפליקציה נפתחת ישר בדף הבית עם כל האנימציות.",
+    chromeTitle: "Chrome / Android",
+    chromeSteps: [
+      "לחצו על התקן למטה (או על הסמל בשורת הכתובת).",
+      "אשרו את ההודעה.",
+    ],
+    install: "התקן",
+    installDisabledTitle: "ההתקנה עדיין לא זמינה",
+    chromeHint: "אם לא מופיעה הודעה, רעננו את הדף.",
+    iosTitle: "Safari ב־iOS",
+    iosSteps: [
+      "לחצו על שיתוף.",
+      "בחרו הוסף למסך הבית.",
+      "אשרו — האפליקציה תופיע במסך הבית.",
+    ],
+    iosTip: "טיפ: אם אין «הוסף למסך הבית», גללו את הדף למעלה.",
+    footnote: "ההתקנה יוצרת אפליקציית PWA קלה ללא רשת. אפשר להסיר בכל עת.",
+  },
+  footer: { terms: "תנאים", privacy: "פרטיות", docs: "מסמכים", cookies: "עוגיות", risk: "סיכונים", rights: "כל הזכויות שמורות." },
 },
 
 
@@ -752,6 +1279,7 @@ const FLAGS = {
 // ===== Helpers =====
 const ALL = Object.values(TEXT).map(x => ({ code: x.code, name: x.name }));
 const RTL_CODES = new Set(Object.values(TEXT).filter(x => x.dir === "rtl").map(x => x.code));
+const SUPPORTED_LOCALES = new Set(Object.keys(TEXT));
 
 function pickInitialLang() {
   try {
@@ -772,9 +1300,10 @@ function pickInitialLang() {
 }
 
 // ===== Language Selector =====
-function LanguageSelector({ lang, setLang }) {
+function LanguageSelector({ lang, setLang, pageDir = "ltr" }) {
   const [isOpen, setIsOpen] = useState(false);
-  
+  const panelSide = pageDir === "rtl" ? "left-4" : "right-4";
+  const itemAlign = pageDir === "rtl" ? "text-right" : "text-left";
   
   return (
     <div className="relative">
@@ -783,7 +1312,7 @@ function LanguageSelector({ lang, setLang }) {
         className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/15 transition text-sm flex items-center gap-2"
         style={{ fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol" }}
       >
-        <span className="mr-1">{FLAGS[lang] || '🌐'}</span>
+        <span className={pageDir === "rtl" ? "ml-1" : "mr-1"}>{FLAGS[lang] || '🌐'}</span>
         <span>{TEXT[lang].name}</span>
         <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -798,7 +1327,7 @@ function LanguageSelector({ lang, setLang }) {
             onClick={() => setIsOpen(false)} 
           />
           <div 
-            className="fixed right-4 top-16 w-52 bg-gray-900 border border-white/20 rounded-xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto"
+            className={`fixed top-16 w-52 bg-gray-900 border border-white/20 rounded-xl shadow-2xl overflow-hidden max-h-[400px] overflow-y-auto ${panelSide}`}
             style={{ 
               fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol",
               backdropFilter: "blur(10px)",
@@ -809,15 +1338,16 @@ function LanguageSelector({ lang, setLang }) {
             {ALL.map(opt => (
               <button
                 key={opt.code}
+                type="button"
                 onClick={() => {
                   setLang(opt.code);
                   setIsOpen(false);
                 }}
-                className={`w-full px-4 py-3 text-left hover:bg-white/15 transition flex items-center gap-3 text-sm ${
+                className={`w-full px-4 py-3 ${itemAlign} hover:bg-white/15 transition flex items-center gap-3 text-sm ${
                   lang === opt.code ? 'bg-white/25 font-bold' : ''
                 }`}
               >
-                <span className="text-lg mr-2">{FLAGS[opt.code] || '🌐'}</span>
+                <span className={`text-lg ${pageDir === "rtl" ? "ml-2" : "mr-2"}`}>{FLAGS[opt.code] || '🌐'}</span>
                 <span>{TEXT[opt.code].name}</span>
               </button>
             ))}
@@ -866,26 +1396,28 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
   }, [showHow, mounted]);
 
   // Persist + set URL & dir
+  const safeLang = useMemo(() => (SUPPORTED_LOCALES.has(lang) ? lang : "en"), [lang]);
+
   useEffect(() => {
     if (!mounted) return;
     try {
-      localStorage.setItem("mleo_lang", lang);
+      localStorage.setItem("mleo_lang", safeLang);
       const url = new URL(window.location.href);
-      url.searchParams.set("lang", lang);
+      url.searchParams.set("lang", safeLang);
       window.history.replaceState({}, "", url.toString());
-      document.documentElement.setAttribute("lang", lang);
-      document.documentElement.setAttribute("dir", RTL_CODES.has(lang) ? "rtl" : "ltr");
+      document.documentElement.setAttribute("lang", safeLang);
+      document.documentElement.setAttribute("dir", RTL_CODES.has(safeLang) ? "rtl" : "ltr");
     } catch {}
-  }, [lang, mounted]);
+  }, [safeLang, mounted]);
 
-  const t = useMemo(() => TEXT[lang] || TEXT.en, [lang]);
+  const t = useMemo(() => TEXT[safeLang], [safeLang]);
   const dir = t.dir || "ltr";
 
   return (
     <>
       <Head>
-        <title>MLEO — Mine. Merge. Earn.</title>
-        <meta name="description" content="MLEO is a playful crypto-mining experience." />
+        <title>{t.pageTitle}</title>
+        <meta name="description" content={t.pageDescription} />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0b0b0d" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -919,9 +1451,9 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
 
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
               {/* Language select */}
-              <LanguageSelector lang={lang} setLang={setLang} />
+              <LanguageSelector lang={lang} setLang={setLang} pageDir={dir} />
 
-              <PWAInstall />
+              <PWAInstall pwa={t.pwa} closeLabel={t.modal.close} />
 
               <button
                 onClick={async () => {
@@ -1042,7 +1574,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
         <footer className="relative z-10 shrink-0 w-full max-w-6xl mx-auto px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 md:px-5 md:pb-4 md:pt-0 text-[11px] md:text-xs text-white/50">
           <div className="flex w-full min-w-0 flex-row flex-nowrap items-center gap-x-1.5 overflow-x-auto overflow-y-hidden [-webkit-overflow-scrolling:touch] md:justify-between md:gap-6 md:overflow-visible">
             <span className="shrink-0 whitespace-nowrap">
-              © {new Date().getFullYear()} MLEO. All rights reserved.
+              © {new Date().getFullYear()} MLEO. {t.footer.rights}
             </span>
             <div className="flex shrink-0 flex-row flex-nowrap items-center gap-x-1.5 md:gap-x-4">
               <button type="button" onClick={() => setPolicyModal("terms")} className="inline-flex shrink-0 items-center whitespace-nowrap px-1.5 py-1.5 min-h-[40px] hover:text-white/80 md:min-h-0 md:px-0 md:py-0">
@@ -1052,10 +1584,10 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
                 {t.footer.privacy}
               </button>
               <button type="button" onClick={() => setPolicyModal("cookies")} className="inline-flex shrink-0 items-center whitespace-nowrap px-1.5 py-1.5 min-h-[40px] hover:text-white/80 md:min-h-0 md:px-0 md:py-0">
-                Cookies
+                {t.footer.cookies}
               </button>
               <button type="button" onClick={() => setPolicyModal("risk")} className="inline-flex shrink-0 items-center whitespace-nowrap px-1.5 py-1.5 min-h-[40px] hover:text-white/80 md:min-h-0 md:px-0 md:py-0">
-                Risk
+                {t.footer.risk}
               </button>
             </div>
           </div>
@@ -1087,7 +1619,7 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
                 type="button"
                 onClick={() => setShowHow(false)}
                 className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20"
-                aria-label="Close"
+                aria-label={t.modal.close}
                 title={t.modal.close}
               >
                 ✕
@@ -1125,9 +1657,9 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
 
       {/* Policy Modals */}
       {policyModal === 'terms' && (
-        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Terms & Conditions">
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title={t.policyTitleTerms} closeAriaLabel={t.modal.close}>
           <div className="prose prose-invert max-w-none">
-            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <p className="text-xs text-gray-400 mb-4">{t.policyLastUpdatedStub}</p>
             <div className="bg-white text-black rounded-lg p-6 md:p-8 space-y-4 text-sm">
               <section>
                 <p className="mb-4">Welcome to the MLEO game platform (the "<strong>Platform</strong>", "<strong>we</strong>", "<strong>us</strong>", or "<strong>our</strong>"). These Terms & Conditions ("<strong>Terms</strong>") govern your access to and use of the Platform, including our websites, games, applications, features, wallet-related integrations, testnet functionality, community features, promotional campaigns, and any related services.</p>
@@ -1535,9 +2067,9 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
       )}
 
       {policyModal === 'privacy' && (
-        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Privacy Policy">
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title={t.policyTitlePrivacy} closeAriaLabel={t.modal.close}>
           <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
-            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <p className="text-xs text-gray-400 mb-4">{t.policyLastUpdatedStub}</p>
             <section>
               <p>This Privacy Policy ("<strong>Policy</strong>") explains how MLEO and/or the operator of the MLEO Platform ("<strong>we</strong>", "<strong>us</strong>", or "<strong>our</strong>") collects, uses, stores, shares, and protects personal data when you access or use our websites, games, applications, wallet-related features, testnet features, support channels, community tools, and related services (collectively, the "<strong>Platform</strong>").</p>
               <p>By accessing or using the Platform, you acknowledge that you have read and understood this Policy.</p>
@@ -1894,9 +2426,9 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
       )}
 
       {policyModal === 'cookies' && (
-        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Cookie Notice">
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title={t.policyTitleCookies} closeAriaLabel={t.modal.close}>
           <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
-            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <p className="text-xs text-gray-400 mb-4">{t.policyLastUpdatedStub}</p>
             <section>
               <p>This Cookie Notice explains how MLEO and/or the operator of the MLEO Platform ("<strong>we</strong>", "<strong>us</strong>", or "<strong>our</strong>") uses cookies, local storage, session storage, pixels, SDKs, and similar technologies ("<strong>Cookies</strong>") when you access or use our websites, games, apps, wallet-related features, and related services (collectively, the "<strong>Platform</strong>").</p>
               <p>This Cookie Notice should be read together with our Privacy Policy and Terms & Conditions.</p>
@@ -2079,9 +2611,9 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
       )}
 
       {policyModal === 'risk' && (
-        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title="Risk / Testnet Disclaimer">
+        <PolicyModal isOpen={true} onClose={() => setPolicyModal(null)} title={t.policyTitleRisk} closeAriaLabel={t.modal.close}>
           <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
-            <p className="text-xs text-gray-400 mb-4">Last Updated: [Insert Date]</p>
+            <p className="text-xs text-gray-400 mb-4">{t.policyLastUpdatedStub}</p>
             <div className="bg-red-900/30 border-2 border-red-700/50 p-4 rounded-lg mb-6">
               <p className="font-bold text-lg mb-2">⚠️ Important Warning</p>
               <p>This Risk / Testnet Disclaimer explains important risks, limitations, and warnings relating to the use of the MLEO Platform, including any wallet-related, reward-related, blockchain-related, or testnet-related features.</p>
