@@ -23,6 +23,7 @@ import {
   readSharedVault,
   subscribeSharedVault,
 } from "../lib/sharedVault";
+import { getInternalGameIdFromPathname } from "../lib/publicGameRoutes";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -348,7 +349,7 @@ export default function BlackjackPage() {
       });
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const gameId = router.pathname.replace('/', '') || 'blackjack';
+    const gameId = getInternalGameIdFromPathname(router.pathname) || "blackjack";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -436,7 +437,7 @@ export default function BlackjackPage() {
     let nextSessionId = null;
     try {
       if (isFreePlay || isFreePlayParam) {
-        const gameId = router.pathname.replace('/', '') || 'blackjack';
+        const gameId = getInternalGameIdFromPathname(router.pathname) || "blackjack";
         const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
           play = Math.max(MIN_PLAY, Math.floor(Number(result.amount || 0) / RESERVED_STAKE_MULTIPLIER) || MIN_PLAY);

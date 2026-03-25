@@ -21,6 +21,7 @@ import {
   readSharedVault,
   subscribeSharedVault,
 } from "../lib/sharedVault";
+import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -292,7 +293,7 @@ export default function UltimatePokerPage() {
 
     const isFree = router.query.freeplay === "true";
     setIsFreePlay(isFree);
-    const gameId = router.pathname.replace('/', '') || 'ultimate-poker';
+    const gameId = getInternalGameIdFromPathname(router.pathname) || "ultimate-poker";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -513,7 +514,7 @@ export default function UltimatePokerPage() {
     let nextSessionId = null;
     let reservedStake = 0;
     if (isFreePlay || isFreePlayParam) {
-      const gameId = router.pathname.replace('/', '') || 'ultimate-poker';
+      const gameId = getInternalGameIdFromPathname(router.pathname) || "ultimate-poker";
       try {
         const result = await startFreeplayArcadeSession(gameId);
         if (!result.success) {
@@ -528,7 +529,7 @@ export default function UltimatePokerPage() {
         nextSessionId = result.sessionId;
         setFreePlayTokens(result.remainingTokens);
         setIsFreePlay(false);
-        router.replace('/ultimate-poker', undefined, { shallow: true });
+        router.replace(getCanonicalPathForInternalGameId("ultimate-poker"), undefined, { shallow: true });
       } catch (error) {
         console.error('Free play error:', error);
         setSessionError("Failed to start session");

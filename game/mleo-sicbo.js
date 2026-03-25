@@ -22,6 +22,7 @@ import {
   readSharedVault,
   subscribeSharedVault,
 } from "../lib/sharedVault";
+import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
 
 // ============================================================================
 // iOS 100vh FIX
@@ -225,7 +226,7 @@ export default function SicBoPage() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
 
-    const gameId = router.pathname.replace('/', '') || 'sicbo';
+    const gameId = getInternalGameIdFromPathname(router.pathname) || "sicbo";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -408,7 +409,7 @@ export default function SicBoPage() {
     let sessionId = null;
 
     if (isFreePlay || isFreePlayParam) {
-      const gameId = router.pathname.replace('/', '') || 'sicbo';
+      const gameId = getInternalGameIdFromPathname(router.pathname) || "sicbo";
       try {
         const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
@@ -416,7 +417,7 @@ export default function SicBoPage() {
           sessionId = result.sessionId;
           setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
-          router.replace('/sicbo', undefined, { shallow: true });
+          router.replace(getCanonicalPathForInternalGameId("sicbo"), undefined, { shallow: true });
         } else {
           alert(result.message || 'No free play tokens available!');
           setIsFreePlay(false);
@@ -890,7 +891,7 @@ export default function SicBoPage() {
                     <p>• Small (4-10): ×2</p>
                     <p>• Big (11-17): ×2</p>
                     <p>• Any Triple: ×30</p>
-                    <p>• Triple 6s: ×50 🎰</p>
+                    <p>• Triple 6s: ×50 ⭐</p>
                   </div>
                 </div>
               </div>

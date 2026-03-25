@@ -22,6 +22,7 @@ import {
   readSharedVault,
   subscribeSharedVault,
 } from "../lib/sharedVault";
+import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -201,7 +202,7 @@ export default function PokerPage() {
 
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const gameId = router.pathname.replace('/', '') || 'poker';
+    const gameId = getInternalGameIdFromPathname(router.pathname) || "poker";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -295,7 +296,7 @@ export default function PokerPage() {
     try {
       let finishResult = null;
       if (isFreePlay || isFreePlayParam) {
-        const gameId = router.pathname.replace('/', '') || 'poker';
+        const gameId = getInternalGameIdFromPathname(router.pathname) || "poker";
         const startResult = await startFreeplayArcadeSession(gameId);
         if (!startResult.success) {
           setSessionError("Failed to start session");
@@ -307,7 +308,7 @@ export default function PokerPage() {
         play = startResult.amount;
         setFreePlayTokens(startResult.remainingTokens);
         setIsFreePlay(false);
-        router.replace('/poker', undefined, { shallow: true });
+        router.replace(getCanonicalPathForInternalGameId("poker"), undefined, { shallow: true });
         finishResult = await finishArcadeSession(startResult.sessionId, {});
       } else {
         if (play < MIN_PLAY) { 

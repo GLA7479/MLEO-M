@@ -29,6 +29,7 @@ import {
   readSharedVault,
   subscribeSharedVault,
 } from "../lib/sharedVault";
+import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
 
 // ===== viewport fix (מוסיף גם --satb ל-safe-area) =====
 function useIOSViewportFix() {
@@ -220,7 +221,7 @@ export default function ColorWheelPage() {
       });
     const isFree = router.query.freePlay === "true";
     setIsFreePlay(isFree);
-    const gameId = router.pathname.replace('/', '') || 'roulette';
+    const gameId = getInternalGameIdFromPathname(router.pathname) || "roulette";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -407,7 +408,7 @@ export default function ColorWheelPage() {
     let play = Number(playAmount) || MIN_PLAY;
     let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
-      const gameId = router.pathname.replace('/', '') || 'roulette';
+      const gameId = getInternalGameIdFromPathname(router.pathname) || "roulette";
       try {
         const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
@@ -415,7 +416,7 @@ export default function ColorWheelPage() {
           sessionId = result.sessionId;
           setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
-          router.replace("/roulette", undefined, { shallow: true });
+          router.replace(getCanonicalPathForInternalGameId("roulette"), undefined, { shallow: true });
         } else {
           alert(result.message || "No free play tokens available!");
           setIsFreePlay(false);
@@ -805,7 +806,7 @@ export default function ColorWheelPage() {
               style={{ animation: "fadeIn 0.3s ease-in-out" }}
             >
               <div className="text-4xl mb-2">
-                {gameResult.win ? "🎰" : "💥"}
+                {gameResult.win ? "🎉" : "💥"}
               </div>
               <div className="text-2xl font-bold mb-1">
                 {gameResult.win ? "YOU WON!" : "YOU LOST!"}
@@ -911,7 +912,7 @@ export default function ColorWheelPage() {
         {showHowToPlay && (
           <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
             <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto">
-              <h2 className="text-2xl font-extrabold mb-4">🎰 How to Play</h2>
+              <h2 className="text-2xl font-extrabold mb-4">🔴 How to Play</h2>
               <div className="space-y-3 text-sm">
                 <p>
                   <strong>1. Choose Play Type:</strong> Red, Black, Even, Odd, Low, or High

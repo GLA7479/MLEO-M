@@ -6,6 +6,10 @@ import { useRouter } from "next/router";
 import { useAccount } from "wagmi";
 import RoomBrowser from "../components/online/RoomBrowser";
 import { supabaseMP as supabase, getClientId } from "../lib/supabaseClients";
+import {
+  resolvePublicGameQueryToInternal,
+  getCanonicalPublicGameQuery,
+} from "../lib/publicGameRoutes";
 
 // iOS Viewport Fix (כמו במשחקים הקיימים)
 function useIOSViewportFix() {
@@ -173,7 +177,7 @@ const GAME_REGISTRY = [
   {
     id: "poker-tables",
     title: "Card Rooms",
-    emoji: "🎰",
+    emoji: "🃏",
     description: "Live multiplayer card tables with drop-in/drop-out play and session-based progression. Includes strategic heads-up rounds (pre-flop through river).",
     color: "#7C3AED",
     isMultiplayer: false,
@@ -367,31 +371,57 @@ const [selectedMode, setSelectedMode] = useState(null); // 'online' | 'bot' | 'l
     }
   }, [playerName]);
 
-  // Handle game selection from URL or clicks
-useEffect(() => {
-  const gameId = router.query.game;
-  const roomId = router.query.room;
-  const tierParam = router.query.tier;
-  const modeParam = router.query.mode || router.query.variant;
+  // Normalize ?game= public query to canonical neutral tokens (internal ids unchanged in state)
+  useEffect(() => {
+    if (!router.isReady) return;
+    const raw = router.query.game;
+    if (!raw || typeof raw !== "string") return;
+    const internal = resolvePublicGameQueryToInternal(raw);
+    const canonical = getCanonicalPublicGameQuery(internal);
+    if (canonical !== raw) {
+      router.replace(
+        { pathname: router.pathname, query: { ...router.query, game: canonical } },
+        undefined,
+        { shallow: true }
+      );
+    }
+  }, [
+    router.isReady,
+    router.pathname,
+    router.query.game,
+    router.query.room,
+    router.query.tier,
+    router.query.mode,
+    router.query.variant,
+  ]);
 
-  if (gameId && GAME_REGISTRY.some(g => g.id === gameId)) {
-    setSelectedGame(gameId);
-    setSelectedRoomId(roomId || null);
-    setSelectedTier(tierParam ? String(tierParam) : null);
-    setSelectedMode(modeParam ? String(modeParam) : null);
-    if (gameId === "ludo") {
-      setShowLudoModePicker(!modeParam && !roomId);
+  // Handle game selection from URL or clicks
+  useEffect(() => {
+    const rawGame = router.query.game;
+    const roomId = router.query.room;
+    const tierParam = router.query.tier;
+    const modeParam = router.query.mode || router.query.variant;
+    const gameId =
+      typeof rawGame === "string" ? resolvePublicGameQueryToInternal(rawGame) : null;
+
+    if (gameId && GAME_REGISTRY.some((g) => g.id === gameId)) {
+      setSelectedGame(gameId);
+      setSelectedRoomId(roomId || null);
+      setSelectedTier(tierParam ? String(tierParam) : null);
+      setSelectedMode(modeParam ? String(modeParam) : null);
+      if (gameId === "ludo") {
+        setShowLudoModePicker(!modeParam && !roomId);
+      } else {
+        setShowLudoModePicker(false);
+      }
     } else {
+      setSelectedGame(null);
+      setSelectedRoomId(null);
+      setSelectedTier(null);
+      setSelectedMode(null);
       setShowLudoModePicker(false);
     }
-  } else {
-    setSelectedGame(null);
-    setSelectedRoomId(null);
-    setSelectedTier(null);
-    setSelectedMode(null);
-    setShowLudoModePicker(false);
-  }
-}, [router.query.game, router.query.room, router.query.tier, router.query.mode, router.query.variant]);
+  }, [router.query.game, router.query.room, router.query.tier, router.query.mode, router.query.variant]);
 
   function setVaultBoth(next) {
     setVault(next);
@@ -442,7 +472,7 @@ useEffect(() => {
       // For single player games, go directly to game
       const url = {
         pathname: router.pathname,
-        query: { ...router.query, game: gameId }
+        query: { ...router.query, game: getCanonicalPublicGameQuery(gameId) },
       };
       setShowLudoModePicker(false);
       setSelectedMode(null);
@@ -464,7 +494,11 @@ useEffect(() => {
     if (selectedGame === "ludo") {
       setSelectedMode("online");
     }
-    const query = { ...router.query, game: selectedGame, room: roomId };
+    const query = {
+      ...router.query,
+      game: getCanonicalPublicGameQuery(selectedGame),
+      room: roomId,
+    };
     if (tierCode) query.tier = tierCode;
     if (selectedGame === "ludo") {
       query.mode = "online";
@@ -482,7 +516,11 @@ useEffect(() => {
       return;
     }
 
-    const baseQuery = { ...router.query, game: "ludo", mode };
+    const baseQuery = {
+      ...router.query,
+      game: getCanonicalPublicGameQuery("ludo"),
+      mode,
+    };
     delete baseQuery.room;
     delete baseQuery.tier;
 

@@ -22,6 +22,7 @@ import {
   readSharedVault,
   subscribeSharedVault,
 } from "../lib/sharedVault";
+import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -50,8 +51,8 @@ function useIOSViewportFix() {
 
 const LS_KEY = "mleo_slots_v2";
 const MIN_PLAY = 100;
-const SYMBOLS = ['💎', '⭐', '🍒', '🍋', '🍊', '🍉', '🎰', '7️⃣', '🔔'];
-const PRIZES = { '💎': { 5: 492.5, 4: 98.5, 3: 19.7 }, '7️⃣': { 5: 197, 4: 49.25, 3: 14.775 }, '⭐': { 5: 98.5, 4: 29.55, 3: 9.85 }, '🔔': { 5: 78.8, 4: 19.7, 3: 7.88 }, '🎰': { 5: 59.1, 4: 14.775, 3: 5.91 }, '🍒': { 5: 39.4, 4: 9.85, 3: 4.925 }, '🍉': { 5: 29.55, 4: 7.88, 3: 3.94 }, '🍊': { 5: 19.7, 4: 5.91, 3: 2.955 }, '🍋': { 5: 14.775, 4: 4.925, 3: 1.97 } };
+const SYMBOLS = ['💎', '⭐', '🍒', '🍋', '🍊', '🍉', '✨', '7️⃣', '🔔'];
+const PRIZES = { '💎': { 5: 492.5, 4: 98.5, 3: 19.7 }, '7️⃣': { 5: 197, 4: 49.25, 3: 14.775 }, '⭐': { 5: 98.5, 4: 29.55, 3: 9.85 }, '🔔': { 5: 78.8, 4: 19.7, 3: 7.88 }, '✨': { 5: 59.1, 4: 14.775, 3: 5.91 }, '🎰': { 5: 59.1, 4: 14.775, 3: 5.91 }, '🍒': { 5: 39.4, 4: 9.85, 3: 4.925 }, '🍉': { 5: 29.55, 4: 7.88, 3: 3.94 }, '🍊': { 5: 19.7, 4: 5.91, 3: 2.955 }, '🍋': { 5: 14.775, 4: 4.925, 3: 1.97 } };
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
@@ -103,7 +104,7 @@ export default function SlotsPage() {
   const metersRef = useRef(null);
   const betRef = useRef(null);
   const ctaRef = useRef(null);
-  const [reels, setReels] = useState(['🎰', '🎰', '🎰', '🎰', '🎰']);
+  const [reels, setReels] = useState(['✨', '✨', '✨', '✨', '✨']);
   const [spinning, setSpinning] = useState(false);
   const [gameResult, setGameResult] = useState(null);
   const [isFreePlay, setIsFreePlay] = useState(false);
@@ -139,7 +140,7 @@ export default function SlotsPage() {
       });
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const gameId = router.pathname.replace('/', '') || 'slots-upgraded';
+    const gameId = getInternalGameIdFromPathname(router.pathname) || "slots-upgraded";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -226,10 +227,10 @@ export default function SlotsPage() {
     let play = Number(playAmount) || MIN_PLAY;
     let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
-      const gameId = router.pathname.replace('/', '') || 'slots-upgraded';
+      const gameId = getInternalGameIdFromPathname(router.pathname) || "slots-upgraded";
       try {
         const result = await startFreeplayArcadeSession(gameId);
-        if (result.success) { play = result.amount; sessionId = result.sessionId; setFreePlayTokens(result.remainingTokens); setIsFreePlay(false); router.replace('/slots-upgraded', undefined, { shallow: true }); }
+        if (result.success) { play = result.amount; sessionId = result.sessionId; setFreePlayTokens(result.remainingTokens); setIsFreePlay(false); router.replace(getCanonicalPathForInternalGameId("slots-upgraded"), undefined, { shallow: true }); }
         else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); setSpinning(false); return; }
       } catch (error) {
         console.error('Free play error:', error);
@@ -283,7 +284,7 @@ export default function SlotsPage() {
       return;
     }
     const payload = finishResult?.serverPayload || {};
-    const finalReels = Array.isArray(payload.reels) ? payload.reels : ['🎰', '🎰', '🎰', '🎰', '🎰'];
+    const finalReels = Array.isArray(payload.reels) ? payload.reels : ['✨', '✨', '✨', '✨', '✨'];
     const prize = Math.max(0, Number(finishResult?.approvedReward || 0));
     const win = Boolean(payload.won);
 
@@ -440,7 +441,7 @@ export default function SlotsPage() {
 
         {menuOpen && (<div className="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-3" onClick={() => setMenuOpen(false)}><div className="w-[86vw] max-w-[250px] max-h-[70vh] bg-[#0b1220] text-white shadow-2xl rounded-2xl p-4 md:p-5 overflow-y-auto" onClick={(e) => e.stopPropagation()}><div className="flex items-center justify-between mb-2 md:mb-3"><h2 className="text-xl font-extrabold">Settings</h2><button onClick={() => setMenuOpen(false)} className="h-9 w-9 rounded-lg bg-white/10 hover:bg-white/20 grid place-items-center">✕</button></div><div className="mb-3 space-y-2"><h3 className="text-sm font-semibold opacity-80">Wallet</h3><div className="flex items-center gap-2"><button onClick={openWalletModalUnified} className={`px-3 py-2 rounded-md text-sm font-semibold ${isConnected ? "bg-emerald-500/90 hover:bg-emerald-500 text-white" : "bg-rose-500/90 hover:bg-rose-500 text-white"}`}>{isConnected ? "Connected" : "Disconnected"}</button>{isConnected && (<button onClick={hardDisconnect} className="px-3 py-2 rounded-md text-sm font-semibold bg-rose-500/90 hover:bg-rose-500 text-white">Disconnect</button>)}</div>{isConnected && address && (<button onClick={() => { try { navigator.clipboard.writeText(address).then(() => { setCopiedAddr(true); setTimeout(() => setCopiedAddr(false), 1500); }); } catch {} }} className="mt-1 text-xs text-gray-300 hover:text-white transition underline">{shortAddr(address)}{copiedAddr && <span className="ml-2 text-emerald-400">Copied!</span>}</button>)}</div><div className="mb-4 space-y-2"><h3 className="text-sm font-semibold opacity-80">Sound</h3><button onClick={() => setSfxMuted(v => !v)} className={`px-3 py-2 rounded-lg text-sm font-semibold ${sfxMuted ? "bg-rose-500/90 hover:bg-rose-500 text-white" : "bg-emerald-500/90 hover:bg-emerald-500 text-white"}`}>SFX: {sfxMuted ? "Off" : "On"}</button></div><div className="mt-4 text-xs opacity-70"><p>Slots v2.0</p></div></div></div>)}
 
-        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">🎰 How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Place Play:</strong> Min {MIN_PLAY} MLEO</p><p><strong>2. Spin:</strong> 5 reels spin!</p><p><strong>3. Win:</strong> Match 3+ symbols!</p><div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3"><p className="text-yellow-300 font-semibold">💰 Prize Table (5 symbols):</p><div className="text-xs text-white/80 mt-2 space-y-1"><p>• 💎 ×500 | 7️⃣ ×200 | ⭐ ×100</p><p>• 🔔 ×80 | 🎰 ×60 | 🍒 ×40</p><p>• 🍉 ×30 | 🍊 ×20 | 🍋 ×15</p></div></div><div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-2 mt-2"><p className="text-purple-300 font-semibold text-xs">💡 4 or 3 symbols = smaller prizes!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
+        {showHowToPlay && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">✨ How to Play</h2><div className="space-y-3 text-sm"><p><strong>1. Place Play:</strong> Min {MIN_PLAY} MLEO</p><p><strong>2. Spin:</strong> 5 reels spin!</p><p><strong>3. Win:</strong> Match 3+ symbols!</p><div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3"><p className="text-yellow-300 font-semibold">💰 Prize Table (5 symbols):</p><div className="text-xs text-white/80 mt-2 space-y-1"><p>• 💎 ×500 | 7️⃣ ×200 | ⭐ ×100</p><p>• 🔔 ×80 | ✨ ×60 | 🍒 ×40</p><p>• 🍉 ×30 | 🍊 ×20 | 🍋 ×15</p></div></div><div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-2 mt-2"><p className="text-purple-300 font-semibold text-xs">💡 4 or 3 symbols = smaller prizes!</p></div></div><button onClick={() => setShowHowToPlay(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 
         {showStats && (<div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"><div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl max-h-[85vh] overflow-auto"><h2 className="text-2xl font-extrabold mb-4">📊 Your Statistics</h2><div className="space-y-3"><div className="grid grid-cols-2 gap-3"><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Spins</div><div className="text-xl font-bold">{stats.totalSpins}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Win Rate</div><div className="text-xl font-bold text-green-400">{stats.totalSpins > 0 ? ((stats.wins / stats.totalSpins) * 100).toFixed(1) : 0}%</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Play</div><div className="text-lg font-bold text-amber-400">{fmt(stats.totalPlay)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Total Won</div><div className="text-lg font-bold text-emerald-400">{fmt(stats.totalWon)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">Biggest Win</div><div className="text-lg font-bold text-yellow-400">{fmt(stats.biggestWin)}</div></div><div className="bg-black/30 border border-white/10 rounded-lg p-3"><div className="text-xs text-white/60">GrandPrizes</div><div className="text-lg font-bold text-purple-400">{stats.grandPrizes}</div></div></div></div><button onClick={() => setShowStats(false)} className="w-full mt-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 font-bold">Close</button></div></div>)}
 

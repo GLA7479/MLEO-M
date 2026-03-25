@@ -1441,7 +1441,7 @@ export default function RouletteMP({ roomId, playerName, vault, setVaultBoth, ti
                             </div>
                           </>
                         ) : isSpinningStage ? (
-                          <div className="text-yellow-400 text-3xl animate-pulse">🎰</div>
+                          <div className="text-yellow-400 text-3xl animate-pulse">🔴</div>
                         ) : isBetting && bettingTimeLeft > 0 ? (
                           <>
                             <div className="text-white/60 text-xs mb-1">Time Left</div>

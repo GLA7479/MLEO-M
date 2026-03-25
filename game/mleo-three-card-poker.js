@@ -22,6 +22,7 @@ import {
   readSharedVault,
   subscribeSharedVault,
 } from "../lib/sharedVault";
+import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -205,7 +206,7 @@ export default function ThreeCardPokerPage() {
 
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const gameId = router.pathname.replace('/', '') || 'three-card-poker';
+    const gameId = getInternalGameIdFromPathname(router.pathname) || "three-card-poker";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -291,7 +292,7 @@ export default function ThreeCardPokerPage() {
     try {
       let finishResult = null;
       if (isFreePlay || isFreePlayParam) {
-        const gameId = router.pathname.replace('/', '') || 'three-card-poker';
+        const gameId = getInternalGameIdFromPathname(router.pathname) || "three-card-poker";
         const startResult = await startFreeplayArcadeSession(gameId);
         if (!startResult.success) {
           setSessionError("Failed to start session");
@@ -303,7 +304,7 @@ export default function ThreeCardPokerPage() {
         play = startResult.amount;
         setFreePlayTokens(startResult.remainingTokens);
         setIsFreePlay(false);
-        router.replace('/three-card-poker', undefined, { shallow: true });
+        router.replace(getCanonicalPathForInternalGameId("three-card-poker"), undefined, { shallow: true });
         finishResult = await finishArcadeSession(startResult.sessionId, {});
       } else {
         if (play < MIN_PLAY) { 

@@ -22,6 +22,7 @@ import {
   readSharedVault,
   subscribeSharedVault,
 } from "../lib/sharedVault";
+import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
 
 // ============================================================================
 // iOS 100vh FIX
@@ -158,7 +159,7 @@ export default function DiceArenaPage() {
       });
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const gameId = router.pathname.replace('/', '') || 'craps';
+    const gameId = getInternalGameIdFromPathname(router.pathname) || "craps";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -263,7 +264,7 @@ export default function DiceArenaPage() {
     let play = Number(playAmount) || MIN_PLAY;
     let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
-      const gameId = router.pathname.replace('/', '') || 'craps';
+      const gameId = getInternalGameIdFromPathname(router.pathname) || "craps";
       try {
         const result = await startFreeplayArcadeSession(gameId);
         if (result.success) {
@@ -271,7 +272,7 @@ export default function DiceArenaPage() {
           sessionId = result.sessionId;
           setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
-          router.replace('/craps', undefined, { shallow: true });
+          router.replace(getCanonicalPathForInternalGameId("craps"), undefined, { shallow: true });
         } else {
           alert(result.message || 'No free play tokens available!');
           setIsFreePlay(false);

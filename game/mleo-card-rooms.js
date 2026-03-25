@@ -1997,7 +1997,7 @@ export default function CardRoomsPage() {
           {/* Main Content */}
           <div className="relative w-full h-full flex flex-col items-center justify-start px-4 pt-[calc(var(--head-h,0px)+12px)] pb-4">
             <div className="text-center mb-4">
-              <h1 className="text-xl md:text-2xl font-bold text-white mb-1">🎰🎴 Card Rooms</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-white mb-1">🃏🎴 Card Rooms</h1>
               <p className="text-white/70 text-sm md:text-base">Join a table and start playing!</p>
             </div>
 
@@ -2081,7 +2081,7 @@ export default function CardRoomsPage() {
                       className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-2.5 md:p-3 hover:border-purple-400/50 transition-all"
                     >
                       <div className="space-y-1">
-                        <div className="text-sm md:text-base font-bold text-white">🎰🎴 {table.name}</div>
+                        <div className="text-sm md:text-base font-bold text-white">🃏🎴 {table.name}</div>
                         <div className="text-white/70 text-xs">
                           Min Entry Fee: <span className="text-emerald-400 font-semibold">{fmt(table.min_entry_fee)} MLEO</span>
                         </div>
@@ -2151,7 +2151,7 @@ export default function CardRoomsPage() {
             {showHowToPlay && (
               <div className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4">
                 <div className="bg-zinc-900 text-white max-w-md w-full rounded-2xl p-6 shadow-2xl">
-                  <h2 className="text-2xl font-extrabold mb-4">🎰🎴 How to Play</h2>
+                  <h2 className="text-2xl font-extrabold mb-4">🃏🎴 How to Play</h2>
                   <div className="space-y-3 text-sm text-white/90">
                     <p><strong>1. Enter your name:</strong> Type your player name in "Your Balance".</p>
                     <p><strong>2. Join a table:</strong> Review Min Buy‑in and Blinds, then press <strong>JOIN TABLE</strong>.</p>
@@ -2246,7 +2246,7 @@ export default function CardRoomsPage() {
             <div className="relative px-2 py-3" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 10px)" }}>
               <div className="flex items-center justify-between gap-2 pointer-events-auto">
                 <button onClick={() => router.push('/arcade-online')} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title="Back to Arcade">BACK</button>
-                <div className="text-white font-extrabold text-lg truncate">🎰🎴 {selectedTable?.name}</div>
+                <div className="text-white font-extrabold text-lg truncate">🃏🎴 {selectedTable?.name}</div>
                 <button onClick={toggleFullscreen} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>{isFullscreen ? 'EXIT' : 'FULL'}</button>
               </div>
             </div>
@@ -2351,7 +2351,7 @@ export default function CardRoomsPage() {
               <div className="flex items-center justify-between gap-2 pointer-events-auto">
                 <button onClick={() => router.push('/arcade-online')} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title="Back to Arcade">BACK</button>
                 <div className="text-center flex-1">
-                  <div className="text-white font-extrabold text-lg truncate">🎰🎴 {selectedTable?.name}</div>
+                  <div className="text-white font-extrabold text-lg truncate">🃏🎴 {selectedTable?.name}</div>
                   <div className="text-white/60 text-xs">Round: {game?.round || 'preflop'} | Prize Pool: {fmt(game?.prizePool || 0)} MLEO</div>
                 </div>
                 <button onClick={toggleFullscreen} className="min-w-[60px] px-3 py-1 rounded-lg text-sm font-bold bg-white/5 border border-white/10 hover:bg-white/10" title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>{isFullscreen ? 'EXIT' : 'FULL'}</button>

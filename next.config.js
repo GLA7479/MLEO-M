@@ -53,6 +53,19 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: path.resolve(__dirname),
+  async redirects() {
+    return [
+      { source: "/blackjack", destination: "/21-challenge", permanent: true },
+      { source: "/poker", destination: "/card-arena", permanent: true },
+      { source: "/roulette", destination: "/color-wheel", permanent: true },
+      { source: "/baccarat", destination: "/card-duel", permanent: true },
+      { source: "/craps", destination: "/dice-arena", permanent: true },
+      { source: "/sicbo", destination: "/triple-dice", permanent: true },
+      { source: "/slots-upgraded", destination: "/symbol-match", permanent: true },
+      { source: "/three-card-poker", destination: "/triple-cards", permanent: true },
+      { source: "/ultimate-poker", destination: "/ultimate-cards", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {
