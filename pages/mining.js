@@ -4190,6 +4190,7 @@ function pickInitialLang() {
 // ===== Language Selector =====
 function LanguageSelector({ currentLang, onLanguageChange, pageDir = "ltr" }) {
   const [isOpen, setIsOpen] = useState(false);
+  const safeLang = SUPPORTED_LOCALES.has(currentLang) ? currentLang : "en";
   const panelAlign = pageDir === "rtl" ? "left-0" : "right-0";
   const itemText = pageDir === "rtl" ? "text-right" : "text-left";
   const flagMargin = pageDir === "rtl" ? "ml-2" : "mr-2";
@@ -4201,8 +4202,8 @@ function LanguageSelector({ currentLang, onLanguageChange, pageDir = "ltr" }) {
         className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/15 transition text-sm flex items-center gap-2"
         style={{ fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol" }}
       >
-        <span className={pageDir === "rtl" ? "ml-1" : "mr-1"}>{FLAGS[currentLang] || '🌐'}</span>
-        <span>{TEXT[currentLang].name}</span>
+        <span className={pageDir === "rtl" ? "ml-1" : "mr-1"}>{FLAGS[safeLang] || '🌐'}</span>
+        <span>{TEXT[safeLang].name}</span>
         <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>

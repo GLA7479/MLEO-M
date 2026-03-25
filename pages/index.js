@@ -1074,9 +1074,9 @@ pt: {
       "Had je Bitcoin graag op dag één gemined? Begin vandaag met MLEO.",
       "Tik. Voeg samen. Verdien. Maak van je spel MLEO.",
       "Van meme naar machine — ontgin de toekomst met Leo.",
-      "Eerlijke emissie. Echte competitie. Pure fun.",
+      "Eerlijke emissie. Echte competitie. Puur speelplezier.",
       "Geen gas, geen gedoe (demo). Gewoon minen en stijgen.",
-      "Sluit je aan bij de early miners. Claim jouw deel van het MLEO-tijdperk.",
+      "Sluit je aan bij de vroege mijnwerkers. Claim jouw deel van het MLEO-tijdperk.",
     ],
     modal: {
       title: "Zo bouw je MLEO op",
@@ -1125,7 +1125,7 @@ pt: {
   el: {
     name: "Ελληνικά", dir: "ltr", code: "el",
     new: "Νέο", early: "Καλωσορίζουμε τους πρώτους εξορυκτές",
-    heroH1_1: "Mining. Συνένωση. Κέρδος.",
+    heroH1_1: "Εξόρυξη. Συνένωση. Κέρδος.",
     heroH1_2: "Καλώς ήρθες στο MLEO.",
     start: "ΞΕΚΙΝΑ ΤΩΡΑ",
     how: "Πώς λειτουργεί",
@@ -1135,12 +1135,12 @@ pt: {
       "Εγκαταστάσιμη PWA",
     ],
     slogans: [
-      "Θα ήθελες να έκανες mining Bitcoin από την πρώτη μέρα; Ξεκίνα σήμερα με το MLEO.",
+      "Θα ήθελες να έκανες εξόρυξη Bitcoin από την πρώτη μέρα; Ξεκίνα σήμερα με το MLEO.",
       "Πάτησε. Συνένωσε. Κέρδισε. Μετέτρεψε το παιχνίδι σου σε MLEO.",
-      "Από meme σε μηχανή — κάνε mining το μέλλον με τον Leo.",
+      "Από meme σε μηχανή — εξόρυξε το μέλλον με τον Leo.",
       "Δίκαιη έκδοση. Πραγματικός ανταγωνισμός. Καθαρή διασκέδαση.",
-      "Χωρίς gas, χωρίς μπέρδεμα (demo). Απλώς κάνε mining και ανέβα.",
-      "Μπες στους πρώτους miners. Διεκδίκησε το μερίδιό σου στην εποχή MLEO.",
+      "Χωρίς κόστος αερίου, χωρίς μπέρδεμα (δοκιμή). Απλώς εξόρυξε και ανέβα.",
+      "Μπες στους πρώτους εξορύκτες. Διεκδίκησε το μερίδιό σου στην εποχή MLEO.",
     ],
     modal: {
       title: "Πώς συσσωρεύεται το MLEO",
@@ -1302,6 +1302,7 @@ function pickInitialLang() {
 // ===== Language Selector =====
 function LanguageSelector({ lang, setLang, pageDir = "ltr" }) {
   const [isOpen, setIsOpen] = useState(false);
+  const labelLang = SUPPORTED_LOCALES.has(lang) ? lang : "en";
   const panelSide = pageDir === "rtl" ? "left-4" : "right-4";
   const itemAlign = pageDir === "rtl" ? "text-right" : "text-left";
   
@@ -1312,8 +1313,8 @@ function LanguageSelector({ lang, setLang, pageDir = "ltr" }) {
         className="px-3 py-2 rounded-xl bg-white/10 border border-white/20 hover:bg-white/15 transition text-sm flex items-center gap-2"
         style={{ fontFamily: "system-ui, Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol" }}
       >
-        <span className={pageDir === "rtl" ? "ml-1" : "mr-1"}>{FLAGS[lang] || '🌐'}</span>
-        <span>{TEXT[lang].name}</span>
+        <span className={pageDir === "rtl" ? "ml-1" : "mr-1"}>{FLAGS[labelLang] || '🌐'}</span>
+        <span>{TEXT[labelLang].name}</span>
         <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
