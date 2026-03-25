@@ -3367,6 +3367,9 @@ function BankedQuickPanel({
         <div className="text-[12px] leading-5 text-white/72">
           Shipping moves banked MLEO to the shared vault; it does not increase production rate.
         </div>
+        <div className="text-[12px] leading-5 text-white/72">
+          Daily reset happens at 00:00 UTC based on server time, not your local device time.
+        </div>
       </div>
     </DesktopFloatingPanelShell>
   );
