@@ -3215,40 +3215,53 @@ function BankedQuickPanel({
       onClose={onClose}
       bodyScrollRef={bodyScrollRef}
     >
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/65">
-            Rate / hr
+      <div className="space-y-2">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-2.5 py-2">
+            <div className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/65">
+              Rate / hr
+            </div>
+            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+              {fmtRate(s.perHour)}
+            </div>
           </div>
-          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-            {fmtRate(s.perHour)}
+
+          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
+            <div className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+              Per day
+            </div>
+            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+              {fmtRate(s.perDay)}
+            </div>
+          </div>
+
+          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
+            <div className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+              Today
+            </div>
+            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+              {fmtRate(s.mleoProducedToday)}
+            </div>
           </div>
         </div>
 
-        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-            Per day
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+              Daily prod. cap
+            </div>
+            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+              {fmt(s.dailyMleoCap ?? s.shipCap)}
+            </div>
           </div>
-          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-            {fmtRate(s.perDay)}
-          </div>
-        </div>
 
-        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-            Daily prod. cap
-          </div>
-          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-            {fmt(s.dailyMleoCap ?? s.shipCap)}
-          </div>
-        </div>
-
-        <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-            Cap ETA
-          </div>
-          <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
-            {s.etaHours == null ? "—" : `${fmtRate(s.etaHours, 1)}h`}
+          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-3 py-2">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+              Cap ETA
+            </div>
+            <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
+              {s.etaHours == null ? "—" : `${fmtRate(s.etaHours, 1)}h`}
+            </div>
           </div>
         </div>
       </div>
@@ -3318,18 +3331,21 @@ function BankedQuickPanel({
         </div>
       </div>
 
-      <div className="mt-3 space-y-2.5 text-[13px] leading-6 text-white/76">
+      <div className="mt-3 space-y-2 text-[12px] leading-5 text-white/72">
         <div>
-          Base Banked grows only while Refinery is supplied with Ore, Scrap and enough
-          Energy.
+          Banked MLEO = stored accumulated output inside BASE, not today&apos;s production.
         </div>
         <div>
-          Shipping does not increase the rate. Shipping only moves banked MLEO into
-          the real shared vault.
+          Rate / hr = current live refinery snapshot.
         </div>
         <div>
-          Red means this is the reason output stopped. Orange means this is the best
-          improvement lane right now. Green means this lane is currently balanced.
+          Per day = projected remaining daily output estimate (not simply Rate / hr × 24).
+        </div>
+        <div>
+          Daily prod. cap limits today&apos;s production only, not total banked stock.
+        </div>
+        <div>
+          Shipping moves banked MLEO to the shared vault; it does not increase production rate.
         </div>
       </div>
     </DesktopFloatingPanelShell>
