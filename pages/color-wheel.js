@@ -1,5 +1,3 @@
-import RoulettePage from "../game/mleo-roulette";
+import ColorWheelPage from "../game/arcade/color-wheel";
 
-export default function ColorWheelPage() {
-  return <RoulettePage />;
-}
+export default ColorWheelPage;

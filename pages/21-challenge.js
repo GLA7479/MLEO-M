@@ -1,5 +1,3 @@
-import MLEOBlackjackPage from "../game/mleo-blackjack";
+import Challenge21Page from "../game/arcade/challenge-21";
 
-export default function Challenge21Page() {
-  return <MLEOBlackjackPage />;
-}
+export default Challenge21Page;

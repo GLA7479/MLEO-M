@@ -5,24 +5,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import Layout from "../components/Layout";
+import Layout from "../../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../../lib/free-play-system";
 import {
   finishArcadeSession,
   startFreeplayArcadeSession,
   startPaidArcadeSession,
-} from "../lib/arcadeSessionClient";
+} from "../../lib/arcadeSessionClient";
 import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
   readSharedVault,
   subscribeSharedVault,
-} from "../lib/sharedVault";
-import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
+} from "../../lib/sharedVault";
+import {
+  ARCADE_APP_IDS,
+  ARCADE_LS,
+  ARCADE_VAULT_DEBIT,
+  getArcadeAppIdFromPathname,
+  getCanonicalPathForAppId,
+  readArcadeLocalStats,
+} from "../../lib/arcadeGameIds";
 
 // ============================================================================
 // iOS 100vh FIX
@@ -52,7 +59,7 @@ function useIOSViewportFix() {
   }, []);
 }
 
-const LS_KEY = "mleo_craps_v2";
+const LS_KEYS = ARCADE_LS.diceArena;
 const MIN_PLAY = 100;
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
@@ -138,7 +145,16 @@ export default function DiceArenaPage() {
   const winSound = useRef(null);
 
   const [stats, setStats] = useState(() =>
-    safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, sevens: 0, lastPlay: MIN_PLAY })
+    readArcadeLocalStats(LS_KEYS.legacy, LS_KEYS.clean, {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+      sevens: 0,
+      lastPlay: MIN_PLAY,
+    })
   );
 
   const playSfx = (sound) => {
@@ -159,7 +175,6 @@ export default function DiceArenaPage() {
       });
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const gameId = getInternalGameIdFromPathname(router.pathname) || "craps";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -190,7 +205,9 @@ export default function DiceArenaPage() {
     };
   }, [router.query]);
 
-  useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
+  useEffect(() => {
+    safeWrite(LS_KEYS.clean, stats);
+  }, [stats]);
   useEffect(() => { if (!wrapRef.current) return; const calc = () => { const rootH = window.visualViewport?.height ?? window.innerHeight; const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px", "")) || 0; const headH = headerRef.current?.offsetHeight || 0; document.documentElement.style.setProperty("--head-h", headH + "px"); const topPad = headH + 8; const used = headH + (metersRef.current?.offsetHeight || 0) + (betRef.current?.offsetHeight || 0) + (ctaRef.current?.offsetHeight || 0) + topPad + 48 + safeBottom + 24; const freeH = Math.max(200, rootH - used); document.documentElement.style.setProperty("--chart-h", freeH + "px"); }; calc(); window.addEventListener("resize", calc); window.visualViewport?.addEventListener("resize", calc); return () => { window.removeEventListener("resize", calc); window.visualViewport?.removeEventListener("resize", calc); }; }, [mounted]);
   useEffect(() => {
     if (gameResult) {
@@ -220,7 +237,7 @@ export default function DiceArenaPage() {
         args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address,
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      const debitResult = await debitSharedVault(wholeCollectAmount, "craps-claim");
+      const debitResult = await debitSharedVault(wholeCollectAmount, ARCADE_VAULT_DEBIT.DICE_ARENA_CLAIM);
       if (!debitResult.ok) { alert(debitResult.error || "Vault update failed"); return; }
       setVaultState(debitResult.balance);
       setCollectAmount(wholeCollectAmount);
@@ -264,15 +281,15 @@ export default function DiceArenaPage() {
     let play = Number(playAmount) || MIN_PLAY;
     let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
-      const gameId = getInternalGameIdFromPathname(router.pathname) || "craps";
+      const appGameId = getArcadeAppIdFromPathname(router.pathname) || ARCADE_APP_IDS.DICE_ARENA;
       try {
-        const result = await startFreeplayArcadeSession(gameId);
+        const result = await startFreeplayArcadeSession(appGameId);
         if (result.success) {
           play = result.amount;
           sessionId = result.sessionId;
           setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
-          router.replace(getCanonicalPathForInternalGameId("craps"), undefined, { shallow: true });
+          router.replace(getCanonicalPathForAppId(ARCADE_APP_IDS.DICE_ARENA), undefined, { shallow: true });
         } else {
           alert(result.message || 'No free play tokens available!');
           setIsFreePlay(false);
@@ -292,7 +309,7 @@ export default function DiceArenaPage() {
         setRolling(false);
         return; 
       }
-      const startResult = await startPaidArcadeSession("craps", play);
+      const startResult = await startPaidArcadeSession(ARCADE_APP_IDS.DICE_ARENA, play);
       if (!startResult.success) { 
         alert(startResult.message || 'Failed to start session'); 
         setRolling(false);
@@ -594,3 +611,4 @@ export default function DiceArenaPage() {
     </Layout>
   );
 }
+

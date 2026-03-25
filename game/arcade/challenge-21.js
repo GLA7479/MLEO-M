@@ -5,25 +5,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import Layout from "../components/Layout";
+import Layout from "../../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../../lib/free-play-system";
 import {
   finishArcadeSession,
   startFreeplayArcadeSession,
   startPaidArcadeSession,
-} from "../lib/arcadeSessionClient";
-import { createDeterministicCardDeck } from "../lib/arcadeDeterministicCards";
+} from "../../lib/arcadeSessionClient";
+import { createDeterministicCardDeck } from "../../lib/arcadeDeterministicCards";
 import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
   readSharedVault,
   subscribeSharedVault,
-} from "../lib/sharedVault";
-import { getInternalGameIdFromPathname } from "../lib/publicGameRoutes";
+} from "../../lib/sharedVault";
+import {
+  ARCADE_APP_IDS,
+  ARCADE_LS,
+  ARCADE_VAULT_DEBIT,
+  getArcadeAppIdFromPathname,
+  readArcadeLocalStats,
+} from "../../lib/arcadeGameIds";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -50,7 +56,7 @@ function useIOSViewportFix() {
   }, []);
 }
 
-const LS_KEY = "mleo_blackjack_v3";
+const LS_KEYS = ARCADE_LS.challenge21;
 const MIN_PLAY = 100;
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -156,7 +162,7 @@ function PlayingCard({ card, hidden = false, delay = 0 }) {
   );
 }
 
-export default function BlackjackPage() {
+export default function Challenge21Page() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -212,11 +218,24 @@ export default function BlackjackPage() {
   const [currentSplitIndex, setCurrentSplitIndex] = useState(0);
   const [isSplitGame, setIsSplitGame] = useState(false);
 
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { 
-    totalHands: 0, wins: 0, losses: 0, pushes: 0, totalPlay: 0, totalWon: 0, 
-    biggestWin: 0, blackjacks: 0, doubles: 0, splits: 0, surrenders: 0, 
-    insuranceWins: 0, insuranceLosses: 0, lastPlay: MIN_PLAY 
-  }));
+  const [stats, setStats] = useState(() =>
+    readArcadeLocalStats(LS_KEYS.legacy, LS_KEYS.clean, {
+      totalHands: 0,
+      wins: 0,
+      losses: 0,
+      pushes: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+      blackjacks: 0,
+      doubles: 0,
+      splits: 0,
+      surrenders: 0,
+      insuranceWins: 0,
+      insuranceLosses: 0,
+      lastPlay: MIN_PLAY,
+    })
+  );
   const sessionIdRef = useRef(null);
   const baseStakeRef = useRef(0);
   const insuranceTakenRef = useRef(false);
@@ -259,7 +278,7 @@ export default function BlackjackPage() {
       // DB must run full sql/arcade_sessions_add_slots_mystery.sql (all arcade games share finish_arcade_session)
       if (finishResult?.code === "ARCADE_FINISH_NOT_CONFIGURED") {
         setSessionError(
-          "השרת לא מוגדר למשחק הזה. באדמין: להריץ ב-Supabase את sql/arcade_sessions_add_slots_mystery.sql (מעדכן את finish_arcade_session)."
+          "×”×©×¨×ª ×œ× ×ž×•×’×“×¨ ×œ×ž×©×—×§ ×”×–×”. ×‘××“×ž×™×Ÿ: ×œ×”×¨×™×¥ ×‘-Supabase ××ª sql/arcade_sessions_add_slots_mystery.sql (×ž×¢×“×›×Ÿ ××ª finish_arcade_session)."
         );
         setGameState("lobby");
         sessionIdRef.current = null;
@@ -349,7 +368,6 @@ export default function BlackjackPage() {
       });
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const gameId = getInternalGameIdFromPathname(router.pathname) || "blackjack";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -372,7 +390,9 @@ export default function BlackjackPage() {
     return () => { cancelled = true; unsubscribeVault(); clearInterval(interval); document.removeEventListener("fullscreenchange", handleFullscreenChange); };
   }, [router.query]);
 
-  useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
+  useEffect(() => {
+    safeWrite(LS_KEYS.clean, stats);
+  }, [stats]);
   useEffect(() => { if (!wrapRef.current) return; const calc = () => { const rootH = window.visualViewport?.height ?? window.innerHeight; const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px", "")) || 0; const headH = headerRef.current?.offsetHeight || 0; document.documentElement.style.setProperty("--head-h", headH + "px"); const topPad = headH + 8; const used = headH + (metersRef.current?.offsetHeight || 0) + (betRef.current?.offsetHeight || 0) + (ctaRef.current?.offsetHeight || 0) + topPad + 48 + safeBottom + 24; const freeH = Math.max(200, rootH - used); document.documentElement.style.setProperty("--chart-h", freeH + "px"); }; calc(); window.addEventListener("resize", calc); window.visualViewport?.addEventListener("resize", calc); return () => { window.removeEventListener("resize", calc); window.visualViewport?.removeEventListener("resize", calc); }; }, [mounted]);
   useEffect(() => { if (gameResult) { setShowResultPopup(true); const timer = setTimeout(() => setShowResultPopup(false), 4000); return () => clearTimeout(timer); } }, [gameResult]);
 
@@ -390,7 +410,7 @@ export default function BlackjackPage() {
       const amountUnits = parseUnits(String(wholeCollectAmount), MLEO_DECIMALS);
       const hash = await writeContractAsync({ address: CLAIM_ADDRESS, abi: MINING_CLAIM_ABI, functionName: "claim", args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address });
       await publicClient.waitForTransactionReceipt({ hash });
-      const debitResult = await applyVaultDebit(wholeCollectAmount, "blackjack-claim");
+      const debitResult = await applyVaultDebit(wholeCollectAmount, ARCADE_VAULT_DEBIT.CHALLENGE_21_CLAIM);
       if (!debitResult.ok) { alert(debitResult.error || "Vault update failed"); return; }
       setCollectAmount(wholeCollectAmount);
       alert(`✅ Sent ${fmt(wholeCollectAmount)} MLEO to wallet!`);
@@ -437,8 +457,8 @@ export default function BlackjackPage() {
     let nextSessionId = null;
     try {
       if (isFreePlay || isFreePlayParam) {
-        const gameId = getInternalGameIdFromPathname(router.pathname) || "blackjack";
-        const result = await startFreeplayArcadeSession(gameId);
+        const appGameId = getArcadeAppIdFromPathname(router.pathname) || ARCADE_APP_IDS.CHALLENGE_21;
+        const result = await startFreeplayArcadeSession(appGameId);
         if (result.success) {
           play = Math.max(MIN_PLAY, Math.floor(Number(result.amount || 0) / RESERVED_STAKE_MULTIPLIER) || MIN_PLAY);
           nextSessionId = result.sessionId;
@@ -458,7 +478,7 @@ export default function BlackjackPage() {
           return; 
         }
         const reservedStake = Math.floor(play * RESERVED_STAKE_MULTIPLIER);
-        const startResult = await startPaidArcadeSession("blackjack", reservedStake);
+        const startResult = await startPaidArcadeSession(ARCADE_APP_IDS.CHALLENGE_21, reservedStake);
         if (!startResult.success) {
           setSessionError("Failed to start session");
           alert(startResult.message || "Failed to start session");
@@ -473,7 +493,7 @@ export default function BlackjackPage() {
         throw new Error("Missing session id");
       }
     } catch (error) {
-      console.error("Blackjack start session error:", error);
+      console.error("Challenge 21 start session error:", error);
       setSessionError(error?.message || "Failed to start session");
       if (isFreePlay || isFreePlayParam) {
         setIsFreePlay(false);
@@ -1307,3 +1327,4 @@ export default function BlackjackPage() {
     </Layout>
   );
 }
+

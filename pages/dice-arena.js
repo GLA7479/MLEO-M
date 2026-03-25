@@ -1,1 +1,1 @@
-export { default } from "../game/mleo-craps";
+export { default } from "../game/arcade/dice-arena";

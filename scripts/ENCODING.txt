@@ -1,0 +1,18 @@
+UTF-8 safe file writes (Windows / PowerShell)
+
+Why: Default PowerShell 5.x "Set-Content" / redirection may use the system ANSI
+code page and destroy non-ASCII characters (emoji, suits, bullets) in .js/.json.
+
+Prefer one of:
+  # PowerShell 7+
+  Set-Content -Path $path -Value $content -Encoding utf8NoBOM
+
+  # .NET (PS 5 or 7) — UTF-8 without BOM (good default for JS tooling)
+  [System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))
+
+  # Node
+  fs.writeFileSync(path, content, "utf8")
+
+Avoid bulk-editing repo JS via Set-Content without an explicit UTF-8 encoding.
+
+If UI shows strings like "â€¢" or "ðŸŽ", see scripts/restore-utf8-from-git.js and git history.

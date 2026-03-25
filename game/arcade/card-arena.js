@@ -5,24 +5,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import Layout from "../components/Layout";
+import Layout from "../../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../../lib/free-play-system";
 import {
   finishArcadeSession,
   startFreeplayArcadeSession,
   startPaidArcadeSession,
-} from "../lib/arcadeSessionClient";
+} from "../../lib/arcadeSessionClient";
 import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
   readSharedVault,
   subscribeSharedVault,
-} from "../lib/sharedVault";
-import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
+} from "../../lib/sharedVault";
+import {
+  ARCADE_APP_IDS,
+  ARCADE_LS,
+  ARCADE_VAULT_DEBIT,
+  getArcadeAppIdFromPathname,
+  getCanonicalPathForAppId,
+  readArcadeLocalStats,
+} from "../../lib/arcadeGameIds";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -49,7 +56,7 @@ function useIOSViewportFix() {
   }, []);
 }
 
-const LS_KEY = "mleo_poker_v2";
+const LS_KEYS = ARCADE_LS.cardArena;
 const MIN_PLAY = 100;
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -57,6 +64,7 @@ const PRIZES = { "Royal Flush": 800, "Straight Flush": 160, "Four of a Kind": 40
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
+// TODO(product/contract): shares numeric ID 14 with Triple Dice on-chain claim path — needs product review; do not change without contract alignment.
 const GAME_ID = 14;
 const MINING_CLAIM_ABI = [{ type: "function", name: "claim", stateMutability: "nonpayable", inputs: [{ name: "gameId", type: "uint256" }, { name: "amount", type: "uint256" }], outputs: [] }];
 const S_CLICK = "/sounds/click.mp3";
@@ -142,7 +150,7 @@ function PlayingCard({ card, delay = 0 }) {
   );
 }
 
-export default function PokerPage() {
+export default function CardArenaPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -184,7 +192,18 @@ export default function PokerPage() {
   const clickSound = useRef(null);
   const winSound = useRef(null);
 
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalHands: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, royalFlushes: 0, lastPlay: MIN_PLAY }));
+  const [stats, setStats] = useState(() =>
+    readArcadeLocalStats(LS_KEYS.legacy, LS_KEYS.clean, {
+      totalHands: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+      royalFlushes: 0,
+      lastPlay: MIN_PLAY,
+    })
+  );
 
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
@@ -202,7 +221,6 @@ export default function PokerPage() {
 
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const gameId = getInternalGameIdFromPathname(router.pathname) || "poker";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -233,7 +251,9 @@ export default function PokerPage() {
     };
   }, [router.query]);
 
-  useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
+  useEffect(() => {
+    safeWrite(LS_KEYS.clean, stats);
+  }, [stats]);
   useEffect(() => { if (!wrapRef.current) return; const calc = () => { const rootH = window.visualViewport?.height ?? window.innerHeight; const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px", "")) || 0; const headH = headerRef.current?.offsetHeight || 0; document.documentElement.style.setProperty("--head-h", headH + "px"); const topPad = headH + 8; const used = headH + (metersRef.current?.offsetHeight || 0) + (betRef.current?.offsetHeight || 0) + (ctaRef.current?.offsetHeight || 0) + topPad + 48 + safeBottom + 24; const freeH = Math.max(200, rootH - used); document.documentElement.style.setProperty("--chart-h", freeH + "px"); }; calc(); window.addEventListener("resize", calc); window.visualViewport?.addEventListener("resize", calc); return () => { window.removeEventListener("resize", calc); window.visualViewport?.removeEventListener("resize", calc); }; }, [mounted]);
   useEffect(() => {
     const finalResult = gameResult && !gameResult.dealing && typeof gameResult.hand === "string";
@@ -259,7 +279,7 @@ export default function PokerPage() {
       const amountUnits = parseUnits(String(wholeAmount), MLEO_DECIMALS);
       const hash = await writeContractAsync({ address: CLAIM_ADDRESS, abi: MINING_CLAIM_ABI, functionName: "claim", args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address });
       await publicClient.waitForTransactionReceipt({ hash });
-      const debitResult = await debitSharedVault(wholeAmount, "poker");
+      const debitResult = await debitSharedVault(wholeAmount, ARCADE_VAULT_DEBIT.CARD_ARENA);
       setVaultState(debitResult.balance);
       alert(`✅ Sent ${fmt(wholeAmount)} MLEO to wallet!`);
       setShowVaultModal(false);
@@ -296,8 +316,8 @@ export default function PokerPage() {
     try {
       let finishResult = null;
       if (isFreePlay || isFreePlayParam) {
-        const gameId = getInternalGameIdFromPathname(router.pathname) || "poker";
-        const startResult = await startFreeplayArcadeSession(gameId);
+        const appGameId = getArcadeAppIdFromPathname(router.pathname) || ARCADE_APP_IDS.CARD_ARENA;
+        const startResult = await startFreeplayArcadeSession(appGameId);
         if (!startResult.success) {
           setSessionError("Failed to start session");
           alert(startResult.message || 'No free play tokens available!');
@@ -308,7 +328,7 @@ export default function PokerPage() {
         play = startResult.amount;
         setFreePlayTokens(startResult.remainingTokens);
         setIsFreePlay(false);
-        router.replace(getCanonicalPathForInternalGameId("poker"), undefined, { shallow: true });
+        router.replace(getCanonicalPathForAppId(ARCADE_APP_IDS.CARD_ARENA), undefined, { shallow: true });
         finishResult = await finishArcadeSession(startResult.sessionId, {});
       } else {
         if (play < MIN_PLAY) { 
@@ -316,7 +336,7 @@ export default function PokerPage() {
           setGameResult(null);
           return; 
         }
-        const startResult = await startPaidArcadeSession("poker", play);
+        const startResult = await startPaidArcadeSession(ARCADE_APP_IDS.CARD_ARENA, play);
         if (!startResult.success) {
           setSessionError("Failed to start session");
           alert(startResult.message || 'Failed to start session');
@@ -535,3 +555,4 @@ export default function PokerPage() {
     </Layout>
   );
 }
+

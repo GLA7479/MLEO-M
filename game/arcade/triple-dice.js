@@ -5,24 +5,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import Layout from "../components/Layout";
+import Layout from "../../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../../lib/free-play-system";
 import {
   finishArcadeSession,
   startFreeplayArcadeSession,
   startPaidArcadeSession,
-} from "../lib/arcadeSessionClient";
+} from "../../lib/arcadeSessionClient";
 import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
   readSharedVault,
   subscribeSharedVault,
-} from "../lib/sharedVault";
-import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
+} from "../../lib/sharedVault";
+import {
+  ARCADE_APP_IDS,
+  ARCADE_LS,
+  ARCADE_VAULT_DEBIT,
+  getArcadeAppIdFromPathname,
+  getCanonicalPathForAppId,
+  readArcadeLocalStats,
+} from "../../lib/arcadeGameIds";
 
 // ============================================================================
 // iOS 100vh FIX
@@ -59,7 +66,7 @@ function useIOSViewportFix() {
 // ============================================================================
 // CONFIG
 // ============================================================================
-const LS_KEY = "mleo_sicbo_v2";
+const LS_KEYS = ARCADE_LS.tripleDice;
 const MIN_PLAY = 100;
 
 // Play types and their prizes
@@ -74,7 +81,8 @@ const PLAY_TYPES = {
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
 const MLEO_DECIMALS = Number(process.env.NEXT_PUBLIC_MLEO_DECIMALS || 18);
-const GAME_ID = 14; // Triple Dice game ID
+// TODO(product/contract): shares numeric ID 14 with Card Arena on-chain claim path — needs product review; do not change without contract alignment.
+const GAME_ID = 14;
 
 const MINING_CLAIM_ABI = [{
   type: "function",
@@ -138,7 +146,7 @@ function shortAddr(addr) {
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
-export default function SicBoPage() {
+export default function TripleDicePage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -189,7 +197,7 @@ export default function SicBoPage() {
 
   // Stats
   const [stats, setStats] = useState(() =>
-    safeRead(LS_KEY, {
+    readArcadeLocalStats(LS_KEYS.legacy, LS_KEYS.clean, {
       totalGames: 0,
       wins: 0,
       losses: 0,
@@ -197,7 +205,7 @@ export default function SicBoPage() {
       totalWon: 0,
       biggestWin: 0,
       triples: 0,
-      lastPlay: MIN_PLAY
+      lastPlay: MIN_PLAY,
     })
   );
 
@@ -226,7 +234,6 @@ export default function SicBoPage() {
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
 
-    const gameId = getInternalGameIdFromPathname(router.pathname) || "sicbo";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -267,7 +274,7 @@ export default function SicBoPage() {
 
   // Persist stats
   useEffect(() => {
-    safeWrite(LS_KEY, stats);
+    safeWrite(LS_KEYS.clean, stats);
   }, [stats]);
 
   // Dynamic layout calculation
@@ -359,7 +366,7 @@ export default function SicBoPage() {
 
       await publicClient.waitForTransactionReceipt({ hash });
 
-      const debitResult = await debitSharedVault(wholeAmount, "sicbo");
+      const debitResult = await debitSharedVault(wholeAmount, ARCADE_VAULT_DEBIT.TRIPLE_DICE);
       setVaultState(debitResult.balance);
 
       alert(`✅ Sent ${fmt(wholeAmount)} MLEO to wallet!`);
@@ -409,15 +416,15 @@ export default function SicBoPage() {
     let sessionId = null;
 
     if (isFreePlay || isFreePlayParam) {
-      const gameId = getInternalGameIdFromPathname(router.pathname) || "sicbo";
+      const appGameId = getArcadeAppIdFromPathname(router.pathname) || ARCADE_APP_IDS.TRIPLE_DICE;
       try {
-        const result = await startFreeplayArcadeSession(gameId);
+        const result = await startFreeplayArcadeSession(appGameId);
         if (result.success) {
           play = result.amount;
           sessionId = result.sessionId;
           setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
-          router.replace(getCanonicalPathForInternalGameId("sicbo"), undefined, { shallow: true });
+          router.replace(getCanonicalPathForAppId(ARCADE_APP_IDS.TRIPLE_DICE), undefined, { shallow: true });
         } else {
           alert(result.message || 'No free play tokens available!');
           setIsFreePlay(false);
@@ -437,7 +444,7 @@ export default function SicBoPage() {
         setRolling(false);
         return;
       }
-      const startResult = await startPaidArcadeSession("sicbo", play);
+      const startResult = await startPaidArcadeSession(ARCADE_APP_IDS.TRIPLE_DICE, play);
       if (!startResult.success) {
         alert(startResult.message || 'Failed to start session');
         setRolling(false);
@@ -1019,3 +1026,4 @@ export default function SicBoPage() {
     </Layout>
   );
 }
+

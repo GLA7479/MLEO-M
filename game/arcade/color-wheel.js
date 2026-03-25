@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import Layout from "../components/Layout";
+import Layout from "../../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import {
   useAccount,
@@ -16,22 +16,29 @@ import {
   useChainId,
 } from "wagmi";
 import { parseUnits } from "viem";
-import { getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../../lib/free-play-system";
 import {
   finishArcadeSession,
   startFreeplayArcadeSession,
   startPaidArcadeSession,
-} from "../lib/arcadeSessionClient";
+} from "../../lib/arcadeSessionClient";
 import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
   readSharedVault,
   subscribeSharedVault,
-} from "../lib/sharedVault";
-import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
+} from "../../lib/sharedVault";
+import {
+  ARCADE_APP_IDS,
+  ARCADE_LS,
+  ARCADE_VAULT_DEBIT,
+  getArcadeAppIdFromPathname,
+  getCanonicalPathForAppId,
+  readArcadeLocalStats,
+} from "../../lib/arcadeGameIds";
 
-// ===== viewport fix (מוסיף גם --satb ל-safe-area) =====
+// ===== viewport fix (visual viewport + --satb / safe-area) =====
 function useIOSViewportFix() {
   useEffect(() => {
     const root = document.documentElement;
@@ -62,7 +69,7 @@ function useIOSViewportFix() {
   }, []);
 }
 
-const LS_KEY = "mleo_roulette_v2";
+const LS_KEYS = ARCADE_LS.colorWheel;
 const MIN_PLAY = 100;
 const ROULETTE_NUMBERS = [
   { number: 0, color: "green" }, { number: 1, color: "red" }, { number: 2, color: "black" },
@@ -146,7 +153,7 @@ export default function ColorWheelPage() {
   useIOSViewportFix();
   const router = useRouter();
 
-  // --- Layout refs for auto-scale (ללא גלילה) ---
+  // --- Layout refs for auto-scale ---
   const wrapRef = useRef(null);
   const headerRef = useRef(null);
   const metersRef = useRef(null);
@@ -188,7 +195,7 @@ export default function ColorWheelPage() {
   const winSound = useRef(null);
 
   const [stats, setStats] = useState(() =>
-    safeRead(LS_KEY, {
+    readArcadeLocalStats(LS_KEYS.legacy, LS_KEYS.clean, {
       totalGames: 0,
       wins: 0,
       losses: 0,
@@ -207,7 +214,7 @@ export default function ColorWheelPage() {
     } catch {}
   };
 
-  // --- Mount/setup (כמו במקור) ---
+  // --- Mount/setup ---
   useEffect(() => {
     let cancelled = false;
     setMounted(true);
@@ -221,7 +228,6 @@ export default function ColorWheelPage() {
       });
     const isFree = router.query.freePlay === "true";
     setIsFreePlay(isFree);
-    const gameId = getInternalGameIdFromPathname(router.pathname) || "roulette";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -254,7 +260,7 @@ export default function ColorWheelPage() {
   }, [router.query]);
 
   useEffect(() => {
-    safeWrite(LS_KEY, stats);
+    safeWrite(LS_KEYS.clean, stats);
   }, [stats]);
 
   useEffect(() => {
@@ -363,7 +369,7 @@ export default function ColorWheelPage() {
         account: address,
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      const debitResult = await debitSharedVault(wholeCollectAmount, "roulette-claim");
+      const debitResult = await debitSharedVault(wholeCollectAmount, ARCADE_VAULT_DEBIT.COLOR_WHEEL_CLAIM);
       if (!debitResult.ok) {
         alert(debitResult.error || "Vault update failed");
         return;
@@ -408,15 +414,15 @@ export default function ColorWheelPage() {
     let play = Number(playAmount) || MIN_PLAY;
     let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
-      const gameId = getInternalGameIdFromPathname(router.pathname) || "roulette";
+      const appGameId = getArcadeAppIdFromPathname(router.pathname) || ARCADE_APP_IDS.COLOR_WHEEL;
       try {
-        const result = await startFreeplayArcadeSession(gameId);
+        const result = await startFreeplayArcadeSession(appGameId);
         if (result.success) {
           play = result.amount;
           sessionId = result.sessionId;
           setFreePlayTokens(result.remainingTokens);
           setIsFreePlay(false);
-          router.replace(getCanonicalPathForInternalGameId("roulette"), undefined, { shallow: true });
+          router.replace(getCanonicalPathForAppId(ARCADE_APP_IDS.COLOR_WHEEL), undefined, { shallow: true });
         } else {
           alert(result.message || "No free play tokens available!");
           setIsFreePlay(false);
@@ -436,7 +442,7 @@ export default function ColorWheelPage() {
         setSpinning(false);
         return;
       }
-      const startResult = await startPaidArcadeSession("roulette", play);
+      const startResult = await startPaidArcadeSession(ARCADE_APP_IDS.COLOR_WHEEL, play);
       if (!startResult.success) {
         alert(startResult.message || 'Failed to start session');
         setSpinning(false);
@@ -601,7 +607,7 @@ export default function ColorWheelPage() {
 </div>
 
 
-        {/* MAIN BODY (ללא גלילה; הגלגל מתכווץ אוטומטית) */}
+        {/* MAIN BODY (layout auto-scale) */}
         <div
           className="relative h-full flex flex-col items-center justify-start px-4 pb-4"
           style={{ minHeight: "100%", paddingTop: "calc(var(--head-h, 56px) + 8px)" }}
@@ -1082,3 +1088,4 @@ export default function ColorWheelPage() {
     </Layout>
   );
 }
+

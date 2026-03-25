@@ -5,24 +5,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import Layout from "../components/Layout";
+import Layout from "../../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../../lib/free-play-system";
 import {
   finishArcadeSession,
   startFreeplayArcadeSession,
   startPaidArcadeSession,
-} from "../lib/arcadeSessionClient";
+} from "../../lib/arcadeSessionClient";
 import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
   readSharedVault,
   subscribeSharedVault,
-} from "../lib/sharedVault";
-import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
+} from "../../lib/sharedVault";
+import {
+  ARCADE_APP_IDS,
+  ARCADE_LS,
+  ARCADE_VAULT_DEBIT,
+  getArcadeAppIdFromPathname,
+  getCanonicalPathForAppId,
+  readArcadeLocalStats,
+} from "../../lib/arcadeGameIds";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -49,7 +56,7 @@ function useIOSViewportFix() {
   }, []);
 }
 
-const LS_KEY = "mleo_baccarat_v2";
+const LS_KEYS = ARCADE_LS.cardDuel;
 const MIN_PLAY = 100;
 const CLAIM_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CLAIM_CHAIN_ID || 97);
 const CLAIM_ADDRESS = (process.env.NEXT_PUBLIC_MLEO_CLAIM_ADDRESS || "").trim();
@@ -115,7 +122,18 @@ export default function CardDuelPage() {
   const clickSound = useRef(null);
   const winSound = useRef(null);
 
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, ties: 0, lastPlay: MIN_PLAY }));
+  const [stats, setStats] = useState(() =>
+    readArcadeLocalStats(LS_KEYS.legacy, LS_KEYS.clean, {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+      ties: 0,
+      lastPlay: MIN_PLAY,
+    })
+  );
 
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
@@ -132,7 +150,6 @@ export default function CardDuelPage() {
       });
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const gameId = getInternalGameIdFromPathname(router.pathname) || "baccarat";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -155,7 +172,9 @@ export default function CardDuelPage() {
     return () => { cancelled = true; unsubscribeVault(); clearInterval(interval); document.removeEventListener("fullscreenchange", handleFullscreenChange); };
   }, [router.query]);
 
-  useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
+  useEffect(() => {
+    safeWrite(LS_KEYS.clean, stats);
+  }, [stats]);
   useEffect(() => { if (!wrapRef.current) return; const calc = () => { const rootH = window.visualViewport?.height ?? window.innerHeight; const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px", "")) || 0; const headH = headerRef.current?.offsetHeight || 0; document.documentElement.style.setProperty("--head-h", headH + "px"); const topPad = headH + 8; const used = headH + (metersRef.current?.offsetHeight || 0) + (betRef.current?.offsetHeight || 0) + (ctaRef.current?.offsetHeight || 0) + topPad + 48 + safeBottom + 24; const freeH = Math.max(200, rootH - used); document.documentElement.style.setProperty("--chart-h", freeH + "px"); }; calc(); window.addEventListener("resize", calc); window.visualViewport?.addEventListener("resize", calc); return () => { window.removeEventListener("resize", calc); window.visualViewport?.removeEventListener("resize", calc); }; }, [mounted]);
   useEffect(() => { if (gameResult) { setShowResultPopup(true); const timer = setTimeout(() => setShowResultPopup(false), 4000); return () => clearTimeout(timer); } }, [gameResult]);
 
@@ -173,7 +192,7 @@ export default function CardDuelPage() {
       const amountUnits = parseUnits(String(wholeCollectAmount), MLEO_DECIMALS);
       const hash = await writeContractAsync({ address: CLAIM_ADDRESS, abi: MINING_CLAIM_ABI, functionName: "claim", args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address });
       await publicClient.waitForTransactionReceipt({ hash });
-      const debitResult = await debitSharedVault(wholeCollectAmount, "baccarat-claim");
+      const debitResult = await debitSharedVault(wholeCollectAmount, ARCADE_VAULT_DEBIT.CARD_DUEL_CLAIM);
       if (!debitResult.ok) { alert(debitResult.error || "Vault update failed"); return; }
       setVaultState(debitResult.balance);
       setCollectAmount(wholeCollectAmount);
@@ -214,10 +233,16 @@ export default function CardDuelPage() {
     let play = Number(playAmount) || MIN_PLAY;
     let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
-      const gameId = getInternalGameIdFromPathname(router.pathname) || "baccarat";
+      const appGameId = getArcadeAppIdFromPathname(router.pathname) || ARCADE_APP_IDS.CARD_DUEL;
       try {
-        const result = await startFreeplayArcadeSession(gameId);
-        if (result.success) { play = result.amount; sessionId = result.sessionId; setFreePlayTokens(result.remainingTokens); setIsFreePlay(false); router.replace(getCanonicalPathForInternalGameId("baccarat"), undefined, { shallow: true }); }
+        const result = await startFreeplayArcadeSession(appGameId);
+        if (result.success) {
+          play = result.amount;
+          sessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
+          setIsFreePlay(false);
+          router.replace(getCanonicalPathForAppId(ARCADE_APP_IDS.CARD_DUEL), undefined, { shallow: true });
+        }
         else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); setDealing(false); return; }
       } catch (error) {
         console.error('Free play error:', error);
@@ -232,7 +257,7 @@ export default function CardDuelPage() {
         setDealing(false);
         return; 
       }
-      const startResult = await startPaidArcadeSession("baccarat", play);
+      const startResult = await startPaidArcadeSession(ARCADE_APP_IDS.CARD_DUEL, play);
       if (!startResult.success) { 
         alert(startResult.message || 'Failed to start session'); 
         setDealing(false);
@@ -515,3 +540,4 @@ export default function CardDuelPage() {
     </Layout>
   );
 }
+

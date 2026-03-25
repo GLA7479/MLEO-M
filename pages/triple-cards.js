@@ -1,5 +1,3 @@
-import ThreeCardPokerPage from "../game/mleo-three-card-poker";
+import TripleCardsPage from "../game/arcade/triple-cards";
 
-export default function TripleCardsPage() {
-  return <ThreeCardPokerPage />;
-}
+export default TripleCardsPage;

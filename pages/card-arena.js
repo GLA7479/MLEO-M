@@ -1,5 +1,3 @@
-import PokerPage from "../game/mleo-poker";
+import CardArenaPage from "../game/arcade/card-arena";
 
-export default function CardArenaPage() {
-  return <PokerPage />;
-}
+export default CardArenaPage;

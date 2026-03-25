@@ -5,23 +5,29 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import Layout from "../components/Layout";
+import Layout from "../../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect } from "wagmi";
-import { getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../../lib/free-play-system";
 import {
   finishArcadeSession,
   startFreeplayArcadeSession,
   startPaidArcadeSession,
-} from "../lib/arcadeSessionClient";
-import { createDeterministicCardDeck } from "../lib/arcadeDeterministicCards";
+} from "../../lib/arcadeSessionClient";
+import { createDeterministicCardDeck } from "../../lib/arcadeDeterministicCards";
 import {
   initSharedVault,
   peekSharedVault,
   readSharedVault,
   subscribeSharedVault,
-} from "../lib/sharedVault";
-import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
+} from "../../lib/sharedVault";
+import {
+  ARCADE_APP_IDS,
+  ARCADE_LS,
+  getArcadeAppIdFromPathname,
+  getCanonicalPathForAppId,
+  readArcadeLocalStats,
+} from "../../lib/arcadeGameIds";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -48,7 +54,7 @@ function useIOSViewportFix() {
   }, []);
 }
 
-const LS_KEY = "mleo_ultimate_poker_v1";
+const LS_KEYS = ARCADE_LS.ultimateCards;
 const MIN_PLAY = 100;
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -217,7 +223,7 @@ function PlayingCard({ card, delay = 0, hidden = false }) {
   );
 }
 
-export default function UltimatePokerPage() {
+export default function UltimateCardsPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -272,10 +278,22 @@ export default function UltimatePokerPage() {
   const winSound = useRef(null);
   
   // Stats
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { 
-    totalHands: 0, wins: 0, losses: 0, ties: 0, totalPlay: 0, totalWon: 0, 
-    biggestWin: 0, royalFlushes: 0, raise4x: 0, raise2x: 0, raise1x: 0, folds: 0
-  }));
+  const [stats, setStats] = useState(() =>
+    readArcadeLocalStats(LS_KEYS.legacy, LS_KEYS.clean, {
+      totalHands: 0,
+      wins: 0,
+      losses: 0,
+      ties: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+      royalFlushes: 0,
+      raise4x: 0,
+      raise2x: 0,
+      raise1x: 0,
+      folds: 0,
+    })
+  );
 
   const playSfx = (audio) => { if (!sfxMuted && audio) { audio.currentTime = 0; audio.play().catch(() => {}); } };
 
@@ -293,7 +311,6 @@ export default function UltimatePokerPage() {
 
     const isFree = router.query.freeplay === "true";
     setIsFreePlay(isFree);
-    const gameId = getInternalGameIdFromPathname(router.pathname) || "ultimate-poker";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -324,7 +341,9 @@ export default function UltimatePokerPage() {
     };
   }, [router.query]);
 
-  useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
+  useEffect(() => {
+    safeWrite(LS_KEYS.clean, stats);
+  }, [stats]);
   useEffect(() => { if (!wrapRef.current) return; const calc = () => { const rootH = window.visualViewport?.height ?? window.innerHeight; const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px", "")) || 0; const headH = headerRef.current?.offsetHeight || 0; document.documentElement.style.setProperty("--head-h", headH + "px"); const topPad = headH + 8; const used = headH + (metersRef.current?.offsetHeight || 0) + (betRef.current?.offsetHeight || 0) + (ctaRef.current?.offsetHeight || 0) + topPad + 48 + safeBottom + 24; const freeH = Math.max(200, rootH - used); document.documentElement.style.setProperty("--chart-h", freeH + "px"); }; calc(); window.addEventListener("resize", calc); window.visualViewport?.addEventListener("resize", calc); return () => { window.removeEventListener("resize", calc); window.visualViewport?.removeEventListener("resize", calc); }; }, [mounted]);
   useEffect(() => { if (gameResult) { setShowResultPopup(true); const timer = setTimeout(() => setShowResultPopup(false), 4000); return () => clearTimeout(timer); } }, [gameResult]);
 
@@ -478,7 +497,7 @@ export default function UltimatePokerPage() {
 
       doShowdown();
     } catch (error) {
-      console.error("Ultimate poker session error:", error);
+      console.error("Ultimate Cards session error:", error);
       setSessionError("Session failed to finish");
       clearActions();
     }
@@ -514,9 +533,9 @@ export default function UltimatePokerPage() {
     let nextSessionId = null;
     let reservedStake = 0;
     if (isFreePlay || isFreePlayParam) {
-      const gameId = getInternalGameIdFromPathname(router.pathname) || "ultimate-poker";
+      const appGameId = getArcadeAppIdFromPathname(router.pathname) || ARCADE_APP_IDS.ULTIMATE_CARDS;
       try {
-        const result = await startFreeplayArcadeSession(gameId);
+        const result = await startFreeplayArcadeSession(appGameId);
         if (!result.success) {
           setSessionError("Failed to start session");
           alert(result.message || 'No free play tokens available!');
@@ -529,7 +548,7 @@ export default function UltimatePokerPage() {
         nextSessionId = result.sessionId;
         setFreePlayTokens(result.remainingTokens);
         setIsFreePlay(false);
-        router.replace(getCanonicalPathForInternalGameId("ultimate-poker"), undefined, { shallow: true });
+        router.replace(getCanonicalPathForAppId(ARCADE_APP_IDS.ULTIMATE_CARDS), undefined, { shallow: true });
       } catch (error) {
         console.error('Free play error:', error);
         setSessionError("Failed to start session");
@@ -545,7 +564,7 @@ export default function UltimatePokerPage() {
         return; 
       }
       reservedStake = play * RESERVED_STAKE_MULTIPLIER;
-      const startResult = await startPaidArcadeSession("ultimate-poker", reservedStake);
+      const startResult = await startPaidArcadeSession(ARCADE_APP_IDS.ULTIMATE_CARDS, reservedStake);
       if (!startResult.success) {
         setSessionError("Failed to start session");
         alert(startResult.message || 'Failed to start session');
@@ -943,4 +962,5 @@ export default function UltimatePokerPage() {
     </Layout>
   );
 }
+
 

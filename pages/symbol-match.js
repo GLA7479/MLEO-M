@@ -1,2 +1,3 @@
-import SlotsUpgradedGame from "../game/mleo-slots-upgraded";
-export default SlotsUpgradedGame;
+import SymbolMatchPage from "../game/arcade/symbol-match";
+
+export default SymbolMatchPage;

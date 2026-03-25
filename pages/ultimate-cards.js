@@ -1,5 +1,3 @@
-import MLEOUltimatePokerPage from "../game/mleo-ultimate-poker";
+import UltimateCardsPage from "../game/arcade/ultimate-cards";
 
-export default function UltimateCardsPage() {
-  return <MLEOUltimatePokerPage />;
-}
+export default UltimateCardsPage;

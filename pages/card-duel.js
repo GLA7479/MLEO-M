@@ -1,1 +1,1 @@
-export { default } from "../game/mleo-baccarat";
+export { default } from "../game/arcade/card-duel";

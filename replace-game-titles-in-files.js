@@ -7,8 +7,8 @@ const path = require('path');
 // Game title replacements in game files
 const gameTitleReplacements = [
   // Ultimate Poker
-  { file: 'game/mleo-ultimate-poker.js', from: /Ultimate Texas Hold'em/g, to: 'Ultimate Cards' },
-  { file: 'game/mleo-ultimate-poker.js', from: /Strategic poker against the opponent!/g, to: 'A strategy-focused card mode with staged decisions and stronger reward tiers.' },
+  { file: 'game/arcade/ultimate-cards.js', from: /Ultimate Texas Hold'em/g, to: 'Ultimate Cards' },
+  { file: 'game/arcade/ultimate-cards.js', from: /Strategic poker against the opponent!/g, to: 'A strategy-focused card mode with staged decisions and stronger reward tiers.' },
   
   // Chamber
   { file: 'game/mleo-chamber.js', from: /Lucky Chamber/g, to: 'Mystery Chamber' },
@@ -31,23 +31,23 @@ const gameTitleReplacements = [
   { file: 'game/mleo-crash-v2.js', from: /MLEO Crash/g, to: 'MLEO Sky Run' },
   
   // Blackjack
-  { file: 'game/mleo-blackjack.js', from: /MLEO Blackjack/g, to: 'MLEO 21 Challenge' },
+  { file: 'game/arcade/challenge-21.js', from: /MLEO Blackjack/g, to: 'MLEO 21 Challenge' },
   
   // Poker
-  { file: 'game/mleo-poker.js', from: /MLEO Poker/g, to: 'MLEO Card Arena' },
-  { file: 'game/mleo-poker.js', from: /Texas Hold'em/g, to: 'Card Arena' },
+  { file: 'game/arcade/card-arena.js', from: /MLEO Poker/g, to: 'MLEO Card Arena' },
+  { file: 'game/arcade/card-arena.js', from: /Texas Hold'em/g, to: 'Card Arena' },
   
   // Three Card Poker
-  { file: 'game/mleo-three-card-poker.js', from: /MLEO Three Card Poker/g, to: 'MLEO Triple Cards' },
-  { file: 'game/mleo-three-card-poker.js', from: /Three Card Poker/g, to: 'Triple Cards' },
+  { file: 'game/arcade/triple-cards.js', from: /MLEO Three Card Poker/g, to: 'MLEO Triple Cards' },
+  { file: 'game/arcade/triple-cards.js', from: /Three Card Poker/g, to: 'Triple Cards' },
   
   // Roulette
-  { file: 'game/mleo-roulette.js', from: /MLEO Roulette/g, to: 'MLEO Color Wheel' },
-  { file: 'game/mleo-roulette.js', from: /Roulette/g, to: 'Color Wheel' },
+  { file: 'game/arcade/color-wheel.js', from: /MLEO Roulette/g, to: 'MLEO Color Wheel' },
+  { file: 'game/arcade/color-wheel.js', from: /Roulette/g, to: 'Color Wheel' },
   
   // Slots
-  { file: 'game/mleo-slots-upgraded.js', from: /MLEO Slots Upgraded/g, to: 'MLEO Symbol Match' },
-  { file: 'game/mleo-slots-upgraded.js', from: /Slots Upgraded/g, to: 'Symbol Match' },
+  { file: 'game/arcade/symbol-match.js', from: /MLEO Slots Upgraded/g, to: 'MLEO Symbol Match' },
+  { file: 'game/arcade/symbol-match.js', from: /Slots Upgraded/g, to: 'Symbol Match' },
   
   // Mega Wheel
   { file: 'game/mleo-mega-wheel.js', from: /MLEO Mega Wheel/g, to: 'MLEO Mega Spin Board' },
@@ -58,16 +58,16 @@ const gameTitleReplacements = [
   { file: 'game/mleo-keno.js', from: /Keno/g, to: 'Number Hunt' },
   
   // Craps
-  { file: 'game/mleo-craps.js', from: /MLEO Craps/g, to: 'MLEO Dice Arena' },
-  { file: 'game/mleo-craps.js', from: /Craps/g, to: 'Dice Arena' },
+  { file: 'game/arcade/dice-arena.js', from: /MLEO Craps/g, to: 'MLEO Dice Arena' },
+  { file: 'game/arcade/dice-arena.js', from: /Craps/g, to: 'Dice Arena' },
   
   // Baccarat
-  { file: 'game/mleo-baccarat.js', from: /MLEO Baccarat/g, to: 'MLEO Card Duel' },
-  { file: 'game/mleo-baccarat.js', from: /Baccarat/g, to: 'Card Duel' },
+  { file: 'game/arcade/card-duel.js', from: /MLEO Baccarat/g, to: 'MLEO Card Duel' },
+  { file: 'game/arcade/card-duel.js', from: /Baccarat/g, to: 'Card Duel' },
   
   // Sic Bo
-  { file: 'game/mleo-sicbo.js', from: /MLEO Sic Bo/g, to: 'MLEO Triple Dice' },
-  { file: 'game/mleo-sicbo.js', from: /Sic Bo/g, to: 'Triple Dice' },
+  { file: 'game/arcade/triple-dice.js', from: /MLEO Sic Bo/g, to: 'MLEO Triple Dice' },
+  { file: 'game/arcade/triple-dice.js', from: /Sic Bo/g, to: 'Triple Dice' },
   
   // Limbo
   { file: 'game/mleo-limbo.js', from: /MLEO Limbo/g, to: 'MLEO Limit Run' },

@@ -5,24 +5,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import Layout from "../components/Layout";
+import Layout from "../../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../../lib/free-play-system";
 import {
   finishArcadeSession,
   startFreeplayArcadeSession,
   startPaidArcadeSession,
-} from "../lib/arcadeSessionClient";
+} from "../../lib/arcadeSessionClient";
 import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
   readSharedVault,
   subscribeSharedVault,
-} from "../lib/sharedVault";
-import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
+} from "../../lib/sharedVault";
+import {
+  ARCADE_APP_IDS,
+  ARCADE_LS,
+  ARCADE_VAULT_DEBIT,
+  getArcadeAppIdFromPathname,
+  getCanonicalPathForAppId,
+  readArcadeLocalStats,
+} from "../../lib/arcadeGameIds";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -49,7 +56,7 @@ function useIOSViewportFix() {
   }, []);
 }
 
-const LS_KEY = "mleo_three_card_poker_v2";
+const LS_KEYS = ARCADE_LS.tripleCards;
 const MIN_PLAY = 100;
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -144,7 +151,7 @@ function PlayingCard({ card, delay = 0 }) {
   );
 }
 
-export default function ThreeCardPokerPage() {
+export default function TripleCardsPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -188,7 +195,18 @@ export default function ThreeCardPokerPage() {
   const clickSound = useRef(null);
   const winSound = useRef(null);
 
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalHands: 0, wins: 0, losses: 0, ties: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, lastPlay: MIN_PLAY }));
+  const [stats, setStats] = useState(() =>
+    readArcadeLocalStats(LS_KEYS.legacy, LS_KEYS.clean, {
+      totalHands: 0,
+      wins: 0,
+      losses: 0,
+      ties: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+      lastPlay: MIN_PLAY,
+    })
+  );
 
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
@@ -206,7 +224,6 @@ export default function ThreeCardPokerPage() {
 
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const gameId = getInternalGameIdFromPathname(router.pathname) || "three-card-poker";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -237,7 +254,9 @@ export default function ThreeCardPokerPage() {
     };
   }, [router.query]);
 
-  useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
+  useEffect(() => {
+    safeWrite(LS_KEYS.clean, stats);
+  }, [stats]);
   useEffect(() => { if (!wrapRef.current) return; const calc = () => { const rootH = window.visualViewport?.height ?? window.innerHeight; const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px", "")) || 0; const headH = headerRef.current?.offsetHeight || 0; document.documentElement.style.setProperty("--head-h", headH + "px"); const topPad = headH + 8; const used = headH + (metersRef.current?.offsetHeight || 0) + (betRef.current?.offsetHeight || 0) + (ctaRef.current?.offsetHeight || 0) + topPad + 48 + safeBottom + 24; const freeH = Math.max(200, rootH - used); document.documentElement.style.setProperty("--chart-h", freeH + "px"); }; calc(); window.addEventListener("resize", calc); window.visualViewport?.addEventListener("resize", calc); return () => { window.removeEventListener("resize", calc); window.visualViewport?.removeEventListener("resize", calc); }; }, [mounted]);
   useEffect(() => { if (gameResult) { setShowResultPopup(true); const timer = setTimeout(() => setShowResultPopup(false), 4000); return () => clearTimeout(timer); } }, [gameResult]);
 
@@ -255,7 +274,7 @@ export default function ThreeCardPokerPage() {
       const amountUnits = parseUnits(String(wholeAmount), MLEO_DECIMALS);
       const hash = await writeContractAsync({ address: CLAIM_ADDRESS, abi: MINING_CLAIM_ABI, functionName: "claim", args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address });
       await publicClient.waitForTransactionReceipt({ hash });
-      const debitResult = await debitSharedVault(wholeAmount, "three-card-poker");
+      const debitResult = await debitSharedVault(wholeAmount, ARCADE_VAULT_DEBIT.TRIPLE_CARDS);
       setVaultState(debitResult.balance);
       alert(`✅ Sent ${fmt(wholeAmount)} MLEO to wallet!`);
       setShowVaultModal(false);
@@ -292,8 +311,8 @@ export default function ThreeCardPokerPage() {
     try {
       let finishResult = null;
       if (isFreePlay || isFreePlayParam) {
-        const gameId = getInternalGameIdFromPathname(router.pathname) || "three-card-poker";
-        const startResult = await startFreeplayArcadeSession(gameId);
+        const appGameId = getArcadeAppIdFromPathname(router.pathname) || ARCADE_APP_IDS.TRIPLE_CARDS;
+        const startResult = await startFreeplayArcadeSession(appGameId);
         if (!startResult.success) {
           setSessionError("Failed to start session");
           alert(startResult.message || 'No free play tokens available!');
@@ -304,7 +323,7 @@ export default function ThreeCardPokerPage() {
         play = startResult.amount;
         setFreePlayTokens(startResult.remainingTokens);
         setIsFreePlay(false);
-        router.replace(getCanonicalPathForInternalGameId("three-card-poker"), undefined, { shallow: true });
+        router.replace(getCanonicalPathForAppId(ARCADE_APP_IDS.TRIPLE_CARDS), undefined, { shallow: true });
         finishResult = await finishArcadeSession(startResult.sessionId, {});
       } else {
         if (play < MIN_PLAY) { 
@@ -312,7 +331,7 @@ export default function ThreeCardPokerPage() {
           setGameState("playing");
           return; 
         }
-        const startResult = await startPaidArcadeSession("three-card-poker", play);
+        const startResult = await startPaidArcadeSession(ARCADE_APP_IDS.TRIPLE_CARDS, play);
         if (!startResult.success) {
           setSessionError("Failed to start session");
           alert(startResult.message || 'Failed to start session');
@@ -618,3 +637,4 @@ export default function ThreeCardPokerPage() {
     </Layout>
   );
 }
+

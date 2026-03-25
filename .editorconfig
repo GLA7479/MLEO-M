@@ -1,0 +1,15 @@
+# https://editorconfig.org — keep source as UTF-8 to avoid mojibake in JS/JSON/CSS/MD.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{js,mjs,cjs,jsx,ts,tsx,json,css,scss,md,mdx,yml,yaml}]
+charset = utf-8
+end_of_line = lf
+
+[*.md]
+trim_trailing_whitespace = false

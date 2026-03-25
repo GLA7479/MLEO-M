@@ -5,24 +5,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import Layout from "../components/Layout";
+import Layout from "../../components/Layout";
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
-import { getFreePlayStatus } from "../lib/free-play-system";
+import { getFreePlayStatus } from "../../lib/free-play-system";
 import {
   finishArcadeSession,
   startFreeplayArcadeSession,
   startPaidArcadeSession,
-} from "../lib/arcadeSessionClient";
+} from "../../lib/arcadeSessionClient";
 import {
   debitSharedVault,
   initSharedVault,
   peekSharedVault,
   readSharedVault,
   subscribeSharedVault,
-} from "../lib/sharedVault";
-import { getInternalGameIdFromPathname, getCanonicalPathForInternalGameId } from "../lib/publicGameRoutes";
+} from "../../lib/sharedVault";
+import {
+  ARCADE_APP_IDS,
+  ARCADE_LS,
+  ARCADE_VAULT_DEBIT,
+  getArcadeAppIdFromPathname,
+  getCanonicalPathForAppId,
+  readArcadeLocalStats,
+} from "../../lib/arcadeGameIds";
 
 function useIOSViewportFix() {
   useEffect(() => {
@@ -49,7 +56,7 @@ function useIOSViewportFix() {
   }, []);
 }
 
-const LS_KEY = "mleo_slots_v2";
+const LS_KEYS = ARCADE_LS.symbolMatch;
 const MIN_PLAY = 100;
 const SYMBOLS = ['💎', '⭐', '🍒', '🍋', '🍊', '🍉', '✨', '7️⃣', '🔔'];
 const PRIZES = { '💎': { 5: 492.5, 4: 98.5, 3: 19.7 }, '7️⃣': { 5: 197, 4: 49.25, 3: 14.775 }, '⭐': { 5: 98.5, 4: 29.55, 3: 9.85 }, '🔔': { 5: 78.8, 4: 19.7, 3: 7.88 }, '✨': { 5: 59.1, 4: 14.775, 3: 5.91 }, '🎰': { 5: 59.1, 4: 14.775, 3: 5.91 }, '🍒': { 5: 39.4, 4: 9.85, 3: 4.925 }, '🍉': { 5: 29.55, 4: 7.88, 3: 3.94 }, '🍊': { 5: 19.7, 4: 5.91, 3: 2.955 }, '🍋': { 5: 14.775, 4: 4.925, 3: 1.97 } };
@@ -82,7 +89,7 @@ function checkWin(reels) {
   return null;
 }
 
-export default function SlotsPage() {
+export default function SymbolMatchPage() {
   useIOSViewportFix();
   const router = useRouter();
   const wrapRef = useRef(null);
@@ -123,7 +130,17 @@ export default function SlotsPage() {
   const clickSound = useRef(null);
   const winSound = useRef(null);
 
-  const [stats, setStats] = useState(() => safeRead(LS_KEY, { totalSpins: 0, wins: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, grandPrizes: 0, lastPlay: MIN_PLAY }));
+  const [stats, setStats] = useState(() =>
+    readArcadeLocalStats(LS_KEYS.legacy, LS_KEYS.clean, {
+      totalSpins: 0,
+      wins: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+      grandPrizes: 0,
+      lastPlay: MIN_PLAY,
+    })
+  );
 
   const playSfx = (sound) => { if (sfxMuted || !sound) return; try { sound.currentTime = 0; sound.play().catch(() => {}); } catch {} };
 
@@ -140,7 +157,6 @@ export default function SlotsPage() {
       });
     const isFree = router.query.freePlay === 'true';
     setIsFreePlay(isFree);
-    const gameId = getInternalGameIdFromPathname(router.pathname) || "slots-upgraded";
     getFreePlayStatus().then(status => {
       if (!cancelled) setFreePlayTokens(status.tokens);
     }).catch(err => console.error('Failed to get free play status:', err));
@@ -168,7 +184,9 @@ export default function SlotsPage() {
     };
   }, [router.query]);
 
-  useEffect(() => { safeWrite(LS_KEY, stats); }, [stats]);
+  useEffect(() => {
+    safeWrite(LS_KEYS.clean, stats);
+  }, [stats]);
   useEffect(() => { if (!wrapRef.current) return; const calc = () => { const rootH = window.visualViewport?.height ?? window.innerHeight; const safeBottom = Number(getComputedStyle(document.documentElement).getPropertyValue("--satb").replace("px", "")) || 0; const headH = headerRef.current?.offsetHeight || 0; document.documentElement.style.setProperty("--head-h", headH + "px"); const topPad = headH + 8; const used = headH + (metersRef.current?.offsetHeight || 0) + (betRef.current?.offsetHeight || 0) + (ctaRef.current?.offsetHeight || 0) + topPad + 48 + safeBottom + 24; const freeH = Math.max(200, rootH - used); document.documentElement.style.setProperty("--chart-h", freeH + "px"); }; calc(); window.addEventListener("resize", calc); window.visualViewport?.addEventListener("resize", calc); return () => { window.removeEventListener("resize", calc); window.visualViewport?.removeEventListener("resize", calc); }; }, [mounted]);
   useEffect(() => { if (gameResult) { setShowResultPopup(true); const timer = setTimeout(() => setShowResultPopup(false), 4000); return () => clearTimeout(timer); } }, [gameResult]);
 
@@ -186,7 +204,7 @@ export default function SlotsPage() {
       const amountUnits = parseUnits(String(wholeCollectAmount), MLEO_DECIMALS);
       const hash = await writeContractAsync({ address: CLAIM_ADDRESS, abi: MINING_CLAIM_ABI, functionName: "claim", args: [BigInt(GAME_ID), amountUnits], chainId: CLAIM_CHAIN_ID, account: address });
       await publicClient.waitForTransactionReceipt({ hash });
-      const debitResult = await debitSharedVault(wholeCollectAmount, "slots-claim");
+      const debitResult = await debitSharedVault(wholeCollectAmount, ARCADE_VAULT_DEBIT.SYMBOL_MATCH_CLAIM);
       if (!debitResult.ok) {
         alert(debitResult.error || "Vault update failed");
         return;
@@ -227,10 +245,16 @@ export default function SlotsPage() {
     let play = Number(playAmount) || MIN_PLAY;
     let sessionId = null;
     if (isFreePlay || isFreePlayParam) {
-      const gameId = getInternalGameIdFromPathname(router.pathname) || "slots-upgraded";
+      const appGameId = getArcadeAppIdFromPathname(router.pathname) || ARCADE_APP_IDS.SYMBOL_MATCH;
       try {
-        const result = await startFreeplayArcadeSession(gameId);
-        if (result.success) { play = result.amount; sessionId = result.sessionId; setFreePlayTokens(result.remainingTokens); setIsFreePlay(false); router.replace(getCanonicalPathForInternalGameId("slots-upgraded"), undefined, { shallow: true }); }
+        const result = await startFreeplayArcadeSession(appGameId);
+        if (result.success) {
+          play = result.amount;
+          sessionId = result.sessionId;
+          setFreePlayTokens(result.remainingTokens);
+          setIsFreePlay(false);
+          router.replace(getCanonicalPathForAppId(ARCADE_APP_IDS.SYMBOL_MATCH), undefined, { shallow: true });
+        }
         else { alert(result.message || 'No free play tokens available!'); setIsFreePlay(false); setSpinning(false); return; }
       } catch (error) {
         console.error('Free play error:', error);
@@ -241,7 +265,7 @@ export default function SlotsPage() {
       }
     } else {
       if (play < MIN_PLAY) { alert(`Minimum play is ${MIN_PLAY} MLEO`); setSpinning(false); return; }
-      const startResult = await startPaidArcadeSession("slots-upgraded", play);
+      const startResult = await startPaidArcadeSession(ARCADE_APP_IDS.SYMBOL_MATCH, play);
       if (!startResult.success) {
         alert(startResult.message || 'Failed to start session');
         setSpinning(false);
@@ -450,3 +474,4 @@ export default function SlotsPage() {
     </Layout>
   );
 }
+
