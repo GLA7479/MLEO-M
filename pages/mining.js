@@ -38,40 +38,14 @@ const TEXT = {
     logout: "LOG OUT",
     liveTestnet: "Live Testnet • Earn in-game MLEO",
     chooseGame: "Choose Your Game",
-    chooseGameDesc: "Two modes, one Vault. Play actively with upgrades (Miners) or let passive accrual run (Token Rush). You can switch anytime.",
     miners: "MLEO — Miners",
     minersDesc: "Idle & upgrades with tap gifts and boosts. Vault integration + on-chain CLAIM for steady, hands-on progress.",
     active: "Active",
     howToPlay: "HOW TO PLAY",
     terms: "TERMS",
     playMiners: "Play Miners",
-    acceptTermsToPlay: "🔒 Accept Terms to Play",
-    rush: "MLEO — Rush",
-    rushDesc: "Advanced mining with Prestige system! Mine MLEO passively, upgrade equipment, earn achievements, and reset for permanent bonuses.",
-    passive: "Passive",
-    playTokenRush: "Play Token Rush",
     howToPlayTitle: "How to Play",
     goal: "Goal",
-    rushGoal: "Rush Goal",
-    rushGoalDesc: "Mine MLEO tokens passively and build your empire! Use mined MLEO to upgrade equipment, earn achievements, and prestige for permanent bonuses. The more you play, the stronger you become.",
-    rushGameplay: "Gameplay",
-    rushGameplaySteps: [
-      "Mine MLEO passively - your equipment works automatically",
-      "Click BOOST to increase mining speed temporarily (+2% per click)",
-      "Collect mined MLEO to your Vault for upgrades and claims",
-      "Buy upgrades: Auto-Drill, Helmet, Cart, and Leo Bot for faster mining",
-      "Earn achievements by reaching milestones for bonus rewards",
-      "Prestige at 10M MLEO to reset progress for permanent bonuses"
-    ],
-    rushFeatures: "Key Features",
-    rushFeaturesList: [
-      "Prestige System: Reset upgrades for permanent +2% per prestige point",
-      "Achievements: 6 different achievements with Prestige Point rewards",
-      "Upgrades: 4 equipment types with multiple levels each",
-      "Boost System: Temporary speed increase that decays over time",
-      "Guild System: Join mining guilds for bonus multipliers",
-      "Bridge: Transfer MLEO from Miners game to Rush vault"
-    ],
     goalDesc: "Merge dogs (miners), break rocks, and earn Coins. Coins are an in-game resource used for upgrades and buying more miners. Some activity in the game can also accrue MLEO (see \"Mining & Tokens\" below).",
     boardMerging: "Board & Merging",
     boardSteps: [
@@ -124,7 +98,7 @@ const TEXT = {
       "Some games use randomized events, while others focus on timing, reaction, memory, or decision-making",
       "Click the ℹ️ button on each game card to view the rules, controls, and reward structure"
     ],
-    chooseGameLobbyShort: "Four modes, one Vault. Pick where to play.",
+    chooseGameLobbyShort: "Four destinations, one shared vault: Miners, MLEO BASE, Arcade, and Arcade Online.",
     minersDescShort: "Idle & upgrades. Vault + on-chain claim.",
     poolStatus: "Pool",
     arcadeGames: "Arcade Games",
@@ -136,7 +110,40 @@ const TEXT = {
     arcadeDescShort: "Solo mini-games. Shared vault & session rewards.",
     arcadeOnlineDescShort: "Multiplayer & live modes. Same shared vault.",
     arcadeOnlineHowIntro: "Live and online arcade modes use the same shared vault and ecosystem rules as solo arcade. Session costs and rewards may differ per mode.",
-    legalShort: "Legal"
+    legalShort: "Legal",
+    howToPlayArcadeTitle: "How to Play — Arcade",
+    howToPlayArcadeOnlineTitle: "How to Play — Arcade Online",
+    howToPlayMinersTitle: "How to Play — Miners",
+    questHow: {
+      title: "How to Play — MLEO BASE",
+      goal: "Goal",
+      goalDesc: "MLEO BASE is the strategic command center of the MLEO ecosystem. Build and upgrade your base, manage energy and stability, produce key resources, launch expeditions, refine materials into banked MLEO, and carefully ship part of it to the shared vault.",
+      gameplay: "Your mission",
+      gameplaySteps: [
+        "Upgrade buildings",
+        "Manage energy and base stability",
+        "Produce Ore, Gold, Scrap, and Data",
+        "Use Data for advanced operations",
+        "Refine resources into banked MLEO",
+        "Launch expeditions for progression and materials",
+        "Ship MLEO to the shared vault with smart timing",
+        "Support the wider ecosystem through long-term planning",
+      ],
+      features: "Good to Know",
+      featuresList: [
+        "Banked MLEO stays inside BASE until you ship it to the shared vault.",
+        "Shipping is controlled by daily limits and efficiency pressure, so smart pacing matters.",
+        "This mode works together with Miners and Arcade to support long-term progression, smart utility, and healthier token balance.",
+        "Build smart, maintain stability, grow steadily, and strengthen your base.",
+      ],
+    },
+    baseTitle: "MLEO — BASE",
+    baseDesc: "A support-management base that links Miners, Arcade and the shared vault with missions, DATA, expeditions and structural upgrades.",
+    baseDescShort: "Support hub: missions, DATA & expeditions for the shared vault.",
+    baseBadgeLabel: "Support",
+    playBase: "Play MLEO BASE",
+    baseHub: "Four destinations, one shared vault: Miners, MLEO BASE, solo Arcade, and Arcade Online.",
+    baseHubShort: "Four destinations, one vault: Miners, BASE, Arcade, and Arcade Online.",
   },
   ar: {
     name: "العربية", dir: "rtl", code: "ar",
@@ -144,40 +151,14 @@ const TEXT = {
     logout: "تسجيل الخروج",
     liveTestnet: "شبكة اختبار حية • اربح MLEO في اللعبة",
     chooseGame: "اختر لعبتك",
-    chooseGameDesc: "وضعان، خزنة واحدة. العب بنشاط مع الترقيات (المنقبون) أو دع الاستحقاق السلبي يعمل (اندفاعة الرمز). يمكنك التبديل في أي وقت.",
     miners: "MLEO — المنقبون",
     minersDesc: "العبة الخاملة والترقيات مع هدايا النقر والزيادات. تكامل الخزنة + المطالبة على السلسلة للتقدم المستقر واليدوي.",
     active: "نشط",
     howToPlay: "كيف تلعب",
     terms: "الشروط",
     playMiners: "العب المنقبون",
-    acceptTermsToPlay: "🔒 اقبل الشروط للعب",
-    rush: "MLEO — الاندفاعة",
-    rushDesc: "التعدين المتقدم مع نظام Prestige! عدِّن MLEO سلبيًا، رقِّ المعدات، احصل على الإنجازات وأعد التعيين للحصول على مكافآت دائمة.",
-    passive: "سلبي",
-    playTokenRush: "العب اندفاعة الرمز",
     howToPlayTitle: "كيف تلعب",
     goal: "الهدف",
-    rushGoal: "هدف الاندفاعة",
-    rushGoalDesc: "عدِّن رموز MLEO سلبيًا وابن إمبراطوريتك! استخدم MLEO المُعدَّن لترقية المعدات، والحصول على الإنجازات، والـprestige للحصول على مكافآت دائمة. كلما لعبت أكثر، أصبحت أقوى.",
-    rushGameplay: "اللعب",
-    rushGameplaySteps: [
-      "عدِّن MLEO سلبيًا - معداتك تعمل تلقائيًا",
-      "انقر BOOST لزيادة سرعة التعدين مؤقتًا (+2% لكل نقرة)",
-      "اجمع MLEO المُعدَّن إلى خزنتك للترقيات والمطالبات",
-      "اشتر الترقيات: Auto-Drill، Helmet، Cart، وLeo Bot للتعدين الأسرع",
-      "احصل على الإنجازات بتحقيق المعالم للحصول على مكافآت إضافية",
-      "Prestige عند 10M MLEO لإعادة تعيين التقدم للحصول على مكافآت دائمة"
-    ],
-    rushFeatures: "الميزات الرئيسية",
-    rushFeaturesList: [
-      "نظام Prestige: إعادة تعيين الترقيات للحصول على +2% دائم لكل نقطة prestige",
-      "الإنجازات: 6 إنجازات مختلفة مع مكافآت نقاط Prestige",
-      "الترقيات: 4 أنواع معدات مع مستويات متعددة لكل منها",
-      "نظام Boost: زيادة سرعة مؤقتة تتحلل بمرور الوقت",
-      "نظام النقابة: انضم إلى نقابات التعدين للحصول على مضاعفات إضافية",
-      "الجسر: انقل MLEO من لعبة المنقبين إلى خزنة Rush"
-    ],
     goalDesc: "ادمج الكلاب (المنقبون)، اكسر الصخور، واربح العملات. العملات هي مورد في اللعبة يُستخدم للترقيات وشراء المزيد من المنقبين. بعض النشاط في اللعبة يمكن أن يحصل أيضًا على MLEO (انظر \"التعدين والرموز\" أدناه).",
     boardMerging: "اللوحة والدمج",
     boardSteps: [
@@ -230,67 +211,52 @@ const TEXT = {
       "بعض الألعاب تستخدم أحداث عشوائية، بينما تركز أخرى على التوقيت، رد الفعل، الذاكرة، أو اتخاذ القرار",
       "انقر على زر ℹ️ في كل بطاقة لعبة لعرض القواعد، التحكم، وهيكل المكافآت"
     ],
-    rushFeatures: "Ключевые особенности",
-    rushFeaturesList: [
-      "Система Prestige: Сброс улучшений для постоянных +2% за каждое очко prestige",
-      "Достижения: 6 разных достижений с наградами очков Prestige",
-      "Улучшения: 4 типа оборудования с множественными уровнями каждый",
-      "Система Boost: Временное увеличение скорости, которое уменьшается со временем",
-      "Система гильдий: Присоединяйтесь к гильдиям майнинга для бонусных множителей",
-      "Мост: Переводите MLEO из игры Майнеры в хранилище Раша"
-    ],
-    goalDesc: "Объединяйте собак (майнеров), разбивайте камни и зарабатывайте монеты. Монеты - это игровой ресурс, используемый для улучшений и покупки большего количества майнеров. Некоторые действия в игре также могут начислять MLEO (см. \"Майнинг и токены\" ниже).",
-    boardMerging: "Доска и объединение",
-    boardSteps: [
-      "Нажмите ADD на пустом слоте, чтобы разместить собаку. Стоимость растет со временем.",
-      "Перетащите двух собак одного уровня вместе, чтобы объединить их в более высокий уровень.",
-      "Каждая собака добавляет урон в секунду (DPS) к своей полосе. Когда камень разбивается, вы получаете монеты."
-    ],
-    upgradesBonuses: "Улучшения и бонусы",
-    upgradesList: [
-      "Улучшения DPS заставляют камни разбиваться быстрее.",
-      "Улучшения GOLD увеличивают монеты, которые вы получаете от каждого камня, на 10% за улучшение.",
-      "Подарки, автоматические собаки и другие бонусы могут появляться время от времени. Точные тайминги, типы дропов и значения баланса динамичны и могут изменяться без предварительного уведомления.",
-      "Алмазы можно собирать и тратить на специальные награды. Доступность и награды не гарантированы."
-    ],
-    miningTokens: "Майнинг и токены (MLEO)",
-    miningList: [
-      "Как начисляется MLEO: Только разбивание камней может генерировать MLEO. Часть монет, которые вы зарабатываете от разбивания камней, может конвертироваться в MLEO по переменному курсу, который зависит от игрового баланса, дневных лимитов и защиты от злоупотреблений.",
-      "Дневные лимиты и затухание: Чтобы поддерживать справедливость, дневное начисление может уменьшаться по мере приближения к вашему личному лимиту на день. Лимиты и расчеты внутренние и могут изменяться.",
-      "Прогресс в оффлайне: Ограниченный оффлайн прогресс симулируется с пониженной эффективностью по сравнению с активной игрой. Точные значения внутренние и могут изменяться.",
-      "ЗАБРАТЬ: Ваш начисленный MLEO появляется как баланс. Забирание перемещает его в ваше игровое хранилище. Если/когда станут доступны заборы в блокчейне, могут применяться дополнительные окна разблокировки и ограничения.",
-      "Обещание отсутствует: MLEO в этой игре - это утилитарный токен для развлечения. У него нет внутренней или гарантированной денежной стоимости. Ничто здесь не является предложением, призывом или обещанием будущей стоимости."
-    ],
-    goodToKnow: "Хорошо знать",
-    goodToKnowList: [
-      "Игровой баланс, показатели дропов, лимиты и расписания динамичны и могут быть изменены, приостановлены или сброшены в любое время для стабильности, справедливости или обслуживания.",
-      "Прогресс может быть скорректирован для устранения ошибок, эксплойтов или злоупотреблений.",
-      "Это версия тестовой сети. Данные могут быть стерты или сброшены во время разработки.",
-      "Подключите свой кошелек, чтобы забрать токены MLEO в блокчейне, когда они станут доступны."
-    ],
-    arcadeWhat: "Что такое MLEO Arcade?",
-    arcadeWhatDesc: "MLEO Arcade - это коллекция из 24 увлекательных мини-игр, где вы можете собирать внутриигровые награды MLEO! Каждая игра имеет уникальную механику и множители.",
-    arcadeHowToPlay: "Как играть",
-    arcadeSteps: [
-      "Выберите любую игру из аркады",
-      "Каждая сессия использует минимум 100 MLEO из вашего внутриигрового хранилища. Некоторые режимы могут использовать другую стоимость сессии",
-      "Следуйте инструкциям для конкретной игры",
-      "Завершайте раунды, достигайте вех и собирайте бонусы наград на основе ваших результатов",
-      "Награды сессии автоматически добавляются в ваше хранилище, включая награды, заработанные в бесплатных сессиях"
-    ],
-    arcadeFreePlay: "Токены бесплатной игры",
-    arcadeFreePlayList: [
-      "Получайте 1 токен бесплатной игры каждый час (до 5 хранимых)",
-      "Используйте токены для запуска одной аркадной сессии без использования MLEO из хранилища",
-      "Награды из бесплатных сессий добавляются в ваше хранилище так же, как и стандартные награды сессии"
-    ],
-    arcadeGoodToKnow: "Хорошо знать",
-    arcadeGoodToKnowList: [
-      "Ваше хранилище общее для всех игр MLEO",
-      "Каждая игра отслеживает вашу активность, завершенные сессии, лучший результат, серии и вехи прогресса",
-      "Некоторые игры используют случайные события, в то время как другие фокусируются на времени, реакции, памяти или принятии решений",
-      "Нажмите кнопку ℹ️ на каждой карточке игры, чтобы просмотреть правила, управление и структуру наград"
-    ],
+    chooseGameLobbyShort: "أربع وجهات، خزنة واحدة مشتركة: المنقبون، قاعدة MLEO، الأركيد، وأركيد أونلاين.",
+    minersDescShort: "خامل وترقيات. خزنة + مطالبة على السلسلة.",
+    poolStatus: "المجمع",
+    arcadeGames: "ألعاب الأركيد",
+    arcadeOnline: "أركيد أونلاين",
+    arcadeRegularTitle: "MLEO — الأركيد",
+    arcadeOnlineTitle: "MLEO — أركيد أونلاين",
+    arcadeBadgeLabel: "أركيد",
+    onlineBadgeLabel: "أونلاين",
+    arcadeDescShort: "ألعاب صغيرة فردية. خزنة وجوائز جلسات مشتركة.",
+    arcadeOnlineDescShort: "أنماط متعددة اللاعبين والمباشر. نفس الخزنة المشتركة.",
+    arcadeOnlineHowIntro: "تستخدم أوضاع الأركيد المباشرة والأونلاين نفس الخزنة المشتركة وقواعد النظام البيئي مثل الأركيد الفردي. قد تختلف تكاليف الجلسات والمكافآت حسب الوضع.",
+    legalShort: "قانوني",
+    howToPlayArcadeTitle: "كيف تلعب — الأركيد",
+    howToPlayArcadeOnlineTitle: "كيف تلعب — أركيد أونلاين",
+    howToPlayMinersTitle: "كيف تلعب — المنقبون",
+    questHow: {
+      title: "كيف تلعب — قاعدة MLEO",
+      goal: "هدف اللعبة",
+      goalDesc: "قاعدة MLEO هي مركز القيادة الاستراتيجي لنظام MLEO البيئي. ابنِ وطوّر قاعدتك، أدر الطاقة والاستقرار، انتج الموارد، انطلق في المهام، حوّل المواد إلى MLEO محفوظ، وأرسل جزءًا بحذر إلى الخزنة المشتركة.",
+      gameplay: "مهمتك",
+      gameplaySteps: [
+        "طوّر المباني",
+        "أدر الطاقة واستقرار القاعدة",
+        "انتج خامًا وذهبًا وخردة وبيانات",
+        "استخدم البيانات للعمليات المتقدمة",
+        "حوّل الموارد إلى MLEO محفوظ",
+        "انطلق في المهام للتقدم والمواد",
+        "أرسل MLEO إلى الخزنة المشتركة بتوقيت ذكي",
+        "ادعم النظام البيئي على المدى الطويل",
+      ],
+      features: "جيد أن تعرف",
+      featuresList: [
+        "يبقى MLEO المحفوظ داخل القاعدة حتى ترسله إلى الخزنة المشتركة.",
+        "الإرسال يخضع لحدود يومية وضغط كفاءة، لذا التوقيت مهم.",
+        "يعمل هذا الوضع مع المنقبين والأركيد لدعم التقدم طويل المدى.",
+        "ابنِ بحكمة، حافظ على الاستقرار، ونمِّ قاعدتك.",
+      ],
+    },
+    baseTitle: "MLEO — القاعدة",
+    baseDesc: "قاعدة دعم وإدارة تربط المنقبين والأركيد والخزنة المشتركة عبر المهام والبيانات والحملات والترقيات الهيكلية.",
+    baseDescShort: "مركز دعم: مهام وبيانات وحملات للخزنة المشتركة.",
+    baseBadgeLabel: "دعم",
+    playBase: "العب قاعدة MLEO",
+    baseHub: "أربع وجهات، خزنة واحدة مشتركة: المنقبون، قاعدة MLEO، الأركيد الفردي، وأركيد أونلاين.",
+    baseHubShort: "أربع وجهات، خزنة واحدة: المنقبون، القاعدة، الأركيد، وأركيد أونلاين.",
   },
   es: {
     name: "Español", dir: "ltr", code: "es",
@@ -298,40 +264,14 @@ const TEXT = {
     logout: "Cerrar sesión",
     liveTestnet: "Testnet en vivo • Gana MLEO en el juego",
     chooseGame: "Elige tu juego",
-    chooseGameDesc: "Dos modos, una bóveda. Juega activamente con mejoras (Miners) o deja que la acumulación pasiva funcione (Token Rush). Puedes cambiar en cualquier momento.",
     miners: "MLEO — Miners",
     minersDesc: "Juego idle y mejoras con regalos de toque y boosts. Integración con bóveda + CLAIM en cadena para progreso estable y manual.",
     active: "Activo",
     howToPlay: "CÓMO JUGAR",
     terms: "TÉRMINOS",
     playMiners: "Jugar Miners",
-    acceptTermsToPlay: "🔒 Aceptar términos para jugar",
-    rush: "MLEO — Rush",
-    rushDesc: "¡Minería avanzada con sistema Prestige! Mina MLEO pasivamente, mejora equipos, gana logros y reinicia para bonos permanentes.",
-    passive: "Pasivo",
-    playTokenRush: "Jugar Token Rush",
     howToPlayTitle: "Cómo jugar",
     goal: "Objetivo",
-    rushGoal: "Objetivo Rush",
-    rushGoalDesc: "¡Mina tokens MLEO pasivamente y construye tu imperio! Usa MLEO minado para mejorar equipos, ganar logros y prestige para bonos permanentes. Cuanto más juegues, más fuerte te vuelves.",
-    rushGameplay: "Jugabilidad",
-    rushGameplaySteps: [
-      "Mina MLEO pasivamente - tu equipo funciona automáticamente",
-      "Haz clic en BOOST para aumentar temporalmente la velocidad de minería (+2% por clic)",
-      "Recoge MLEO minado a tu bóveda para mejoras y reclamaciones",
-      "Compra mejoras: Auto-Drill, Helmet, Cart y Leo Bot para minería más rápida",
-      "Gana logros alcanzando hitos para recompensas bonus",
-      "Prestige en 10M MLEO para reiniciar progreso por bonos permanentes"
-    ],
-    rushFeatures: "Características clave",
-    rushFeaturesList: [
-      "Sistema Prestige: Reinicia mejoras por +2% permanente por punto de prestige",
-      "Logros: 6 logros diferentes con recompensas de puntos Prestige",
-      "Mejoras: 4 tipos de equipo con múltiples niveles cada uno",
-      "Sistema Boost: Aumento temporal de velocidad que decae con el tiempo",
-      "Sistema de gremios: Únete a gremios de minería para multiplicadores bonus",
-      "Puente: Transfiere MLEO del juego Miners a la bóveda Rush"
-    ],
     goalDesc: "Fusiona perros (mineros), rompe rocas y gana monedas. Las monedas son un recurso del juego usado para mejoras y comprar más mineros. Algunas actividades en el juego también pueden acumular MLEO (ver \"Minería y tokens\" abajo).",
     boardMerging: "Tablero y fusión",
     boardSteps: [
@@ -377,6 +317,53 @@ const TEXT = {
       "Usa tokens para iniciar una sesión de arcade sin usar MLEO de la bóveda",
       "Las recompensas de sesiones de juego gratis se agregan a tu bóveda igual que las recompensas de sesión estándar"
     ],
+
+    chooseGameLobbyShort: "Cuatro destinos, una bóveda compartida: mineros, MLEO Base, arcade y arcade en línea.",
+    minersDescShort: "Idle y mejoras. Bóveda + reclamación on-chain.",
+    poolStatus: "Pool",
+    arcadeGames: "Arcade",
+    arcadeOnline: "Arcade Online",
+    arcadeRegularTitle: "MLEO — Arcade",
+    arcadeOnlineTitle: "MLEO — Arcade Online",
+    arcadeBadgeLabel: "Arcade",
+    onlineBadgeLabel: "Online",
+    arcadeDescShort: "Minijuegos en solitario. Bóveda compartida y recompensas de sesión.",
+    arcadeOnlineDescShort: "Multijugador y modos en vivo. Misma bóveda compartida.",
+    arcadeOnlineHowIntro: "Los modos arcade en vivo y online usan la misma bóveda compartida y reglas del ecosistema que el arcade en solitario. El coste de sesión y las recompensas pueden variar según el modo.",
+    legalShort: "Legal",
+    howToPlayArcadeTitle: "Cómo jugar — Arcade",
+    howToPlayArcadeOnlineTitle: "Cómo jugar — Arcade Online",
+    howToPlayMinersTitle: "Cómo jugar — Miners",
+    questHow: {
+      title: "Cómo jugar — MLEO Base",
+      goal: "Objetivo",
+      goalDesc: "MLEO Base es el centro de mando estratégico del ecosistema MLEO. Construye y mejora tu base, gestiona energía y estabilidad, produce recursos clave, lanza expediciones, refina materiales en MLEO bancarizado y envía parte con cuidado a la bóveda compartida.",
+      gameplay: "Tu misión",
+      gameplaySteps: [
+        "Mejora edificios",
+        "Gestiona energía y estabilidad de la base",
+        "Produce mineral, oro, chatarra y datos",
+        "Usa datos para operaciones avanzadas",
+        "Refina recursos en MLEO bancarizado",
+        "Lanza expediciones para progreso y materiales",
+        "Envía MLEO a la bóveda compartida con buen timing",
+        "Apoya el ecosistema a largo plazo",
+      ],
+      features: "Bueno saber",
+      featuresList: [
+        "El MLEO bancarizado permanece en la Base hasta que lo envíes a la bóveda compartida.",
+        "El envío está sujeto a límites diarios y presión de eficiencia; el ritmo importa.",
+        "Este modo funciona con Miners y Arcade para progresión y utilidad a largo plazo.",
+        "Construye con cabeza, mantén la estabilidad y fortalece tu base.",
+      ],
+    },
+    baseTitle: "MLEO — Base",
+    baseDesc: "Base de apoyo y gestión que conecta el modo mineros, el arcade y la bóveda compartida con misiones, datos, expediciones y mejoras estructurales.",
+    baseDescShort: "Centro de apoyo: misiones, datos y expediciones para la bóveda compartida.",
+    baseBadgeLabel: "Apoyo",
+    playBase: "Jugar MLEO Base",
+    baseHub: "Cuatro destinos, una bóveda compartida: mineros, MLEO Base, arcade en solitario y arcade en línea.",
+    baseHubShort: "Cuatro destinos, una bóveda: mineros, Base, arcade y arcade en línea.",
     arcadeGoodToKnow: "Bueno saber",
     arcadeGoodToKnowList: [
       "Tu bóveda se comparte entre todos los juegos MLEO",
@@ -391,40 +378,14 @@ const TEXT = {
     logout: "Se déconnecter",
     liveTestnet: "Testnet en direct • Gagnez MLEO dans le jeu",
     chooseGame: "Choisissez votre jeu",
-    chooseGameDesc: "Deux modes, un coffre-fort. Jouez activement avec des améliorations (Miners) ou laissez l'accumulation passive fonctionner (Token Rush). Vous pouvez changer à tout moment.",
     miners: "MLEO — Miners",
     minersDesc: "Jeu idle et améliorations avec cadeaux de clic et boosts. Intégration coffre-fort + CLAIM en chaîne pour progression stable et manuelle.",
     active: "Actif",
     howToPlay: "COMMENT JOUER",
     terms: "TERMES",
     playMiners: "Jouer Miners",
-    acceptTermsToPlay: "🔒 Accepter les termes pour jouer",
-    rush: "MLEO — Rush",
-    rushDesc: "Mining avancé avec système Prestige ! Minez MLEO passivement, améliorez l'équipement, gagnez des succès et réinitialisez pour des bonus permanents.",
-    passive: "Passif",
-    playTokenRush: "Jouer Token Rush",
     howToPlayTitle: "Comment jouer",
     goal: "Objectif",
-    rushGoal: "Objectif Rush",
-    rushGoalDesc: "Minez des tokens MLEO passivement et construisez votre empire ! Utilisez MLEO miné pour améliorer l'équipement, gagner des succès et prestige pour des bonus permanents. Plus vous jouez, plus vous devenez fort.",
-    rushGameplay: "Gameplay",
-    rushGameplaySteps: [
-      "Minez MLEO passivement - votre équipement fonctionne automatiquement",
-      "Cliquez BOOST pour augmenter temporairement la vitesse de mining (+2% par clic)",
-      "Collectez MLEO miné dans votre coffre-fort pour améliorations et réclamations",
-      "Achetez améliorations: Auto-Drill, Helmet, Cart et Leo Bot pour mining plus rapide",
-      "Gagnez succès en atteignant des jalons pour récompenses bonus",
-      "Prestige à 10M MLEO pour réinitialiser progression pour bonus permanents"
-    ],
-    rushFeatures: "Caractéristiques clés",
-    rushFeaturesList: [
-      "Système Prestige: Réinitialise améliorations pour +2% permanent par point de prestige",
-      "Succès: 6 succès différents avec récompenses de points Prestige",
-      "Améliorations: 4 types d'équipement avec multiples niveaux chacun",
-      "Système Boost: Augmentation temporaire de vitesse qui diminue avec le temps",
-      "Système de guilde: Rejoignez guildes de mining pour multiplicateurs bonus",
-      "Pont: Transférez MLEO du jeu Miners vers le coffre-fort Rush"
-    ],
     goalDesc: "Fusionnez chiens (mineurs), cassez rochers et gagnez pièces. Les pièces sont une ressource de jeu utilisée pour améliorations et acheter plus de mineurs. Certaines activités dans le jeu peuvent aussi accumuler MLEO (voir \"Mining et tokens\" ci-dessous).",
     boardMerging: "Plateau et fusion",
     boardSteps: [
@@ -470,6 +431,53 @@ const TEXT = {
       "Utilisez les tokens pour démarrer une session d'arcade sans utiliser MLEO du coffre",
       "Les récompenses des sessions de jeu gratuit sont ajoutées à votre coffre comme les récompenses de session standard"
     ],
+
+    chooseGameLobbyShort: "Quatre destinations, un coffre-fort partagé : mineurs, MLEO Base, arcade et arcade en ligne.",
+    minersDescShort: "Idle et améliorations. Coffre + réclamation on-chain.",
+    poolStatus: "Pool",
+    arcadeGames: "Arcade",
+    arcadeOnline: "Arcade Online",
+    arcadeRegularTitle: "MLEO — Arcade",
+    arcadeOnlineTitle: "MLEO — Arcade Online",
+    arcadeBadgeLabel: "Arcade",
+    onlineBadgeLabel: "En ligne",
+    arcadeDescShort: "Mini-jeux solo. Coffre partagé et récompenses de session.",
+    arcadeOnlineDescShort: "Multijoueur et modes live. Même coffre partagé.",
+    arcadeOnlineHowIntro: "Les modes arcade live et en ligne partagent le même coffre et les mêmes règles d’écosystème que l’arcade solo. Coûts de session et récompenses peuvent varier selon le mode.",
+    legalShort: "Infos légales",
+    howToPlayArcadeTitle: "Comment jouer — Arcade",
+    howToPlayArcadeOnlineTitle: "Comment jouer — Arcade Online",
+    howToPlayMinersTitle: "Comment jouer — Miners",
+    questHow: {
+      title: "Comment jouer — MLEO Base",
+      goal: "Objectif",
+      goalDesc: "MLEO Base est le centre de commandement stratégique de l’écosystème MLEO. Construisez et améliorez votre base, gérez l’énergie et la stabilité, produisez des ressources, lancez des expéditions, affinez des matériaux en MLEO bancarisé et expédiez-en une partie vers le coffre partagé.",
+      gameplay: "Votre mission",
+      gameplaySteps: [
+        "Améliorer les bâtiments",
+        "Gérer l’énergie et la stabilité de la base",
+        "Produire minerai, or, ferraille et données",
+        "Utiliser les données pour des opérations avancées",
+        "Raffiner les ressources en MLEO bancarisé",
+        "Lancer des expéditions pour la progression",
+        "Envoyer du MLEO au coffre partagé au bon moment",
+        "Soutenir l’écosystème sur le long terme",
+      ],
+      features: "Bon à savoir",
+      featuresList: [
+        "Le MLEO bancarisé reste dans la Base jusqu’à envoi vers le coffre partagé.",
+        "L’envoi est limité par des plafonds quotidiens et la pression d’efficacité.",
+        "Ce mode s’aligne avec Miners et Arcade pour une progression durable.",
+        "Construisez intelligemment et renforcez votre base.",
+      ],
+    },
+    baseTitle: "MLEO — Base",
+    baseDesc: "Base de soutien et de gestion reliant les mineurs, l’arcade et le coffre partagé avec missions, données, expéditions et améliorations structurelles.",
+    baseDescShort: "Centre de soutien : missions, données et expéditions pour le coffre partagé.",
+    baseBadgeLabel: "Soutien",
+    playBase: "Jouer à MLEO Base",
+    baseHub: "Quatre destinations, un coffre partagé : mineurs, MLEO Base, arcade solo et arcade en ligne.",
+    baseHubShort: "Quatre destinations, un coffre : mineurs, Base, arcade et arcade en ligne.",
     arcadeGoodToKnow: "Bon à savoir",
     arcadeGoodToKnowList: [
       "Votre coffre est partagé entre tous les jeux MLEO",
@@ -484,40 +492,14 @@ const TEXT = {
     logout: "Abmelden",
     liveTestnet: "Live Testnet • Verdiene MLEO im Spiel",
     chooseGame: "Wähle dein Spiel",
-    chooseGameDesc: "Zwei Modi, ein Vault. Spiele aktiv mit Upgrades (Miners) oder lass passives Sammeln laufen (Token Rush). Du kannst jederzeit wechseln.",
     miners: "MLEO — Miners",
     minersDesc: "Idle-Spiel und Upgrades mit Klick-Geschenken und Boosts. Vault-Integration + On-Chain CLAIM für stetigen, manuellen Fortschritt.",
     active: "Aktiv",
     howToPlay: "WIE MAN SPIELT",
     terms: "BEDINGUNGEN",
     playMiners: "Spiele Miners",
-    acceptTermsToPlay: "🔒 Bedingungen akzeptieren zum Spielen",
-    rush: "MLEO — Rush",
-    rushDesc: "Fortgeschrittenes Mining mit Prestige-System! Mine MLEO passiv, verbessere Ausrüstung, verdiene Erfolge und setze zurück für permanente Boni.",
-    passive: "Passiv",
-    playTokenRush: "Spiele Token Rush",
-    howToPlayTitle: "Wie man spielt",
+    howToPlayTitle: "Spielanleitung",
     goal: "Ziel",
-    rushGoal: "Rush-Ziel",
-    rushGoalDesc: "Mine MLEO-Token passiv und baue dein Imperium! Nutze gemintes MLEO für Ausrüstungsverbesserungen, Erfolge und Prestige für permanente Boni. Je mehr du spielst, desto stärker wirst du.",
-    rushGameplay: "Gameplay",
-    rushGameplaySteps: [
-      "Mine MLEO passiv - deine Ausrüstung arbeitet automatisch",
-      "Klicke BOOST um Mining-Geschwindigkeit temporär zu erhöhen (+2% pro Klick)",
-      "Sammle gemintes MLEO in deinen Vault für Upgrades und Claims",
-      "Kaufe Upgrades: Auto-Drill, Helmet, Cart und Leo Bot für schnelleres Mining",
-      "Verdiene Erfolge durch Erreichen von Meilensteinen für Bonus-Belohnungen",
-      "Prestige bei 10M MLEO um Fortschritt für permanente Boni zurückzusetzen"
-    ],
-    rushFeatures: "Hauptmerkmale",
-    rushFeaturesList: [
-      "Prestige-System: Setze Upgrades zurück für permanente +2% pro Prestige-Punkt",
-      "Erfolge: 6 verschiedene Erfolge mit Prestige-Punkt-Belohnungen",
-      "Upgrades: 4 Ausrüstungstypen mit mehreren Stufen jeweils",
-      "Boost-System: Temporäre Geschwindigkeitserhöhung die mit der Zeit abnimmt",
-      "Gilden-System: Tritt Mining-Gilden für Bonus-Multiplikatoren bei",
-      "Brücke: Übertrage MLEO vom Miners-Spiel zum Rush-Vault"
-    ],
     goalDesc: "Verbinde Hunde (Miner), zerschlage Steine und verdiene Münzen. Münzen sind eine In-Game-Ressource für Upgrades und Kauf mehrerer Miner. Manche Aktivitäten im Spiel können auch MLEO sammeln (siehe \"Mining & Tokens\" unten).",
     boardMerging: "Board & Verbinden",
     boardSteps: [
@@ -563,6 +545,53 @@ const TEXT = {
       "Verwenden Sie Token, um eine Arcade-Sitzung zu starten, ohne MLEO aus dem Tresor zu verwenden",
       "Belohnungen aus kostenlosen Spielsitzungen werden zu Ihrem Tresor hinzugefügt, genau wie Standard-Sitzungsbelohnungen"
     ],
+
+    chooseGameLobbyShort: "Vier Ziele, ein gemeinsamer Vault: Miner, MLEO-Basis, Solo-Arcade und Online-Arcade.",
+    minersDescShort: "Idle & Upgrades. Vault + On-Chain-Claim.",
+    poolStatus: "Pool",
+    arcadeGames: "Arcade",
+    arcadeOnline: "Arcade Online",
+    arcadeRegularTitle: "MLEO — Arcade",
+    arcadeOnlineTitle: "MLEO — Arcade Online",
+    arcadeBadgeLabel: "Arcade",
+    onlineBadgeLabel: "Online",
+    arcadeDescShort: "Solo-Minispiele. Geteilter Vault & Sitzungsbelohnungen.",
+    arcadeOnlineDescShort: "Multiplayer & Live-Modi. Derselbe geteilte Vault.",
+    arcadeOnlineHowIntro: "Live- und Online-Arcade-Modi nutzen denselben geteilten Vault und dieselben Ökosystemregeln wie Solo-Arcade. Sitzungskosten und Belohnungen können je nach Modus variieren.",
+    legalShort: "Rechtliches",
+    howToPlayArcadeTitle: "Spielanleitung — Arcade",
+    howToPlayArcadeOnlineTitle: "Spielanleitung — Arcade Online",
+    howToPlayMinersTitle: "Spielanleitung — Miners",
+    questHow: {
+      title: "Spielanleitung — MLEO-Basis",
+      goal: "Ziel",
+      goalDesc: "MLEO-Basis ist das strategische Kommandozentrum des MLEO-Ökosystems. Baue und verbessere deine Basis, verwalte Energie und Stabilität, produziere Ressourcen, starte Expeditionen, veredle Materialien zu gebanktem MLEO und versende einen Teil in den gemeinsamen Vault.",
+      gameplay: "Deine Mission",
+      gameplaySteps: [
+        "Gebäude upgraden",
+        "Energie und Basisstabilität managen",
+        "Erz, Gold, Schrott und Data produzieren",
+        "Data für fortgeschrittene Operationen nutzen",
+        "Ressourcen zu gebanktem MLEO veredeln",
+        "Expeditionen für Fortschritt starten",
+        "MLEO mit gutem Timing in den gemeinsamen Vault senden",
+        "Das Ökosystem langfristig unterstützen",
+      ],
+      features: "Gut zu wissen",
+      featuresList: [
+        "Gebanktes MLEO bleibt in der Basis, bis du es in den gemeinsamen Vault sendest.",
+        "Versand unterliegt Tageslimits und Effizienzdruck.",
+        "Dieser Modus ergänzt Miners und Arcade für langfristige Progression.",
+        "Klug bauen, Stabilität halten, Basis stärken.",
+      ],
+    },
+    baseTitle: "MLEO — Basis",
+    baseDesc: "Eine Unterstützungs- und Management-Basis, die Miner, Arcade und den gemeinsamen Vault mit Missionen, Daten, Expeditionen und strukturellen Verbesserungen verbindet.",
+    baseDescShort: "Unterstützungszentrale: Missionen, Daten und Expeditionen für den gemeinsamen Vault.",
+    baseBadgeLabel: "Unterstützung",
+    playBase: "MLEO-Basis spielen",
+    baseHub: "Vier Ziele, ein geteilter Vault: Miner, MLEO-Basis, Solo-Arcade und Online-Arcade.",
+    baseHubShort: "Vier Ziele, ein Vault: Miner, Basis, Solo-Arcade und Online-Arcade.",
     arcadeGoodToKnow: "Gut zu wissen",
     arcadeGoodToKnowList: [
       "Ihr Tresor wird von allen MLEO-Spielen geteilt",
@@ -577,40 +606,14 @@ const TEXT = {
     logout: "退出登录",
     liveTestnet: "实时测试网 • 在游戏中赚取MLEO",
     chooseGame: "选择你的游戏",
-    chooseGameDesc: "两种模式，一个金库。主动升级游戏（矿工）或让被动累积运行（代币冲刺）。你可以随时切换。",
     miners: "MLEO — 矿工",
     minersDesc: "休闲游戏和升级，有点击礼物和加速。金库集成 + 链上CLAIM实现稳定、手动进度。",
     active: "主动",
     howToPlay: "如何游戏",
     terms: "条款",
     playMiners: "玩矿工",
-    acceptTermsToPlay: "🔒 接受条款开始游戏",
-    rush: "MLEO — 冲刺",
-    rushDesc: "高级挖矿与声望系统！被动挖取MLEO，升级装备，获得成就，重置永久奖励。",
-    passive: "被动",
-    playTokenRush: "玩代币冲刺",
-    howToPlayTitle: "如何游戏",
+    howToPlayTitle: "游戏说明",
     goal: "目标",
-    rushGoal: "冲刺目标",
-    rushGoalDesc: "被动挖取MLEO代币并建立你的帝国！使用挖取的MLEO升级装备，获得成就和声望以获得永久奖励。你玩得越多，变得越强。",
-    rushGameplay: "游戏玩法",
-    rushGameplaySteps: [
-      "被动挖取MLEO - 你的装备自动工作",
-      "点击BOOST临时增加挖矿速度（+2%每次点击）",
-      "收集挖取的MLEO到你的金库进行升级和提取",
-      "购买升级：自动钻头、头盔、推车和Leo机器人进行更快挖矿",
-      "通过达到里程碑获得成就以获得奖励",
-      "在10M MLEO时声望以重置进度获得永久奖励"
-    ],
-    rushFeatures: "主要特点",
-    rushFeaturesList: [
-      "声望系统：重置升级获得永久+2%每声望点",
-      "成就：6个不同成就带声望点奖励",
-      "升级：4种装备类型每种多级",
-      "加速系统：临时速度增加随时间衰减",
-      "公会系统：加入挖矿公会获得奖励倍数",
-      "桥梁：从矿工游戏转移MLEO到冲刺金库"
-    ],
     goalDesc: "合并狗（矿工），砸石头，赚取硬币。硬币是游戏内资源用于升级和购买更多矿工。游戏中的一些活动也可能累积MLEO（见下面\"挖矿与代币\"）。",
     boardMerging: "棋盘与合并",
     boardSteps: [
@@ -656,6 +659,53 @@ const TEXT = {
       "使用代币启动一次街机会话，而无需使用金库MLEO",
       "免费游戏会话的奖励会添加到您的金库，就像标准会话奖励一样"
     ],
+
+    chooseGameLobbyShort: "四个目的地，一个共享金库：矿工、MLEO 基地、街机与在线街机。",
+    minersDescShort: "放置与升级。金库 + 链上领取。",
+    poolStatus: "池",
+    arcadeGames: "街机",
+    arcadeOnline: "在线街机",
+    arcadeRegularTitle: "MLEO — 街机",
+    arcadeOnlineTitle: "MLEO — 在线街机",
+    arcadeBadgeLabel: "街机",
+    onlineBadgeLabel: "在线",
+    arcadeDescShort: "单人小游戏。共享金库与对局奖励。",
+    arcadeOnlineDescShort: "多人与实时模式。同一共享金库。",
+    arcadeOnlineHowIntro: "在线与实时街机模式与单人街机使用相同的共享金库与生态规则。会话消耗与奖励因模式而异。",
+    legalShort: "法律信息",
+    howToPlayArcadeTitle: "玩法说明 — 街机",
+    howToPlayArcadeOnlineTitle: "玩法说明 — 在线街机",
+    howToPlayMinersTitle: "玩法说明 — 矿工",
+    questHow: {
+      title: "玩法说明 — MLEO 基地",
+      goal: "目标",
+      goalDesc: "MLEO 基地是 MLEO 生态的战略指挥中心。建造并升级基地，管理能源与稳定性，生产关键资源，发起远征，将材料精炼为已入账 MLEO，并适时向共享金库运送。",
+      gameplay: "你的任务",
+      gameplaySteps: [
+        "升级建筑",
+        "管理能源与基地稳定性",
+        "生产矿石、金币、废料与数据",
+        "将数据用于高级操作",
+        "将资源精炼为已入账 MLEO",
+        "发起远征获取进度与材料",
+        "把握时机向共享金库运送 MLEO",
+        "长期支持整个生态",
+      ],
+      features: "温馨提示",
+      featuresList: [
+        "已入账 MLEO 在运送到共享金库前保留在基地内。",
+        "运送受每日上限与效率压力约束。",
+        "该模式与 Miners、街机协同，支持长期成长。",
+        "稳健建造，保持增长，强化基地。",
+      ],
+    },
+    baseTitle: "MLEO — 基地",
+    baseDesc: "连接矿工、街机与共享金库的支持管理基地，包含任务、数据、远征与建筑升级。",
+    baseDescShort: "支援枢纽：面向共享金库的任务、数据与远征。",
+    baseBadgeLabel: "支援",
+    playBase: "玩 MLEO 基地",
+    baseHub: "四个目的地，一个共享金库：矿工、MLEO 基地、单人街机与在线街机。",
+    baseHubShort: "四个目的地，一个金库：矿工、基地、街机与在线街机。",
     arcadeGoodToKnow: "须知",
     arcadeGoodToKnowList: [
       "您的金库在所有MLEO游戏中共享",
@@ -670,40 +720,14 @@ const TEXT = {
     logout: "ログアウト",
     liveTestnet: "ライブテストネット • ゲーム内でMLEOを獲得",
     chooseGame: "ゲームを選択",
-    chooseGameDesc: "2つのモード、1つのVault。アップグレードでアクティブにプレイ（Miners）またはパッシブ蓄積を実行（Token Rush）。いつでも切り替え可能。",
     miners: "MLEO — マイナー",
     minersDesc: "アイドルゲームとアップグレード、クリックギフトとブースト。Vault統合 + オンチェーンCLAIMで安定した手動進行。",
     active: "アクティブ",
     howToPlay: "遊び方",
     terms: "利用規約",
     playMiners: "マイナーをプレイ",
-    acceptTermsToPlay: "🔒 プレイするには利用規約に同意",
-    rush: "MLEO — ラッシュ",
-    rushDesc: "プレステージシステム付き高度マイニング！MLEOをパッシブにマイニング、装備アップグレード、実績獲得、永続ボーナスでリセット。",
-    passive: "パッシブ",
-    playTokenRush: "トークンラッシュをプレイ",
     howToPlayTitle: "遊び方",
     goal: "目標",
-    rushGoal: "ラッシュ目標",
-    rushGoalDesc: "MLEOトークンをパッシブにマイニングして帝国を建設！マイニングしたMLEOで装備アップグレード、実績獲得、永続ボーナスのプレステージ。プレイするほど強くなる。",
-    rushGameplay: "ゲームプレイ",
-    rushGameplaySteps: [
-      "MLEOをパッシブにマイニング - 装備が自動動作",
-      "BOOSTをクリックしてマイニング速度を一時的に増加（+2%クリック毎）",
-      "マイニングしたMLEOをVaultに収集してアップグレードと請求",
-      "アップグレード購入：より速いマイニングのAuto-Drill、Helmet、Cart、Leo Bot",
-      "マイルストーン達成で実績獲得してボーナス報酬",
-      "10M MLEOでプレステージして永続ボーナスのため進歩リセット"
-    ],
-    rushFeatures: "主要機能",
-    rushFeaturesList: [
-      "プレステージシステム：永続+2%プレステージポイント毎でアップグレードリセット",
-      "実績：プレステージポイント報酬付き6つの異なる実績",
-      "アップグレード：各複数レベル付き4種類の装備",
-      "ブーストシステム：時間とともに減衰する一時速度増加",
-      "ギルドシステム：ボーナス乗数のマイニングギルド参加",
-      "ブリッジ：MinersゲームからRush VaultへMLEO転送"
-    ],
     goalDesc: "犬（マイナー）をマージ、岩を壊し、コインを獲得。コインはアップグレードとより多くのマイナー購入に使用されるゲーム内リソース。ゲーム内の一部活動もMLEOを蓄積可能（下記「マイニング＆トークン」参照）。",
     boardMerging: "ボード＆マージ",
     boardSteps: [
@@ -749,6 +773,53 @@ const TEXT = {
       "トークンを使用してボルトMLEOを使用せずにアーケードセッションを開始",
       "無料プレイセッションからの報酬は、標準セッション報酬と同様にボルトに追加されます"
     ],
+
+    chooseGameLobbyShort: "4つの行き先、1つの共有Vault：マイナー、MLEO基地、アーケード、アーケードオンライン。",
+    minersDescShort: "放置とアップグレード。Vault＋オンチェーンCLAIM。",
+    poolStatus: "プール",
+    arcadeGames: "アーケード",
+    arcadeOnline: "アーケードオンライン",
+    arcadeRegularTitle: "MLEO — アーケード",
+    arcadeOnlineTitle: "MLEO — アーケードオンライン",
+    arcadeBadgeLabel: "アーケード",
+    onlineBadgeLabel: "オンライン",
+    arcadeDescShort: "ソロミニゲーム。共有Vaultとセッション報酬。",
+    arcadeOnlineDescShort: "マルチとライブモード。同じ共有Vault。",
+    arcadeOnlineHowIntro: "ライブ／オンラインアーケードはソロアーケードと同じ共有Vaultとエコシステムルールを使用します。セッションコストと報酬はモードにより異なる場合があります。",
+    legalShort: "法的情報",
+    howToPlayArcadeTitle: "遊び方 — アーケード",
+    howToPlayArcadeOnlineTitle: "遊び方 — アーケードオンライン",
+    howToPlayMinersTitle: "遊び方 — マイナー",
+    questHow: {
+      title: "遊び方 — MLEO基地",
+      goal: "目標",
+      goalDesc: "MLEO基地はMLEOエコシステムの戦略司令センターです。基地を建設・アップグレードし、エネルギーと安定性を管理し、資源を生産し、遠征に出て、素材をバンク済みMLEOに精製し、共有Vaultへ慎重に送ります。",
+      gameplay: "ミッション",
+      gameplaySteps: [
+        "建物をアップグレード",
+        "エネルギーと基地安定性を管理",
+        "鉱石・金・スクラップ・データを生産",
+        "データで高度な操作を実行",
+        "資源をバンク済みMLEOに精製",
+        "遠征で進行と素材を獲得",
+        "タイミングよく共有VaultへMLEOを送る",
+        "長期的にエコシステムを支援",
+      ],
+      features: "ヒント",
+      featuresList: [
+        "バンク済みMLEOは共有Vaultへ送るまで基地内に留まります。",
+        "送付は日次上限と効率プレッシャーの対象です。",
+        "Minersとアーケードと連携し長期成長を支えます。",
+        "賢く建設し、安定を保ち、基地を強化しましょう。",
+      ],
+    },
+    baseTitle: "MLEO — 基地",
+    baseDesc: "マイナー、アーケード、共有Vaultをミッション・データ・遠征・施設アップグレードでつなぐサポート管理拠点。",
+    baseDescShort: "サポート拠点：共有Vault向けのミッション、データ、遠征。",
+    baseBadgeLabel: "サポート",
+    playBase: "MLEO基地で遊ぶ",
+    baseHub: "4つの行き先、1つの共有Vault：マイナー、MLEO基地、ソロアーケード、アーケードオンライン。",
+    baseHubShort: "4つ先、1つのVault：マイナー、基地、アーケード、アーケードオンライン。",
     arcadeGoodToKnow: "知っておくと良いこと",
     arcadeGoodToKnowList: [
       "ボルトはすべてのMLEOゲーム間で共有されます",
@@ -763,40 +834,14 @@ const TEXT = {
     logout: "로그아웃",
     liveTestnet: "라이브 테스트넷 • 게임에서 MLEO 획득",
     chooseGame: "게임 선택",
-    chooseGameDesc: "두 가지 모드, 하나의 금고. 업그레이드로 활발히 플레이(마이너) 또는 패시브 적립 실행(토큰 러시). 언제든지 전환 가능.",
     miners: "MLEO — 마이너",
     minersDesc: "아이들 게임과 업그레이드, 클릭 선물과 부스트. 금고 통합 + 온체인 CLAIM으로 안정적이고 수동적인 진행.",
     active: "활성",
     howToPlay: "플레이 방법",
     terms: "약관",
     playMiners: "마이너 플레이",
-    acceptTermsToPlay: "🔒 플레이하려면 약관 동의",
-    rush: "MLEO — 러시",
-    rushDesc: "프레스티지 시스템이 있는 고급 채굴! MLEO를 패시브하게 채굴하고, 장비를 업그레이드하고, 성과를 얻고, 영구 보너스를 위해 리셋.",
-    passive: "패시브",
-    playTokenRush: "토큰 러시 플레이",
     howToPlayTitle: "플레이 방법",
     goal: "목표",
-    rushGoal: "러시 목표",
-    rushGoalDesc: "MLEO 토큰을 패시브하게 채굴하고 제국을 건설하세요! 채굴한 MLEO를 사용해 장비를 업그레이드하고, 성과를 얻고, 영구 보너스를 위한 프레스티지. 더 많이 플레이할수록 강해집니다.",
-    rushGameplay: "게임플레이",
-    rushGameplaySteps: [
-      "MLEO를 패시브하게 채굴 - 장비가 자동으로 작동",
-      "BOOST 클릭하여 채굴 속도를 일시적으로 증가 (+2% 클릭당)",
-      "채굴한 MLEO를 금고에 수집하여 업그레이드와 청구",
-      "업그레이드 구매: 더 빠른 채굴을 위한 Auto-Drill, Helmet, Cart, Leo Bot",
-      "마일스톤 달성으로 성과 획득하여 보너스 보상",
-      "10M MLEO에서 프레스티지하여 영구 보너스를 위해 진행 리셋"
-    ],
-    rushFeatures: "주요 특징",
-    rushFeaturesList: [
-      "프레스티지 시스템: 프레스티지 포인트당 영구 +2%를 위해 업그레이드 리셋",
-      "성과: 프레스티지 포인트 보상이 있는 6가지 다른 성과",
-      "업그레이드: 각각 여러 레벨이 있는 4가지 장비 유형",
-      "부스트 시스템: 시간이 지나면서 감소하는 일시적 속도 증가",
-      "길드 시스템: 보너스 배수를 위한 채굴 길드 참여",
-      "브리지: 마이너 게임에서 러시 금고로 MLEO 전송"
-    ],
     goalDesc: "개(마이너)를 병합하고, 바위를 깨고, 코인을 획득하세요. 코인은 업그레이드와 더 많은 마이너 구매에 사용되는 게임 내 자원입니다. 게임의 일부 활동도 MLEO를 적립할 수 있습니다(아래 \"채굴 및 토큰\" 참조).",
     boardMerging: "보드 및 병합",
     boardSteps: [
@@ -842,6 +887,53 @@ const TEXT = {
       "토큰을 사용하여 금고 MLEO를 사용하지 않고 아케이드 세션 시작",
       "무료 플레이 세션의 보상은 표준 세션 보상과 마찬가지로 금고에 추가됩니다"
     ],
+
+    chooseGameLobbyShort: "네 가지 목적지, 하나의 공유 금고: 마이너, MLEO 기지, 아케이드, 아케이드 온라인.",
+    minersDescShort: "방치형 & 업그레이드. 금고 + 온체인 클레임.",
+    poolStatus: "풀",
+    arcadeGames: "아케이드",
+    arcadeOnline: "아케이드 온라인",
+    arcadeRegularTitle: "MLEO — 아케이드",
+    arcadeOnlineTitle: "MLEO — 아케이드 온라인",
+    arcadeBadgeLabel: "아케이드",
+    onlineBadgeLabel: "온라인",
+    arcadeDescShort: "솔로 미니게임. 공유 금고 & 세션 보상.",
+    arcadeOnlineDescShort: "멀티 & 라이브 모드. 동일한 공유 금고.",
+    arcadeOnlineHowIntro: "라이브 및 온라인 아케이드는 솔로 아케이드와 같은 공유 금고와 생태계 규칙을 사용합니다. 세션 비용과 보상은 모드에 따라 다를 수 있습니다.",
+    legalShort: "법적 고지",
+    howToPlayArcadeTitle: "플레이 방법 — 아케이드",
+    howToPlayArcadeOnlineTitle: "플레이 방법 — 아케이드 온라인",
+    howToPlayMinersTitle: "플레이 방법 — 마이너",
+    questHow: {
+      title: "플레이 방법 — MLEO 기지",
+      goal: "목표",
+      goalDesc: "MLEO 기지는 MLEO 생태계의 전략 지휘 센터입니다. 기지를 건설·업그레이드하고 에너지와 안정성을 관리하며 자원을 생산하고 원정을 띄워 재료를 뱅크된 MLEO로 정제하고 공유 금고로 일부를 신중히 보냅니다.",
+      gameplay: "미션",
+      gameplaySteps: [
+        "건물 업그레이드",
+        "에너지와 기지 안정성 관리",
+        "광석, 금, 스크랩, 데이터 생산",
+        "데이터로 고급 운영 수행",
+        "자원을 뱅크된 MLEO로 정제",
+        "원정으로 진행과 재료 획득",
+        "타이밍을 맞춰 공유 금고로 MLEO 전송",
+        "장기적으로 생태계 지원",
+      ],
+      features: "알아두기",
+      featuresList: [
+        "뱅크된 MLEO는 공유 금고로 보내기 전까지 기지에 남습니다.",
+        "전송은 일일 한도와 효율 압박의 영향을 받습니다.",
+        "Miners·아케이드와 함께 장기 성장을 돕습니다.",
+        "현명하게 건설하고 안정을 유지하며 기지를 강화하세요.",
+      ],
+    },
+    baseTitle: "MLEO — 기지",
+    baseDesc: "미션·데이터·원정·구조 업그레이드로 마이너, 아케이드, 공유 금고를 잇는 지원·관리 거점입니다.",
+    baseDescShort: "지원 거점: 공유 금고를 위한 미션, 데이터, 원정.",
+    baseBadgeLabel: "지원",
+    playBase: "MLEO 기지 시작",
+    baseHub: "네 곳의 목적지, 하나의 공유 금고: 마이너, MLEO 기지, 혼자 아케이드, 아케이드 온라인.",
+    baseHubShort: "네 곳, 하나의 금고: 마이너, 기지, 아케이드, 아케이드 온라인.",
     arcadeGoodToKnow: "알아두면 좋은 정보",
     arcadeGoodToKnowList: [
       "금고는 모든 MLEO 게임 간에 공유됩니다",
@@ -856,40 +948,14 @@ const TEXT = {
     logout: "Çıkış Yap",
     liveTestnet: "Canlı Testnet • Oyunda MLEO Kazanın",
     chooseGame: "Oyununuzu Seçin",
-    chooseGameDesc: "İki mod, bir kasa. Yükseltmelerle aktif oynayın (Minerlar) veya pasif birikim çalıştırın (Token Rush). İstediğiniz zaman değiştirebilirsiniz.",
     miners: "MLEO — Minerlar",
     minersDesc: "Boş oyun ve yükseltmeler, tıklama hediyeleri ve artışlarla. Kasa entegrasyonu + zincir üzeri CLAIM ile istikrarlı, manuel ilerleme.",
     active: "Aktif",
     howToPlay: "NASIL OYNANIR",
     terms: "ŞARTLAR",
     playMiners: "Minerlar Oyna",
-    acceptTermsToPlay: "🔒 Oynamak için şartları kabul et",
-    rush: "MLEO — Rush",
-    rushDesc: "Prestige sistemi ile gelişmiş madencilik! MLEO'yu pasif olarak kazın, ekipmanı yükseltin, başarılar kazanın ve kalıcı bonuslar için sıfırlayın.",
-    passive: "Pasif",
-    playTokenRush: "Token Rush Oyna",
     howToPlayTitle: "Nasıl oynanır",
     goal: "Hedef",
-    rushGoal: "Rush Hedefi",
-    rushGoalDesc: "MLEO tokenlerini pasif olarak kazın ve imparatorluğunuzu inşa edin! Kazılan MLEO'yu ekipman yükseltmeleri, başarılar ve kalıcı bonuslar için prestij için kullanın. Ne kadar çok oynarsanız, o kadar güçlü olursunuz.",
-    rushGameplay: "Oyun",
-    rushGameplaySteps: [
-      "MLEO'yu pasif olarak kazın - ekipmanınız otomatik çalışır",
-      "Madencilik hızını geçici olarak artırmak için BOOST'a tıklayın (+%2 tıklama başına)",
-      "Kazılan MLEO'yu yükseltmeler ve talepler için kasınıza toplayın",
-      "Yükseltme satın alın: Daha hızlı madencilik için Auto-Drill, Helmet, Cart ve Leo Bot",
-      "Bonus ödüller için kilometre taşlarına ulaşarak başarılar kazanın",
-      "Kalıcı bonuslar için ilerlemeyi sıfırlamak için 10M MLEO'da prestij"
-    ],
-    rushFeatures: "Ana özellikler",
-    rushFeaturesList: [
-      "Prestige Sistemi: Prestij puanı başına kalıcı +%2 için yükseltmeleri sıfırla",
-      "Başarılar: Prestige Puan ödülleri olan 6 farklı başarı",
-      "Yükseltmeler: Her biri birden fazla seviye olan 4 ekipman türü",
-      "Boost Sistemi: Zamanla azalan geçici hız artışı",
-      "Lonca Sistemi: Bonus çarpanları için madencilik loncalarına katılın",
-      "Köprü: Minerlar oyunundan Rush kasasına MLEO transfer edin"
-    ],
     goalDesc: "Köpekleri (minerlar) birleştirin, kayaları kırın ve jeton kazanın. Jetonlar, yükseltmeler ve daha fazla minar satın almak için kullanılan oyun içi kaynaktır. Oyundaki bazı aktiviteler de MLEO biriktirebilir (aşağıdaki \"Madencilik ve Tokenlar\" bölümüne bakın).",
     boardMerging: "Tahta ve Birleştirme",
     boardSteps: [
@@ -935,6 +1001,53 @@ const TEXT = {
       "Kasası MLEO kullanmadan bir arcade oturumu başlatmak için jetonları kullanın",
       "Ücretsiz oyun oturumlarından gelen ödüller, standart oturum ödülleri gibi kasasına eklenir"
     ],
+
+    chooseGameLobbyShort: "Dört hedef, bir paylaşımlı kasa: madenciler, MLEO Üssü, arcade ve çevrimiçi arcade.",
+    minersDescShort: "Idle ve yükseltmeler. Kasa + zincir üstü talep.",
+    poolStatus: "Havuz",
+    arcadeGames: "Arcade",
+    arcadeOnline: "Arcade Online",
+    arcadeRegularTitle: "MLEO — Arcade",
+    arcadeOnlineTitle: "MLEO — Arcade Online",
+    arcadeBadgeLabel: "Arcade",
+    onlineBadgeLabel: "Çevrimiçi",
+    arcadeDescShort: "Tek oyunculu mini oyunlar. Paylaşımlı kasa ve oturum ödülleri.",
+    arcadeOnlineDescShort: "Çok oyunculu ve canlı modlar. Aynı paylaşımlı kasa.",
+    arcadeOnlineHowIntro: "Canlı ve çevrimiçi arcade modları, solo arcade ile aynı paylaşımlı kasa ve ekosistem kurallarını kullanır. Oturum maliyetleri ve ödüller moda göre değişebilir.",
+    legalShort: "Yasal",
+    howToPlayArcadeTitle: "Nasıl oynanır — Arcade",
+    howToPlayArcadeOnlineTitle: "Nasıl oynanır — Arcade Online",
+    howToPlayMinersTitle: "Nasıl oynanır — Miners",
+    questHow: {
+      title: "Nasıl oynanır — MLEO Üssü",
+      goal: "Hedef",
+      goalDesc: "MLEO Üssü, MLEO ekosisteminin stratejik komuta merkezidir. Üssünüzü inşa edin ve yükseltin, enerji ve istikrarı yönetin, kaynak üretin, seferlere çıkın, malzemeleri bankalanmış MLEO’ya rafine edin ve paylaşımlı kasaya dikkatlice gönderin.",
+      gameplay: "Göreviniz",
+      gameplaySteps: [
+        "Binaları yükseltin",
+        "Enerji ve üs istikrarını yönetin",
+        "Cevher, altın, hurda ve veri üretin",
+        "Veriyi ileri operasyonlar için kullanın",
+        "Kaynakları bankalanmış MLEO’ya rafine edin",
+        "İlerleme ve malzeme için seferler başlatın",
+        "MLEO’yu doğru zamanda paylaşımlı kasaya gönderin",
+        "Ekosistemi uzun vadede destekleyin",
+      ],
+      features: "Bilinmesi gerekenler",
+      featuresList: [
+        "Bankalanmış MLEO, paylaşımlı kasaya gönderilene kadar MLEO Üssü'nde kalır.",
+        "Gönderim günlük limitler ve verim baskısına tabidir.",
+        "Bu mod Miners ve Arcade ile uzun vadeli ilerlemeyi destekler.",
+        "Akıllıca inşa edin, istikrarı koruyun, üssünüzü güçlendirin.",
+      ],
+    },
+    baseTitle: "MLEO — Üs",
+    baseDesc: "Görevler, veri, seferler ve yapısal yükseltmelerle madencileri, arcade’i ve paylaşımlı kasayı birleştiren destek ve yönetim üssü.",
+    baseDescShort: "Destek merkezi: paylaşımlı kasa için görevler, veri ve seferler.",
+    baseBadgeLabel: "Destek",
+    playBase: "MLEO Üssü Oyna",
+    baseHub: "Dört hedef, bir paylaşımlı kasa: madenciler, MLEO Üssü, tek oyunculu arcade ve çevrimiçi arcade.",
+    baseHubShort: "Dört hedef, bir kasa: madenciler, Üs, arcade ve çevrimiçi arcade.",
     arcadeGoodToKnow: "Bilmekte fayda var",
     arcadeGoodToKnowList: [
       "Kasası tüm MLEO oyunları arasında paylaşılır",
@@ -949,40 +1062,14 @@ const TEXT = {
     logout: "Esci",
     liveTestnet: "Testnet Live • Guadagna MLEO nel gioco",
     chooseGame: "Scegli il tuo gioco",
-    chooseGameDesc: "Due modalità, una cassaforte. Gioca attivamente con miglioramenti (Miner) o lascia funzionare l'accumulo passivo (Token Rush). Puoi cambiare in qualsiasi momento.",
     miners: "MLEO — Miner",
     minersDesc: "Gioco idle e miglioramenti con regali click e boost. Integrazione cassaforte + CLAIM on-chain per progresso stabile e manuale.",
     active: "Attivo",
     howToPlay: "COME GIOCARE",
     terms: "TERMINI",
     playMiners: "Gioca Miner",
-    acceptTermsToPlay: "🔒 Accetta termini per giocare",
-    rush: "MLEO — Rush",
-    rushDesc: "Mining avanzato con sistema Prestige! Mina MLEO passivamente, migliora equipaggiamento, guadagna risultati e resetta per bonus permanenti.",
-    passive: "Passivo",
-    playTokenRush: "Gioca Token Rush",
     howToPlayTitle: "Come giocare",
     goal: "Obiettivo",
-    rushGoal: "Obiettivo Rush",
-    rushGoalDesc: "Mina token MLEO passivamente e costruisci il tuo impero! Usa MLEO minato per migliorare equipaggiamento, guadagnare risultati e prestigio per bonus permanenti. Più giochi, più diventi forte.",
-    rushGameplay: "Gameplay",
-    rushGameplaySteps: [
-      "Mina MLEO passivamente - il tuo equipaggiamento funziona automaticamente",
-      "Clicca BOOST per aumentare temporaneamente la velocità di mining (+2% per click)",
-      "Raccogli MLEO minato nella tua cassaforte per miglioramenti e richieste",
-      "Compra miglioramenti: Auto-Drill, Helmet, Cart e Leo Bot per mining più veloce",
-      "Guadagna risultati raggiungendo traguardi per ricompense bonus",
-      "Prestigio a 10M MLEO per resettare progresso per bonus permanenti"
-    ],
-    rushFeatures: "Caratteristiche chiave",
-    rushFeaturesList: [
-      "Sistema Prestige: Resetta miglioramenti per +2% permanente per punto prestigio",
-      "Risultati: 6 diversi risultati con ricompense punti Prestige",
-      "Miglioramenti: 4 tipi di equipaggiamento con livelli multipli ciascuno",
-      "Sistema Boost: Aumento temporaneo di velocità che diminuisce nel tempo",
-      "Sistema gilda: Unisciti a gilde di mining per moltiplicatori bonus",
-      "Ponte: Trasferisci MLEO dal gioco Miner alla cassaforte Rush"
-    ],
     goalDesc: "Fondi cani (miner), rompi rocce e guadagna monete. Le monete sono una risorsa in-game usata per miglioramenti e comprare più miner. Alcune attività nel gioco possono anche accumulare MLEO (vedi \"Mining e Token\" sotto).",
     boardMerging: "Board e Fusione",
     boardSteps: [
@@ -1028,6 +1115,53 @@ const TEXT = {
       "Usa i token per avviare una sessione arcade senza usare MLEO dal caveau",
       "Le ricompense delle sessioni di gioco gratuito vengono aggiunte al tuo caveau proprio come le ricompense di sessione standard"
     ],
+
+    chooseGameLobbyShort: "Quattro destinazioni, un vault condiviso: minatori, MLEO Base, arcade e arcade online.",
+    minersDescShort: "Idle e potenziamenti. Vault + claim on-chain.",
+    poolStatus: "Pool",
+    arcadeGames: "Arcade",
+    arcadeOnline: "Arcade Online",
+    arcadeRegularTitle: "MLEO — Arcade",
+    arcadeOnlineTitle: "MLEO — Arcade Online",
+    arcadeBadgeLabel: "Arcade",
+    onlineBadgeLabel: "Online",
+    arcadeDescShort: "Mini-giochi in solitaria. Vault condiviso e ricompense di sessione.",
+    arcadeOnlineDescShort: "Multigiocatore e modalità live. Stesso vault condiviso.",
+    arcadeOnlineHowIntro: "Le modalità arcade live e online usano lo stesso vault condiviso e le stesse regole dell’ecosistema dell’arcade in solitaria. Costi di sessione e ricompense possono variare.",
+    legalShort: "Note legali",
+    howToPlayArcadeTitle: "Come giocare — Arcade",
+    howToPlayArcadeOnlineTitle: "Come giocare — Arcade Online",
+    howToPlayMinersTitle: "Come giocare — Miners",
+    questHow: {
+      title: "Come giocare — MLEO Base",
+      goal: "Obiettivo",
+      goalDesc: "MLEO Base è il centro di comando strategico dell’ecosistema MLEO. Costruisci e potenzia la base, gestisci energia e stabilità, produci risorse, lancia spedizioni, affina i materiali in MLEO depositato e invia parte al vault condiviso.",
+      gameplay: "La tua missione",
+      gameplaySteps: [
+        "Potenzia gli edifici",
+        "Gestisci energia e stabilità della base",
+        "Produci minerale, oro, rottami e dati",
+        "Usa i dati per operazioni avanzate",
+        "Affina le risorse in MLEO depositato",
+        "Lancia spedizioni per progresso e materiali",
+        "Invia MLEO al vault condiviso con tempismo",
+        "Sostieni l’ecosistema nel lungo periodo",
+      ],
+      features: "Da sapere",
+      featuresList: [
+        "Il MLEO depositato resta nella Base fino all’invio al vault condiviso.",
+        "L’invio è soggetto a limiti giornalieri e pressione di efficienza.",
+        "Questa modalità lavora con Miners e Arcade per la progressione.",
+        "Costruisci con intelligenza e rafforza la base.",
+      ],
+    },
+    baseTitle: "MLEO — Base",
+    baseDesc: "Base di supporto e gestione che collega minatori, arcade e il vault condiviso con missioni, dati, spedizioni e miglioramenti strutturali.",
+    baseDescShort: "Centro di supporto: missioni, dati e spedizioni per il vault condiviso.",
+    baseBadgeLabel: "Supporto",
+    playBase: "Gioca a MLEO Base",
+    baseHub: "Quattro destinazioni, un vault condiviso: minatori, MLEO Base, arcade in solitaria e arcade online.",
+    baseHubShort: "Quattro destinazioni, un vault: minatori, Base, arcade e arcade online.",
     arcadeGoodToKnow: "Buono a sapersi",
     arcadeGoodToKnowList: [
       "Il tuo caveau è condiviso tra tutti i giochi MLEO",
@@ -1042,40 +1176,14 @@ const TEXT = {
     logout: "გასვლა",
     liveTestnet: "ცოცხალი ტესტნეტი • მიიღე MLEO თამაშში",
     chooseGame: "აირჩიე შენი თამაში",
-    chooseGameDesc: "ორი რეჟიმი, ერთი საცავი. ითამაშე აქტივურად გაუმჯობესებებით (მაინერები) ან დაუშვი პასიური დაგროვება (ტოკენ ბუმი). შეგიძლია ნებისმიერ დროს შეცვალო.",
     miners: "MLEO — მაინერები",
     minersDesc: "უმოქმედო თამაში და გაუმჯობესებები, დაწკაპუნების საჩუქრებით და ბუსტებით. საცავის ინტეგრაცია + ონჩეინ CLAIM სტაბილური, ხელით პროგრესისთვის.",
     active: "აქტიური",
     howToPlay: "როგორ ვითამაშოთ",
     terms: "პირობები",
     playMiners: "ითამაშე მაინერები",
-    acceptTermsToPlay: "🔒 მიიღე პირობები თამაშისთვის",
-    rush: "MLEO — ბუმი",
-    rushDesc: "მოწინავე მაინინგი პრესტიჟის სისტემით! მოიპოვე MLEO პასიურად, გააუმჯობესე აღჭურვილობა, მიიღე მიღწევები და გადატვირთე მუდმივი ბონუსებისთვის.",
-    passive: "პასიური",
-    playTokenRush: "ითამაშე ტოკენ ბუმი",
     howToPlayTitle: "როგორ ვითამაშოთ",
     goal: "მიზანი",
-    rushGoal: "ბუმის მიზანი",
-    rushGoalDesc: "მოიპოვე MLEO ტოკენები პასიურად და ააშენე შენი იმპერია! გამოიყენე მოპოვებული MLEO აღჭურვილობის გასაუმჯობესებლად, მიღწევების მისაღებად და პრესტიჟისთვის მუდმივი ბონუსებისთვის. რაც უფრო მეტს თამაშობ, მით უფრო ძლიერი ხდები.",
-    rushGameplay: "თამაშის პროცესი",
-    rushGameplaySteps: [
-      "მოიპოვე MLEO პასიურად - შენი აღჭურვილობა ავტომატურად მუშაობს",
-      "დააწკაპუნე BOOST-ზე მაინინგის სიჩქარის დროებით გასაზრდელად (+2% ყოველ დაწკაპუნებაზე)",
-      "შეაგროვე მოპოვებული MLEO შენს საცავში გაუმჯობესებებისთვის და მოთხოვნებისთვის",
-      "იყიდე გაუმჯობესებები: Auto-Drill, Helmet, Cart და Leo Bot უფრო სწრაფი მაინინგისთვის",
-      "მიიღე მიღწევები მიზნების მიღწევით ბონუს ჯილდოებისთვის",
-      "პრესტიჟი 10M MLEO-ზე პროგრესის გადატვირთვისთვის მუდმივი ბონუსებისთვის"
-    ],
-    rushFeatures: "მთავარი მახასიათებლები",
-    rushFeaturesList: [
-      "პრესტიჟის სისტემა: გადატვირთე გაუმჯობესებები მუდმივი +2%-ისთვის ყოველ პრესტიჟის ქულაზე",
-      "მიღწევები: 6 განსხვავებული მიღწევა პრესტიჟის ქულების ჯილდოებით",
-      "გაუმჯობესებები: 4 აღჭურვილობის ტიპი ყოველში მრავალი დონით",
-      "ბუსტის სისტემა: დროებითი სიჩქარის გაზრდა, რომელიც დროთა განმავლობაში მცირდება",
-      "გილდიის სისტემა: შეუერთდი მაინინგის გილდიებს ბონუს მულტიპლიკატორებისთვის",
-      "ხიდი: გადაიტანე MLEO მაინერების თამაშიდან ბუმის საცავში"
-    ],
     goalDesc: "შეაერთე ძაღლები (მაინერები), მოტეხე ქვები და მიიღე მონეტები. მონეტები არის თამაშის რესურსი, რომელიც გამოიყენება გაუმჯობესებებისთვის და მეტი მაინერის შესაძენად. თამაშში გარკვეული აქტივობები ასევე შეიძლება დაგროვდეს MLEO (იხილე \"მაინინგი და ტოკენები\" ქვემოთ).",
     boardMerging: "დაფა და შერწყმა",
     boardSteps: [
@@ -1121,6 +1229,53 @@ const TEXT = {
       "გამოიყენეთ ტოკენები არკადის სესიის დასაწყებად ვოლტის MLEO-ს გამოყენების გარეშე",
       "უფასო თამაშის სესიებიდან ჯილდოები ემატება თქვენს ვოლტს, ისევე როგორც სტანდარტული სესიის ჯილდოები"
     ],
+
+    chooseGameLobbyShort: "ოთხი მიმართულება, ერთი საერთო საცავი: მაინერები, MLEO ბაზა, არკადა და არკადა ონლაინ.",
+    minersDescShort: "Idle და გაუმჯობესებები. საცავი + on-chain claim.",
+    poolStatus: "პული",
+    arcadeGames: "არკადა",
+    arcadeOnline: "არკადა ონლაინ",
+    arcadeRegularTitle: "MLEO — არკადა",
+    arcadeOnlineTitle: "MLEO — არკადა ონლაინ",
+    arcadeBadgeLabel: "არკადა",
+    onlineBadgeLabel: "ონლაინ",
+    arcadeDescShort: "სოლო მინი-თამაშები. საერთო საცავი და სესიის ჯილდოები.",
+    arcadeOnlineDescShort: "მულტიპლეიერი და ცოცხალი რეჟიმები. იგივე საერთო საცავი.",
+    arcadeOnlineHowIntro: "ცოცხალი და ონლაინ არკადის რეჟიმები იყენებს იმავე საერთო საცავსა და ეკოსისტემის წესებს, რაც სოლო არკადას. სესიის ღირებულება და ჯილდოები შეიძლება განსხვავდებოდეს.",
+    legalShort: "იურიდიული",
+    howToPlayArcadeTitle: "როგორ ვითამაშოთ — არკადა",
+    howToPlayArcadeOnlineTitle: "როგორ ვითამაშოთ — არკადა ონლაინ",
+    howToPlayMinersTitle: "როგორ ვითამაშოთ — მაინერები",
+    questHow: {
+      title: "როგორ ვითამაშოთ — MLEO ბაზა",
+      goal: "მიზანი",
+      goalDesc: "MLEO ბაზა არის MLEO ეკოსისტემის სტრატეგიული სამმართველო ცენტრი. ააშენეთ და გააუმჯობესეთ ბაზა, მართეთ ენერგია და სტაბილურობა, წარმოება რესურსები, გაუშვით ექსპედიციები, გადააქციეთ მასალები ბანკირებულ MLEO-ში და გაგზავნეთ ნაწილი საერთო საცავში.",
+      gameplay: "თქვენი მისია",
+      gameplaySteps: [
+        "შენობების გაუმჯობესება",
+        "ენერგიისა და ბაზის სტაბილურობის მართვა",
+        "საბადოს, ოქროს, ჯართისა და მონაცემების წარმოება",
+        "მონაცემების გამოყენება დამატებით ოპერაციებში",
+        "რესურსების ბანკირებულ MLEO-ში გადაყვანა",
+        "ექსპედიციები პროგრესისთვის",
+        "MLEO-ს გაგზავნა საერთო საცავში სწორი დროით",
+        "ეკოსისტემის გრძელვადიანი მხარდაჭერა",
+      ],
+      features: "სასარგებლო ინფო",
+      featuresList: [
+        "ბანკირებული MLEO ბაზაში რჩება სანამ საერთო საცავში არ გაგზავნით.",
+        "გაგზავნა დღიური ლიმიტებისა და ეფექტურობის ზეწოლის ქვეშაა.",
+        "ეს რეჟიმი Miners-სა და Arcade-ს უხსნის გრძელვადიან პროგრესს.",
+        "გონივრულად ააშენეთ და გააძლიერეთ ბაზა.",
+      ],
+    },
+    baseTitle: "MLEO — ბაზა",
+    baseDesc: "მხარდაჭერისა და მართვის ბაზა, რომელიც აერთებს მაინერებს, არკადეს და საერთო საცავს მისიებით, მონაცემებით, ექსპედიციებითა და სტრუქტურული გაუმჯობესებებით.",
+    baseDescShort: "მხარდაჭერის ცენტრი: მისიები, მონაცემები და ექსპედიციები საერთო საცავისთვის.",
+    baseBadgeLabel: "მხარდაჭერა",
+    playBase: "ითამაშე MLEO ბაზა",
+    baseHub: "ოთხი მიმართულება, ერთი საერთო საცავი: მაინერები, MLEO ბაზა, სოლო არკადა და არკადა ონლაინ.",
+    baseHubShort: "ოთხი მიმართულება, ერთი საცავი: მაინერები, ბაზა, არკადა და არკადა ონლაინ.",
     arcadeGoodToKnow: "კარგი იცოდე",
     arcadeGoodToKnowList: [
       "თქვენი ვოლტი იზიარება ყველა MLEO თამაშს შორის",
@@ -1135,40 +1290,14 @@ const TEXT = {
     logout: "Wyloguj",
     liveTestnet: "Live Testnet • Zarabiaj MLEO w grze",
     chooseGame: "Wybierz swoją grę",
-    chooseGameDesc: "Dwa tryby, jeden skarbiec. Graj aktywnie z ulepszeniami (Górnicy) lub pozwól pasywnemu gromadzeniu działać (Token Rush). Możesz przełączać się w dowolnym momencie.",
     miners: "MLEO — Górnicy",
     minersDesc: "Gra idle i ulepszenia z prezentami kliknięć i boostami. Integracja skarbca + CLAIM on-chain dla stabilnego, ręcznego postępu.",
     active: "Aktywny",
     howToPlay: "JAK GRAĆ",
     terms: "WARUNKI",
     playMiners: "Graj Górnicy",
-    acceptTermsToPlay: "🔒 Zaakceptuj warunki aby grać",
-    rush: "MLEO — Rush",
-    rushDesc: "Zaawansowane kopanie z systemem Prestige! Kop MLEO pasywnie, ulepszaj sprzęt, zdobywaj osiągnięcia i resetuj dla stałych bonusów.",
-    passive: "Pasywny",
-    playTokenRush: "Graj Token Rush",
     howToPlayTitle: "Jak grać",
     goal: "Cel",
-    rushGoal: "Cel Rush",
-    rushGoalDesc: "Kop tokeny MLEO pasywnie i buduj swoje imperium! Używaj wykopanego MLEO do ulepszania sprzętu, zdobywania osiągnięć i prestiżu dla stałych bonusów. Im więcej grasz, tym silniejszy się stajesz.",
-    rushGameplay: "Rozgrywka",
-    rushGameplaySteps: [
-      "Kop MLEO pasywnie - twój sprzęt działa automatycznie",
-      "Kliknij BOOST aby tymczasowo zwiększyć prędkość kopania (+2% na kliknięcie)",
-      "Zbieraj wykopane MLEO do swojego skarbca na ulepszenia i roszczenia",
-      "Kup ulepszenia: Auto-Drill, Helmet, Cart i Leo Bot dla szybszego kopania",
-      "Zdobywaj osiągnięcia osiągając kamienie milowe dla bonusowych nagród",
-      "Prestiż przy 10M MLEO aby zresetować postęp dla stałych bonusów"
-    ],
-    rushFeatures: "Kluczowe funkcje",
-    rushFeaturesList: [
-      "System Prestige: Resetuj ulepszenia dla stałych +2% na punkt prestiżu",
-      "Osiągnięcia: 6 różnych osiągnięć z nagrodami punktów Prestige",
-      "Ulepszenia: 4 typy sprzętu z wieloma poziomami każdy",
-      "System Boost: Tymczasowy wzrost prędkości który maleje z czasem",
-      "System gildii: Dołącz do gildii kopania dla bonusowych mnożników",
-      "Most: Transferuj MLEO z gry Górnicy do skarbca Rush"
-    ],
     goalDesc: "Łącz psy (górników), łam skały i zarabiaj monety. Monety to zasób w grze używany do ulepszeń i kupowania więcej górników. Niektóre aktywności w grze mogą też gromadzić MLEO (zobacz \"Kopanie i Tokeny\" poniżej).",
     boardMerging: "Plansza i Łączenie",
     boardSteps: [
@@ -1214,6 +1343,53 @@ const TEXT = {
       "Używaj tokenów do rozpoczęcia sesji salonu gier bez używania MLEO ze skarbca",
       "Nagrody z darmowych sesji gry są dodawane do twojego skarbca tak samo jak standardowe nagrody sesji"
     ],
+
+    chooseGameLobbyShort: "Cztery miejsca docelowe, jeden wspólny skarbiec: górnicy, MLEO Baza, arcade i arcade online.",
+    minersDescShort: "Idle i ulepszenia. Skarbiec + odbiór on-chain.",
+    poolStatus: "Pula",
+    arcadeGames: "Arcade",
+    arcadeOnline: "Arcade Online",
+    arcadeRegularTitle: "MLEO — Arcade",
+    arcadeOnlineTitle: "MLEO — Arcade Online",
+    arcadeBadgeLabel: "Arcade",
+    onlineBadgeLabel: "Online",
+    arcadeDescShort: "Mini-gry solo. Wspólny skarbiec i nagrody sesji.",
+    arcadeOnlineDescShort: "Multiplayer i tryby na żywo. Ten sam wspólny skarbiec.",
+    arcadeOnlineHowIntro: "Tryby arcade na żywo i online korzystają z tego samego wspólnego skarbca i zasad co arcade solo. Koszty sesji i nagrody mogą się różnić.",
+    legalShort: "Informacje prawne",
+    howToPlayArcadeTitle: "Jak grać — Arcade",
+    howToPlayArcadeOnlineTitle: "Jak grać — Arcade Online",
+    howToPlayMinersTitle: "Jak grać — Miners",
+    questHow: {
+      title: "Jak grać — MLEO Baza",
+      goal: "Cel",
+      goalDesc: "MLEO Baza to strategiczne centrum dowodzenia ekosystemem MLEO. Buduj i ulepszaj bazę, zarządzaj energią i stabilnością, produkuj zasoby, wysyłaj ekspedycje, przetwarzaj materiały na zdeponowane MLEO i ostrożnie wysyłaj część do wspólnego skarbca.",
+      gameplay: "Twoja misja",
+      gameplaySteps: [
+        "Ulepszaj budynki",
+        "Zarządzaj energią i stabilnością bazy",
+        "Produkuj rudę, złom, złoto i dane",
+        "Używaj danych do zaawansowanych operacji",
+        "Przetwarzaj zasoby na zdeponowane MLEO",
+        "Wysyłaj ekspedycje po postęp i materiały",
+        "Wysyłaj MLEO do wspólnego skarbca z dobrym timingiem",
+        "Wspieraj ekosystem długoterminowo",
+      ],
+      features: "Warto wiedzieć",
+      featuresList: [
+        "Zdeponowane MLEO zostaje w Bazie do wysłania do wspólnego skarbca.",
+        "Wysyłka podlega limitom dziennym i presji efektywności.",
+        "Tryb współpracuje z Miners i Arcade dla długiej gry.",
+        "Buduj mądrze, utrzymuj stabilność, wzmacniaj bazę.",
+      ],
+    },
+    baseTitle: "MLEO — Baza",
+    baseDesc: "Baza wsparcia i zarządzania łącząca tryb górników, arcade i wspólny skarbiec misjami, danymi, ekspedycjami i ulepszeniami strukturalnymi.",
+    baseDescShort: "Centrum wsparcia: misje, dane i ekspedycje dla wspólnego skarbca.",
+    baseBadgeLabel: "Wsparcie",
+    playBase: "Graj w MLEO Bazę",
+    baseHub: "Cztery miejsca, jeden wspólny skarbiec: górnicy, MLEO Baza, arcade solo i arcade online.",
+    baseHubShort: "Cztery miejsca, jeden skarbiec: górnicy, Baza, arcade i arcade online.",
     arcadeGoodToKnow: "Dobrze wiedzieć",
     arcadeGoodToKnowList: [
       "Twój skarbiec jest współdzielony między wszystkimi grami MLEO",
@@ -1228,40 +1404,14 @@ const TEXT = {
     logout: "Deconectare",
     liveTestnet: "Testnet Live • Câștigă MLEO în joc",
     chooseGame: "Alege jocul tău",
-    chooseGameDesc: "Două moduri, un seif. Joacă activ cu upgrade-uri (Mineri) sau lasă acumularea pasivă să funcționeze (Token Rush). Poți schimba oricând.",
     miners: "MLEO — Mineri",
     minersDesc: "Joc idle și upgrade-uri cu cadouri click și boost-uri. Integrare seif + CLAIM on-chain pentru progres stabil și manual.",
     active: "Activ",
     howToPlay: "CUM SE JOACĂ",
     terms: "TERMENI",
     playMiners: "Joacă Mineri",
-    acceptTermsToPlay: "🔒 Acceptă termenii pentru a juca",
-    rush: "MLEO — Rush",
-    rushDesc: "Mining avansat cu sistem Prestige! Minează MLEO pasiv, îmbunătățește echipamentul, câștigă realizări și resetează pentru bonusuri permanente.",
-    passive: "Pasiv",
-    playTokenRush: "Joacă Token Rush",
     howToPlayTitle: "Cum se joacă",
     goal: "Obiectiv",
-    rushGoal: "Obiectiv Rush",
-    rushGoalDesc: "Minează token-uri MLEO pasiv și construiește imperiul tău! Folosește MLEO minat pentru îmbunătățirea echipamentului, câștigarea realizărilor și prestigiu pentru bonusuri permanente. Cu cât joci mai mult, cu atât devii mai puternic.",
-    rushGameplay: "Gameplay",
-    rushGameplaySteps: [
-      "Minează MLEO pasiv - echipamentul tău funcționează automat",
-      "Apasă BOOST pentru a crește temporar viteza de mining (+2% per click)",
-      "Colectează MLEO minat în seiful tău pentru upgrade-uri și cereri",
-      "Cumpără upgrade-uri: Auto-Drill, Helmet, Cart și Leo Bot pentru mining mai rapid",
-      "Câștigă realizări atingând repere pentru recompense bonus",
-      "Prestigiu la 10M MLEO pentru a reseta progresul pentru bonusuri permanente"
-    ],
-    rushFeatures: "Caracteristici cheie",
-    rushFeaturesList: [
-      "Sistem Prestige: Resetează upgrade-urile pentru +2% permanent per punct prestigiu",
-      "Realizări: 6 realizări diferite cu recompense puncte Prestige",
-      "Upgrade-uri: 4 tipuri de echipament cu mai multe niveluri fiecare",
-      "Sistem Boost: Creștere temporară de viteză care scade în timp",
-      "Sistem guild: Alătură-te guild-urilor de mining pentru multiplicatori bonus",
-      "Pod: Transferă MLEO din jocul Mineri în seiful Rush"
-    ],
     goalDesc: "Fuzionează câini (mineri), sparge pietre și câștigă monede. Monedele sunt o resursă în joc folosită pentru upgrade-uri și cumpărarea mai multor mineri. Unele activități în joc rewardPool de asemenea acumula MLEO (vezi \"Mining și Token-uri\" mai jos).",
     boardMerging: "Board și Fuzionare",
     boardSteps: [
@@ -1307,6 +1457,53 @@ const TEXT = {
       "Folosește tokenurile pentru a începe o sesiune arcade fără a folosi MLEO din seif",
       "Recompensele din sesiunile de joc gratuit sunt adăugate în seiful tău la fel ca recompensele standard de sesiune"
     ],
+
+    chooseGameLobbyShort: "Patru destinații, un seif partajat: mineri, MLEO Bază, arcade și arcade online.",
+    minersDescShort: "Idle și upgrade-uri. Seif + claim on-chain.",
+    poolStatus: "Pool",
+    arcadeGames: "Arcade",
+    arcadeOnline: "Arcade Online",
+    arcadeRegularTitle: "MLEO — Arcade",
+    arcadeOnlineTitle: "MLEO — Arcade Online",
+    arcadeBadgeLabel: "Arcade",
+    onlineBadgeLabel: "Online",
+    arcadeDescShort: "Mini-jocuri solo. Seif partajat și recompense de sesiune.",
+    arcadeOnlineDescShort: "Multiplayer și moduri live. Același seif partajat.",
+    arcadeOnlineHowIntro: "Modurile arcade live și online folosesc același seif partajat și aceleași reguli ca arcade solo. Costurile și recompensele pot diferi.",
+    legalShort: "Legal",
+    howToPlayArcadeTitle: "Cum se joacă — Arcade",
+    howToPlayArcadeOnlineTitle: "Cum se joacă — Arcade Online",
+    howToPlayMinersTitle: "Cum se joacă — Miners",
+    questHow: {
+      title: "Cum se joacă — MLEO Bază",
+      goal: "Obiectiv",
+      goalDesc: "MLEO Bază este centrul strategic de comandă al ecosistemului MLEO. Construiește și îmbunătățește baza, gestionează energia și stabilitatea, produce resurse, lansează expediții, rafinează materiale în MLEO bancat și trimite o parte către seiful partajat.",
+      gameplay: "Misiunea ta",
+      gameplaySteps: [
+        "Îmbunătățește clădirile",
+        "Gestionează energia și stabilitatea bazei",
+        "Produce minereu, aur, fier vechi și date",
+        "Folosește datele pentru operațiuni avansate",
+        "Rafinează resursele în MLEO bancat",
+        "Lansează expediții pentru progres",
+        "Trimite MLEO în seiful partajat la momentul potrivit",
+        "Sprijină ecosistemul pe termen lung",
+      ],
+      features: "De știut",
+      featuresList: [
+        "MLEO bancat rămâne în Bază până la trimitere în seiful partajat.",
+        "Trimiterea respectă limite zilnice și presiune de eficiență.",
+        "Modul lucrează cu Miners și Arcade pentru progres.",
+        "Construiește inteligent și întărește baza.",
+      ],
+    },
+    baseTitle: "MLEO — Bază",
+    baseDesc: "Bază de suport și management care leagă minerii, arcade-ul și seiful partajat prin misiuni, date, expediții și îmbunătățiri structurale.",
+    baseDescShort: "Centru de suport: misiuni, date și expediții pentru seiful partajat.",
+    baseBadgeLabel: "Suport",
+    playBase: "Joacă MLEO Bază",
+    baseHub: "Patru destinații, un seif partajat: mineri, MLEO Bază, arcade solo și arcade online.",
+    baseHubShort: "Patru destinații, un seif: mineri, Bază, arcade și arcade online.",
     arcadeGoodToKnow: "Bine de știut",
     arcadeGoodToKnowList: [
       "Seiful tău este partajat între toate jocurile MLEO",
@@ -1321,40 +1518,14 @@ const TEXT = {
     logout: "Odhlásit se",
     liveTestnet: "Live Testnet • Získejte MLEO ve hře",
     chooseGame: "Vyberte si hru",
-    chooseGameDesc: "Dva režimy, jeden trezor. Hrajte aktivně s vylepšeními (Horníci) nebo nechte pasivní akumulaci běžet (Token Rush). Můžete kdykoli přepnout.",
     miners: "MLEO — Horníci",
     minersDesc: "Idle hra a vylepšení s klikacími dárky a boosty. Integrace trezoru + CLAIM on-chain pro stabilní, manuální pokrok.",
     active: "Aktivní",
     howToPlay: "JAK HRÁT",
     terms: "PODMÍNKY",
     playMiners: "Hraj Horníci",
-    acceptTermsToPlay: "🔒 Přijmout podmínky pro hraní",
-    rush: "MLEO — Rush",
-    rushDesc: "Pokročilé těžba se systémem Prestige! Těžte MLEO pasivně, vylepšujte vybavení, získávejte úspěchy a resetujte pro trvalé bonusy.",
-    passive: "Pasivní",
-    playTokenRush: "Hraj Token Rush",
     howToPlayTitle: "Jak hrát",
     goal: "Cíl",
-    rushGoal: "Cíl Rush",
-    rushGoalDesc: "Těžte MLEO tokeny pasivně a budujte své impérium! Používejte vytěžené MLEO pro vylepšení vybavení, získávání úspěchů a prestiž pro trvalé bonusy. Čím více hrajete, tím silnější se stáváte.",
-    rushGameplay: "Hratelnost",
-    rushGameplaySteps: [
-      "Těžte MLEO pasivně - vaše vybavení funguje automaticky",
-      "Klikněte BOOST pro dočasné zvýšení rychlosti těžby (+2% na kliknutí)",
-      "Sbírejte vytěžené MLEO do svého trezoru pro vylepšení a nároky",
-      "Kupujte vylepšení: Auto-Drill, Helmet, Cart a Leo Bot pro rychlejší těžbu",
-      "Získávejte úspěchy dosahováním milníků pro bonusové odměny",
-      "Prestiž při 10M MLEO pro reset pokroku pro trvalé bonusy"
-    ],
-    rushFeatures: "Klíčové funkce",
-    rushFeaturesList: [
-      "Systém Prestige: Resetujte vylepšení pro trvalé +2% na bod prestiže",
-      "Úspěchy: 6 různých úspěchů s odměnami bodů Prestige",
-      "Vylepšení: 4 typy vybavení s více úrovněmi každý",
-      "Systém Boost: Dočasné zvýšení rychlosti které se časem snižuje",
-      "Systém cechů: Připojte se k těžebním cechům pro bonusové multiplikátory",
-      "Most: Přeneste MLEO z hry Horníci do trezoru Rush"
-    ],
     goalDesc: "Slučujte psy (horníky), lámejte kameny a vydělávejte mince. Mince jsou herní zdroj používaný pro vylepšení a nákup více horníků. Některé aktivity ve hře mohou také akumulovat MLEO (viz \"Těžba a Tokeny\" níže).",
     boardMerging: "Deska a Slučování",
     boardSteps: [
@@ -1400,6 +1571,53 @@ const TEXT = {
       "Použijte tokeny k zahájení arkádové relace bez použití MLEO z trezoru",
       "Odměny z bezplatných herních relací jsou přidávány do vašeho trezoru stejně jako standardní odměny relace"
     ],
+
+    chooseGameLobbyShort: "Čtyři cíle, jeden sdílený trezor: horníci, MLEO Základna, arcade a arcade online.",
+    minersDescShort: "Idle a vylepšení. Trezor + on-chain claim.",
+    poolStatus: "Pool",
+    arcadeGames: "Arcade",
+    arcadeOnline: "Arcade Online",
+    arcadeRegularTitle: "MLEO — Arcade",
+    arcadeOnlineTitle: "MLEO — Arcade Online",
+    arcadeBadgeLabel: "Arcade",
+    onlineBadgeLabel: "Online",
+    arcadeDescShort: "Sólové minihry. Sdílený trezor a odměny za session.",
+    arcadeOnlineDescShort: "Multiplayer a živé módy. Stejný sdílený trezor.",
+    arcadeOnlineHowIntro: "Živé a online arcade módy používají stejný sdílený trezor a pravidla jako sólové arcade. Náklady a odměny se mohou lišit.",
+    legalShort: "Právní info",
+    howToPlayArcadeTitle: "Jak hrát — Arcade",
+    howToPlayArcadeOnlineTitle: "Jak hrát — Arcade Online",
+    howToPlayMinersTitle: "Jak hrát — Miners",
+    questHow: {
+      title: "Jak hrát — MLEO Základna",
+      goal: "Cíl",
+      goalDesc: "MLEO Základna je strategické velitelské centrum ekosystému MLEO. Stavte a vylepšujte základnu, spravujte energii a stabilitu, vyrábějte suroviny, vypravujte expedice, rafinujte materiály na bankované MLEO a část opatrně posílejte do sdíleného trezoru.",
+      gameplay: "Vaše mise",
+      gameplaySteps: [
+        "Vylepšujte budovy",
+        "Spravujte energii a stabilitu základny",
+        "Vyrábějte rudu, zlato, šrot a data",
+        "Používejte data pro pokročilé operace",
+        "Rafinujte suroviny na bankované MLEO",
+        "Vypravujte expedice pro pokrok",
+        "Posílejte MLEO do sdíleného trezoru ve správný čas",
+        "Dlouhodobě podporujte ekosystém",
+      ],
+      features: "Dobré vědět",
+      featuresList: [
+        "Bankované MLEO zůstává v Základně do odeslání do sdíleného trezoru.",
+        "Odeslání podléhá denním limitům a tlaku na efektivitu.",
+        "Režim doplňuje Miners a Arcade pro dlouhodobou hru.",
+        "Stavte chytře a posilujte základnu.",
+      ],
+    },
+    baseTitle: "MLEO — Základna",
+    baseDesc: "Základna podpory a řízení propojující režim horníků, arcade a sdílený trezor misemi, daty, expediciemi a strukturálními vylepšeními.",
+    baseDescShort: "Centrum podpory: mise, data a expedice pro sdílený trezor.",
+    baseBadgeLabel: "Podpora",
+    playBase: "Hrát MLEO Základna",
+    baseHub: "Čtyři cíle, jeden sdílený trezor: horníci, MLEO Základna, sólové arcade a arcade online.",
+    baseHubShort: "Čtyři cíle, jeden trezor: horníci, Základna, arcade a arcade online.",
     arcadeGoodToKnow: "Dobré vědět",
     arcadeGoodToKnowList: [
       "Váš trezor je sdílen mezi všemi hrami MLEO",
@@ -1414,40 +1632,14 @@ const TEXT = {
     logout: "Uitloggen",
     liveTestnet: "Live Testnet • Verdien MLEO in het spel",
     chooseGame: "Kies je spel",
-    chooseGameDesc: "Twee modi, één kluis. Speel actief met upgrades (Mijnwerkers) of laat passieve accumulatie draaien (Token Rush). Je kunt altijd wisselen.",
     miners: "MLEO — Mijnwerkers",
     minersDesc: "Idle spel en upgrades met klik geschenken en boosts. Kluis integratie + on-chain CLAIM voor stabiele, handmatige voortgang.",
     active: "Actief",
     howToPlay: "HOE TE SPELEN",
     terms: "VOORWAARDEN",
     playMiners: "Speel Mijnwerkers",
-    acceptTermsToPlay: "🔒 Accepteer voorwaarden om te spelen",
-    rush: "MLEO — Rush",
-    rushDesc: "Geavanceerd mijnen met Prestige systeem! Mijn MLEO passief, upgrade uitrusting, verdien prestaties en reset voor permanente bonussen.",
-    passive: "Passief",
-    playTokenRush: "Speel Token Rush",
     howToPlayTitle: "Hoe te spelen",
     goal: "Doel",
-    rushGoal: "Rush Doel",
-    rushGoalDesc: "Mijn MLEO tokens passief en bouw je rijk! Gebruik gemijnde MLEO voor uitrusting upgrades, prestaties verdienen en prestige voor permanente bonussen. Hoe meer je speelt, hoe sterker je wordt.",
-    rushGameplay: "Gameplay",
-    rushGameplaySteps: [
-      "Mijn MLEO passief - je uitrusting werkt automatisch",
-      "Klik BOOST om tijdelijk mijnsnelheid te verhogen (+2% per klik)",
-      "Verzamel gemijnde MLEO naar je kluis voor upgrades en claims",
-      "Koop upgrades: Auto-Drill, Helmet, Cart en Leo Bot voor sneller mijnen",
-      "Verdien prestaties door mijlpalen te bereiken voor bonus beloningen",
-      "Prestige op 10M MLEO om voortgang te resetten voor permanente bonussen"
-    ],
-    rushFeatures: "Sleutel kenmerken",
-    rushFeaturesList: [
-      "Prestige Systeem: Reset upgrades voor permanente +2% per prestige punt",
-      "Prestaties: 6 verschillende prestaties met Prestige Punt beloningen",
-      "Upgrades: 4 uitrustingstypes met meerdere niveaus elk",
-      "Boost Systeem: Tijdelijke snelheidsverhoging die in de loop van de tijd afneemt",
-      "Gilde Systeem: Word lid van mijn gildes voor bonus vermenigvuldigers",
-      "Brug: Transfer MLEO van Mijnwerkers spel naar Rush kluis"
-    ],
     goalDesc: "Voeg honden (mijnwerkers) samen, breek stenen en verdien munten. Munten zijn een in-game resource gebruikt voor upgrades en het kopen van meer mijnwerkers. Sommige activiteiten in het spel kunnen ook MLEO accumuleren (zie \"Mijnen en Tokens\" hieronder).",
     boardMerging: "Bord en Samenvoegen",
     boardSteps: [
@@ -1493,6 +1685,53 @@ const TEXT = {
       "Gebruik tokens om een arcade-sessie te starten zonder kluis MLEO te gebruiken",
       "Beloningen van gratis spelsessies worden toegevoegd aan je kluis, net als standaard sessiebeloningen"
     ],
+
+    chooseGameLobbyShort: "Vier bestemmingen, één gedeelde kluis: mijnwerkers, MLEO-basis, arcade en online arcade.",
+    minersDescShort: "Idle & upgrades. Kluis + on-chain claim.",
+    poolStatus: "Pool",
+    arcadeGames: "Arcade",
+    arcadeOnline: "Arcade Online",
+    arcadeRegularTitle: "MLEO — Arcade",
+    arcadeOnlineTitle: "MLEO — Arcade Online",
+    arcadeBadgeLabel: "Arcade",
+    onlineBadgeLabel: "Online",
+    arcadeDescShort: "Solo minigames. Gedeelde kluis & sessiebeloningen.",
+    arcadeOnlineDescShort: "Multiplayer & live modi. Dezelfde gedeelde kluis.",
+    arcadeOnlineHowIntro: "Live- en online-arcademodi gebruiken dezelfde gedeelde kluis en ecosysteemregels als solo-arcade. Sessiekosten en beloningen kunnen verschillen.",
+    legalShort: "Juridisch",
+    howToPlayArcadeTitle: "Hoe te spelen — Arcade",
+    howToPlayArcadeOnlineTitle: "Hoe te spelen — Arcade Online",
+    howToPlayMinersTitle: "Hoe te spelen — Miners",
+    questHow: {
+      title: "Hoe te spelen — MLEO-basis",
+      goal: "Doel",
+      goalDesc: "MLEO-basis is het strategische commandocentrum van het MLEO-ecosysteem. Bouw en upgrade je basis, beheer energie en stabiliteit, produceer grondstoffen, start expedities, raffineer materialen naar gebankt MLEO en stuur voorzichtig deel naar de gedeelde kluis.",
+      gameplay: "Jouw missie",
+      gameplaySteps: [
+        "Gebouwen upgraden",
+        "Energie en basisstabiliteit beheren",
+        "Erts, goud, schroot en data produceren",
+        "Data gebruiken voor geavanceerde operaties",
+        "Grondstoffen raffineren naar gebankt MLEO",
+        "Expedities starten voor voortgang",
+        "MLEO naar gedeelde kluis sturen met goede timing",
+        "Ecosysteem op lange termijn ondersteunen",
+      ],
+      features: "Handig om te weten",
+      featuresList: [
+        "Gebankt MLEO blijft op de basis tot verzending naar gedeelde kluis.",
+        "Verzending onderhevig aan daglimieten en efficiëntiedruk.",
+        "Modus werkt samen met Miners en Arcade.",
+        "Slim bouwen en basis versterken.",
+      ],
+    },
+    baseTitle: "MLEO — basis",
+    baseDesc: "Een ondersteunings- en managementbasis die mijnwerkers, arcade en de gedeelde kluis verbindt met missies, data, expedities en structurele verbeteringen.",
+    baseDescShort: "Steunpunt: missies, data en expedities voor de gedeelde kluis.",
+    baseBadgeLabel: "Ondersteuning",
+    playBase: "Speel MLEO-basis",
+    baseHub: "Vier bestemmingen, één gedeelde kluis: mijnwerkers, MLEO-basis, solo-arcade en online arcade.",
+    baseHubShort: "Vier bestemmingen, één kluis: mijnwerkers, basis, arcade en online arcade.",
     arcadeGoodToKnow: "Goed om te weten",
     arcadeGoodToKnowList: [
       "Je kluis wordt gedeeld tussen alle MLEO-games",
@@ -1507,40 +1746,14 @@ const TEXT = {
     logout: "Αποσύνδεση",
     liveTestnet: "Live Testnet • Κέρδισε MLEO στο παιχνίδι",
     chooseGame: "Επίλεξε το παιχνίδι σου",
-    chooseGameDesc: "Δύο λειτουργίες, ένα θησαυροφυλάκιο. Παίξε ενεργά με αναβαθμίσεις (Εξορυκτές) ή άσε την παθητική συσσώρευση να τρέχει (Token Rush). Μπορείς να αλλάξεις ανά πάσα στιγμή.",
     miners: "MLEO — Εξορυκτές",
     minersDesc: "Αδρανές παιχνίδι και αναβαθμίσεις με δώρα κλικ και ενισχύσεις. Ενσωμάτωση θησαυροφυλακίου + CLAIM on-chain για σταθερή, χειροκίνητη πρόοδο.",
     active: "Ενεργό",
     howToPlay: "ΠΩΣ ΝΑ ΠΑΙΞΕΙΣ",
     terms: "ΟΡΟΙ",
     playMiners: "Παίξε Εξορυκτές",
-    acceptTermsToPlay: "🔒 Αποδέξου όρους για να παίξεις",
-    rush: "MLEO — Rush",
-    rushDesc: "Προηγμένη εξόρυξη με σύστημα Prestige! Εξόρυξε MLEO παθητικά, αναβαθμίσε εξοπλισμό, κέρδισε επιτεύγματα και επαναφορά για μόνιμα μπόνους.",
-    passive: "Παθητικό",
-    playTokenRush: "Παίξε Token Rush",
     howToPlayTitle: "Πώς να παίξεις",
     goal: "Στόχος",
-    rushGoal: "Στόχος Rush",
-    rushGoalDesc: "Εξόρυξε MLEO tokens παθητικά και χτίσε την αυτοκρατορία σου! Χρησιμοποίησε εξορυχθέντα MLEO για αναβαθμίσεις εξοπλισμού, κέρδισμα επιτευγμάτων και prestige για μόνιμα μπόνους. Όσο περισσότερο παίζεις, τόσο πιο δυνατός γίνεσαι.",
-    rushGameplay: "Παιχνίδι",
-    rushGameplaySteps: [
-      "Εξόρυξε MLEO παθητικά - ο εξοπλισμός σου λειτουργεί αυτόματα",
-      "Κάνε κλικ BOOST για προσωρινή αύξηση ταχύτητας εξόρυξης (+2% ανά κλικ)",
-      "Συλλέγει εξορυχθέντα MLEO στο θησαυροφυλάκιό σου για αναβαθμίσεις και αξιώσεις",
-      "Αγόρασε αναβαθμίσεις: Auto-Drill, Helmet, Cart και Leo Bot για ταχύτερη εξόρυξη",
-      "Κέρδισε επιτεύγματα φτάνοντας ορόσημα για μπόνους ανταμοιβές",
-      "Prestige στα 10M MLEO για επαναφορά προόδου για μόνιμα μπόνους"
-    ],
-    rushFeatures: "Κύρια χαρακτηριστικά",
-    rushFeaturesList: [
-      "Σύστημα Prestige: Επαναφορά αναβαθμίσεων για μόνιμο +2% ανά σημείο prestige",
-      "Επιτεύγματα: 6 διαφορετικά επιτεύγματα με ανταμοιβές σημείων Prestige",
-      "Αναβαθμίσεις: 4 τύποι εξοπλισμού με πολλαπλά επίπεδα ο καθένας",
-      "Σύστημα Boost: Προσωρινή αύξηση ταχύτητας που μειώνεται με τον χρόνο",
-      "Σύστημα σωματείων: Γίνε μέλος σωματείων εξόρυξης για μπόνους πολλαπλασιαστές",
-      "Γέφυρα: Μεταφορά MLEO από το παιχνίδι Εξορυκτές στο θησαυροφυλάκιο Rush"
-    ],
     goalDesc: "Συνένωσε σκυλιά (εξορυκτές), σπάσε πέτρες και κέρδισε νομίσματα. Τα νομίσματα είναι πόρος εντός παιχνιδιού που χρησιμοποιείται για αναβαθμίσεις και αγορά περισσότερων εξορυκτών. Μερικές δραστηριότητες στο παιχνίδι μπορούν επίσης να συσσωρεύσουν MLEO (βλέπε \"Εξόρυξη και Tokens\" παρακάτω).",
     boardMerging: "Ταμπλό και Συγχώνευση",
     boardSteps: [
@@ -1592,7 +1805,53 @@ const TEXT = {
       "Κάθε παιχνίδι παρακολουθεί τη δραστηριότητά σας, τις ολοκληρωμένες συνεδρίες, την καλύτερη βαθμολογία, τις σειρές και τα ορόσημα προόδου",
       "Ορισμένα παιχνίδια χρησιμοποιούν τυχαία γεγονότα, ενώ άλλα εστιάζουν στον συγχρονισμό, την αντίδραση, τη μνήμη ή τη λήψη αποφάσεων",
       "Κάντε κλικ στο κουμπί ℹ️ σε κάθε κάρτα παιχνιδιού για να δείτε τους κανόνες, τα στοιχεία ελέγχου και τη δομή ανταμοιβών"
-    ]
+    ],
+    chooseGameLobbyShort: "Τέσσερις προορισμοί, ένα κοινό χρηματοκιβώτιο: εξορυκτές, MLEO Βάση, arcade και arcade online.",
+    minersDescShort: "Idle και αναβαθμίσεις. Vault + on-chain claim.",
+    poolStatus: "Pool",
+    arcadeGames: "Arcade",
+    arcadeOnline: "Arcade Online",
+    arcadeRegularTitle: "MLEO — Arcade",
+    arcadeOnlineTitle: "MLEO — Arcade Online",
+    arcadeBadgeLabel: "Arcade",
+    onlineBadgeLabel: "Online",
+    arcadeDescShort: "Solo mini παιχνίδια. Κοινό vault & ανταμοιβές session.",
+    arcadeOnlineDescShort: "Πολλοί παίκτες & live modes. Το ίδιο κοινό vault.",
+    arcadeOnlineHowIntro: "Τα live και online arcade modes χρησιμοποιούν το ίδιο κοινό vault και κανόνες με το solo arcade. Κόστος session και ανταμοιβές μπορεί να διαφέρουν.",
+    legalShort: "Νομικά",
+    howToPlayArcadeTitle: "Πώς να παίξεις — Arcade",
+    howToPlayArcadeOnlineTitle: "Πώς να παίξεις — Arcade Online",
+    howToPlayMinersTitle: "Πώς να παίξεις — Miners",
+    questHow: {
+      title: "Πώς να παίξεις — MLEO Βάση",
+      goal: "Στόχος",
+      goalDesc: "Η MLEO Βάση είναι το στρατηγικό κέντρο διοίκησης του οικοσυστήματος MLEO. Χτίσε και αναβάθμισε τη βάση, διαχειρίσου ενέργεια και σταθερότητα, παρήγαγε πόρους, εκτέλεσε αποστολές, καθάρισε υλικά σε τραπεζικό MLEO και στείλε μέρος στο κοινό vault.",
+      gameplay: "Η αποστολή σου",
+      gameplaySteps: [
+        "Αναβάθμισε κτίρια",
+        "Διαχειρίσου ενέργεια και σταθερότητα βάσης",
+        "Παρήγαγε μετάλλευμα, χρυσό, σκραπ και δεδομένα",
+        "Χρησιμοποίησε δεδομένα για προχωρημένες ενέργειες",
+        "Καθάρισε πόρους σε τραπεζικό MLEO",
+        "Εκτέλεσε αποστολές για πρόοδο",
+        "Στείλε MLEO στο κοινό vault με σωστό timing",
+        "Υποστήριξε το οικοσύστημα μακροπρόθεσμα",
+      ],
+      features: "Καλό να ξέρεις",
+      featuresList: [
+        "Το τραπεζικό MLEO μένει στη βάση μέχρι αποστολή στο κοινό vault.",
+        "Η αποστολή υπόκειται σε ημερήσια όρια και πίεση αποδοτικότητας.",
+        "Λειτουργεί με Miners και Arcade για μακροπρόθεσμη πρόοδο.",
+        "Χτίσε έξυπνα και ενίσχυσε τη βάση.",
+      ],
+    },
+    baseTitle: "MLEO — Βάση",
+    baseDesc: "Βάση υποστήριξης και διαχείρισης που συνδέει εξορυκτές, arcade και το κοινό χρηματοκιβώτιο με αποστολές, δεδομένα, εκστρατείες και δομικές αναβαθμίσεις.",
+    baseDescShort: "Κέντρο υποστήριξης: αποστολές, δεδομένα και εκστρατείες για το κοινό χρηματοκιβώτιο.",
+    baseBadgeLabel: "Υποστήριξη",
+    playBase: "Παίξε MLEO Βάση",
+    baseHub: "Τέσσερις προορισμοί, ένα κοινό χρηματοκιβώτιο: εξορυκτές, MLEO Βάση, μονό arcade και arcade online.",
+    baseHubShort: "Τέσσερις προορισμοί, ένα χρηματοκιβώτιο: εξορυκτές, Βάση, arcade και arcade online.",
   },
   he: {
     name: "עברית", dir: "rtl", code: "he",
@@ -1600,40 +1859,14 @@ const TEXT = {
     logout: "התנתק",
     liveTestnet: "רשת בדיקה חיה • הרוויחו MLEO במשחק",
     chooseGame: "בחר את המשחק שלך",
-    chooseGameDesc: "שני מצבים, Vault אחד. שחק באופן פעיל עם שדרוגים (כורים) או תן לצבירה פסיבית לרוץ (Token Rush). אתה יכול להחליף בכל עת.",
     miners: "MLEO — כורים",
     minersDesc: "משחק מנוחה ושדרוגים עם מתנות לחיצה והגברות. אינטגרציה עם Vault + CLAIM על השרשרת להתקדמות יציבה וידנית.",
     active: "פעיל",
     howToPlay: "איך לשחק",
     terms: "תנאים",
     playMiners: "שחק כורים",
-    acceptTermsToPlay: "🔒 קבל תנאים כדי לשחק",
-    rush: "MLEO — Rush",
-    rushDesc: "כרייה מתקדמת עם מערכת Prestige! כרה MLEO פסיבית, שדרג ציוד, השג הישגים ואיפוס עבור בונוסים קבועים.",
-    passive: "פסיבי",
-    playTokenRush: "שחק Token Rush",
     howToPlayTitle: "איך לשחק",
     goal: "מטרה",
-    rushGoal: "מטרת Rush",
-    rushGoalDesc: "כרה מטבעות MLEO פסיבית ובנה את האימפריה שלך! השתמש ב-MLEO הכרו לשדרוג ציוד, השג הישגים ו-prestige עבור בונוסים קבועים. ככל שתשחק יותר, תהיה חזק יותר.",
-    rushGameplay: "משחק",
-    rushGameplaySteps: [
-      "כרה MLEO פסיבית - הציוד שלך עובד אוטומטית",
-      "לחץ BOOST כדי להגדיל זמנית את מהירות הכרייה (+2% לכל לחיצה)",
-      "אסוף MLEO כרו ל-Vault שלך לשדרוגים ותביעות",
-      "קנה שדרוגים: Auto-Drill, Helmet, Cart ו-Leo Bot לכרייה מהירה יותר",
-      "השג הישגים על ידי הגעה לאבני דרך עבור תגמולי בונוס",
-      "Prestige ב-10M MLEO כדי לאפס התקדמות עבור בונוסים קבועים"
-    ],
-    rushFeatures: "תכונות עיקריות",
-    rushFeaturesList: [
-      "מערכת Prestige: אפס שדרוגים עבור +2% קבוע לכל נקודת prestige",
-      "הישגים: 6 הישגים שונים עם תגמולי נקודות Prestige",
-      "שדרוגים: 4 סוגי ציוד עם מספר רמות כל אחד",
-      "מערכת Boost: הגדלת מהירות זמנית שמדעכת עם הזמן",
-      "מערכת Guild: הצטרף לגילדות כרייה עבור מכפילי בונוס",
-      "Bridge: העבר MLEO ממשחק Miners ל-Vault של Rush"
-    ],
     goalDesc: "מזג כלבים (כורים), שבור סלעים והרווח מטבעות. מטבעות הם משאב במשחק המשמש לשדרוגים וקניית כורים נוספים. פעילות מסוימת במשחק יכולה גם לצבור MLEO (ראה \"כרייה ומטבעות\" למטה).",
     boardMerging: "לוח ומיזוג",
     boardSteps: [
@@ -1679,6 +1912,49 @@ const TEXT = {
       "השתמשו באסימונים כדי להתחיל סשן ארקייד אחד ללא שימוש ב-MLEO מהכספת",
       "פרסים מסשני משחק חינמיים מתווספים לכספת שלכם בדיוק כמו פרסי סשן סטנדרטיים"
     ],
+
+    chooseGameLobbyShort: "ארבעה יעדים, כספת אחת משותפת: כורים, MLEO בסיס, ארקייד וארקייד אונליין.",
+    minersDescShort: "משחק מנוחה ושדרוגים. Vault + CLAIM על השרשרת.",
+    poolStatus: "מאגר",
+    arcadeGames: "ארקייד",
+    arcadeOnline: "ארקייד אונליין",
+    arcadeRegularTitle: "MLEO — ארקייד",
+    arcadeOnlineTitle: "MLEO — ארקייד אונליין",
+    arcadeBadgeLabel: "ארקייד",
+    onlineBadgeLabel: "אונליין",
+    arcadeDescShort: "מיני-משחקים לבד. Vault משותף ופרסי סשן.",
+    arcadeOnlineDescShort: "רב-משתתפים ומצבים חיים. אותו Vault משותף.",
+    arcadeOnlineHowIntro: "מצבי ארקייד חיים ואונליין משתמשים באותו Vault משותף וכללי אקוסיסטם כמו ארקייד יחיד. עלויות סשן ופרסים עשויים להשתנות לפי המצב.",
+    legalShort: "משפטי",
+    howToPlayArcadeTitle: "איך לשחק — ארקייד",
+    howToPlayArcadeOnlineTitle: "איך לשחק — ארקייד אונליין",
+    howToPlayMinersTitle: "איך לשחק — כורים",
+    questHow: {
+      title: "איך לשחק — MLEO בסיס",
+      goal: "מטרת המשחק",
+      goalDesc: "MLEO בסיס הוא מרכז הפיקוד האסטרטגי שלך באקוסיסטם של MLEO. בנה ושדרג את הבסיס שלך, נהל אנרגיה, הפק משאבים, צא למשלחות, זקק חומרים ל-MLEO שמור ושלח אותו ל-Vault המשותף.",
+      gameplay: "איך זה עובד",
+      gameplaySteps: [
+        "שדרג מבנים",
+        "נהל אנרגיה",
+        "הפק Ore, Gold, Scrap ו-Data",
+        "זקק Banked MLEO",
+        "צא למשלחות",
+        "שלח MLEO ל-Vault המשותף",
+      ],
+      features: "מה חשוב לדעת",
+      featuresList: [
+        "המוד הזה עובד יחד עם Miners ו-Arcade כדי לתמוך בהתקדמות ארוכת טווח, utility חכם ואיזון טוקן בריא.",
+        "בנה חכם, גדל בהדרגה, וחזק את הבסיס שלך.",
+      ],
+    },
+    baseTitle: "MLEO — בסיס",
+    baseDesc: "בסיס ניהול תומך שמחבר בין כורים, ארקייד והכספת המשותפת עם משימות, נתונים, משלחות ושדרוגי בסיס.",
+    baseDescShort: "בסיס תומך: משימות, נתונים ומשלחות לכספת המשותפת.",
+    baseBadgeLabel: "תמיכה",
+    playBase: "שחק MLEO בסיס",
+    baseHub: "ארבעה יעדים, כספת אחת משותפת: כורים, MLEO בסיס, ארקייד יחיד וארקייד אונליין.",
+    baseHubShort: "ארבעה יעדים, כספת אחת: כורים, בסיס, ארקייד וארקייד אונליין.",
     arcadeGoodToKnow: "טוב לדעת",
     arcadeGoodToKnowList: [
       "הכספת שלכם משותפת בין כל משחקי MLEO",
@@ -1791,74 +2067,32 @@ function Modal({ isOpen, onClose, children, maxWidth = "2xl", padding = "6" }) {
 
 // ===== How to Play Component =====
 function HowToPlay({ lang, onClose, gameType = "miners" }) {
-  const text = TEXT[lang];
-  const questText = lang === "he"
-    ? {
-        title: "איך לשחק - MLEO BASE",
-        goal: "מטרת המשחק",
-        goalDesc: "MLEO BASE הוא מרכז הפיקוד האסטרטגי שלך באקוסיסטם של MLEO. בנה ושדרג את הבסיס שלך, נהל אנרגיה, הפק משאבים, צא למשלחות, זקק חומרים ל-MLEO שמור ושלח אותו ל-Vault המשותף.",
-        gameplay: "איך זה עובד",
-        gameplaySteps: [
-          "שדרג מבנים",
-          "נהל אנרגיה",
-          "הפק Ore, Gold, Scrap ו-Data",
-          "זקק Banked MLEO",
-          "צא למשלחות",
-          "שלח MLEO ל-Vault המשותף",
-        ],
-        features: "מה חשוב לדעת",
-        featuresList: [
-          "המוד הזה עובד יחד עם Miners ו-Arcade כדי לתמוך בהתקדמות ארוכת טווח, utility חכם ואיזון טוקן בריא.",
-          "בנה חכם, גדל בהדרגה, וחזק את הבסיס שלך.",
-        ],
-      }
-    : {
-        title: "How to Play - MLEO BASE",
-        goal: "Goal",
-        goalDesc: "MLEO BASE is the strategic command center of the MLEO ecosystem. Build and upgrade your base, manage energy and stability, produce key resources, launch expeditions, refine materials into banked MLEO, and carefully ship part of it to the shared vault.",
-        gameplay: "Your mission",
-        gameplaySteps: [
-          "Upgrade buildings",
-          "Manage energy and base stability",
-          "Produce Ore, Gold, Scrap, and Data",
-          "Use Data for advanced operations",
-          "Refine resources into banked MLEO",
-          "Launch expeditions for progression and materials",
-          "Ship MLEO to the shared vault with smart timing",
-          "Support the wider ecosystem through long-term planning",
-        ],
-        features: "Good to Know",
-        featuresList: [
-          "Banked MLEO stays inside BASE until you ship it to the shared vault.",
-          "Shipping is controlled by daily limits and efficiency pressure, so smart pacing matters.",
-          "This mode works together with Miners and Arcade to support long-term progression, smart utility, and healthier token balance.",
-          "Build smart, maintain stability, grow steadily, and strengthen your base.",
-        ],
-      };
-  
+  const text = TEXT[lang] || TEXT.en;
+  const qh = text.questHow || TEXT.en.questHow;
+
   if (gameType === "quest") {
     return (
       <div>
-        <h2 className="text-2xl font-bold mb-4">{questText.title}</h2>
-        
+        <h2 className="text-2xl font-bold mb-4">{qh.title}</h2>
+
         <section className="mb-6">
-          <h3 className="font-bold text-lg mb-2">{questText.goal}</h3>
-          <p className="text-gray-700">{questText.goalDesc}</p>
+          <h3 className="font-bold text-lg mb-2">{qh.goal}</h3>
+          <p className="text-gray-700">{qh.goalDesc}</p>
         </section>
-        
+
         <section className="mb-6">
-          <h3 className="font-bold text-lg mb-2">{questText.gameplay}</h3>
+          <h3 className="font-bold text-lg mb-2">{qh.gameplay}</h3>
           <ol className="list-decimal ml-5 space-y-2">
-            {questText.gameplaySteps.map((step, index) => (
+            {qh.gameplaySteps.map((step, index) => (
               <li key={index} className="text-gray-700">{step}</li>
             ))}
           </ol>
         </section>
-        
+
         <section className="mb-6">
-          <h3 className="font-bold text-lg mb-2">{questText.features}</h3>
+          <h3 className="font-bold text-lg mb-2">{qh.features}</h3>
           <ul className="list-disc ml-5 space-y-2">
-            {questText.featuresList.map((item, index) => (
+            {qh.featuresList.map((item, index) => (
               <li key={index} className="text-gray-700">{item}</li>
             ))}
           </ul>
@@ -1866,15 +2100,15 @@ function HowToPlay({ lang, onClose, gameType = "miners" }) {
       </div>
     );
   }
-  
+
   if (gameType === "arcade" || gameType === "arcade-online") {
     const isOnline = gameType === "arcade-online";
+    const arcadeHeading = isOnline
+      ? (text.howToPlayArcadeOnlineTitle || TEXT.en.howToPlayArcadeOnlineTitle)
+      : (text.howToPlayArcadeTitle || TEXT.en.howToPlayArcadeTitle);
     return (
       <div>
-        <h2 className="text-2xl font-bold mb-4">
-          {text.howToPlayTitle}
-          {isOnline ? " — Arcade Online" : " — Arcade"}
-        </h2>
+        <h2 className="text-2xl font-bold mb-4">{arcadeHeading}</h2>
         {isOnline && text.arcadeOnlineHowIntro && (
           <p className="text-gray-600 mb-4 text-sm leading-relaxed">{text.arcadeOnlineHowIntro}</p>
         )}
@@ -1916,7 +2150,7 @@ function HowToPlay({ lang, onClose, gameType = "miners" }) {
   
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4">{text.howToPlayTitle} - Miners</h2>
+      <h2 className="text-2xl font-bold mb-4">{text.howToPlayMinersTitle || TEXT.en.howToPlayMinersTitle}</h2>
       
       <section className="mb-6">
         <h3 className="font-bold text-lg mb-2">{text.goal}</h3>
@@ -2855,25 +3089,6 @@ export default function GamesHub() {
 
   const text = useMemo(() => TEXT[lang] || TEXT.en, [lang]);
   const dir = text.dir || "ltr";
-  const questCard = lang === "he"
-    ? {
-        title: "MLEO — BASE",
-        desc: "בסיס ניהול תומך שמחבר בין Miners, Arcade וה-Vault המשותף עם משימות, DATA, משלחות ושדרוגי בסיס.",
-        descShort: "בסיס תומך: משימות, DATA ומשלחות ל-Vault המשותף.",
-        badge: "Support",
-        play: "שחק MLEO BASE",
-        hub: "ארבעה יעדים, Vault אחד: Miners, MLEO BASE, ארקייד וארקייד אונליין — כולם באותו Vault משותף.",
-        hubShort: "ארבעה יעדים, Vault אחד: Miners, BASE, ארקייד וארקייד אונליין.",
-      }
-    : {
-        title: "MLEO — BASE",
-        desc: "A support-management base that links Miners, Arcade and the shared vault with missions, DATA, expeditions and structural upgrades.",
-        descShort: "Support hub: missions, DATA & expeditions for the shared vault.",
-        badge: "Support",
-        play: "Play MLEO BASE",
-        hub: "Four destinations, one shared vault: Miners, MLEO BASE, solo Arcade, and Arcade Online.",
-        hubShort: "Four destinations, one vault: Miners, BASE, Arcade, and Arcade Online.",
-      };
 
   if (!mounted) {
   return (
@@ -2961,7 +3176,7 @@ export default function GamesHub() {
                   {text.chooseGame}
                 </h1>
                 <p className="text-zinc-400 text-xs mt-1.5 leading-snug line-clamp-2 mx-auto max-w-sm">
-                  {questCard.hubShort || text.chooseGameLobbyShort || questCard.hub}
+                  {text.baseHubShort || text.baseHub || text.chooseGameLobbyShort}
                 </p>
               </header>
 
@@ -2984,7 +3199,7 @@ export default function GamesHub() {
                         onClick={() => open("miners-how")}
                         className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-2 py-1 rounded-md text-[10px] font-bold border border-blue-500/35 leading-none whitespace-nowrap"
                       >
-                        HOW TO
+                        {text.howToPlay}
                       </button>
                       <button
                         type="button"
@@ -3004,13 +3219,13 @@ export default function GamesHub() {
 
                 <article className="rounded-xl border border-white/12 bg-black/45 backdrop-blur-sm p-2 flex flex-col min-h-[160px] shadow-md">
                   <div className="flex items-start justify-between gap-1">
-                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{questCard.title}</h2>
+                    <h2 className="text-[11px] font-extrabold leading-tight line-clamp-2 text-left">{text.baseTitle}</h2>
                     <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-orange-500/15 text-orange-300 border border-orange-500/30">
-                      {questCard.badge}
+                      {text.baseBadgeLabel}
                     </span>
                   </div>
                   <p className="text-[10px] text-zinc-400 mt-1 leading-snug line-clamp-3 flex-1">
-                    {questCard.descShort || questCard.desc}
+                    {text.baseDescShort || text.baseDesc}
                   </p>
                   <div className="mt-auto pt-1 flex flex-col gap-1">
                     <div className="flex gap-1">
@@ -3019,7 +3234,7 @@ export default function GamesHub() {
                         onClick={() => open("quest-how")}
                         className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-2 py-1 rounded-md text-[10px] font-bold border border-blue-500/35 leading-none whitespace-nowrap"
                       >
-                        HOW TO
+                        {text.howToPlay}
                       </button>
                       <button
                         type="button"
@@ -3031,7 +3246,7 @@ export default function GamesHub() {
                     </div>
                     <Link href="/mleo-base" className="block">
                       <span className="flex w-full items-center justify-center bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white py-2 rounded-lg text-[11px] font-bold shadow-md active:opacity-90">
-                        {questCard.play}
+                        {text.playBase}
                       </span>
                     </Link>
                   </div>
@@ -3056,7 +3271,7 @@ export default function GamesHub() {
                         onClick={() => open("arcade-how")}
                         className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-2 py-1 rounded-md text-[10px] font-bold border border-blue-500/35 leading-none whitespace-nowrap"
                       >
-                        HOW TO
+                        {text.howToPlay}
                       </button>
                       <button
                         type="button"
@@ -3093,7 +3308,7 @@ export default function GamesHub() {
                         onClick={() => open("arcade-online-how")}
                         className="flex-1 bg-blue-600/25 hover:bg-blue-600/35 text-blue-200 px-2 py-1 rounded-md text-[10px] font-bold border border-blue-500/35 leading-none whitespace-nowrap"
                       >
-                        HOW TO
+                        {text.howToPlay}
                       </button>
                       <button
                         type="button"
@@ -3142,7 +3357,7 @@ export default function GamesHub() {
                 </span>
                 <h1 className="mt-1 text-2xl font-extrabold tracking-tight lg:text-3xl">{text.chooseGame}</h1>
                 <p className="mx-auto mt-1 line-clamp-2 max-w-2xl text-xs leading-snug text-zinc-300 lg:text-sm">
-                  {questCard.hubShort || questCard.hub}
+                  {text.baseHubShort || text.baseHub || text.chooseGameLobbyShort}
                 </p>
               </header>
 
@@ -3197,14 +3412,14 @@ export default function GamesHub() {
                       <div className="text-3xl leading-none lg:text-[2rem]" aria-hidden>
                         🏗️
                       </div>
-                      <h2 className="text-xl font-extrabold leading-snug tracking-tight lg:text-[1.3125rem]">{questCard.title}</h2>
+                      <h2 className="text-xl font-extrabold leading-snug tracking-tight lg:text-[1.3125rem]">{text.baseTitle}</h2>
                     </div>
                     <span className="shrink-0 rounded-full border border-orange-500/35 bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold text-orange-200">
-                      {questCard.badge}
+                      {text.baseBadgeLabel}
                     </span>
                   </div>
                   <p className="mt-2 line-clamp-4 min-h-0 flex-1 text-left text-[13px] font-medium leading-relaxed text-zinc-200/95 lg:text-sm">
-                    {questCard.descShort || questCard.desc}
+                    {text.baseDescShort || text.baseDesc}
                   </p>
                   <div className="mt-2.5 flex shrink-0 flex-col gap-2">
                     <div className="flex flex-wrap justify-center gap-2">
@@ -3227,7 +3442,7 @@ export default function GamesHub() {
                       href="/mleo-base"
                       className="block w-full rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 py-2.5 text-center text-sm font-bold text-white shadow-lg hover:from-orange-700 hover:to-amber-700 lg:py-3"
                     >
-                      {questCard.play}
+                      {text.playBase}
                     </Link>
                   </div>
                 </article>
