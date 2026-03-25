@@ -54,9 +54,11 @@ function useIOSViewportFix() {
 
 
 // ====== Config ======
-const LANES = 4;
+const LANES = 3;
 const SLOTS_PER_LANE = 4;
 const MAX_MINERS = LANES * SLOTS_PER_LANE;
+/** Board Y centers for each lane (fraction of board height). Matches former rows 1–3 after removing the top row under CLAIM. */
+const LANE_CENTER_Y_FRACS = [0.53, 0.68, 0.825];
 const PADDING = 6;
 const LS_KEY = "mleoMiners_v5_85";
 // First–play terms acceptance gate (global versioned)
@@ -1334,6 +1336,10 @@ useEffect(() => {
   const loaded = loadSafe();
   const init = loaded ? { ...freshState(), ...loaded } : freshState();
 
+  // Prevent runtime crashes when loading older/newer saves with different lane counts.
+  // Must run before any logic that touches `init.lanes[l].rock/slots` (e.g. costBase + draw()).
+  normalizeSavedLanesToLaneCount(init);
+
   if (loaded && loaded.minerScale == null) init.minerScale = 1.60;
   if (loaded && loaded.minerWidth  == null) init.minerWidth  = 0.8;
   // וודא שיש pendingOfflineStageCounts
@@ -1787,8 +1793,8 @@ function boardRect(){
 function laneRect(lane){
   const b = boardRect();
   const h = b.h * 0.18;
-  const centers = [0.380,0.530,0.680,0.825];
-  const centerY = b.y + b.h * centers[lane];
+  const frac = LANE_CENTER_Y_FRACS[lane] ?? LANE_CENTER_Y_FRACS[LANE_CENTER_Y_FRACS.length - 1];
+  const centerY = b.y + b.h * frac;
   const y = Math.max(b.y, Math.min(centerY - h*0.5, b.y + b.h - h));
   return { x:b.x, y, w:b.w, h };
 }
@@ -2234,6 +2240,116 @@ function newRock(lane, idx) {
   return { lane, idx, maxHp: hp, hp };
 }
 
+/**
+ * Ensures `s.lanes` matches the current `LANES` constant.
+ * Some stored saves can have a different lane count; without this,
+ * `draw()` can crash when it reads `s.lanes[l].slots[k]`.
+ */
+function normalizeSavedLanesToLaneCount(s) {
+  if (!s) return;
+
+  if (!Array.isArray(s.lanes)) s.lanes = [];
+
+  if (s.lanes.length < LANES) {
+    while (s.lanes.length < LANES) {
+      const laneIdx = s.lanes.length;
+      s.lanes.push({
+        slots: Array(SLOTS_PER_LANE).fill(null),
+        rock: newRock(laneIdx, 0),
+        rockCount: 0,
+        beltShift: 0,
+      });
+    }
+  } else if (s.lanes.length > LANES) {
+    const old = s.lanes;
+    const dropCount = old.length - LANES;
+    const kept = old.slice(dropCount).map((ln, idx) => {
+      const rockCount = Number(ln?.rockCount ?? ln?.rock?.idx ?? 0) || 0;
+      const rock =
+        ln?.rock && typeof ln.rock.maxHp === "number" && typeof ln.rock.hp === "number"
+          ? { ...ln.rock, lane: idx, idx: Number(ln.rock.idx ?? rockCount) }
+          : newRock(idx, rockCount);
+      return {
+        slots: Array.isArray(ln?.slots) ? [...ln.slots] : Array(SLOTS_PER_LANE).fill(null),
+        rock,
+        rockCount,
+        beltShift: ln?.beltShift ?? 0,
+      };
+    });
+    s.lanes = kept;
+
+    const miners = s.miners && typeof s.miners === "object" ? s.miners : {};
+    const orphanIds = [];
+    for (const id of Object.keys(miners)) {
+      const m = miners[id];
+      if (!m || typeof m.lane !== "number") continue;
+      if (m.lane < dropCount) orphanIds.push(Number(id));
+      else m.lane -= dropCount;
+    }
+
+    for (let l = 0; l < LANES; l++) {
+      s.lanes[l].slots = Array(SLOTS_PER_LANE).fill(null);
+    }
+    for (const id of Object.keys(miners)) {
+      const m = miners[id];
+      if (!m || orphanIds.includes(Number(id))) continue;
+      if (m.lane >= 0 && m.lane < LANES && m.slot >= 0 && m.slot < SLOTS_PER_LANE) {
+        s.lanes[m.lane].slots[m.slot] = { id: m.id };
+      }
+    }
+    for (const oid of orphanIds) {
+      const m = miners[oid];
+      if (!m) continue;
+      let placed = false;
+      for (let l = 0; l < LANES && !placed; l++) {
+        for (let slot = 0; slot < SLOTS_PER_LANE && !placed; slot++) {
+          if (!s.lanes[l].slots[slot]) {
+            m.lane = l;
+            m.slot = slot;
+            s.lanes[l].slots[slot] = { id: oid };
+            placed = true;
+          }
+        }
+      }
+      if (!placed) delete miners[oid];
+    }
+  }
+
+  for (let l = 0; l < LANES; l++) {
+    if (!s.lanes[l]) {
+      s.lanes[l] = {
+        slots: Array(SLOTS_PER_LANE).fill(null),
+        rock: newRock(l, 0),
+        rockCount: 0,
+        beltShift: 0,
+      };
+    }
+
+    const lane = s.lanes[l];
+
+    if (!Array.isArray(lane.slots)) lane.slots = Array(SLOTS_PER_LANE).fill(null);
+    if (lane.slots.length < SLOTS_PER_LANE) {
+      while (lane.slots.length < SLOTS_PER_LANE) lane.slots.push(null);
+    } else if (lane.slots.length > SLOTS_PER_LANE) {
+      lane.slots = lane.slots.slice(0, SLOTS_PER_LANE);
+    }
+
+    const rockCount = Number(lane.rockCount ?? lane.rock?.idx ?? 0) || 0;
+    if (!lane.rock || typeof lane.rock.maxHp !== "number" || typeof lane.rock.hp !== "number") {
+      lane.rock = newRock(l, rockCount);
+    } else {
+      lane.rock = {
+        ...lane.rock,
+        lane: l,
+        idx: Number(lane.rock.idx ?? rockCount),
+        maxHp: typeof lane.rock.maxHp === "number" ? lane.rock.maxHp : newRock(l, rockCount).maxHp,
+        hp: typeof lane.rock.hp === "number" ? lane.rock.hp : newRock(l, rockCount).hp,
+      };
+    }
+    lane.rockCount = rockCount;
+  }
+}
+
 function makeFreshState() { return freshState(); }
 
 // ── Save/Load ──
@@ -2296,12 +2412,14 @@ function expectedRockCoinReward(s) {
   if (bestDps <= 0) {
     let sum = 0;
     for (let l = 0; l < LANES; l++) {
-      const rk = s.lanes[l].rock;
+      const rk = s.lanes?.[l]?.rock;
+      if (!rk?.maxHp) continue;
       sum += Math.floor(rk.maxHp * GOLD_FACTOR * (s.goldMult || 1));
     }
     return Math.floor(sum / LANES);
   }
-  const rock = s.lanes[bestLane].rock;
+  const rock = s.lanes?.[bestLane]?.rock;
+  if (!rock?.maxHp) return 0;
   return Math.floor(rock.maxHp * GOLD_FACTOR * (s.goldMult || 1));
 }
 
@@ -2310,7 +2428,8 @@ function expectedGiftCoinReward(s) {
   const mult = (s.goldMult || 1);
   const vals = [];
   for (let l = 0; l < LANES; l++) {
-    const rk = s.lanes[l].rock;
+    const rk = s.lanes?.[l]?.rock;
+    if (!rk?.maxHp) continue;
     vals.push(Math.floor(rk.maxHp * GOLD_FACTOR * mult));
   }
   if (!vals.length) return 0;
@@ -2359,7 +2478,7 @@ function afterPurchaseBump(s) {
 }
 function trySpawnAtSlot(lane, slot) {
   const s = stateRef.current; if (!s) return;
-  if (countMiners(s) >= MAX_MINERS) { try{play?.(S_CLICK);}catch{}; alert("Maximum 16 miners on the board."); return; }
+  if (countMiners(s) >= MAX_MINERS) { try{play?.(S_CLICK);}catch{}; alert(`Maximum ${MAX_MINERS} miners on the board.`); return; }
   if (s.spawnCost == null || s.gold < s.spawnCost) { try{play?.(S_CLICK);}catch{}; return; }
   const ok = spawnMinerAt(s, lane, slot, s.spawnLevel);
   if (!ok) return;
@@ -2374,7 +2493,7 @@ function trySpawnAtSlot(lane, slot) {
 }
 function addMiner() {
   const s = stateRef.current; if (!s) return;
-  if (countMiners(s) >= MAX_MINERS) { try{play?.(S_CLICK);}catch{}; alert("Maximum 16 miners on the board."); return; }
+  if (countMiners(s) >= MAX_MINERS) { try{play?.(S_CLICK);}catch{}; alert(`Maximum ${MAX_MINERS} miners on the board.`); return; }
   if (s.spawnCost == null || s.gold < s.spawnCost) return;
   const ok = spawnMiner(s, s.spawnLevel);
   if (!ok) return;
@@ -2868,7 +2987,7 @@ Purchases left to the next level: ${toNextLv}.`;
 const spawnCostNow=sNow?.spawnCost??ui.spawnCost;
 const dpsCostNow=(typeof _dpsCost==="function")?_dpsCost(sNow):160;
 const goldCostNow=(typeof _goldCost==="function")?_goldCost(sNow):160;
-const canBuyMiner=!!sNow&&sNow.gold>=spawnCostNow&&Object.keys(sNow.miners||{}).length<(typeof MAX_MINERS==="number"?MAX_MINERS:16);
+const canBuyMiner=!!sNow&&sNow.gold>=spawnCostNow&&Object.keys(sNow.miners||{}).length<MAX_MINERS;
 const canBuyDps=!!sNow&&sNow.gold>=dpsCostNow;
 const canBuyGold=!!sNow&&sNow.gold>=goldCostNow;
 const boughtCount = sNow?.totalPurchased || 0;
@@ -3705,6 +3824,7 @@ MLEO
                 <ol className="list-decimal ml-5 space-y-1">
                   <li>Tap <b>ADD</b> on an empty slot to place a dog. Cost rises over time.</li>
                   <li>Drag two dogs of the same level together to merge into a higher level.</li>
+                  <li>The board has 3 lanes with 4 dogs each (12 dogs max).</li>
                   <li>Each dog adds damage per second (DPS) to its lane. When a rock breaks you receive Coins.</li>
                 </ol>
               </section>
