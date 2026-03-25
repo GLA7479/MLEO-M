@@ -125,6 +125,9 @@ const ALLOW_TESTNET_WALLET_FLAG =
 /** Dev-only: persisted index 0 = default BG, 1…N = /images/bg-caveN.png */
  const DEV_BG_LS_KEY = "mleo_dev_bg_index";
  const DEV_BG_VARIANT_COUNT = 20;
+ /** Dev-only rock sprite: 0 = default rock.png, 1–6 = /images/rockN.png */
+ const DEV_ROCK_LS_KEY = "mleo_dev_rock_index";
+ const DEV_ROCK_VARIANT_COUNT = 6;
  function isDevBgPickerEnabled(){
    try {
      if (isLocalHost()) return true;
@@ -701,6 +704,8 @@ const router = useRouter();
   const stateRef  = useRef(null);
   /** Dev background override; read in drawBg (ref so RAF loop always sees latest). */
   const boardBgSrcRef = useRef(IMG_BG);
+  /** Dev rock sprite override; read in drawRock. */
+  const rockImgSrcRef = useRef(IMG_ROCK);
   const flagsRef = useRef({ isMobileLandscape: false, paused: true });
   const { openConnectModal } = useConnectModal();
   const { openAccountModal } = useAccountModal();
@@ -746,6 +751,8 @@ const { disconnect } = useDisconnect();
   const [debugUI, setDebugUI] = useState(false); // ← קיים
   /** 0 = default cave BG, 1…DEV_BG_VARIANT_COUNT = bg-cave1 … (dev picker only). */
   const [devBgIndex, setDevBgIndex] = useState(0);
+  /** 0 = default rock.png, 1…DEV_ROCK_VARIANT_COUNT = rock1 … (dev picker only). */
+  const [devRockIndex, setDevRockIndex] = useState(0);
 
 // Wallet address copy feedback
   const [copiedAddr, setCopiedAddr] = useState(false);
@@ -928,12 +935,26 @@ const { disconnect } = useDisconnect();
     if (!isDevBgPickerEnabled()) return;
     try {
       const raw = localStorage.getItem(DEV_BG_LS_KEY);
-      if (raw == null || raw === "") return;
-      const n = parseInt(raw, 10);
-      if (!Number.isFinite(n) || n < 0 || n > DEV_BG_VARIANT_COUNT) return;
-      setDevBgIndex(n);
-      boardBgSrcRef.current = n === 0 ? IMG_BG : `/images/bg-cave${n}.png`;
-      getImg(boardBgSrcRef.current);
+      if (raw != null && raw !== "") {
+        const n = parseInt(raw, 10);
+        if (Number.isFinite(n) && n >= 0 && n <= DEV_BG_VARIANT_COUNT) {
+          setDevBgIndex(n);
+          boardBgSrcRef.current = n === 0 ? IMG_BG : `/images/bg-cave${n}.png`;
+          getImg(boardBgSrcRef.current);
+        }
+      }
+    } catch {}
+    try {
+      const rawR = localStorage.getItem(DEV_ROCK_LS_KEY);
+      if (rawR != null && rawR !== "") {
+        const r = parseInt(rawR, 10);
+        if (Number.isFinite(r) && r >= 0 && r <= DEV_ROCK_VARIANT_COUNT) {
+          setDevRockIndex(r);
+          rockImgSrcRef.current =
+            r === 0 ? IMG_ROCK : `/images/rock${r}.png`;
+          getImg(rockImgSrcRef.current);
+        }
+      }
     } catch {}
   }, [mounted]);
 
@@ -1949,7 +1970,8 @@ function drawRock(ctx, rect, rock){
   const scale = 0.35 + 0.65 * pct;
 
   // מסגרות ומידות
-  const img   = getImg(IMG_ROCK);
+  const rockSrc = rockImgSrcRef.current || IMG_ROCK;
+  const img   = getImg(rockSrc);
   const pad   = 6;
   const fullW = rect.w - pad*2;
   const fullH = rect.h - pad*2;
@@ -3357,38 +3379,71 @@ const BTN_DIS  = "opacity-60 cursor-not-allowed";
 
 {mounted && isDevBgPickerEnabled() && (
   <div
-    className="absolute right-2 sm:right-3 z-[40] flex flex-col items-end gap-0.5"
+    className="absolute right-2 sm:right-3 z-[40] flex flex-row items-end gap-2"
     style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)" }}
   >
-    <span className="text-[9px] font-bold text-white/90 drop-shadow-md bg-black/45 px-1.5 py-0.5 rounded">
-      DEV BG
-    </span>
-    <select
-      aria-label={`Dev background 1–${DEV_BG_VARIANT_COUNT}`}
-      value={devBgIndex}
-      onChange={(e) => {
-        const n = parseInt(e.target.value, 10);
-        const next =
-          Number.isFinite(n) && n >= 0 && n <= DEV_BG_VARIANT_COUNT ? n : 0;
-        setDevBgIndex(next);
-        const path = next === 0 ? IMG_BG : `/images/bg-cave${next}.png`;
-        boardBgSrcRef.current = path;
-        try {
-          localStorage.setItem(DEV_BG_LS_KEY, String(next));
-        } catch {}
-        try {
-          getImg(path);
-        } catch {}
-      }}
-      className="max-w-[140px] text-[11px] font-bold rounded-lg border border-slate-500 bg-slate-900/90 text-amber-200 px-2 py-1 shadow-md"
-    >
-      <option value={0}>Default (bg-cave)</option>
-      {Array.from({ length: DEV_BG_VARIANT_COUNT }, (_, i) => i + 1).map((i) => (
-        <option key={i} value={i}>
-          bg-cave{i}
-        </option>
-      ))}
-    </select>
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="text-[9px] font-bold text-white/90 drop-shadow-md bg-black/45 px-1.5 py-0.5 rounded">
+        DEV BG
+      </span>
+      <select
+        aria-label={`Dev background 1–${DEV_BG_VARIANT_COUNT}`}
+        value={devBgIndex}
+        onChange={(e) => {
+          const n = parseInt(e.target.value, 10);
+          const next =
+            Number.isFinite(n) && n >= 0 && n <= DEV_BG_VARIANT_COUNT ? n : 0;
+          setDevBgIndex(next);
+          const path = next === 0 ? IMG_BG : `/images/bg-cave${next}.png`;
+          boardBgSrcRef.current = path;
+          try {
+            localStorage.setItem(DEV_BG_LS_KEY, String(next));
+          } catch {}
+          try {
+            getImg(path);
+          } catch {}
+        }}
+        className="max-w-[140px] text-[11px] font-bold rounded-lg border border-slate-500 bg-slate-900/90 text-amber-200 px-2 py-1 shadow-md"
+      >
+        <option value={0}>Default (bg-cave)</option>
+        {Array.from({ length: DEV_BG_VARIANT_COUNT }, (_, i) => i + 1).map((i) => (
+          <option key={i} value={i}>
+            bg-cave{i}
+          </option>
+        ))}
+      </select>
+    </div>
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="text-[9px] font-bold text-white/90 drop-shadow-md bg-black/45 px-1.5 py-0.5 rounded">
+        ROCK
+      </span>
+      <select
+        aria-label={`Dev rock rock1–rock${DEV_ROCK_VARIANT_COUNT}`}
+        value={devRockIndex}
+        onChange={(e) => {
+          const n = parseInt(e.target.value, 10);
+          const next =
+            Number.isFinite(n) && n >= 0 && n <= DEV_ROCK_VARIANT_COUNT ? n : 0;
+          setDevRockIndex(next);
+          const path = next === 0 ? IMG_ROCK : `/images/rock${next}.png`;
+          rockImgSrcRef.current = path;
+          try {
+            localStorage.setItem(DEV_ROCK_LS_KEY, String(next));
+          } catch {}
+          try {
+            getImg(path);
+          } catch {}
+        }}
+        className="max-w-[120px] text-[11px] font-bold rounded-lg border border-slate-500 bg-slate-900/90 text-emerald-200 px-2 py-1 shadow-md"
+      >
+        <option value={0}>Default (rock)</option>
+        {Array.from({ length: DEV_ROCK_VARIANT_COUNT }, (_, i) => i + 1).map((i) => (
+          <option key={i} value={i}>
+            rock{i}
+          </option>
+        ))}
+      </select>
+    </div>
   </div>
 )}
 
