@@ -3531,9 +3531,11 @@ const BTN_DIS  = "opacity-60 cursor-not-allowed";
               <span className="opacity-80">/3</span>
             </button>
 
-            {/* Phase label */}
+            {/* Phase label — avoid Date.now() before mount (hydration mismatch vs SSR) */}
             <button onClick={()=>setHudModal('gifts')} className="px-2 py-1 rounded-lg hover:bg-white/10">
-              {`⏳ ${(_getPhaseInfo(stateRef.current, Date.now()).intervalSec)}s `}
+              {mounted
+                ? `⏳ ${(_getPhaseInfo(stateRef.current, Date.now()).intervalSec)}s `
+                : "⏳ — "}
             </button>
 
             <div className="flex items-center gap-3 ml-2">
@@ -3541,7 +3543,11 @@ const BTN_DIS  = "opacity-60 cursor-not-allowed";
               <button
                 onClick={()=>setHudModal('giftRing')}
                 className="relative w-8 h-8 rounded-full grid place-items-center hover:opacity-90 active:scale-95 transition"
-                title={`⏳ ${(_getPhaseInfo(stateRef.current, Date.now()).intervalSec)}s gifts`}
+                title={
+                  mounted
+                    ? `⏳ ${(_getPhaseInfo(stateRef.current, Date.now()).intervalSec)}s gifts`
+                    : "Gift timer"
+                }
                 aria-label="Gift timer info"
               >
                 <div className="absolute inset-0 rounded-full" style={ringBg(giftProgress)} />
