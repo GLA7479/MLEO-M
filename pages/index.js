@@ -1523,8 +1523,8 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
               </button>
             </div>
 
-            {/* Bullets — desktop / tablet only (same layout as before) */}
-            <div className="hidden md:grid md:grid-cols-3 gap-3 text-sm text-white/70">
+            {/* Bullets — tablet only (desktop moved under media) */}
+            <div className="hidden md:grid md:grid-cols-3 lg:hidden gap-3 text-sm text-white/70">
               {t.bullets.map((b, i) => (
                 <div key={i} className="p-3 rounded-xl bg-white/5 border border-white/10">{b}</div>
               ))}
@@ -1532,18 +1532,26 @@ const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'co
           </div>
 
           {/* VIDEO — mobile: shrink-0, flows under CTA (not vertically centered in flex-1 space); md: grid cell */}
-          <div className="relative shrink-0 md:flex-none md:shrink">
-            <div className="absolute -inset-4 md:-inset-6 rounded-[24px] md:rounded-[32px] bg-yellow-400/10 blur-2xl md:blur-3xl" />
-            <div className="relative min-h-0 w-full rounded-2xl md:rounded-3xl border border-white/10 bg-white/5 p-2.5 md:p-3 shadow-xl backdrop-blur overflow-hidden">
-              <video
-                autoPlay
-                loop
-                muted
-                playsInline
-                poster="/images/mleo-hero-preview.png"
-                className="w-full max-md:max-h-[min(260px,42vh)] md:max-h-[min(300px,48vh)] h-auto rounded-xl md:rounded-2xl object-cover object-center"
-                src="/videos/intro.mp4"
-              />
+          <div className="shrink-0 md:flex-none md:shrink lg:flex lg:flex-col lg:gap-4">
+            <div className="relative">
+              <div className="absolute -inset-4 md:-inset-6 rounded-[24px] md:rounded-[32px] bg-yellow-400/10 blur-2xl md:blur-3xl" />
+              <div className="relative min-h-0 w-full rounded-2xl md:rounded-3xl border border-white/10 bg-white/5 p-2.5 md:p-3 shadow-xl backdrop-blur overflow-hidden">
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  poster="/images/mleo-hero-preview.png"
+                  className="w-full max-md:max-h-[min(260px,42vh)] md:max-h-[min(300px,48vh)] h-auto rounded-xl md:rounded-2xl object-cover object-center"
+                  src="/videos/intro.mp4"
+                />
+              </div>
+            </div>
+            {/* Bullets — desktop only, anchored below media */}
+            <div className="hidden lg:grid lg:grid-cols-3 lg:gap-3 text-sm text-white/70">
+              {t.bullets.map((b, i) => (
+                <div key={i} className="h-full p-3 rounded-xl bg-white/5 border border-white/10">{b}</div>
+              ))}
             </div>
           </div>
 
