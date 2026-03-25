@@ -122,8 +122,9 @@ const ALLOW_TESTNET_WALLET_FLAG =
  function isLocalHost(){
    try { return DEBUG_HOSTS.includes(location.hostname); } catch { return false; }
  }
-/** Dev-only: persisted index 0 = default BG, 1–10 = /images/bg-caveN.png */
+/** Dev-only: persisted index 0 = default BG, 1…N = /images/bg-caveN.png */
  const DEV_BG_LS_KEY = "mleo_dev_bg_index";
+ const DEV_BG_VARIANT_COUNT = 20;
  function isDevBgPickerEnabled(){
    try {
      if (isLocalHost()) return true;
@@ -743,7 +744,7 @@ const { disconnect } = useDisconnect();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [debugUI, setDebugUI] = useState(false); // ← קיים
-  /** 0 = default cave BG, 1–10 = bg-cave1 … bg-cave10 (dev picker only). */
+  /** 0 = default cave BG, 1…DEV_BG_VARIANT_COUNT = bg-cave1 … (dev picker only). */
   const [devBgIndex, setDevBgIndex] = useState(0);
 
 // Wallet address copy feedback
@@ -929,7 +930,7 @@ const { disconnect } = useDisconnect();
       const raw = localStorage.getItem(DEV_BG_LS_KEY);
       if (raw == null || raw === "") return;
       const n = parseInt(raw, 10);
-      if (!Number.isFinite(n) || n < 0 || n > 10) return;
+      if (!Number.isFinite(n) || n < 0 || n > DEV_BG_VARIANT_COUNT) return;
       setDevBgIndex(n);
       boardBgSrcRef.current = n === 0 ? IMG_BG : `/images/bg-cave${n}.png`;
       getImg(boardBgSrcRef.current);
@@ -3363,11 +3364,12 @@ const BTN_DIS  = "opacity-60 cursor-not-allowed";
       DEV BG
     </span>
     <select
-      aria-label="Dev background 1–10"
+      aria-label={`Dev background 1–${DEV_BG_VARIANT_COUNT}`}
       value={devBgIndex}
       onChange={(e) => {
         const n = parseInt(e.target.value, 10);
-        const next = Number.isFinite(n) && n >= 0 && n <= 10 ? n : 0;
+        const next =
+          Number.isFinite(n) && n >= 0 && n <= DEV_BG_VARIANT_COUNT ? n : 0;
         setDevBgIndex(next);
         const path = next === 0 ? IMG_BG : `/images/bg-cave${next}.png`;
         boardBgSrcRef.current = path;
@@ -3378,10 +3380,10 @@ const BTN_DIS  = "opacity-60 cursor-not-allowed";
           getImg(path);
         } catch {}
       }}
-      className="max-w-[120px] text-[11px] font-bold rounded-lg border border-slate-500 bg-slate-900/90 text-amber-200 px-2 py-1 shadow-md"
+      className="max-w-[140px] text-[11px] font-bold rounded-lg border border-slate-500 bg-slate-900/90 text-amber-200 px-2 py-1 shadow-md"
     >
       <option value={0}>Default (bg-cave)</option>
-      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+      {Array.from({ length: DEV_BG_VARIANT_COUNT }, (_, i) => i + 1).map((i) => (
         <option key={i} value={i}>
           bg-cave{i}
         </option>
