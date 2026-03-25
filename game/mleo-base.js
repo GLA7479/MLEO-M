@@ -3331,20 +3331,32 @@ function BankedQuickPanel({
         </div>
       </div>
 
-      <div className="mt-3 space-y-2 text-[12px] leading-5 text-white/72">
+      <div className="mt-3 space-y-2.5 text-[13px] leading-6 text-white/76">
         <div>
+          Base Banked grows only while Refinery is supplied with Ore, Scrap and enough
+          Energy.
+        </div>
+        <div>
+          Shipping does not increase the rate. Shipping only moves banked MLEO into
+          the real shared vault.
+        </div>
+        <div>
+          Red means this is the reason output stopped. Orange means this is the best
+          improvement lane right now. Green means this lane is currently balanced.
+        </div>
+        <div className="border-t border-white/10 pt-2 text-[12px] leading-5 text-white/72">
           Banked MLEO = stored accumulated output inside BASE, not today&apos;s production.
         </div>
-        <div>
+        <div className="text-[12px] leading-5 text-white/72">
           Rate / hr = current live refinery snapshot.
         </div>
-        <div>
+        <div className="text-[12px] leading-5 text-white/72">
           Per day = projected remaining daily output estimate (not simply Rate / hr × 24).
         </div>
-        <div>
+        <div className="text-[12px] leading-5 text-white/72">
           Daily prod. cap limits today&apos;s production only, not total banked stock.
         </div>
-        <div>
+        <div className="text-[12px] leading-5 text-white/72">
           Shipping moves banked MLEO to the shared vault; it does not increase production rate.
         </div>
       </div>
