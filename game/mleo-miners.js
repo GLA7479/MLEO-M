@@ -122,6 +122,15 @@ const ALLOW_TESTNET_WALLET_FLAG =
  function isLocalHost(){
    try { return DEBUG_HOSTS.includes(location.hostname); } catch { return false; }
  }
+/** Dev-only: persisted index 0 = default BG, 1–10 = /images/bg-caveN.png */
+ const DEV_BG_LS_KEY = "mleo_dev_bg_index";
+ function isDevBgPickerEnabled(){
+   try {
+     if (isLocalHost()) return true;
+     const v = (process.env.NEXT_PUBLIC_DEBUG_UI || "").toLowerCase();
+     return v === "true" || v === "1";
+   } catch { return false; }
+ }
  try {
    if (typeof window !== "undefined") {
      const z = localStorage.getItem("SPAWN_ICON_ZOOM");
@@ -689,6 +698,8 @@ const router = useRouter();
   const rafRef    = useRef(0);
   const dragRef   = useRef({ active:false });
   const stateRef  = useRef(null);
+  /** Dev background override; read in drawBg (ref so RAF loop always sees latest). */
+  const boardBgSrcRef = useRef(IMG_BG);
   const flagsRef = useRef({ isMobileLandscape: false, paused: true });
   const { openConnectModal } = useConnectModal();
   const { openAccountModal } = useAccountModal();
@@ -732,6 +743,8 @@ const { disconnect } = useDisconnect();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [debugUI, setDebugUI] = useState(false); // ← קיים
+  /** 0 = default cave BG, 1–10 = bg-cave1 … bg-cave10 (dev picker only). */
+  const [devBgIndex, setDevBgIndex] = useState(0);
 
 // Wallet address copy feedback
   const [copiedAddr, setCopiedAddr] = useState(false);
@@ -908,6 +921,20 @@ const { disconnect } = useDisconnect();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (!isDevBgPickerEnabled()) return;
+    try {
+      const raw = localStorage.getItem(DEV_BG_LS_KEY);
+      if (raw == null || raw === "") return;
+      const n = parseInt(raw, 10);
+      if (!Number.isFinite(n) || n < 0 || n > 10) return;
+      setDevBgIndex(n);
+      boardBgSrcRef.current = n === 0 ? IMG_BG : `/images/bg-cave${n}.png`;
+      getImg(boardBgSrcRef.current);
+    } catch {}
+  }, [mounted]);
 
   // === [GAIN] state & helpers (קיים אצלך — לא שיניתי) ===
   const [showGainModal, setShowGainModal] = useState(false);
@@ -1894,7 +1921,8 @@ function pickMiner(x,y){
 
 // ----- ציור -----
 function drawBg(ctx,b){
-  const img = getImg(IMG_BG);
+  const src = boardBgSrcRef.current || IMG_BG;
+  const img = getImg(src);
   if (img.complete && img.naturalWidth>0) {
     const iw=img.naturalWidth, ih=img.naturalHeight;
     const ir=iw/ih, br=b.w/b.h;
@@ -3323,6 +3351,42 @@ const BTN_DIS  = "opacity-60 cursor-not-allowed";
     >
       RESET
     </button>
+  </div>
+)}
+
+{mounted && isDevBgPickerEnabled() && (
+  <div
+    className="absolute right-2 sm:right-3 z-[40] flex flex-col items-end gap-0.5"
+    style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 8px)" }}
+  >
+    <span className="text-[9px] font-bold text-white/90 drop-shadow-md bg-black/45 px-1.5 py-0.5 rounded">
+      DEV BG
+    </span>
+    <select
+      aria-label="Dev background 1–10"
+      value={devBgIndex}
+      onChange={(e) => {
+        const n = parseInt(e.target.value, 10);
+        const next = Number.isFinite(n) && n >= 0 && n <= 10 ? n : 0;
+        setDevBgIndex(next);
+        const path = next === 0 ? IMG_BG : `/images/bg-cave${next}.png`;
+        boardBgSrcRef.current = path;
+        try {
+          localStorage.setItem(DEV_BG_LS_KEY, String(next));
+        } catch {}
+        try {
+          getImg(path);
+        } catch {}
+      }}
+      className="max-w-[120px] text-[11px] font-bold rounded-lg border border-slate-500 bg-slate-900/90 text-amber-200 px-2 py-1 shadow-md"
+    >
+      <option value={0}>Default (bg-cave)</option>
+      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+        <option key={i} value={i}>
+          bg-cave{i}
+        </option>
+      ))}
+    </select>
   </div>
 )}
 
