@@ -3157,11 +3157,11 @@ function DesktopFloatingPanelShell({
         ref={bodyScrollRef}
         className="
           min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-10 md:pb-12
-          [scrollbar-gutter:stable] banked-scroll [webkit-overflow-scrolling:touch]
+          banked-scroll [webkit-overflow-scrolling:touch]
         "
       >
         {children}
-        <div aria-hidden className="h-8 md:h-10 shrink-0" />
+        <div aria-hidden className="h-8 shrink-0 md:h-10" />
       </div>
     </div>
   );
