@@ -150,6 +150,9 @@ const REFINERY_ENERGY_NEED_PER_LEVEL = 0.82;
 const REFINERY_BANKED_PER_LEVEL = 0.0165;
 const SHIP_READY_BANKED_THRESHOLD = 100;
 
+/** Interval for merging server BASE state via `getBaseState` (see `MleoBase` poll `useEffect`). */
+const BASE_STATE_POLL_MS = 5000;
+
 function worldLaneToneClass(laneKey) {
   if (laneKey === "open") {
     return "border-emerald-400/30 bg-emerald-500/[0.10] text-emerald-100";
@@ -3093,6 +3096,75 @@ function WindowBankedBadge({ value }) {
   );
 }
 
+function BaseStatePollCountdown({ pollIntervalMs, lastRefreshAtRef, inFlightRef, refreshEpoch }) {
+  const [, setUiTick] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setUiTick((t) => t + 1);
+    const onInterval = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        bump();
+      }
+    };
+    const id = window.setInterval(onInterval, 1000);
+    document.addEventListener("visibilitychange", bump);
+    bump();
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", bump);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!refreshEpoch) return;
+    setUiTick((t) => t + 1);
+  }, [refreshEpoch]);
+
+  const lineClass =
+    "block w-full min-h-4 text-left tabular-nums text-[10px] leading-4 font-normal text-white/38";
+
+  if (typeof document === "undefined") {
+    return (
+      <span className={lineClass} aria-hidden>
+        {"\u00a0"}
+      </span>
+    );
+  }
+
+  if (document.visibilityState !== "visible") {
+    return (
+      <span
+        className={lineClass}
+        title="BASE data refresh pauses while this tab is in the background"
+      >
+        Paused
+      </span>
+    );
+  }
+
+  const last = Number(lastRefreshAtRef?.current || 0);
+  const deadline = last + pollIntervalMs;
+  const remainingMs = deadline - Date.now();
+  const inFlight = !!inFlightRef?.current;
+
+  if (remainingMs <= 0) {
+    return <span className={lineClass}>Updating…</span>;
+  }
+
+  if (remainingMs < 1000) {
+    return (
+      <span className={lineClass}>{inFlight ? "Updating…" : "Next update in 1s"}</span>
+    );
+  }
+
+  const secs = Math.ceil(remainingMs / 1000);
+  return (
+    <span className={lineClass}>
+      Next update in {secs}s
+    </span>
+  );
+}
+
 function DesktopFloatingPanelShell({
   eyebrow,
   title,
@@ -3176,6 +3248,10 @@ function BankedQuickPanel({
   systemState,
   onClose,
   onNavigate,
+  basePollIntervalMs,
+  baseDataLastRefreshAtRef,
+  baseDataRefreshInFlightRef,
+  baseDataRefreshEpoch,
 }) {
   const s = snapshot || {};
   const bankedAuthoritative = Number(state?.bankedMleo || 0);
@@ -3216,9 +3292,23 @@ function BankedQuickPanel({
       eyebrow="Banked MLEO"
       title={formatBankedDetailedValue(bankedAuthoritative)}
       subtitle={
-        <span className="text-[11px] text-white/55">
-          Live refinery output snapshot
-        </span>
+        <div className="w-full min-w-0 text-left">
+          <div className="text-[11px] leading-snug text-white/55">
+            Live refinery output snapshot
+          </div>
+          {basePollIntervalMs &&
+          baseDataLastRefreshAtRef &&
+          baseDataRefreshInFlightRef != null ? (
+            <div className="mt-1 w-full text-left">
+              <BaseStatePollCountdown
+                pollIntervalMs={basePollIntervalMs}
+                lastRefreshAtRef={baseDataLastRefreshAtRef}
+                inFlightRef={baseDataRefreshInFlightRef}
+                refreshEpoch={baseDataRefreshEpoch}
+              />
+            </div>
+          ) : null}
+        </div>
       }
       onClose={onClose}
       bodyScrollRef={bodyScrollRef}
@@ -4870,6 +4960,10 @@ export default function MleoBase() {
   const [devSectorModalOpen, setDevSectorModalOpen] = useState(false);
   const [devSectorBusy, setDevSectorBusy] = useState(false);
 
+  const lastBaseDataRefreshAtRef = useRef(0);
+  const baseDataRefreshInFlightRef = useRef(false);
+  const [baseDataRefreshEpoch, setBaseDataRefreshEpoch] = useState(0);
+
   useEffect(() => {
     if (!tierPromptKey) return;
 
@@ -5968,22 +6062,32 @@ export default function MleoBase() {
 
     let alive = true;
 
+    lastBaseDataRefreshAtRef.current = Date.now();
+
     async function refreshFromServer() {
+      if (baseDataRefreshInFlightRef.current) return;
+      baseDataRefreshInFlightRef.current = true;
       try {
         const res = await getBaseState();
         const serverState = res?.state;
-        if (!alive || !serverState) return;
+        if (!alive) return;
+        if (!serverState) return;
 
         if (res?.eliteRotation) {
           setEliteRotation(res.eliteRotation);
         }
         setState((prev) => mergeAuthoritativeServerState(prev, serverState));
+        lastBaseDataRefreshAtRef.current = Date.now();
       } catch (error) {
         console.error("BASE refresh failed", error);
+      } finally {
+        baseDataRefreshInFlightRef.current = false;
+        if (alive) {
+          setBaseDataRefreshEpoch((e) => e + 1);
+        }
       }
     }
 
-    const BASE_STATE_POLL_MS = 5500;
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         refreshFromServer();
@@ -12868,6 +12972,10 @@ export default function MleoBase() {
                       systemState={systemState}
                       onNavigate={openHomeFlowTarget}
                       onClose={() => setShowBankedPanel(false)}
+                      basePollIntervalMs={BASE_STATE_POLL_MS}
+                      baseDataLastRefreshAtRef={lastBaseDataRefreshAtRef}
+                      baseDataRefreshInFlightRef={baseDataRefreshInFlightRef}
+                      baseDataRefreshEpoch={baseDataRefreshEpoch}
                     />
                   </div>
                 ) : null}
@@ -13710,6 +13818,10 @@ export default function MleoBase() {
                     systemState={systemState}
                     onNavigate={openHomeFlowTarget}
                     onClose={() => setShowBankedPanel(false)}
+                    basePollIntervalMs={BASE_STATE_POLL_MS}
+                    baseDataLastRefreshAtRef={lastBaseDataRefreshAtRef}
+                    baseDataRefreshInFlightRef={baseDataRefreshInFlightRef}
+                    baseDataRefreshEpoch={baseDataRefreshEpoch}
                   />
                 </div>
               </>
