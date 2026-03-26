@@ -3169,7 +3169,6 @@ function DesktopFloatingPanelShell({
 
 function BankedQuickPanel({
   snapshot,
-  bankedValue,
   /** Precomputed in parent via useMemo — avoids re-running guidance simulation on every Banked HUD tick. */
   guidanceItems: guidanceItemsProp,
   state,
@@ -3179,6 +3178,7 @@ function BankedQuickPanel({
   onNavigate,
 }) {
   const s = snapshot || {};
+  const bankedAuthoritative = Number(state?.bankedMleo || 0);
   const guidanceItems =
     guidanceItemsProp ??
     getBankedGuidanceItems({
@@ -3214,7 +3214,7 @@ function BankedQuickPanel({
   return (
     <DesktopFloatingPanelShell
       eyebrow="Banked MLEO"
-      title={formatBankedDetailedValue(bankedValue)}
+      title={formatBankedDetailedValue(bankedAuthoritative)}
       subtitle={
         <span className="text-[11px] text-white/55">
           Live refinery output snapshot
@@ -4848,14 +4848,6 @@ export default function MleoBase() {
   const [activeMilestoneClaimKey, setActiveMilestoneClaimKey] = useState(null);
   const [activeProgramSetKey, setActiveProgramSetKey] = useState(null);
   const [overviewGuidanceState, setOverviewGuidanceState] = useState(null);
-  const [bankedDisplayValue, setBankedDisplayValue] = useState(0);
-  const [bankedDisplayNow, setBankedDisplayNow] = useState(() => Date.now());
-  const bankedDisplayValueRef = useRef(0);
-  const bankedServerValueRef = useRef(0);
-  const bankedDisplayStorageKey = useMemo(
-    () => `mleo_base_banked_display_floor_v1:${address || "guest"}`,
-    [address]
-  );
   const highlightTimeoutRef = useRef(null);
   const expeditionToastNonceRef = useRef(0);
 
@@ -5985,11 +5977,12 @@ export default function MleoBase() {
       }
     }
 
+    const BASE_STATE_POLL_MS = 5500;
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") {
         refreshFromServer();
       }
-    }, 12000);
+    }, BASE_STATE_POLL_MS);
 
     const onFocus = () => {
       if (document.visibilityState === "visible") {
@@ -6800,105 +6793,6 @@ export default function MleoBase() {
     () => getBankedSummaryFromItems(bankedGuidanceItems),
     [bankedGuidanceItems]
   );
-
-  const bankedLiveRatePerSecond = Number(bankedSnapshot?.perSecond || 0);
-  const bankedLiveActive =
-    Boolean(bankedSnapshot?.active) &&
-    bankedLiveRatePerSecond > 0;
-
-  useEffect(() => {
-    bankedDisplayValueRef.current = Number(bankedDisplayValue || 0);
-  }, [bankedDisplayValue]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const serverValue = Number(state.bankedMleo || 0);
-    let storedValue = 0;
-    try {
-      const raw = window.localStorage.getItem(bankedDisplayStorageKey);
-      const parsed = Number(raw || 0);
-      if (Number.isFinite(parsed) && parsed > 0) storedValue = parsed;
-    } catch {}
-
-    const initial = Math.max(serverValue, storedValue);
-    bankedDisplayValueRef.current = initial;
-    setBankedDisplayValue(initial);
-  }, [mounted, bankedDisplayStorageKey]);
-
-  useEffect(() => {
-    if (!mounted) return undefined;
-
-    let rafId = null;
-    let lastCommit = 0;
-
-    const tick = () => {
-      const now = Date.now();
-      if (now - lastCommit >= 120) {
-        lastCommit = now;
-        setBankedDisplayNow(now);
-      }
-      rafId = window.requestAnimationFrame(tick);
-    };
-
-    rafId = window.requestAnimationFrame(tick);
-    return () => {
-      if (rafId != null) window.cancelAnimationFrame(rafId);
-    };
-  }, [mounted]);
-
-  useEffect(() => {
-    const currentDisplay = Number(bankedDisplayValueRef.current || 0);
-    const serverValue = Number(state.bankedMleo || 0);
-    const prevServerValue = Number(bankedServerValueRef.current || 0);
-    const VISUAL_LAG_COINS = 6;
-    const PREVIEW_AHEAD_CAP = 6;
-    const STEP_SECONDS = 0.12;
-    const RATE_DAMPING = 0.65;
-
-    // Legitimate reduction event (shipping/reset/etc): allow controlled downward convergence.
-    const hasServerReduction = serverValue + 0.0005 < prevServerValue;
-    const reductionMagnitude = prevServerValue - serverValue;
-    const allowDownward =
-      hasServerReduction && (reductionMagnitude >= 1 || serverValue <= 0.01);
-
-    let nextDisplay = currentDisplay;
-    const floorTarget = Math.max(0, serverValue - VISUAL_LAG_COINS);
-
-    // Keep display close to truth from below; never stick far behind.
-    if (nextDisplay < floorTarget) {
-      const catchUp = floorTarget - nextDisplay;
-      nextDisplay += catchUp * 0.3;
-      if (Math.abs(nextDisplay - floorTarget) < 0.005) nextDisplay = floorTarget;
-    }
-
-    // Live visual movement only while real mining is active.
-    if (bankedLiveActive) {
-      const effectiveRate = Math.max(0, bankedLiveRatePerSecond * RATE_DAMPING);
-      nextDisplay += effectiveRate * STEP_SECONDS;
-      nextDisplay = Math.min(nextDisplay, serverValue + PREVIEW_AHEAD_CAP);
-    }
-
-    if (allowDownward && nextDisplay > serverValue) {
-      nextDisplay = nextDisplay + (serverValue - nextDisplay) * 0.35;
-      if (Math.abs(nextDisplay - serverValue) < 0.005) nextDisplay = serverValue;
-    } else if (!allowDownward) {
-      nextDisplay = Math.max(nextDisplay, currentDisplay);
-    }
-
-    bankedServerValueRef.current = serverValue;
-    bankedDisplayValueRef.current = nextDisplay;
-    setBankedDisplayValue(nextDisplay);
-
-    try {
-      window.localStorage.setItem(bankedDisplayStorageKey, String(nextDisplay));
-    } catch {}
-  }, [
-    bankedDisplayNow,
-    bankedLiveActive,
-    bankedLiveRatePerSecond,
-    state.bankedMleo,
-    bankedDisplayStorageKey,
-  ]);
 
   const rawOverview = useMemo(
     () =>
@@ -12653,7 +12547,7 @@ export default function MleoBase() {
       key: "bankedMleo",
       infoKey: "bankedMleo",
       label: "Banked",
-      value: `${formatBankedBadgeCompact(bankedDisplayValue)}`,
+      value: `${formatBankedBadgeCompact(Number(state.bankedMleo || 0))}`,
     },
     {
       key: "sharedVault",
@@ -12712,7 +12606,7 @@ export default function MleoBase() {
                         bankedSummary.tone
                       )}`}
                     >
-                      {formatBankedBadgeCompact(bankedDisplayValue)}
+                      {formatBankedBadgeCompact(Number(state.bankedMleo || 0))}
                     </div>
                     {bankedSummary.count > 0 ? (
                       <span
@@ -12945,7 +12839,7 @@ export default function MleoBase() {
                       bankedSummary.tone
                     )}`}
                   >
-                    {formatBankedBadgeCompact(bankedDisplayValue)}
+                    {formatBankedBadgeCompact(Number(state.bankedMleo || 0))}
                   </div>
                   {bankedSummary.count > 0 ? (
                     <span
@@ -12962,7 +12856,6 @@ export default function MleoBase() {
                   <div className="absolute right-0 top-[calc(100%+10px)] z-[130] w-[360px]">
                     <BankedQuickPanel
                       snapshot={bankedSnapshot}
-                      bankedValue={bankedDisplayValue}
                       guidanceItems={bankedGuidanceItems}
                       state={state}
                       derived={derived}
@@ -13365,7 +13258,7 @@ export default function MleoBase() {
                     aria-label={
                       desktopPanelTitle ? `Close ${desktopPanelTitle} panel` : "Close panel"
                     }
-                    bankedBadge={<WindowBankedBadge value={bankedDisplayValue} />}
+                    bankedBadge={<WindowBankedBadge value={Number(state.bankedMleo || 0)} />}
                   >
                     <div>
                       <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-300/70">
@@ -13805,7 +13698,6 @@ export default function MleoBase() {
                 <div className="fixed inset-x-3 top-[88px] bottom-3 z-[126] md:hidden">
                   <BankedQuickPanel
                     snapshot={bankedSnapshot}
-                    bankedValue={bankedDisplayValue}
                     guidanceItems={bankedGuidanceItems}
                     state={state}
                     derived={derived}
@@ -13905,7 +13797,7 @@ export default function MleoBase() {
           {mobilePanel ? (
             <MobilePanelOverlayShell
               title={mobilePanelTitle}
-              bankedBadge={<WindowBankedBadge value={bankedDisplayValue} />}
+              bankedBadge={<WindowBankedBadge value={Number(state.bankedMleo || 0)} />}
               onClose={closeMobilePanel}
               scrollRef={mobilePanelScrollRef}
             >
