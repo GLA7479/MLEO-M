@@ -3156,8 +3156,8 @@ function DesktopFloatingPanelShell({
       <div
         ref={bodyScrollRef}
         className="
-          min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pr-1 pb-10 md:pb-12
-          banked-scroll [webkit-overflow-scrolling:touch]
+          min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-10 md:pb-12
+          [scrollbar-gutter:stable] banked-scroll [webkit-overflow-scrolling:touch]
         "
       >
         {children}
