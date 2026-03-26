@@ -57,8 +57,8 @@ function useIOSViewportFix() {
 const LANES = 3;
 const SLOTS_PER_LANE = 4;
 const MAX_MINERS = LANES * SLOTS_PER_LANE;
-/** Board Y centers per lane (fraction of board height): 0.48, 0.62, 0.81 — rail alignment. */
-const LANE_CENTER_Y_FRACS = [0.48, 0.62, 0.81];
+/** Board Y centers per lane (fraction of board height): 0.46, 0.60, 0.78 — rail alignment. */
+const LANE_CENTER_Y_FRACS = [0.46, 0.60, 0.78];
 const PADDING = 6;
 const LS_KEY = "mleoMiners_v5_85";
 // First–play terms acceptance gate (global versioned)
