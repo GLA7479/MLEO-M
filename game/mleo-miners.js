@@ -1191,7 +1191,7 @@ async function onClaimMinedToWallet() {
 
   // Debug live values (קיים אצלך — לא נוגע)
   const [debugVals, setDebugVals] = useState({
-    minerScale: stateRef.current?.minerScale ?? 1.80,
+    minerScale: stateRef.current?.minerScale ?? 1.9,
     minerWidth: stateRef.current?.minerWidth ?? 0.8,
     spawnIconZoom:
       (typeof window !== "undefined" && (window.SPAWN_ICON_ZOOM ?? Number(localStorage.getItem("SPAWN_ICON_ZOOM")))) || 1.5,
@@ -1205,7 +1205,7 @@ async function onClaimMinedToWallet() {
     const zoom = (typeof window !== "undefined" && (window.SPAWN_ICON_ZOOM ?? Number(localStorage.getItem("SPAWN_ICON_ZOOM")))) || 2.2;
     const shift = (typeof window !== "undefined" && (window.SPAWN_ICON_SHIFT_Y ?? Number(localStorage.getItem("SPAWN_ICON_SHIFT_Y")))) || 0;
     setDebugVals({
-      minerScale: s.minerScale ?? 1.8,
+      minerScale: s.minerScale ?? 1.9,
       minerWidth: s.minerWidth ?? 0.8,
       spawnIconZoom: Number(zoom) || 2.2,
       spawnIconShiftY: Number(shift) || 0,
@@ -1254,8 +1254,8 @@ async function onClaimMinedToWallet() {
       const s = JSON.parse(raw);
       let changed = false;
 
-      if (typeof s.minerScale !== "number" || s.minerScale !== 1.8) {
-        s.minerScale = 1.8; changed = true;
+      if (typeof s.minerScale !== "number" || s.minerScale !== 1.9) {
+        s.minerScale = 1.9; changed = true;
       }
       if (typeof s.minerWidth !== "number" || s.minerWidth !== 0.8) {
         s.minerWidth = 0.8; changed = true;
@@ -1389,7 +1389,7 @@ useEffect(() => {
   // Must run before any logic that touches `init.lanes[l].rock/slots` (e.g. costBase + draw()).
   normalizeSavedLanesToLaneCount(init);
 
-  if (loaded && loaded.minerScale == null) init.minerScale = 1.80;
+  if (loaded && loaded.minerScale == null) init.minerScale = 1.90;
   if (loaded && loaded.minerWidth  == null) init.minerWidth  = 0.8;
   // וודא שיש pendingOfflineStageCounts
   if (!init.pendingOfflineStageCounts || typeof init.pendingOfflineStageCounts !== "object") {
@@ -1658,7 +1658,7 @@ function freshState(){
 
     gold:0, spawnCost:50, dpsMult:1, goldMult:1,
 
-    minerScale: 1.8,
+    minerScale: 1.9,
     minerWidth: 0.8,
 
     anim:{ t:0, coins:[], hint:1, fx:[] },
@@ -2415,7 +2415,7 @@ function save() {
       offlineSessionStartAt: s.offlineSessionStartAt || null,
       offlineConsumedMsInSession: s.offlineConsumedMsInSession || 0,
 
-      minerScale: s.minerScale || 1.8,
+      minerScale: s.minerScale || 1.9,
       minerWidth: s.minerWidth || 0.8,
 
       lastSeen: s.lastSeen,
