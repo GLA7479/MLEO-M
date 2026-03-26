@@ -3224,8 +3224,9 @@ function BankedQuickPanel({
       bodyScrollRef={bodyScrollRef}
     >
       <div className="space-y-2">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <div className="rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-2.5 py-2">
+        {/* 3×2 at all breakpoints (mobile full-screen panel + desktop dropdown) */}
+        <div className="grid w-full grid-cols-3 grid-flow-row gap-x-2 gap-y-2">
+          <div className="min-w-0 rounded-[18px] border border-cyan-400/15 bg-cyan-500/[0.07] px-2.5 py-2">
             <div className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200/65">
               Rate / hr
             </div>
@@ -3234,7 +3235,7 @@ function BankedQuickPanel({
             </div>
           </div>
 
-          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
+          <div className="min-w-0 rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
             <div className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
               Per day
             </div>
@@ -3243,7 +3244,7 @@ function BankedQuickPanel({
             </div>
           </div>
 
-          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
+          <div className="min-w-0 rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
             <div className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
               Today
             </div>
@@ -3252,16 +3253,16 @@ function BankedQuickPanel({
             </div>
           </div>
 
-          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
+          <div className="min-w-0 rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-              Daily
+              Daily cap
             </div>
             <div className="mt-1 text-[1.08rem] font-extrabold leading-none text-white">
               {fmt(s.dailyMleoCap ?? s.shipCap)}
             </div>
           </div>
 
-          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
+          <div className="min-w-0 rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
               Cap ETA
             </div>
@@ -3270,7 +3271,7 @@ function BankedQuickPanel({
             </div>
           </div>
 
-          <div className="rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
+          <div className="min-w-0 rounded-[18px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
             <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
               Softcut
             </div>
@@ -3360,23 +3361,28 @@ function BankedQuickPanel({
           improvement lane. Green means this lane is currently balanced.
         </div>
         <div className="border-t border-white/10 pt-2 text-[12px] leading-5 text-white/72">
-          Banked MLEO = stored accumulated output inside BASE, not today&apos;s production.
+          Banked MLEO = current stored BASE output available inside BASE. This is separate from
+          Today, which only tracks how much you have produced today toward the daily cap.
         </div>
         <div className="text-[12px] leading-5 text-white/72">
           Rate / hr = current live BASE production rate under current conditions.
         </div>
         <div className="text-[12px] leading-5 text-white/72">
-          Per day = projected remaining output for today under current conditions and daily cap
-          limits (not simply Rate / hr × 24).
+          Per day = projected remaining BASE output for the rest of today under current conditions
+          and daily cap limits (not simply Rate / hr × 24).
         </div>
         <div className="text-[12px] leading-5 text-white/72">
-          Today = how much BASE production has already been produced today.
+          Today = total BASE production already produced today for daily-cap tracking.
         </div>
         <div className="text-[12px] leading-5 text-white/72">
-          Daily = today&apos;s maximum BASE production limit, not the total banked stock limit.
+          Daily Cap = today&apos;s maximum BASE production limit, not the total banked stock limit.
         </div>
         <div className="text-[12px] leading-5 text-white/72">
           Cap ETA = estimated time until today&apos;s production cap is reached at the current rate.
+        </div>
+        <div className="text-[12px] leading-5 text-white/72">
+          Softcut = current production effectiveness after the daily-cap slowdown is applied.
+          100% means no slowdown; lower values mean output is reduced as you approach the daily cap.
         </div>
         <div className="text-[12px] leading-5 text-white/72">
           Shipping moves banked MLEO to the shared vault; it does not increase production rate.
