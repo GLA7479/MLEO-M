@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { parseSessionId, resolvePlayerRef } from "../../../../lib/solo-v2/server/contracts";
 import { SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
 import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
+import { buildQuickFlipSettlementSummary } from "../../../../lib/solo-v2/quickFlipConfig";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -26,7 +27,13 @@ function createResolvedPayload(sessionRow) {
     outcome: summary.outcome || null,
     isWin: Boolean(summary.isWin),
     resolvedAt: summary.resolvedAt || sessionRow?.resolved_at || null,
-    settlement: "deferred",
+    settlementSummary:
+      summary.settlementSummary ||
+      buildQuickFlipSettlementSummary({
+        choice: summary.choice || null,
+        outcome: summary.outcome || null,
+        isWin: Boolean(summary.isWin),
+      }),
   };
 }
 
@@ -154,7 +161,7 @@ export default async function handler(req, res) {
       outcome,
       isWin,
       resolvedAt,
-      settlement: "deferred",
+      settlementSummary: buildQuickFlipSettlementSummary({ choice, outcome, isWin }),
       stats: "deferred",
     };
 
@@ -252,7 +259,7 @@ export default async function handler(req, res) {
         outcome,
         isWin,
         resolvedAt,
-        settlement: "deferred",
+        settlementSummary: buildQuickFlipSettlementSummary({ choice, outcome, isWin }),
       },
       authority: {
         outcomeTruth: "server",

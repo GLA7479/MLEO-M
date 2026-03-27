@@ -1,5 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
+import { QUICK_FLIP_CONFIG } from "../lib/solo-v2/quickFlipConfig";
+import {
+  applyQuickFlipSettlementOnce,
+  readQuickFlipLocalVaultBalance,
+} from "../lib/solo-v2/quickFlipLocalVault";
 
 const UI_STATE = {
   IDLE: "idle",
@@ -183,10 +188,15 @@ export default function QuickFlipPage() {
   const [resolvedResult, setResolvedResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [sessionNotice, setSessionNotice] = useState("");
+  const [vaultBalance, setVaultBalance] = useState(QUICK_FLIP_CONFIG.entryCost);
   const createInFlightRef = useRef(false);
   const submitInFlightRef = useRef(false);
   const resolveInFlightRef = useRef(false);
   const cycleRef = useRef(0);
+
+  useEffect(() => {
+    setVaultBalance(readQuickFlipLocalVaultBalance());
+  }, []);
 
   function resetForNewAttempt() {
     cycleRef.current += 1;
@@ -201,6 +211,24 @@ export default function QuickFlipPage() {
     setSessionNotice("");
     setErrorMessage("");
   }
+
+  useEffect(() => {
+    if (uiState !== UI_STATE.RESOLVED) return;
+    const sessionId = resolvedResult?.sessionId || session?.id;
+    const settlementSummary = resolvedResult?.settlementSummary;
+    if (!sessionId || !settlementSummary) return;
+
+    const settlementResult = applyQuickFlipSettlementOnce(sessionId, settlementSummary);
+    setVaultBalance(settlementResult.nextBalance);
+
+    const delta = Number(settlementSummary.netDelta || 0);
+    const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
+    if (settlementResult.applied) {
+      setSessionNotice(`Settled locally (${deltaLabel}). Vault: ${settlementResult.nextBalance}.`);
+    } else {
+      setSessionNotice(`Settlement already applied. Vault: ${settlementResult.nextBalance}.`);
+    }
+  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
 
   const shellStatus = useMemo(() => {
     if (
@@ -338,6 +366,12 @@ export default function QuickFlipPage() {
 
   async function handleStartSession() {
     if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
+    if (vaultBalance < QUICK_FLIP_CONFIG.entryCost) {
+      setUiState(UI_STATE.UNAVAILABLE);
+      setErrorMessage(`Insufficient local vault balance. Need ${QUICK_FLIP_CONFIG.entryCost} to start.`);
+      setSessionNotice("");
+      return;
+    }
     createInFlightRef.current = true;
     cycleRef.current += 1;
     const activeCycle = cycleRef.current;
@@ -599,16 +633,24 @@ export default function QuickFlipPage() {
       UI_STATE.PENDING_MIGRATION,
       UI_STATE.RESOLVE_FAILED,
       UI_STATE.RESOLVED,
-    ].includes(uiState) && !createInFlightRef.current && !submitInFlightRef.current && !resolveInFlightRef.current;
+    ].includes(uiState) &&
+    !createInFlightRef.current &&
+    !submitInFlightRef.current &&
+    !resolveInFlightRef.current &&
+    vaultBalance >= QUICK_FLIP_CONFIG.entryCost;
   const primaryActionLabel =
-    uiState === UI_STATE.IDLE ? "Start Session" : canStartSession ? "Start New Session" : "Session Ready";
+    uiState === UI_STATE.IDLE
+      ? `Start Session (${QUICK_FLIP_CONFIG.entryCost})`
+      : canStartSession
+        ? `Start New Session (${QUICK_FLIP_CONFIG.entryCost})`
+        : "Session Ready";
 
   return (
     <SoloV2GameShell
       title="Quick Flip"
       subtitle="Solo V2 reference game"
-      balanceLabel="Vault"
-      balanceValue="--"
+      balanceLabel="Local Vault"
+      balanceValue={String(vaultBalance)}
       shellStatus={shellStatus}
       statusDetails={statusDetails}
       onBack={() => {
@@ -655,7 +697,7 @@ export default function QuickFlipPage() {
         title: uiState === UI_STATE.RESOLVED ? "Server Result" : "Result Pending",
         message:
           uiState === UI_STATE.RESOLVED
-            ? `Choice: ${String(resolvedResult?.choice || "--")} | Outcome: ${String(resolvedResult?.outcome || "--")} | Settlement deferred`
+            ? `Choice: ${String(resolvedResult?.choice || "--")} | Outcome: ${String(resolvedResult?.outcome || "--")} | Local settlement applied once per session`
             : "Result modal is wired, but resolve may remain pending until backend migration is available.",
         tone: uiState === UI_STATE.RESOLVED ? "resolved_server_authoritative" : "neutral",
       }}
