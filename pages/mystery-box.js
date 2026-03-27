@@ -115,7 +115,7 @@ function MysteryBoxGameplayPanel({
   const canPick = !isOpening && uiState !== UI_STATE.LOADING && !isPickLocked;
 
   return (
-    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col px-2 pt-1 text-center sm:max-w-lg">
+    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg">
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-2 sm:py-4">
           <p className="mb-3 max-w-xs text-xs leading-relaxed text-zinc-400 sm:text-sm">
@@ -144,11 +144,19 @@ function MysteryBoxGameplayPanel({
               onSelect={onSelectBox}
             />
           </div>
-          {uiState === UI_STATE.RESOLVED && winningBoxIndex !== null && winningBoxIndex !== undefined ? (
-            <p className="mt-4 text-xs text-zinc-400">
-              Winning box:{" "}
-              <span className="font-bold text-amber-200/95">{boxLabel(winningBoxIndex)}</span>
-            </p>
+          {uiState !== UI_STATE.IDLE ? (
+            <div className="mt-3 flex h-6 w-full max-w-sm shrink-0 flex-col justify-center sm:mt-4 sm:h-7">
+              {uiState === UI_STATE.RESOLVED && winningBoxIndex !== null && winningBoxIndex !== undefined ? (
+                <p className="text-xs text-zinc-400">
+                  Winning box:{" "}
+                  <span className="font-bold text-amber-200/95">{boxLabel(winningBoxIndex)}</span>
+                </p>
+              ) : (
+                <p className="invisible text-xs leading-tight" aria-hidden>
+                  Winning box: <span className="font-bold">A</span>
+                </p>
+              )}
+            </div>
           ) : null}
         </div>
       </div>
@@ -1058,6 +1066,7 @@ export default function MysteryBoxPage() {
     <SoloV2GameShell
       title="Mystery Box"
       subtitle="Arcade Solo"
+      gameplayScrollable={false}
       menuVaultBalance={vaultBalance}
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
