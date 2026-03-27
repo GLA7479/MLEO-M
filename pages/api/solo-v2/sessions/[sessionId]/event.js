@@ -1,0 +1,211 @@
+import { getSupabaseAdmin } from "../../../../../lib/server/supabaseAdmin";
+import {
+  parseSessionEventPayload,
+  parseSessionId,
+  resolvePlayerRef,
+} from "../../../../../lib/solo-v2/server/contracts";
+import { SOLO_V2_SESSION_STATUS } from "../../../../../lib/solo-v2/server/sessionTypes";
+import { buildQuickFlipSessionSnapshot, normalizeQuickFlipChoice } from "../../../../../lib/solo-v2/server/quickFlipSnapshot";
+
+function isMissingTable(error) {
+  const code = String(error?.code || "");
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    code === "42P01" ||
+    code === "42883" ||
+    message.includes("relation") ||
+    message.includes("does not exist") ||
+    message.includes("function") ||
+    message.includes("rpc")
+  );
+}
+
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ ok: false, category: "validation_error", status: "method_not_allowed" });
+  }
+
+  const sessionId = parseSessionId(req.query?.sessionId);
+  if (!sessionId) {
+    return res.status(400).json({ ok: false, category: "validation_error", status: "invalid_request", message: "Invalid sessionId" });
+  }
+
+  const parsed = parseSessionEventPayload(req.body);
+  if (!parsed.ok) {
+    return res.status(400).json({ ok: false, category: "validation_error", status: "invalid_request", message: parsed.message });
+  }
+
+  // Foundation replay/integrity placeholders:
+  // - playerRef ownership is enforced through the scoped session read.
+  // - nonce/signature verification is intentionally deferred to Deliverable 5.
+  const playerRef = resolvePlayerRef(req);
+  const { eventType, eventPayload } = parsed.value;
+
+  try {
+    const supabase = getSupabaseAdmin();
+
+    const sessionLookup = await supabase.rpc("solo_v2_get_session", {
+      p_session_id: sessionId,
+      p_player_ref: playerRef,
+    });
+    if (sessionLookup.error) {
+      if (isMissingTable(sessionLookup.error)) {
+        return res.status(503).json({
+          ok: false,
+          category: "pending_migration",
+          status: "pending_migration",
+          message: "Solo V2 event persistence is not migrated yet.",
+        });
+      }
+      return res.status(503).json({
+        ok: false,
+        category: "unavailable",
+        status: "unavailable",
+        message: "Session read is temporarily unavailable.",
+      });
+    }
+
+    const sessionRow = Array.isArray(sessionLookup.data) ? sessionLookup.data[0] : sessionLookup.data;
+    if (!sessionRow) {
+      return res.status(404).json({ ok: false, category: "validation_error", status: "not_found", message: "Session not found" });
+    }
+
+    const isQuickFlipChoiceSubmit =
+      sessionRow.game_key === "quick_flip" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "choice_submit";
+
+    if (isQuickFlipChoiceSubmit) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Quick Flip choice submit is only allowed for active sessions.",
+        });
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "quick_flip") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Quick Flip choice submit requires gameKey quick_flip.",
+        });
+      }
+
+      const selectedSide = normalizeQuickFlipChoice(eventPayload?.side);
+      if (!selectedSide) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Quick Flip side must be heads or tails.",
+        });
+      }
+
+      const snapshotResult = await buildQuickFlipSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Choice submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      const priorChoice = normalizeQuickFlipChoice(snapshot.choice);
+      if (priorChoice && priorChoice === selectedSide) {
+        return res.status(200).json({
+          ok: true,
+          category: "success",
+          status: "accepted",
+          idempotent: true,
+          event: {
+            id: snapshot.choiceEventId || null,
+            eventType,
+          },
+          session: {
+            id: sessionId,
+            sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+          },
+          authority: {
+            eventValidation: "server",
+            gameplayResolution: "deferred",
+          },
+        });
+      }
+
+      if (priorChoice && priorChoice !== selectedSide) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "choice_already_submitted",
+          message: "Quick Flip choice is already locked for this session.",
+        });
+      }
+    }
+
+    const appendResult = await supabase.rpc("solo_v2_append_session_event", {
+      p_session_id: sessionId,
+      p_player_ref: playerRef,
+      p_event_type: eventType,
+      p_event_payload: eventPayload,
+    });
+
+    if (appendResult.error) {
+      if (isMissingTable(appendResult.error)) {
+        return res.status(503).json({
+          ok: false,
+          category: "pending_migration",
+          status: "pending_migration",
+          message: "Solo V2 event persistence is not migrated yet.",
+        });
+      }
+      return res.status(409).json({
+        ok: false,
+        category: "conflict",
+        status: "event_rejected",
+        message: appendResult.error.message,
+      });
+    }
+
+    const row = Array.isArray(appendResult.data) ? appendResult.data[0] : appendResult.data;
+    return res.status(200).json({
+      ok: true,
+      category: "success",
+      status: "accepted",
+      event: {
+        id: row?.event_id || null,
+        eventType,
+      },
+      session: {
+        id: sessionId,
+        sessionStatus: row?.session_status || "in_progress",
+      },
+      authority: {
+        eventValidation: "server",
+        gameplayResolution: "deferred",
+      },
+    });
+  } catch (error) {
+    console.error("solo-v2/sessions/[sessionId]/event failed", error);
+    return res.status(500).json({
+      ok: false,
+      category: "unexpected_error",
+      status: "server_error",
+      message: "Append event failed",
+    });
+  }
+}

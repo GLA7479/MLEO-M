@@ -4813,11 +4813,18 @@ export default function GamesHub() {
                         {text.terms}
                       </button>
                     </div>
-                    <Link href="/arcade" className="block">
-                      <span className="flex w-full items-center justify-center bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-2 rounded-lg text-[11px] font-bold shadow-md active:opacity-90">
-                        {text.arcadeGames}
-                      </span>
-                    </Link>
+                    <div className="grid grid-cols-2 gap-1">
+                      <Link href="/arcade" className="block">
+                        <span className="flex w-full items-center justify-center bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white py-2 rounded-lg text-[10px] font-bold shadow-md active:opacity-90">
+                          Legacy Arcade
+                        </span>
+                      </Link>
+                      <Link href="/arcade-v2" className="block">
+                        <span className="flex w-full items-center justify-center bg-gradient-to-r from-violet-500 to-fuchsia-600 hover:from-violet-600 hover:to-fuchsia-700 text-white py-2 rounded-lg text-[10px] font-bold shadow-md active:opacity-90">
+                          New Arcade
+                        </span>
+                      </Link>
+                    </div>
                   </div>
                 </article>
 
@@ -5013,12 +5020,20 @@ export default function GamesHub() {
                         {text.terms}
                       </button>
                     </div>
-                    <Link
-                      href="/arcade"
-                      className="block w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-2.5 text-center text-sm font-bold text-white shadow-lg hover:from-purple-700 hover:to-indigo-700 lg:py-3"
-                    >
-                      {text.arcadeGames}
-                    </Link>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Link
+                        href="/arcade"
+                        className="block w-full rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 py-2.5 text-center text-sm font-bold text-white shadow-lg hover:from-purple-700 hover:to-indigo-700 lg:py-3"
+                      >
+                        Legacy Arcade
+                      </Link>
+                      <Link
+                        href="/arcade-v2"
+                        className="block w-full rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-600 py-2.5 text-center text-sm font-bold text-white shadow-lg hover:from-violet-600 hover:to-fuchsia-700 lg:py-3"
+                      >
+                        New Arcade
+                      </Link>
+                    </div>
                   </div>
                 </article>
 
