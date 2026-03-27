@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import QuickFlipCoinDisplay from "../components/solo-v2/QuickFlipCoinDisplay";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
@@ -130,6 +131,13 @@ function writeQuickFlipStats(nextStats) {
   }
 }
 
+function normalizeQuickFlipServerOutcome(outcome) {
+  const s = String(outcome || "").toLowerCase();
+  if (s === "heads") return "heads";
+  if (s === "tails") return "tails";
+  return null;
+}
+
 function ChoiceButton({ label, value, selectedChoice, disabled, onSelect }) {
   const isSelected = selectedChoice === value;
 
@@ -150,23 +158,25 @@ function ChoiceButton({ label, value, selectedChoice, disabled, onSelect }) {
 }
 
 /** Center gameplay only — shell owns header stats, wager row, CTA, ad slot. */
-function QuickFlipGameplayPanel({ uiState, selectedChoice, isFlipping, resultToast, onSelectChoice }) {
+function QuickFlipGameplayPanel({
+  uiState,
+  selectedChoice,
+  isFlipping,
+  resultToast,
+  onSelectChoice,
+  coinResolvedFace,
+}) {
   const isChoiceLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
   const canChoose =
     !isFlipping && uiState !== UI_STATE.LOADING && !isChoiceLocked;
+
+  const coinPhase = isFlipping ? "flipping" : coinResolvedFace ? "resolved" : "idle";
 
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col px-2 pt-1 text-center sm:max-w-lg">
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3 sm:py-5">
-          <div
-            className={`select-none text-8xl leading-none transition-transform sm:text-9xl ${
-              isFlipping ? "animate-spin" : ""
-            }`}
-            aria-hidden
-          >
-            🪙
-          </div>
+          <QuickFlipCoinDisplay phase={coinPhase} resolvedFace={coinResolvedFace} />
         </div>
 
         <div className="w-full shrink-0 space-y-2.5 pb-2 sm:space-y-3 sm:pb-3">
@@ -950,6 +960,11 @@ export default function QuickFlipPage() {
           isFlipping={isFlipping}
           resultToast={resultToast}
           onSelectChoice={handleSelectChoice}
+          coinResolvedFace={
+            uiState === UI_STATE.RESOLVED
+              ? normalizeQuickFlipServerOutcome(resolvedResult?.outcome)
+              : null
+          }
         />
       }
       helpContent={
