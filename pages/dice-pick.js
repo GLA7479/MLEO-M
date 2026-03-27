@@ -127,6 +127,13 @@ function ChoiceButton({ label, sub, value, selectedChoice, disabled, onSelect })
   );
 }
 
+function formatPickedZoneLine(zone) {
+  const z = String(zone || "").toLowerCase();
+  if (z === "low") return "Your pick: LOW (1–3)";
+  if (z === "high") return "Your pick: HIGH (4–6)";
+  return "Your pick: —";
+}
+
 /** Center gameplay — shell owns header, wager, CTA. */
 function DicePickGameplayPanel({
   uiState,
@@ -136,22 +143,23 @@ function DicePickGameplayPanel({
   onSelectZone,
   resolvedRoll,
   resolvedIsWin,
+  pickedZone,
 }) {
   const isChoiceLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
   const canChoose = !isRolling && uiState !== UI_STATE.LOADING && !isChoiceLocked;
 
   const dicePhase = isRolling ? "rolling" : resolvedRoll != null ? "resolved" : "idle";
 
+  const showResultPopup =
+    uiState === UI_STATE.RESOLVED &&
+    resolvedRoll != null &&
+    typeof resolvedIsWin === "boolean";
+
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg">
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-2 sm:py-4">
-          <DicePickDisplay
-            phase={dicePhase}
-            resolvedRoll={resolvedRoll}
-            resolvedIsWin={resolvedIsWin}
-            resultToast={resultToast}
-          />
+          <DicePickDisplay phase={dicePhase} resolvedRoll={resolvedRoll} />
         </div>
 
         <div className="w-full shrink-0 space-y-2.5 pb-2 sm:space-y-3 sm:pb-3">
@@ -175,6 +183,49 @@ function DicePickGameplayPanel({
           </div>
         </div>
       </div>
+
+      {showResultPopup ? (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-3 py-2">
+          <div
+            key={`${resolvedRoll}-${resolvedIsWin}`}
+            className="w-[88%] max-w-[17.5rem] animate-dice-land-pop"
+            role="status"
+          >
+            <div
+              className={`rounded-xl border px-3.5 py-2.5 text-center shadow-md shadow-black/30 ${
+                resolvedIsWin
+                  ? "border-emerald-400/40 bg-emerald-950/95 text-emerald-50"
+                  : "border-red-400/40 bg-red-950/95 text-red-50"
+              }`}
+            >
+            <div className="text-[13px] font-black uppercase tracking-wide">
+              {resolvedIsWin ? "YOU WIN" : "YOU LOSE"}
+            </div>
+            <div className="mt-1 text-sm font-bold tabular-nums text-white">
+              Rolled <span className="text-amber-100">{resolvedRoll}</span>
+            </div>
+            <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">
+              {formatPickedZoneLine(pickedZone)}
+            </div>
+            <div className="mt-1.5 min-h-[2rem] border-t border-white/10 pt-1.5">
+              {resultToast ? (
+                <div
+                  className={`text-[11px] font-bold tabular-nums ${
+                    resultToast.isWin ? "text-emerald-200" : "text-red-200"
+                  }`}
+                >
+                  Vault {resultToast.deltaLabel}
+                </div>
+              ) : (
+                <div className="invisible text-[11px] font-bold tabular-nums" aria-hidden>
+                  Vault +0
+                </div>
+              )}
+            </div>
+          </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1021,6 +1072,11 @@ export default function DicePickPage() {
             uiState === UI_STATE.RESOLVED && resolvedResult != null
               ? Boolean(resolvedResult.isWin)
               : null
+          }
+          pickedZone={
+            uiState === UI_STATE.RESOLVED && resolvedResult?.zone
+              ? String(resolvedResult.zone).toLowerCase()
+              : selectedZone
           }
         />
       }

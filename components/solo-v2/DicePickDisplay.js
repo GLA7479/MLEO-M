@@ -38,7 +38,7 @@ function IdleFace() {
   return (
     <div className="relative flex h-full w-full flex-col items-center justify-center gap-1 px-3">
       <span
-        className="select-none font-black tabular-nums text-[2.75rem] leading-none text-amber-200/[0.22] drop-shadow-[0_2px_12px_rgba(251,191,36,0.12)] sm:text-[3.25rem]"
+        className="select-none font-black tabular-nums text-[2.75rem] leading-none text-amber-200/25 sm:text-[3.25rem]"
         aria-hidden
       >
         ?
@@ -48,7 +48,7 @@ function IdleFace() {
   );
 }
 
-export default function DicePickDisplay({ phase, resolvedRoll, resolvedIsWin, resultToast }) {
+export default function DicePickDisplay({ phase, resolvedRoll }) {
   const [cycleTick, setCycleTick] = useState(0);
 
   useEffect(() => {
@@ -63,8 +63,6 @@ export default function DicePickDisplay({ phase, resolvedRoll, resolvedIsWin, re
   const n = showResolved ? Math.min(6, Math.max(1, Math.floor(Number(resolvedRoll)))) : null;
   const tumbleFace = phase === "rolling" ? (cycleTick % 6) + 1 : 1;
 
-  const winLoseKnown = showResolved && typeof resolvedIsWin === "boolean";
-
   return (
     <div className="flex w-full max-w-[17rem] flex-col items-center sm:max-w-[19rem]">
       <div
@@ -74,36 +72,24 @@ export default function DicePickDisplay({ phase, resolvedRoll, resolvedIsWin, re
       >
         {phase === "idle" ? (
           <div
-            className="pointer-events-none absolute inset-0 overflow-hidden rounded-[1.35rem] sm:rounded-[1.5rem]"
+            className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl sm:rounded-3xl"
             aria-hidden
           >
-            <div className="absolute inset-0 animate-dice-idle-sheen bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            <div className="absolute inset-0 animate-dice-idle-sheen bg-gradient-to-r from-transparent via-white/[0.07] to-transparent" />
           </div>
         ) : null}
 
+        {/* Single die surface — no outer drop shadow blob, no second “backdrop” panel */}
         <div
           className={[
-            "relative flex h-[10.25rem] w-[10.25rem] items-center justify-center rounded-[1.35rem] sm:h-[12.25rem] sm:w-[12.25rem] sm:rounded-[1.5rem]",
-            "bg-gradient-to-br from-zinc-500/[0.35] via-zinc-900 to-zinc-950",
-            "shadow-[inset_0_1px_0_rgba(255,255,255,0.14),inset_0_-10px_24px_rgba(0,0,0,0.5),0_16px_40px_rgba(0,0,0,0.55),0_0_0_1px_rgba(255,255,255,0.07)]",
-            "ring-1 ring-amber-400/20",
-            phase === "rolling" ? "ring-amber-400/50" : "",
-            showResolved && winLoseKnown
-              ? resolvedIsWin
-                ? "ring-emerald-400/55"
-                : "ring-red-400/45"
-              : "",
+            "relative flex h-[10.25rem] w-[10.25rem] items-center justify-center rounded-2xl p-4 sm:h-[12.25rem] sm:w-[12.25rem] sm:rounded-3xl sm:p-5",
+            "border border-white/[0.12]",
+            "bg-gradient-to-b from-zinc-800 to-zinc-950",
+            "shadow-[inset_0_1px_0_rgba(255,255,255,0.11),inset_0_-4px_14px_rgba(0,0,0,0.42)]",
+            phase === "rolling" ? "border-amber-400/35" : "",
           ].join(" ")}
         >
-          <div
-            className={[
-              "absolute inset-[5px] rounded-[1.05rem] sm:inset-[6px] sm:rounded-[1.2rem]",
-              "bg-gradient-to-b from-zinc-800/90 to-zinc-950",
-              "shadow-[inset_0_2px_6px_rgba(0,0,0,0.55)]",
-            ].join(" ")}
-          />
-
-          <div className="relative z-[1] h-[78%] w-[78%]">
+          <div className="relative z-[1] h-[82%] w-[82%]">
             {phase === "idle" ? <IdleFace /> : null}
             {phase === "rolling" ? (
               <div key={tumbleFace} className="h-full w-full">
@@ -119,13 +105,12 @@ export default function DicePickDisplay({ phase, resolvedRoll, resolvedIsWin, re
         </div>
       </div>
 
-      {/* Fixed-height feedback: no layout shift when copy changes */}
+      {/* Fixed-height strip: no jump; win/loss lives in panel popup */}
       <div
         className="mt-3 flex w-full flex-col items-center gap-1 sm:mt-3.5"
-        style={{ minHeight: "5.25rem" }}
-        aria-live="polite"
+        style={{ minHeight: "3.25rem" }}
       >
-        <div className="flex min-h-[1.375rem] w-full items-center justify-center px-1">
+        <div className="flex min-h-[1.25rem] w-full items-center justify-center px-1">
           {phase === "idle" ? (
             <p className="text-center text-[11px] font-medium leading-snug text-zinc-500 sm:text-xs">
               One die · pick <span className="text-zinc-400">LOW</span> or{" "}
@@ -135,54 +120,11 @@ export default function DicePickDisplay({ phase, resolvedRoll, resolvedIsWin, re
           {phase === "rolling" ? (
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-200/90 sm:text-sm">Rolling…</p>
           ) : null}
-          {showResolved && winLoseKnown ? (
-            <span
-              className={[
-                "rounded-full px-3 py-0.5 text-[11px] font-black uppercase tracking-widest sm:text-xs",
-                resolvedIsWin
-                  ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/35"
-                  : "bg-red-500/15 text-red-200 ring-1 ring-red-400/30",
-              ].join(" ")}
-            >
-              {resolvedIsWin ? "You win" : "You lose"}
-            </span>
-          ) : null}
-          {showResolved && !winLoseKnown ? (
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">Result</span>
-          ) : null}
+          {phase === "resolved" ? <span className="invisible text-xs" aria-hidden>
+            Rolling…
+          </span> : null}
         </div>
-
-        <div className="flex min-h-[1.375rem] w-full items-center justify-center">
-          {showResolved ? (
-            <p className="text-sm font-bold tabular-nums text-zinc-200 sm:text-base">
-              Rolled <span className="text-white">{n}</span>
-              <span className="ml-1.5 text-xs font-semibold text-zinc-500 sm:text-sm">
-                {n <= 3 ? "· low zone" : "· high zone"}
-              </span>
-            </p>
-          ) : (
-            <p className="invisible text-sm tabular-nums sm:text-base" aria-hidden>
-              Rolled 6 · high zone
-            </p>
-          )}
-        </div>
-
-        <div className="flex min-h-[1.25rem] w-full items-center justify-center px-1">
-          {resultToast ? (
-            <p
-              className={[
-                "text-center text-[11px] font-semibold tabular-nums sm:text-xs",
-                resultToast.isWin ? "text-emerald-200/90" : "text-red-200/85",
-              ].join(" ")}
-            >
-              Vault {resultToast.deltaLabel}
-            </p>
-          ) : (
-            <p className="invisible text-[11px] sm:text-xs" aria-hidden>
-              Vault +0
-            </p>
-          )}
-        </div>
+        <div className="min-h-[1rem]" aria-hidden />
       </div>
     </div>
   );
