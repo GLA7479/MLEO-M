@@ -1000,7 +1000,7 @@ export default function HighLowCardsPage() {
               </div>
             </div>
 
-            {/* Fixed-height strip: play ↔ terminal must not change layout height (wager row stays locked) */}
+            {/* Fixed-height strip: buttons while playing; empty reserved height in terminal (popup carries result copy) */}
             <div className="w-full shrink-0 pb-2 sm:pb-3">
               {hiLoBottomSlotActive ? (
                 <div className="flex h-[4.5rem] w-full flex-col justify-center overflow-hidden sm:h-[4.75rem]">
@@ -1030,43 +1030,6 @@ export default function HighLowCardsPage() {
                       >
                         LOWER
                       </button>
-                    </div>
-                  ) : null}
-                  {uiState === UI_STATE.TERMINAL && terminalResult ? (
-                    <div className="flex h-full max-h-full flex-col justify-center gap-0.5 overflow-hidden rounded-xl bg-zinc-950/90 px-2 py-1 text-left ring-1 ring-zinc-700/60 backdrop-blur-sm">
-                      <p
-                        className={`truncate text-xs font-bold leading-tight sm:text-sm ${
-                          terminalResult.isWin ? "text-emerald-300" : "text-rose-300"
-                        }`}
-                      >
-                        {terminalResult.terminalKind === "cashout"
-                          ? `Cashed out — ${terminalResult.streak} streak`
-                          : "Run over — wrong call"}
-                      </p>
-                      <div className="flex min-h-[14px] shrink-0 items-center">
-                        {!terminalResult.isWin && terminalResult.lastNextCard?.rank ? (
-                          <p className="truncate text-[10px] leading-tight text-zinc-400">
-                            Card:{" "}
-                            <span className="font-semibold text-zinc-200">
-                              {terminalResult.lastNextCard.rank}
-                              {terminalResult.lastNextCard.suit || "♠"}
-                            </span>
-                          </p>
-                        ) : (
-                          <span className="invisible truncate text-[10px] leading-tight" aria-hidden>
-                            Card: 10♠
-                          </span>
-                        )}
-                      </div>
-                      {terminalResult.isWin ? (
-                        <p className="line-clamp-2 text-[10px] leading-tight text-zinc-400">
-                          Vault updated — PLAY AGAIN when ready.
-                        </p>
-                      ) : (
-                        <p className="line-clamp-2 text-[10px] leading-tight text-zinc-400">
-                          Streak reset — PLAY AGAIN for a new run.
-                        </p>
-                      )}
                     </div>
                   ) : null}
                 </div>
