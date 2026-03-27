@@ -135,6 +135,7 @@ function DicePickGameplayPanel({
   resultToast,
   onSelectZone,
   resolvedRoll,
+  resolvedIsWin,
 }) {
   const isChoiceLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
   const canChoose = !isRolling && uiState !== UI_STATE.LOADING && !isChoiceLocked;
@@ -144,8 +145,13 @@ function DicePickGameplayPanel({
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg">
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3 sm:py-5">
-          <DicePickDisplay phase={dicePhase} resolvedRoll={resolvedRoll} />
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-2 sm:py-4">
+          <DicePickDisplay
+            phase={dicePhase}
+            resolvedRoll={resolvedRoll}
+            resolvedIsWin={resolvedIsWin}
+            resultToast={resultToast}
+          />
         </div>
 
         <div className="w-full shrink-0 space-y-2.5 pb-2 sm:space-y-3 sm:pb-3">
@@ -169,22 +175,6 @@ function DicePickGameplayPanel({
           </div>
         </div>
       </div>
-
-      {resultToast ? (
-        <div
-          className={`pointer-events-none absolute left-1/2 top-[10%] z-20 w-[88%] max-w-xs -translate-x-1/2 rounded-lg border px-3 py-2 text-center text-xs font-bold sm:top-[12%] ${
-            resultToast.isWin
-              ? "border-emerald-400/35 bg-emerald-700/90 text-white"
-              : "border-red-400/35 bg-red-700/90 text-white"
-          }`}
-        >
-          <div className="text-[13px]">{resultToast.isWin ? "YOU WIN" : "YOU LOSE"}</div>
-          <div className="text-sm">{resultToast.deltaLabel}</div>
-          <div className="mt-0.5 text-[10px] font-semibold opacity-90">
-            {resultToast.rollLabel != null ? `DICE ${resultToast.rollLabel}` : "—"}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -322,7 +312,6 @@ export default function DicePickPage() {
       setResultToast({
         isWin: Boolean(resolvedResult?.isWin),
         deltaLabel: toastDeltaLabel,
-        rollLabel: Number.isFinite(Number(resolvedResult?.roll)) ? Number(resolvedResult.roll) : null,
       });
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => {
@@ -1026,6 +1015,11 @@ export default function DicePickPage() {
           resolvedRoll={
             uiState === UI_STATE.RESOLVED && Number.isFinite(Number(resolvedResult?.roll))
               ? Number(resolvedResult.roll)
+              : null
+          }
+          resolvedIsWin={
+            uiState === UI_STATE.RESOLVED && resolvedResult != null
+              ? Boolean(resolvedResult.isWin)
               : null
           }
         />
