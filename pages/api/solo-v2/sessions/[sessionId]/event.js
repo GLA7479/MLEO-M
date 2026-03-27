@@ -6,6 +6,7 @@ import {
 } from "../../../../../lib/solo-v2/server/contracts";
 import { SOLO_V2_SESSION_STATUS } from "../../../../../lib/solo-v2/server/sessionTypes";
 import { buildQuickFlipSessionSnapshot, normalizeQuickFlipChoice } from "../../../../../lib/solo-v2/server/quickFlipSnapshot";
+import { buildMysteryBoxSessionSnapshot, normalizeMysteryBoxIndex } from "../../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -166,6 +167,105 @@ export default async function handler(req, res) {
           category: "conflict",
           status: "choice_already_submitted",
           message: "Quick Flip choice is already locked for this session.",
+        });
+      }
+    }
+
+    const isMysteryBoxPick =
+      sessionRow.game_key === "mystery_box" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "mystery_box_pick";
+
+    if (isMysteryBoxPick) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Mystery Box pick is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "mystery_box") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Mystery Box pick requires gameKey mystery_box.",
+        });
+      }
+
+      const selectedBox = normalizeMysteryBoxIndex(eventPayload?.boxIndex);
+      if (selectedBox === null) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Mystery Box boxIndex must be 0, 1, or 2.",
+        });
+      }
+
+      const snapshotResult = await buildMysteryBoxSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Pick submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      const priorPick = normalizeMysteryBoxIndex(snapshot.boxChoice);
+      if (priorPick !== null && priorPick === selectedBox) {
+        return res.status(200).json({
+          ok: true,
+          category: "success",
+          status: "accepted",
+          idempotent: true,
+          event: {
+            id: snapshot.pickEventId || null,
+            eventType,
+          },
+          session: {
+            id: sessionId,
+            sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+          },
+          authority: {
+            eventValidation: "server",
+            gameplayResolution: "deferred",
+          },
+        });
+      }
+
+      if (priorPick !== null && priorPick !== selectedBox) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "choice_already_submitted",
+          message: "Mystery Box pick is already locked for this session.",
         });
       }
     }

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import QuickFlipCoinDisplay from "../components/solo-v2/QuickFlipCoinDisplay";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
@@ -8,9 +7,9 @@ import {
   soloV2GiftConsumeOne,
 } from "../lib/solo-v2/soloV2GiftStorage";
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
-import { QUICK_FLIP_CONFIG, QUICK_FLIP_MIN_WAGER, QUICK_FLIP_WIN_MULTIPLIER } from "../lib/solo-v2/quickFlipConfig";
+import { MYSTERY_BOX_MIN_WAGER, MYSTERY_BOX_WIN_MULTIPLIER } from "../lib/solo-v2/mysteryBoxConfig";
 import {
-  applyQuickFlipSettlementOnce,
+  applyMysteryBoxSettlementOnce,
   readQuickFlipSharedVaultBalance,
   subscribeQuickFlipSharedVault,
 } from "../lib/solo-v2/quickFlipLocalVault";
@@ -20,6 +19,9 @@ import {
   classifySoloV2ApiResult,
   isSoloV2EventRejectedStaleSessionMessage,
 } from "../lib/solo-v2/soloV2ApiResult";
+
+const SOLO_V2_PLAYER = "mystery-box-client";
+const GAME_KEY = "mystery_box";
 
 const UI_STATE = {
   IDLE: "idle",
@@ -35,19 +37,10 @@ const UI_STATE = {
   RESOLVE_FAILED: "resolve_failed",
 };
 
-/** Dev-only START ROUND tracing (next dev). Prod: set localStorage solo_v2_qf_start_debug=1 to enable. */
-function qfStartDebug(label, data) {
-  const allowProd =
-    typeof window !== "undefined" && window.localStorage?.getItem("solo_v2_qf_start_debug") === "1";
-  if (process.env.NODE_ENV !== "development" && !allowProd) return;
-  console.warn(`[QuickFlip handleStartSession] ${label}`, data);
-}
-
-const STATS_KEY = "solo_v2_quick_flip_stats_v1";
+const STATS_KEY = "solo_v2_mystery_box_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
 
-/** Parsed numeric wager from the amount field (0 if empty/invalid). No minimum — playability is gated separately. */
 function parseWagerInput(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
   if (!digits) return 0;
@@ -56,18 +49,9 @@ function parseWagerInput(raw) {
   return Math.min(MAX_WAGER, Math.max(0, n));
 }
 
-function readQuickFlipStats() {
+function readMysteryBoxStats() {
   if (typeof window === "undefined") {
-    return {
-      totalGames: 0,
-      wins: 0,
-      losses: 0,
-      totalPlay: 0,
-      totalWon: 0,
-      biggestWin: 0,
-      headsWins: 0,
-      tailsWins: 0,
-    };
+    return { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0 };
   }
   try {
     const raw = window.localStorage.getItem(STATS_KEY);
@@ -80,97 +64,92 @@ function readQuickFlipStats() {
       totalPlay: Number(parsed.totalPlay || 0),
       totalWon: Number(parsed.totalWon || 0),
       biggestWin: Number(parsed.biggestWin || 0),
-      headsWins: Number(parsed.headsWins || 0),
-      tailsWins: Number(parsed.tailsWins || 0),
     };
   } catch {
-    return {
-      totalGames: 0,
-      wins: 0,
-      losses: 0,
-      totalPlay: 0,
-      totalWon: 0,
-      biggestWin: 0,
-      headsWins: 0,
-      tailsWins: 0,
-    };
+    return { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0 };
   }
 }
 
-function writeQuickFlipStats(nextStats) {
+function writeMysteryBoxStats(nextStats) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STATS_KEY, JSON.stringify(nextStats));
   } catch {
-    // ignore storage errors
+    // ignore
   }
 }
 
-function normalizeQuickFlipServerOutcome(outcome) {
-  const s = String(outcome || "").toLowerCase();
-  if (s === "heads") return "heads";
-  if (s === "tails") return "tails";
-  return null;
+function boxLabel(index) {
+  if (index === 0 || index === 1 || index === 2) return `Box ${index + 1}`;
+  return "—";
 }
 
-function ChoiceButton({ label, value, selectedChoice, disabled, onSelect }) {
-  const isSelected = selectedChoice === value;
-
+function BoxButton({ index, label, selectedBox, disabled, onSelect }) {
+  const isSelected = selectedBox === index;
   return (
     <button
       type="button"
       disabled={disabled}
-      onClick={() => onSelect(value)}
-      className={`min-h-[42px] rounded-lg border px-3 py-2 text-sm font-bold transition ${
+      onClick={() => onSelect(index)}
+      className={`flex min-h-[72px] flex-1 flex-col items-center justify-center rounded-xl border px-2 py-2 text-sm font-extrabold transition sm:min-h-[84px] ${
         isSelected
-          ? "border-amber-400/50 bg-amber-500/25 text-amber-50"
+          ? "border-amber-400/55 bg-amber-500/25 text-amber-50 shadow-md shadow-amber-900/25"
           : "border-white/25 bg-white/[0.06] text-zinc-100 hover:bg-white/12"
       } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
     >
-      {label}
+      <span className="text-2xl sm:text-3xl">{label}</span>
+      <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Pick</span>
     </button>
   );
 }
 
-/** Center gameplay only — shell owns header stats, wager row, CTA, ad slot. */
-function QuickFlipGameplayPanel({
+function MysteryBoxGameplayPanel({
   uiState,
-  selectedChoice,
-  isFlipping,
+  selectedBox,
+  isOpening,
   resultToast,
-  onSelectChoice,
-  coinResolvedFace,
+  onSelectBox,
+  winningBoxIndex,
 }) {
-  const isChoiceLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
-  const canChoose =
-    !isFlipping && uiState !== UI_STATE.LOADING && !isChoiceLocked;
-
-  const coinPhase = isFlipping ? "flipping" : coinResolvedFace ? "resolved" : "idle";
+  const isPickLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
+  const canPick = !isOpening && uiState !== UI_STATE.LOADING && !isPickLocked;
 
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col px-2 pt-1 text-center sm:max-w-lg">
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3 sm:py-5">
-          <QuickFlipCoinDisplay phase={coinPhase} resolvedFace={coinResolvedFace} />
-        </div>
-
-        <div className="w-full shrink-0 space-y-2.5 pb-2 sm:space-y-3 sm:pb-3">
-          <div className="grid w-full grid-cols-2 gap-2">
-            <ChoiceButton
-              label="Heads"
-              value="heads"
-              selectedChoice={selectedChoice}
-              disabled={!canChoose}
-              onSelect={onSelectChoice}
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-2 sm:py-4">
+          <p className="mb-3 max-w-xs text-xs leading-relaxed text-zinc-400 sm:text-sm">
+            One box holds the prize. The server picks the winning box when you open.
+          </p>
+          <div className="grid w-full grid-cols-3 gap-2 sm:gap-3">
+            <BoxButton
+              index={0}
+              label="A"
+              selectedBox={selectedBox}
+              disabled={!canPick}
+              onSelect={onSelectBox}
             />
-            <ChoiceButton
-              label="Tails"
-              value="tails"
-              selectedChoice={selectedChoice}
-              disabled={!canChoose}
-              onSelect={onSelectChoice}
+            <BoxButton
+              index={1}
+              label="B"
+              selectedBox={selectedBox}
+              disabled={!canPick}
+              onSelect={onSelectBox}
+            />
+            <BoxButton
+              index={2}
+              label="C"
+              selectedBox={selectedBox}
+              disabled={!canPick}
+              onSelect={onSelectBox}
             />
           </div>
+          {uiState === UI_STATE.RESOLVED && winningBoxIndex !== null && winningBoxIndex !== undefined ? (
+            <p className="mt-4 text-xs text-zinc-400">
+              Winning box:{" "}
+              <span className="font-bold text-amber-200/95">{boxLabel(winningBoxIndex)}</span>
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -184,31 +163,29 @@ function QuickFlipGameplayPanel({
         >
           <div className="text-[13px]">{resultToast.isWin ? "YOU WIN" : "YOU LOSE"}</div>
           <div className="text-sm">{resultToast.deltaLabel}</div>
-          <div className="mt-0.5 text-[10px] font-semibold opacity-90">
-            {String(resultToast.outcome || "--").toUpperCase()}
-          </div>
+          <div className="mt-0.5 text-[10px] font-semibold opacity-90">{resultToast.outcomeLabel}</div>
         </div>
       ) : null}
     </div>
   );
 }
 
-export default function QuickFlipPage() {
+export default function MysteryBoxPage() {
   const giftShell = useSoloV2GiftShellState();
   const giftRefreshRef = useRef(() => {});
   const giftRoundRef = useRef(false);
   const [uiState, setUiState] = useState(UI_STATE.IDLE);
   const [session, setSession] = useState(null);
-  const [selectedChoice, setSelectedChoice] = useState("");
-  const [eventInfo, setEventInfo] = useState(null);
+  const [selectedBox, setSelectedBox] = useState(null);
+  const [, setEventInfo] = useState(null);
   const [resolvedResult, setResolvedResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [, setSessionNotice] = useState("");
   const [vaultBalance, setVaultBalance] = useState(0);
   const [vaultReady, setVaultReady] = useState(false);
-  const [wagerInput, setWagerInput] = useState(String(QUICK_FLIP_MIN_WAGER));
+  const [wagerInput, setWagerInput] = useState(String(MYSTERY_BOX_MIN_WAGER));
   const lastPresetAmountRef = useRef(null);
-  const [stats, setStats] = useState(readQuickFlipStats);
+  const [stats, setStats] = useState(readMysteryBoxStats);
   const [resultToast, setResultToast] = useState(null);
   const toastTimerRef = useRef(null);
   const createInFlightRef = useRef(false);
@@ -250,7 +227,7 @@ export default function QuickFlipPage() {
   }, []);
 
   useEffect(() => {
-    writeQuickFlipStats(stats);
+    writeMysteryBoxStats(stats);
   }, [stats]);
 
   useEffect(() => {
@@ -261,18 +238,17 @@ export default function QuickFlipPage() {
     };
   }, []);
 
-  /** Clears stale session/round state but keeps wager input so the user can try FLIP COIN again. */
   function recoverStaleRound(message) {
     createInFlightRef.current = false;
     submitInFlightRef.current = false;
     resolveInFlightRef.current = false;
     setSession(null);
-    setSelectedChoice("");
+    setSelectedBox(null);
     setEventInfo(null);
     setResolvedResult(null);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
-    setErrorMessage(String(message || "").trim() || "This round is no longer valid. Choose side and press FLIP COIN.");
+    setErrorMessage(String(message || "").trim() || "This round is no longer valid. Pick a box and press OPEN BOX.");
   }
 
   useEffect(() => {
@@ -280,7 +256,7 @@ export default function QuickFlipPage() {
     const sessionId = resolvedResult?.sessionId || session?.id;
     const settlementSummary = resolvedResult?.settlementSummary;
     if (!sessionId || !settlementSummary) return;
-    applyQuickFlipSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
+    applyMysteryBoxSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
       if (!settlementResult) return;
       const authoritativeBalance = Number(settlementResult.nextBalance || 0);
       setVaultBalance(authoritativeBalance);
@@ -294,36 +270,31 @@ export default function QuickFlipPage() {
       const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
       if (settlementResult.applied) {
         setSessionNotice(`Settled (${deltaLabel}). Vault: ${authoritativeBalance}.`);
-        setStats(prev => {
-          const entryCost = Number(settlementSummary.entryCost || QUICK_FLIP_CONFIG.entryCost);
-          const payoutReturn = Number(settlementSummary.payoutReturn || 0);
-          return {
-            ...prev,
-            totalGames: Number(prev.totalGames || 0) + 1,
-            wins: Number(prev.wins || 0) + (resolvedResult?.isWin ? 1 : 0),
-            losses: Number(prev.losses || 0) + (resolvedResult?.isWin ? 0 : 1),
-            totalPlay:
-              Number(prev.totalPlay || 0) + (settlementSummary.fundingSource === "gift" ? 0 : entryCost),
-            totalWon: Number(prev.totalWon || 0) + payoutReturn,
-            biggestWin: Math.max(Number(prev.biggestWin || 0), resolvedResult?.isWin ? payoutReturn : 0),
-            headsWins:
-              Number(prev.headsWins || 0) +
-              (resolvedResult?.isWin && String(resolvedResult?.outcome || "") === "heads" ? 1 : 0),
-            tailsWins:
-              Number(prev.tailsWins || 0) +
-              (resolvedResult?.isWin && String(resolvedResult?.outcome || "") === "tails" ? 1 : 0),
-          };
-        });
+        const entryCost = Number(settlementSummary.entryCost || MYSTERY_BOX_MIN_WAGER);
+        const payoutReturn = Number(settlementSummary.payoutReturn || 0);
+        setStats(prev => ({
+          ...prev,
+          totalGames: Number(prev.totalGames || 0) + 1,
+          wins: Number(prev.wins || 0) + (resolvedResult?.isWin ? 1 : 0),
+          losses: Number(prev.losses || 0) + (resolvedResult?.isWin ? 0 : 1),
+          totalPlay:
+            Number(prev.totalPlay || 0) + (settlementSummary.fundingSource === "gift" ? 0 : entryCost),
+          totalWon: Number(prev.totalWon || 0) + payoutReturn,
+          biggestWin: Math.max(Number(prev.biggestWin || 0), resolvedResult?.isWin ? payoutReturn : 0),
+        }));
       } else {
         setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
       }
 
       const toastDelta = Number(settlementSummary.netDelta || 0);
       const toastDeltaLabel = toastDelta >= 0 ? `+${toastDelta}` : `${toastDelta}`;
+      const ob = resolvedResult?.outcome;
+      const outcomeLabel =
+        ob === 0 || ob === 1 || ob === 2 ? `Prize was in ${boxLabel(ob)}` : "Round complete";
       setResultToast({
         isWin: Boolean(resolvedResult?.isWin),
         deltaLabel: toastDeltaLabel,
-        outcome: resolvedResult?.outcome || null,
+        outcomeLabel,
       });
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => {
@@ -333,13 +304,13 @@ export default function QuickFlipPage() {
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
 
   function hydrateResolvedFromSession(sessionPayload) {
-    const summary = sessionPayload?.quickFlip?.resolvedResult || sessionPayload?.serverOutcomeSummary || {};
+    const summary = sessionPayload?.mysteryBox?.resolvedResult || sessionPayload?.serverOutcomeSummary || {};
     if (sessionPayload?.sessionStatus !== "resolved") return null;
     return {
       sessionId: sessionPayload?.id || null,
       sessionStatus: sessionPayload?.sessionStatus || "resolved",
-      choice: summary.choice || null,
-      outcome: summary.outcome || null,
+      choice: summary.choice ?? null,
+      outcome: summary.outcome ?? null,
       isWin: Boolean(summary.isWin),
       resolvedAt: summary.resolvedAt || sessionPayload?.resolvedAt || null,
       settlementSummary: summary.settlementSummary || null,
@@ -351,14 +322,14 @@ export default function QuickFlipPage() {
     setSession(sessionPayload);
 
     const readState = String(sessionPayload?.readState || "");
-    const quickFlipChoice = sessionPayload?.quickFlip?.choice || null;
-    const quickFlipChoiceEventId = sessionPayload?.quickFlip?.choiceEventId || null;
+    const serverBox = sessionPayload?.mysteryBox?.boxChoice;
+    const pickEventId = sessionPayload?.mysteryBox?.pickEventId || null;
     const resolved = hydrateResolvedFromSession(sessionPayload);
 
     if (readState === "resolved" || resolved) {
       if (resolved) setResolvedResult(resolved);
       setEventInfo(null);
-      setSelectedChoice("");
+      setSelectedBox(null);
       setUiState(UI_STATE.RESOLVED);
       setSessionNotice(resumed ? "Resumed already resolved session." : "Session already resolved on server.");
       setErrorMessage("");
@@ -366,22 +337,22 @@ export default function QuickFlipPage() {
     }
 
     if (readState === "choice_submitted") {
-      setSelectedChoice(quickFlipChoice || "");
+      setSelectedBox(serverBox === 0 || serverBox === 1 || serverBox === 2 ? serverBox : null);
       setEventInfo({
-        eventId: quickFlipChoiceEventId,
+        eventId: pickEventId,
         eventType: "client_action",
       });
       setUiState(UI_STATE.CHOICE_SUBMITTED);
-      setSessionNotice("Resumed session with submitted choice. Ready to resolve.");
+      setSessionNotice("Resumed session with locked pick. Ready to open.");
       setErrorMessage("");
       return;
     }
 
     if (readState === "choice_required" || readState === "ready") {
-      if (localChoiceToKeep === "heads" || localChoiceToKeep === "tails") {
-        setSelectedChoice(localChoiceToKeep);
+      if (localChoiceToKeep === 0 || localChoiceToKeep === 1 || localChoiceToKeep === 2) {
+        setSelectedBox(localChoiceToKeep);
       } else {
-        setSelectedChoice("");
+        setSelectedBox(null);
       }
       setEventInfo(null);
       setResolvedResult(null);
@@ -397,15 +368,15 @@ export default function QuickFlipPage() {
       sessionPayload?.sessionStatus === "cancelled"
     ) {
       setSession(null);
-      setSelectedChoice("");
+      setSelectedBox(null);
       setEventInfo(null);
       setResolvedResult(null);
       setUiState(UI_STATE.IDLE);
       setSessionNotice("");
       setErrorMessage(
         sessionPayload?.sessionStatus === "expired"
-          ? "Session expired. Choose side and press FLIP COIN."
-          : "Session ended. Choose side and press FLIP COIN.",
+          ? "Session expired. Pick a box and press OPEN BOX."
+          : "Session ended. Pick a box and press OPEN BOX.",
       );
       return;
     }
@@ -418,7 +389,7 @@ export default function QuickFlipPage() {
     const response = await fetch(`/api/solo-v2/sessions/${sessionId}`, {
       method: "GET",
       headers: {
-        "x-solo-v2-player": "quick-flip-client",
+        "x-solo-v2-player": SOLO_V2_PLAYER,
       },
     });
 
@@ -450,12 +421,7 @@ export default function QuickFlipPage() {
     };
   }
 
-  /**
-   * Create or resume a server session (authoritative). Preserves local pre-selected side via localChoiceToKeep on resume.
-   * Gift rounds: sessionMode freeplay, stake SOLO_V2_GIFT_ROUND_STAKE; consume one gift only after status "created".
-   * @returns {{ ok: true, session: object } | { ok: false }}
-   */
-  async function bootstrapQuickFlipSession(wager, activeCycle, localChoiceToKeep, createSessionMode, giftRoundMeta) {
+  async function bootstrapMysteryBoxSession(wager, activeCycle, localBoxToKeep, createSessionMode, giftRoundMeta) {
     const isGiftRound = Boolean(giftRoundMeta?.isGiftRound);
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
@@ -469,10 +435,10 @@ export default function QuickFlipPage() {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-solo-v2-player": "quick-flip-client",
+          "x-solo-v2-player": SOLO_V2_PLAYER,
         },
         body: JSON.stringify({
-          gameKey: "quick_flip",
+          gameKey: GAME_KEY,
           sessionMode: createSessionMode,
           entryAmount: wager,
         }),
@@ -482,14 +448,6 @@ export default function QuickFlipPage() {
       if (activeCycle !== cycleRef.current) return { ok: false };
       const result = classifySoloV2ApiResult(response, payload);
       const status = String(payload?.status || "");
-
-      qfStartDebug("fetch_done", {
-        httpStatus: response.status,
-        classify: result,
-        apiStatus: status,
-        sessionId: payload?.session?.id ?? null,
-        rawPayload: payload,
-      });
 
       if (result === SOLO_V2_API_RESULT.SUCCESS && status === "created" && payload?.session) {
         if (isGiftRound) {
@@ -505,7 +463,6 @@ export default function QuickFlipPage() {
         setSessionNotice("");
         setErrorMessage("");
         setUiState(UI_STATE.SESSION_CREATED);
-        qfStartDebug("branch_created", { sessionId: payload.session?.id });
         return { ok: true, session: payload.session };
       }
 
@@ -522,15 +479,10 @@ export default function QuickFlipPage() {
         setErrorMessage("");
 
         const readResult = await readSessionTruth(payload.session.id, activeCycle);
-        qfStartDebug("readSessionTruth_result", {
-          halted: Boolean(readResult?.halted),
-          ok: readResult?.ok,
-          readState: readResult?.session?.readState,
-        });
         if (readResult?.halted) return { ok: false };
         if (!readResult?.ok) {
           setSession(null);
-          setSelectedChoice("");
+          setSelectedBox(null);
           setEventInfo(null);
           setResolvedResult(null);
           setUiState(readResult.state);
@@ -538,8 +490,7 @@ export default function QuickFlipPage() {
           return { ok: false };
         }
 
-        applySessionReadState(readResult.session, { resumed: true, localChoiceToKeep });
-        qfStartDebug("after_applySessionReadState", { readState: String(readResult.session?.readState || "") });
+        applySessionReadState(readResult.session, { resumed: true, localChoiceToKeep: localBoxToKeep });
         const rs = String(readResult.session?.readState || "");
         const st = String(readResult.session?.sessionStatus || "");
         if (rs === "invalid" || st === "expired" || st === "cancelled") {
@@ -578,8 +529,8 @@ export default function QuickFlipPage() {
     }
   }
 
-  async function submitChoiceAndResolveFlow(sessionId, side, activeCycle) {
-    if (!sessionId || (side !== "heads" && side !== "tails")) return;
+  async function submitPickAndResolveFlow(sessionId, boxIndex, activeCycle) {
+    if (!sessionId || (boxIndex !== 0 && boxIndex !== 1 && boxIndex !== 2)) return;
     if (submitInFlightRef.current || resolveInFlightRef.current) return;
 
     submitInFlightRef.current = true;
@@ -591,14 +542,14 @@ export default function QuickFlipPage() {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-solo-v2-player": "quick-flip-client",
+          "x-solo-v2-player": SOLO_V2_PLAYER,
         },
         body: JSON.stringify({
           eventType: "client_action",
           eventPayload: {
-            gameKey: "quick_flip",
-            action: "choice_submit",
-            side,
+            gameKey: GAME_KEY,
+            action: "mystery_box_pick",
+            boxIndex,
           },
         }),
       });
@@ -615,9 +566,9 @@ export default function QuickFlipPage() {
         });
         setUiState(UI_STATE.CHOICE_SUBMITTED);
         if (payload?.idempotent) {
-          setSessionNotice("Choice already accepted. Resolving...");
+          setSessionNotice("Pick already accepted. Opening...");
         } else {
-          setSessionNotice("Flipping...");
+          setSessionNotice("Opening...");
         }
         await handleResolveSession({ sessionIdOverride: sessionId });
         return;
@@ -631,7 +582,7 @@ export default function QuickFlipPage() {
 
       if (result === SOLO_V2_API_RESULT.UNAVAILABLE) {
         setUiState(UI_STATE.UNAVAILABLE);
-        setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Choice submission unavailable."));
+        setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Pick submission unavailable."));
         return;
       }
 
@@ -645,7 +596,7 @@ export default function QuickFlipPage() {
         }
         applySessionReadState(readResult.session, { resumed: true });
         if (String(readResult?.readStatus || "") === "choice_submitted") {
-          setSessionNotice("A choice is already locked on server. Resolving locked choice.");
+          setSessionNotice("Pick already locked on server. Resolving.");
           await handleResolveSession({ sessionIdOverride: readResult.session.id });
         }
         return;
@@ -657,32 +608,32 @@ export default function QuickFlipPage() {
         if (readResult?.ok) {
           applySessionReadState(readResult.session, { resumed: true });
           if (String(readResult?.readStatus || "") === "choice_submitted") {
-            setSessionNotice("Session already has submitted choice. Resolving now.");
+            setSessionNotice("Session already has a pick. Opening now.");
             await handleResolveSession({ sessionIdOverride: readResult.session.id });
           }
           return;
         }
-        recoverStaleRound(buildSoloV2ApiErrorMessage(payload, "Session no longer accepts choice submit."));
+        recoverStaleRound(buildSoloV2ApiErrorMessage(payload, "Session no longer accepts picks."));
         return;
       }
 
       if (result === SOLO_V2_API_RESULT.CONFLICT && status === "event_rejected") {
         const msg = buildSoloV2ApiErrorMessage(payload, "");
         if (isSoloV2EventRejectedStaleSessionMessage(msg)) {
-          recoverStaleRound(msg || "Session expired. Choose side and press FLIP COIN.");
+          recoverStaleRound(msg || "Session expired. Pick a box and press OPEN BOX.");
           return;
         }
         setUiState(UI_STATE.UNAVAILABLE);
-        setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Choice submission rejected."));
+        setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Pick submission rejected."));
         return;
       }
 
       setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Choice submission rejected."));
+      setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Pick submission rejected."));
     } catch (_error) {
       if (activeCycle !== cycleRef.current) return;
       setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage("Network error while submitting choice.");
+      setErrorMessage("Network error while submitting pick.");
     } finally {
       if (activeCycle === cycleRef.current) {
         submitInFlightRef.current = false;
@@ -700,14 +651,14 @@ export default function QuickFlipPage() {
       if (isGiftRound) giftRoundRef.current = false;
       return;
     }
-    const side = selectedChoice;
-    if (side !== "heads" && side !== "tails") {
+    const box = selectedBox;
+    if (box !== 0 && box !== 1 && box !== 2) {
       if (isGiftRound) giftRoundRef.current = false;
       return;
     }
 
     const wager = isGiftRound ? SOLO_V2_GIFT_ROUND_STAKE : parseWagerInput(wagerInput);
-    if (!isGiftRound && wager < QUICK_FLIP_MIN_WAGER) return;
+    if (!isGiftRound && wager < MYSTERY_BOX_MIN_WAGER) return;
     if (!isGiftRound && vaultBalance < wager) {
       setUiState(UI_STATE.UNAVAILABLE);
       setErrorMessage(`Insufficient vault balance. Need ${wager} for this round.`);
@@ -751,7 +702,7 @@ export default function QuickFlipPage() {
       let readStateKnown = String(cur?.readState || "");
 
       if (needsBootstrap) {
-        const boot = await bootstrapQuickFlipSession(wager, activeCycle, side, createSessionMode, {
+        const boot = await bootstrapMysteryBoxSession(wager, activeCycle, box, createSessionMode, {
           isGiftRound,
           onGiftConsumed: () => giftRefreshRef.current?.(),
         });
@@ -768,7 +719,7 @@ export default function QuickFlipPage() {
         return;
       }
 
-      await submitChoiceAndResolveFlow(sessionId, side, activeCycle);
+      await submitPickAndResolveFlow(sessionId, box, activeCycle);
     } finally {
       if (isGiftRound) {
         giftRoundRef.current = false;
@@ -776,7 +727,7 @@ export default function QuickFlipPage() {
     }
   }
 
-  function handleSelectChoice(choice) {
+  function handleSelectBox(index) {
     if (
       uiState === UI_STATE.LOADING ||
       uiState === UI_STATE.SUBMITTING_CHOICE ||
@@ -785,7 +736,7 @@ export default function QuickFlipPage() {
     ) {
       return;
     }
-    setSelectedChoice(choice);
+    setSelectedBox(index);
     setErrorMessage("");
     setEventInfo(null);
     setResolvedResult(null);
@@ -806,11 +757,11 @@ export default function QuickFlipPage() {
     setErrorMessage("");
 
     try {
-      const response = await fetch("/api/solo-v2/quick-flip/resolve", {
+      const response = await fetch("/api/solo-v2/mystery-box/resolve", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-solo-v2-player": "quick-flip-client",
+          "x-solo-v2-player": SOLO_V2_PLAYER,
         },
         body: JSON.stringify({
           sessionId: targetSessionId,
@@ -861,18 +812,16 @@ export default function QuickFlipPage() {
   }
 
   const numericWager = parseWagerInput(wagerInput);
-  const hasValidSide = selectedChoice === "heads" || selectedChoice === "tails";
+  const hasValidBox = selectedBox === 0 || selectedBox === 1 || selectedBox === 2;
   const wagerPlayable =
-    vaultReady && numericWager >= QUICK_FLIP_MIN_WAGER && vaultBalance >= numericWager;
+    vaultReady && numericWager >= MYSTERY_BOX_MIN_WAGER && vaultBalance >= numericWager;
 
   useEffect(() => {
     if (!wagerPlayable) return;
     setErrorMessage(prev => {
       const s = String(prev || "");
       if (
-        /Session expired\. Press START ROUND|Session ended\. Press START ROUND|no longer valid\. Press START ROUND|Session expired\. Choose side and press FLIP COIN|Session ended\. Choose side and press FLIP COIN|no longer valid\. Choose side and press FLIP COIN/i.test(
-          s,
-        )
+        /Session expired\. Pick a box|Session ended\. Pick a box|no longer valid\. Pick a box/i.test(s)
       ) {
         return "";
       }
@@ -880,9 +829,9 @@ export default function QuickFlipPage() {
     });
   }, [wagerPlayable]);
 
-  const canFlipCoin =
+  const canOpenBox =
     wagerPlayable &&
-    hasValidSide &&
+    hasValidBox &&
     ![
       UI_STATE.LOADING,
       UI_STATE.SUBMITTING_CHOICE,
@@ -894,7 +843,7 @@ export default function QuickFlipPage() {
   const isPrimaryLoading =
     uiState === UI_STATE.LOADING || uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
 
-  const primaryActionLabel = hasValidSide ? "FLIP COIN" : "Choose Heads or Tails";
+  const primaryActionLabel = hasValidBox ? "OPEN BOX" : "Choose a box";
 
   function handlePresetClick(presetValue) {
     const v = Number(presetValue);
@@ -916,21 +865,26 @@ export default function QuickFlipPage() {
   }
 
   function handlePrimaryCta() {
-    if (canFlipCoin) {
+    if (canOpenBox) {
       void runOneClickRound();
     }
   }
 
-  const isFlipping = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
-  const potentialWin = Math.floor(numericWager * QUICK_FLIP_WIN_MULTIPLIER);
+  const isOpening = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
+  const potentialWin = Math.floor(numericWager * MYSTERY_BOX_WIN_MULTIPLIER);
+
+  const winningBoxResolved =
+    uiState === UI_STATE.RESOLVED && resolvedResult?.outcome !== null && resolvedResult?.outcome !== undefined
+      ? Number(resolvedResult.outcome)
+      : null;
 
   const handleGiftPlay = useCallback(() => {
     if (!vaultReady) {
       setErrorMessage("Shared vault unavailable.");
       return;
     }
-    if (!hasValidSide) {
-      setErrorMessage("Choose Heads or Tails to play a gift round.");
+    if (!hasValidBox) {
+      setErrorMessage("Choose a box to play a gift round.");
       return;
     }
     if (giftShell.giftCount < 1) return;
@@ -948,11 +902,11 @@ export default function QuickFlipPage() {
     }
     giftRoundRef.current = true;
     void runOneClickRound();
-  }, [vaultReady, hasValidSide, giftShell.giftCount, uiState]);
+  }, [vaultReady, hasValidBox, giftShell.giftCount, uiState]);
 
   return (
     <SoloV2GameShell
-      title="Quick Flip"
+      title="Mystery Box"
       subtitle="Arcade Solo"
       menuVaultBalance={vaultBalance}
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
@@ -978,13 +932,13 @@ export default function QuickFlipPage() {
         betPresets: BET_PRESETS,
         wagerInput,
         wagerNumeric: numericWager,
-        canEditPlay: !isFlipping,
+        canEditPlay: !isOpening,
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
           setWagerInput(prev => {
             const c = parseWagerInput(prev);
-            const next = Math.min(MAX_WAGER, Math.max(0, c - QUICK_FLIP_MIN_WAGER));
+            const next = Math.min(MAX_WAGER, Math.max(0, c - MYSTERY_BOX_MIN_WAGER));
             return String(next);
           });
         },
@@ -1001,36 +955,32 @@ export default function QuickFlipPage() {
         },
         onResetAmount: () => {
           clearPresetChain();
-          setWagerInput(String(QUICK_FLIP_MIN_WAGER));
+          setWagerInput(String(MYSTERY_BOX_MIN_WAGER));
         },
         primaryActionLabel,
-        primaryActionDisabled: !canFlipCoin,
+        primaryActionDisabled: !canOpenBox,
         primaryActionLoading: isPrimaryLoading,
-        primaryLoadingLabel: "FLIPPING...",
+        primaryLoadingLabel: "OPENING...",
         onPrimaryAction: handlePrimaryCta,
         errorMessage,
       }}
       gameplaySlot={
-        <QuickFlipGameplayPanel
+        <MysteryBoxGameplayPanel
           uiState={uiState}
-          selectedChoice={selectedChoice}
-          isFlipping={isFlipping}
+          selectedBox={selectedBox}
+          isOpening={isOpening}
           resultToast={resultToast}
-          onSelectChoice={handleSelectChoice}
-          coinResolvedFace={
-            uiState === UI_STATE.RESOLVED
-              ? normalizeQuickFlipServerOutcome(resolvedResult?.outcome)
-              : null
-          }
+          onSelectBox={handleSelectBox}
+          winningBoxIndex={Number.isFinite(winningBoxResolved) ? winningBoxResolved : null}
         />
       }
       helpContent={
         <div className="space-y-2">
-          <p>1. Choose Heads or Tails.</p>
-          <p>2. Set your play amount and press FLIP COIN.</p>
-          <p>3. If your side matches the result, you win.</p>
-          <p>Win ratio is x1.92 per round in this release.</p>
-          <p>Result is server-resolved before vault settlement is applied.</p>
+          <p>1. Tap a box (A, B, or C).</p>
+          <p>2. Set your play amount and press OPEN BOX.</p>
+          <p>3. The server picks the winning box. If it matches your pick, you win.</p>
+          <p>Win pays about ×2.88 on your play (three boxes, ~96% RTP target).</p>
+          <p>Vault updates after the server result, same shared vault as other Solo V2 games.</p>
         </div>
       }
       statsContent={
@@ -1041,7 +991,6 @@ export default function QuickFlipPage() {
           <p>Total won: {formatCompact(stats.totalWon)}</p>
           <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
           <p>Net profit: {formatCompact(stats.totalWon - stats.totalPlay)}</p>
-          <p>Heads wins: {stats.headsWins} | Tails wins: {stats.tailsWins}</p>
         </div>
       }
       resultState={null}

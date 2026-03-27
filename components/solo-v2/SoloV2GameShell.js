@@ -187,11 +187,6 @@ export default function SoloV2GameShell({
         <p className="text-sm">
           {resultState?.message || "Result display is ready. Game-specific server outcomes will be connected later."}
         </p>
-        {resultState?.tone ? (
-          <div className="mt-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-200">
-            State: {resultState.tone}
-          </div>
-        ) : null}
       </SoloV2Modal>
     </main>
   );

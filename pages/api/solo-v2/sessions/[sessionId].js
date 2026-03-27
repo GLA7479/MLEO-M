@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { parseSessionId, resolvePlayerRef } from "../../../../lib/solo-v2/server/contracts";
 import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
+import { buildMysteryBoxSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -57,25 +58,65 @@ export default async function handler(req, res) {
       return res.status(404).json({ ok: false, category: "validation_error", status: "not_found", message: "Session not found" });
     }
 
-    const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
-    if (!quickFlipSnapshotResult.ok) {
-      if (isMissingTable(quickFlipSnapshotResult.error)) {
+    let sessionReadState = "ready";
+    let quickFlipPayload = null;
+    let mysteryBoxPayload = null;
+
+    if (row.game_key === "quick_flip") {
+      const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
+      if (!quickFlipSnapshotResult.ok) {
+        if (isMissingTable(quickFlipSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
         return res.status(503).json({
           ok: false,
-          category: "pending_migration",
-          status: "pending_migration",
-          message: "Solo V2 event persistence is not migrated yet.",
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
         });
       }
-      return res.status(503).json({
-        ok: false,
-        category: "unavailable",
-        status: "unavailable",
-        message: "Session read is temporarily unavailable.",
-      });
+      const quickFlipSnapshot = quickFlipSnapshotResult.snapshot;
+      sessionReadState = quickFlipSnapshot.readState;
+      quickFlipPayload = {
+        choice: quickFlipSnapshot.choice,
+        choiceEventId: quickFlipSnapshot.choiceEventId,
+        choiceSubmittedAt: quickFlipSnapshot.choiceSubmittedAt,
+        canResolve: quickFlipSnapshot.canResolve,
+        resolvedResult: quickFlipSnapshot.resolvedResult,
+      };
+    } else if (row.game_key === "mystery_box") {
+      const mysterySnapshotResult = await buildMysteryBoxSessionSnapshot(supabase, row);
+      if (!mysterySnapshotResult.ok) {
+        if (isMissingTable(mysterySnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const mysterySnapshot = mysterySnapshotResult.snapshot;
+      sessionReadState = mysterySnapshot.readState;
+      mysteryBoxPayload = {
+        boxChoice: mysterySnapshot.boxChoice,
+        pickEventId: mysterySnapshot.pickEventId,
+        pickSubmittedAt: mysterySnapshot.pickSubmittedAt,
+        canResolve: mysterySnapshot.canResolve,
+        resolvedResult: mysterySnapshot.resolvedResult,
+      };
     }
-    const quickFlipSnapshot = quickFlipSnapshotResult.snapshot;
-    const sessionReadState = row.game_key === "quick_flip" ? quickFlipSnapshot.readState : "ready";
 
     return res.status(200).json({
       ok: true,
@@ -96,15 +137,8 @@ export default async function handler(req, res) {
         expiresAt: row.expires_at || null,
         resolvedAt: row.resolved_at || null,
         readState: sessionReadState,
-        quickFlip: row.game_key === "quick_flip"
-          ? {
-              choice: quickFlipSnapshot.choice,
-              choiceEventId: quickFlipSnapshot.choiceEventId,
-              choiceSubmittedAt: quickFlipSnapshot.choiceSubmittedAt,
-              canResolve: quickFlipSnapshot.canResolve,
-              resolvedResult: quickFlipSnapshot.resolvedResult,
-            }
-          : null,
+        quickFlip: quickFlipPayload,
+        mysteryBox: mysteryBoxPayload,
       },
       authority: {
         sessionTruth: "server",
