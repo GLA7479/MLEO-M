@@ -394,17 +394,19 @@ export default function HighLowCardsPage() {
   }, [vaultReady, tryResumeStoredSession]);
 
   useEffect(() => {
-    if (uiState !== UI_STATE.TERMINAL) return;
+    if (uiState !== UI_STATE.TERMINAL) return undefined;
     const tr = terminalResult;
     const sid = session?.id;
     const settlementSummary = tr?.settlementSummary;
-    if (!sid || !settlementSummary) return;
+    if (!sid || !settlementSummary) return undefined;
+    let cancelled = false;
     applyHighLowCardsSettlementOnce(sid, settlementSummary).then(sr => {
-      if (!sr) return;
+      if (cancelled || !sr) return;
       setVaultBalance(Number(sr.nextBalance || 0));
       if (sr.error) {
         setErrorMessage(sr.error);
         setSessionNotice("Round ended, but vault update failed.");
+        handlePlayAgain();
         return;
       }
       const entryCost = Number(settlementSummary.entryCost || HIGH_LOW_CARDS_MIN_WAGER);
@@ -437,8 +439,16 @@ export default function HighLowCardsPage() {
         vaultDeltaLabel: `${delta >= 0 ? "+" : ""}${formatCompact(delta)}`,
       });
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setResultToast(null), 2000);
+      toastTimerRef.current = window.setTimeout(() => {
+        if (cancelled) return;
+        setResultToast(null);
+        handlePlayAgain();
+      }, 2000);
     });
+    return () => {
+      cancelled = true;
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
   }, [uiState, terminalResult?.settlementSummary, session?.id, terminalResult?.isWin, terminalResult?.streak]);
 
   async function bootstrapSession(wager, activeCycle, createSessionMode, giftMeta) {
@@ -858,7 +868,7 @@ export default function HighLowCardsPage() {
 
   const isRunActive = uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING;
   const primaryLabel =
-    uiState === UI_STATE.TERMINAL ? "PLAY AGAIN" : uiState === UI_STATE.PLAYING ? "Run in progress" : "PLAY";
+    uiState === UI_STATE.TERMINAL ? "PLAY" : uiState === UI_STATE.PLAYING ? "Run in progress" : "PLAY";
   const guessControlsLocked =
     Boolean(pendingGuess) || uiState === UI_STATE.RESOLVING || revealAnimating;
   const hiLoBottomSlotActive =
@@ -919,12 +929,11 @@ export default function HighLowCardsPage() {
           setWagerInput(String(HIGH_LOW_CARDS_MIN_WAGER));
         },
         primaryActionLabel: primaryLabel,
-        primaryActionDisabled: uiState === UI_STATE.TERMINAL ? false : !canStart,
+        primaryActionDisabled: uiState === UI_STATE.TERMINAL ? true : !canStart,
         primaryActionLoading: uiState === UI_STATE.LOADING || (isRunActive && uiState === UI_STATE.RESOLVING),
         primaryLoadingLabel: uiState === UI_STATE.LOADING ? "STARTING..." : "RESOLVING...",
         onPrimaryAction: () => {
-          if (uiState === UI_STATE.TERMINAL) handlePlayAgain();
-          else void handleStartPlay();
+          void handleStartPlay();
         },
         errorMessage,
       }}
