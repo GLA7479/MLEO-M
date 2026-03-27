@@ -1,7 +1,11 @@
 /**
  * Unified Solo V2 result overlay (Dice Pick reference style).
  * Centered, non-flowing, pointer-events none — parent must be `relative` + `overflow-hidden` as today.
+ *
+ * All Solo V2 games must use this duration for auto-dismiss, then reset UI so the player can
+ * adjust wager and start the next round with a single primary action (no separate "play again").
  */
+export const SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS = 2000;
 export function SoloV2ResultPopupVaultLine({ isWin, deltaLabel }) {
   if (deltaLabel == null || deltaLabel === "") {
     return (

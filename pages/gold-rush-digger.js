@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import GoldRushDiggerBoard from "../components/solo-v2/GoldRushDiggerBoard";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
+  SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
 } from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
@@ -156,12 +157,22 @@ export default function GoldRushDiggerPage() {
   const giftRoundRef = useRef(false);
   const giftRefreshRef = useRef(() => {});
   const lastPresetAmountRef = useRef(null);
+  const resultPopupTimerRef = useRef(null);
 
   const giftShell = useSoloV2GiftShellState();
 
   useEffect(() => {
     giftRefreshRef.current = giftShell.refresh;
   }, [giftShell.refresh]);
+
+  useEffect(() => {
+    return () => {
+      if (resultPopupTimerRef.current) {
+        clearTimeout(resultPopupTimerRef.current);
+        resultPopupTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     sessionRef.current = session;
@@ -209,10 +220,31 @@ export default function GoldRushDiggerPage() {
     });
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id]);
 
+  /** After popup auto-dismiss: same pattern as other Solo V2 games — one START RUN for the next round. */
+  function resetAfterResultPopup() {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    createInFlightRef.current = false;
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setResultPopupOpen(false);
+    setSession(null);
+    setResolvedResult(null);
+    setUiState(UI_STATE.IDLE);
+    setSessionNotice("");
+    setPulseCell(null);
+    setShakeCell(null);
+  }
+
   function openResultPopup() {
+    if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
     setResultPopupOpen(true);
-    const t = window.setTimeout(() => setResultPopupOpen(false), 2200);
-    return () => window.clearTimeout(t);
+    resultPopupTimerRef.current = window.setTimeout(() => {
+      resultPopupTimerRef.current = null;
+      resetAfterResultPopup();
+    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
   }
 
   function applySessionReadState(sessionPayload, { resumed = false } = {}) {
@@ -616,7 +648,7 @@ export default function GoldRushDiggerPage() {
     ![UI_STATE.LOADING, UI_STATE.SUBMITTING_PICK, UI_STATE.RESOLVING, UI_STATE.PENDING_MIGRATION].includes(
       uiState,
     ) &&
-    (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE || uiState === UI_STATE.RESOLVED);
+    (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE);
 
   const isPrimaryLoading = uiState === UI_STATE.LOADING;
 
@@ -705,7 +737,8 @@ export default function GoldRushDiggerPage() {
         betPresets: BET_PRESETS,
         wagerInput,
         wagerNumeric: numericWager,
-        canEditPlay: uiState !== UI_STATE.RESOLVING && uiState !== UI_STATE.SUBMITTING_PICK && canStart,
+        canEditPlay:
+          uiState !== UI_STATE.RESOLVING && uiState !== UI_STATE.SUBMITTING_PICK && canStart,
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
@@ -729,19 +762,11 @@ export default function GoldRushDiggerPage() {
           clearPresetChain();
           setWagerInput(String(GOLD_RUSH_DIGGER_MIN_WAGER));
         },
-        primaryActionLabel: uiState === UI_STATE.RESOLVED ? "PLAY AGAIN" : "START RUN",
-        primaryActionDisabled: !canStart && uiState !== UI_STATE.RESOLVED,
+        primaryActionLabel: "START RUN",
+        primaryActionDisabled: !canStart,
         primaryActionLoading: isPrimaryLoading,
         primaryLoadingLabel: "STARTING…",
         onPrimaryAction: () => {
-          if (uiState === UI_STATE.RESOLVED) {
-            setSession(null);
-            setResolvedResult(null);
-            setUiState(UI_STATE.IDLE);
-            setSessionNotice("");
-            setErrorMessage("");
-            return;
-          }
           void runStartRun();
         },
         errorMessage,

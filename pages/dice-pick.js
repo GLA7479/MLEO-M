@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import DicePickDisplay from "../components/solo-v2/DicePickDisplay";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
+  SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
 } from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
@@ -285,9 +286,25 @@ export default function DicePickPage() {
   useEffect(() => {
     if (uiState !== UI_STATE.RESOLVED || !resolvedResult?.sessionId) return undefined;
     setDicePickResultPopupOpen(true);
-    const t = window.setTimeout(() => setDicePickResultPopupOpen(false), 2000);
+    const t = window.setTimeout(() => {
+      setDicePickResultPopupOpen(false);
+      resetRoundAfterResultPopup();
+    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
     return () => window.clearTimeout(t);
   }, [uiState, resolvedResult?.sessionId, resolvedResult?.roll, resolvedResult?.isWin, resolvedResult?.resolvedAt]);
+
+  /** After the result popup closes: clear terminal session, keep zone + wager so one ROLL starts a new round. */
+  function resetRoundAfterResultPopup() {
+    createInFlightRef.current = false;
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setSession(null);
+    setEventInfo(null);
+    setResolvedResult(null);
+    setResultToast(null);
+    setSessionNotice("");
+    setUiState(UI_STATE.IDLE);
+  }
 
   /** Clears stale session/round state but keeps wager input so the user can roll again. */
   function recoverStaleRound(message) {
@@ -298,6 +315,7 @@ export default function DicePickPage() {
     setSelectedZone("");
     setEventInfo(null);
     setResolvedResult(null);
+    setResultToast(null);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
     setErrorMessage(
@@ -355,10 +373,6 @@ export default function DicePickPage() {
         isWin: Boolean(resolvedResult?.isWin),
         deltaLabel: toastDeltaLabel,
       });
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => {
-        setResultToast(null);
-      }, 2000);
     });
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
 

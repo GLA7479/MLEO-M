@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import QuickFlipCoinDisplay from "../components/solo-v2/QuickFlipCoinDisplay";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
+  SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
 } from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
@@ -271,6 +272,19 @@ export default function QuickFlipPage() {
     };
   }, []);
 
+  /** After the result popup closes: clear terminal session, keep side + wager — one FLIP COIN starts the next round. */
+  function resetRoundAfterResultPopup() {
+    createInFlightRef.current = false;
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setSession(null);
+    setEventInfo(null);
+    setResolvedResult(null);
+    setResultToast(null);
+    setSessionNotice("");
+    setUiState(UI_STATE.IDLE);
+  }
+
   /** Clears stale session/round state but keeps wager input so the user can try FLIP COIN again. */
   function recoverStaleRound(message) {
     createInFlightRef.current = false;
@@ -280,6 +294,7 @@ export default function QuickFlipPage() {
     setSelectedChoice("");
     setEventInfo(null);
     setResolvedResult(null);
+    setResultToast(null);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
     setErrorMessage(String(message || "").trim() || "This round is no longer valid. Choose side and press FLIP COIN.");
@@ -297,6 +312,10 @@ export default function QuickFlipPage() {
       if (settlementResult.error) {
         setErrorMessage(settlementResult.error);
         setSessionNotice("Result resolved, but vault update failed.");
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => {
+          resetRoundAfterResultPopup();
+        }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
         return;
       }
 
@@ -338,7 +357,8 @@ export default function QuickFlipPage() {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => {
         setResultToast(null);
-      }, 2000);
+        resetRoundAfterResultPopup();
+      }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
     });
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
 

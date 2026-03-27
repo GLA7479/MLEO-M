@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
+  SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
 } from "../components/solo-v2/SoloV2ResultPopup";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
@@ -443,7 +444,7 @@ export default function HighLowCardsPage() {
         if (cancelled) return;
         setResultToast(null);
         handlePlayAgain();
-      }, 2000);
+      }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
     });
     return () => {
       cancelled = true;

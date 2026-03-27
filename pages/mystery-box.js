@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
+  SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
 } from "../components/solo-v2/SoloV2ResultPopup";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
@@ -262,6 +263,19 @@ export default function MysteryBoxPage() {
     };
   }, []);
 
+  /** After the result popup closes: clear terminal session, keep box + wager — one OPEN BOX starts the next round. */
+  function resetRoundAfterResultPopup() {
+    createInFlightRef.current = false;
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setSession(null);
+    setEventInfo(null);
+    setResolvedResult(null);
+    setResultToast(null);
+    setSessionNotice("");
+    setUiState(UI_STATE.IDLE);
+  }
+
   function recoverStaleRound(message, opts = {}) {
     const releaseCreateLock = opts.releaseCreateLock !== false;
     if (releaseCreateLock) createInFlightRef.current = false;
@@ -271,6 +285,7 @@ export default function MysteryBoxPage() {
     setSelectedBox(null);
     setEventInfo(null);
     setResolvedResult(null);
+    setResultToast(null);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
     setErrorMessage(String(message || "").trim() || "This round is no longer valid. Pick a box and press OPEN BOX.");
@@ -288,6 +303,10 @@ export default function MysteryBoxPage() {
       if (settlementResult.error) {
         setErrorMessage(settlementResult.error);
         setSessionNotice("Result resolved, but vault update failed.");
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => {
+          resetRoundAfterResultPopup();
+        }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
         return;
       }
 
@@ -324,7 +343,8 @@ export default function MysteryBoxPage() {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => {
         setResultToast(null);
-      }, 2000);
+        resetRoundAfterResultPopup();
+      }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
     });
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
 
