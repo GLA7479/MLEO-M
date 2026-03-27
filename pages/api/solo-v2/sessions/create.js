@@ -7,6 +7,7 @@ import { MYSTERY_BOX_MIN_WAGER } from "../../../../lib/solo-v2/mysteryBoxConfig"
 import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
 import { buildMysteryBoxSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 import { buildHighLowCardsSessionSnapshot } from "../../../../lib/solo-v2/server/highLowCardsSnapshot";
+import { buildDicePickSessionSnapshot } from "../../../../lib/solo-v2/server/dicePickSnapshot";
 import { drawServerCard, buildActiveSummaryPatch } from "../../../../lib/solo-v2/server/highLowCardsEngine";
 
 function isMissingTable(error) {
@@ -439,14 +440,16 @@ export default async function handler(req, res) {
   try {
     const supabase = getSupabaseAdmin();
 
-    if (gameKey === "quick_flip" || gameKey === "mystery_box" || gameKey === "high_low_cards") {
+    if (gameKey === "quick_flip" || gameKey === "dice_pick" || gameKey === "mystery_box" || gameKey === "high_low_cards") {
       const minWager = gameKey === "mystery_box" ? MYSTERY_BOX_MIN_WAGER : QUICK_FLIP_MIN_WAGER;
       const buildSnapshot =
         gameKey === "mystery_box"
           ? buildMysteryBoxSessionSnapshot
           : gameKey === "high_low_cards"
             ? buildHighLowCardsSessionSnapshot
-            : buildQuickFlipSessionSnapshot;
+            : gameKey === "dice_pick"
+              ? buildDicePickSessionSnapshot
+              : buildQuickFlipSessionSnapshot;
 
       if (!Number.isFinite(entryAmount) || entryAmount < minWager) {
         return res.status(400).json({
@@ -551,7 +554,11 @@ export default async function handler(req, res) {
     });
     let { data, error } = createCall;
 
-    if (error && (gameKey === "quick_flip" || gameKey === "mystery_box" || gameKey === "high_low_cards") && isGameNotEnabled(error)) {
+    if (
+      error &&
+      (gameKey === "quick_flip" || gameKey === "dice_pick" || gameKey === "mystery_box" || gameKey === "high_low_cards") &&
+      isGameNotEnabled(error)
+    ) {
       console.warn(`solo-v2 create: ${gameKey} missing/disabled in solo_v2_games, attempting catalog bootstrap`);
       const catalogFix = await ensureSoloV2GameCatalogRow(supabase, gameKey);
       if (catalogFix.ok) {
@@ -586,7 +593,7 @@ export default async function handler(req, res) {
       });
 
       if (
-        (gameKey === "quick_flip" || gameKey === "mystery_box" || gameKey === "high_low_cards") &&
+        (gameKey === "quick_flip" || gameKey === "dice_pick" || gameKey === "mystery_box" || gameKey === "high_low_cards") &&
         isLegacyDeviceIdNotNullError(error)
       ) {
         console.warn("solo-v2 create: legacy device_id constraint detected, using compat insert path");
@@ -649,13 +656,18 @@ export default async function handler(req, res) {
         });
       }
 
-      if ((gameKey === "quick_flip" || gameKey === "mystery_box" || gameKey === "high_low_cards") && isUniqueConflict(error)) {
+      if (
+        (gameKey === "quick_flip" || gameKey === "dice_pick" || gameKey === "mystery_box" || gameKey === "high_low_cards") &&
+        isUniqueConflict(error)
+      ) {
         const buildSnapshot =
           gameKey === "mystery_box"
             ? buildMysteryBoxSessionSnapshot
             : gameKey === "high_low_cards"
               ? buildHighLowCardsSessionSnapshot
-              : buildQuickFlipSessionSnapshot;
+              : gameKey === "dice_pick"
+                ? buildDicePickSessionSnapshot
+                : buildQuickFlipSessionSnapshot;
         const conflictLookup = await healAndReReadActiveSessions(supabase, playerRef, gameKey, "post_unique_conflict");
         if (conflictLookup.ok) {
           const conflictRows = conflictLookup.rows;

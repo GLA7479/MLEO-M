@@ -3,6 +3,7 @@ import { parseSessionId, resolvePlayerRef } from "../../../../lib/solo-v2/server
 import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
 import { buildMysteryBoxSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 import { buildHighLowCardsSessionSnapshot } from "../../../../lib/solo-v2/server/highLowCardsSnapshot";
+import { buildDicePickSessionSnapshot } from "../../../../lib/solo-v2/server/dicePickSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -63,6 +64,7 @@ export default async function handler(req, res) {
     let quickFlipPayload = null;
     let mysteryBoxPayload = null;
     let highLowCardsPayload = null;
+    let dicePickPayload = null;
 
     if (row.game_key === "quick_flip") {
       const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
@@ -145,6 +147,33 @@ export default async function handler(req, res) {
         canCashOut: highLowSnapshot.canCashOut,
         resolvedResult: highLowSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "dice_pick") {
+      const dicePickSnapshotResult = await buildDicePickSessionSnapshot(supabase, row);
+      if (!dicePickSnapshotResult.ok) {
+        if (isMissingTable(dicePickSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const dicePickSnapshot = dicePickSnapshotResult.snapshot;
+      sessionReadState = dicePickSnapshot.readState;
+      dicePickPayload = {
+        zone: dicePickSnapshot.zone,
+        submitEventId: dicePickSnapshot.submitEventId,
+        submitSubmittedAt: dicePickSnapshot.submitSubmittedAt,
+        canResolve: dicePickSnapshot.canResolve,
+        resolvedResult: dicePickSnapshot.resolvedResult,
+      };
     }
 
     return res.status(200).json({
@@ -169,6 +198,7 @@ export default async function handler(req, res) {
         quickFlip: quickFlipPayload,
         mysteryBox: mysteryBoxPayload,
         highLowCards: highLowCardsPayload,
+        dicePick: dicePickPayload,
       },
       authority: {
         sessionTruth: "server",
