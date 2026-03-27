@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import { QUICK_FLIP_CONFIG } from "../lib/solo-v2/quickFlipConfig";
 import {
   applyQuickFlipSettlementOnce,
-  readQuickFlipLocalVaultBalance,
+  readQuickFlipSharedVaultBalance,
+  subscribeQuickFlipSharedVault,
 } from "../lib/solo-v2/quickFlipLocalVault";
 
 const UI_STATE = {
@@ -71,6 +72,7 @@ function QuickFlipPlaceholderPanel({
   selectedChoice,
   eventInfo,
   resolvedResult,
+  sessionNotice,
   errorMessage,
   onSelectChoice,
   onSubmitChoice,
@@ -95,17 +97,13 @@ function QuickFlipPlaceholderPanel({
       <h2 className="text-lg font-bold text-white">Quick Flip</h2>
       {session ? (
         <div className="w-full max-w-sm space-y-2 rounded-lg border border-emerald-300/25 bg-emerald-500/10 px-3 py-3 text-left text-xs text-emerald-100">
-          <p className="font-semibold">Session bootstrap succeeded.</p>
+          <p className="font-semibold">Session active.</p>
           <p>Session ID: {session.id || "--"}</p>
           <p>Status: {session.sessionStatus || "created"}</p>
-          <p>Mode: {session.sessionMode || "standard"}</p>
-          <p>Entry: {String(session.entryAmount ?? 0)}</p>
+          <p>Pick heads or tails, then submit.</p>
         </div>
       ) : (
-        <p className="max-w-sm text-sm text-zinc-300">
-          Session bootstrap wiring is active. Start Session calls the Solo V2 create-session API only. Outcome
-          resolution and reward settlement remain disabled.
-        </p>
+        <p className="max-w-sm text-sm text-zinc-300">Pick a side and let the server resolve the outcome.</p>
       )}
       <div className="grid w-full max-w-sm grid-cols-2 gap-2">
         <ChoiceButton
@@ -143,8 +141,7 @@ function QuickFlipPlaceholderPanel({
         <div className="w-full max-w-sm rounded-lg border border-blue-300/25 bg-blue-500/10 px-3 py-2 text-left text-xs text-blue-100">
           <p className="font-semibold">Choice submitted to server.</p>
           <p>Event ID: {eventInfo.eventId}</p>
-          <p>Event Type: {eventInfo.eventType}</p>
-          <p className="text-blue-100/90">Server resolve is triggered after successful choice submission.</p>
+          <p className="text-blue-100/90">Waiting for server result.</p>
         </div>
       ) : null}
       {resolvedResult ? (
@@ -153,7 +150,11 @@ function QuickFlipPlaceholderPanel({
           <p>Choice: {String(resolvedResult.choice || "--")}</p>
           <p>Outcome: {String(resolvedResult.outcome || "--")}</p>
           <p>Result: {resolvedResult.isWin ? "Match" : "No match"}</p>
-          <p className="text-violet-100/90">Settlement is deferred in this phase (no vault mutation).</p>
+        </div>
+      ) : null}
+      {sessionNotice ? (
+        <div className="max-w-sm rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs text-zinc-200">
+          {sessionNotice}
         </div>
       ) : null}
       {errorMessage ? (
@@ -175,7 +176,6 @@ function QuickFlipPlaceholderPanel({
           Start New Session
         </button>
       ) : null}
-      <div className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs text-zinc-200">Current state: {uiState}</div>
     </div>
   );
 }
@@ -188,14 +188,36 @@ export default function QuickFlipPage() {
   const [resolvedResult, setResolvedResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [sessionNotice, setSessionNotice] = useState("");
-  const [vaultBalance, setVaultBalance] = useState(QUICK_FLIP_CONFIG.entryCost);
+  const [vaultBalance, setVaultBalance] = useState(0);
+  const [vaultReady, setVaultReady] = useState(false);
   const createInFlightRef = useRef(false);
   const submitInFlightRef = useRef(false);
   const resolveInFlightRef = useRef(false);
   const cycleRef = useRef(0);
 
   useEffect(() => {
-    setVaultBalance(readQuickFlipLocalVaultBalance());
+    let active = true;
+    readQuickFlipSharedVaultBalance().then(result => {
+      if (!active) return;
+      if (!result?.ok) {
+        setVaultReady(false);
+        setUiState(UI_STATE.UNAVAILABLE);
+        setErrorMessage(result?.message || "Shared vault unavailable.");
+        return;
+      }
+      setVaultBalance(Number(result.balance || 0));
+      setVaultReady(true);
+    });
+
+    const unsubscribe = subscribeQuickFlipSharedVault(snapshot => {
+      if (!active) return;
+      setVaultBalance(Number(snapshot?.balance || 0));
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   function resetForNewAttempt() {
@@ -217,57 +239,24 @@ export default function QuickFlipPage() {
     const sessionId = resolvedResult?.sessionId || session?.id;
     const settlementSummary = resolvedResult?.settlementSummary;
     if (!sessionId || !settlementSummary) return;
+    applyQuickFlipSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
+      if (!settlementResult) return;
+      setVaultBalance(settlementResult.nextBalance);
+      if (settlementResult.error) {
+        setErrorMessage(settlementResult.error);
+        setSessionNotice("Result resolved, but vault update failed.");
+        return;
+      }
 
-    const settlementResult = applyQuickFlipSettlementOnce(sessionId, settlementSummary);
-    setVaultBalance(settlementResult.nextBalance);
-
-    const delta = Number(settlementSummary.netDelta || 0);
-    const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
-    if (settlementResult.applied) {
-      setSessionNotice(`Settled locally (${deltaLabel}). Vault: ${settlementResult.nextBalance}.`);
-    } else {
-      setSessionNotice(`Settlement already applied. Vault: ${settlementResult.nextBalance}.`);
-    }
+      const delta = Number(settlementSummary.netDelta || 0);
+      const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
+      if (settlementResult.applied) {
+        setSessionNotice(`Settled (${deltaLabel}). Vault: ${settlementResult.nextBalance}.`);
+      } else {
+        setSessionNotice(`Settlement already applied. Vault: ${settlementResult.nextBalance}.`);
+      }
+    });
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
-
-  const shellStatus = useMemo(() => {
-    if (
-      uiState === UI_STATE.SESSION_CREATED ||
-      uiState === UI_STATE.CHOICE_SELECTED ||
-      uiState === UI_STATE.CHOICE_SUBMITTED ||
-      uiState === UI_STATE.RESOLVED
-    ) {
-      return "ready";
-    }
-    if (uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING) return "loading";
-    if (uiState === UI_STATE.RESOLVE_FAILED) return "unavailable";
-    return uiState;
-  }, [uiState]);
-
-  const statusDetails = useMemo(() => {
-    if ((uiState === UI_STATE.SESSION_CREATED || uiState === UI_STATE.CHOICE_SELECTED) && session?.id) {
-      return sessionNotice || `Session ready: ${session.id}`;
-    }
-    if (uiState === UI_STATE.CHOICE_SUBMITTED && eventInfo?.eventId) {
-      return `Choice submitted. Event: ${eventInfo.eventId}. Waiting for server resolve.`;
-    }
-    if (uiState === UI_STATE.RESOLVING) {
-      return "Resolving outcome on server...";
-    }
-    if (uiState === UI_STATE.RESOLVED && resolvedResult?.outcome) {
-      return `Resolved by server: ${resolvedResult.outcome}. Settlement remains deferred.`;
-    }
-    if (uiState === UI_STATE.RESOLVE_FAILED) {
-      return "Resolve attempt failed. You can start a new session.";
-    }
-    if (uiState === UI_STATE.PENDING_MIGRATION) {
-      return "Solo V2 session persistence is not migrated yet.";
-    }
-    if (uiState === UI_STATE.UNAVAILABLE) {
-      return "Service is temporarily unavailable. Start a new session to retry.";
-    }
-    return "";
-  }, [eventInfo?.eventId, resolvedResult?.outcome, session?.id, sessionNotice, uiState]);
 
   function hydrateResolvedFromSession(sessionPayload) {
     const summary = sessionPayload?.quickFlip?.resolvedResult || sessionPayload?.serverOutcomeSummary || {};
@@ -279,7 +268,7 @@ export default function QuickFlipPage() {
       outcome: summary.outcome || null,
       isWin: Boolean(summary.isWin),
       resolvedAt: summary.resolvedAt || sessionPayload?.resolvedAt || null,
-      settlement: "deferred",
+      settlementSummary: summary.settlementSummary || null,
     };
   }
 
@@ -319,7 +308,7 @@ export default function QuickFlipPage() {
       setEventInfo(null);
       setResolvedResult(null);
       setUiState(UI_STATE.SESSION_CREATED);
-      setSessionNotice(resumed ? "Resumed active session. Choose heads or tails." : "Session ready for choice.");
+      setSessionNotice(resumed ? "Resumed active session." : "Session ready.");
       setErrorMessage("");
       return;
     }
@@ -366,9 +355,15 @@ export default function QuickFlipPage() {
 
   async function handleStartSession() {
     if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
+    if (!vaultReady) {
+      setUiState(UI_STATE.UNAVAILABLE);
+      setErrorMessage("Shared vault unavailable.");
+      setSessionNotice("");
+      return;
+    }
     if (vaultBalance < QUICK_FLIP_CONFIG.entryCost) {
       setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage(`Insufficient local vault balance. Need ${QUICK_FLIP_CONFIG.entryCost} to start.`);
+      setErrorMessage(`Insufficient vault balance. Need ${QUICK_FLIP_CONFIG.entryCost} to start.`);
       setSessionNotice("");
       return;
     }
@@ -637,6 +632,7 @@ export default function QuickFlipPage() {
     !createInFlightRef.current &&
     !submitInFlightRef.current &&
     !resolveInFlightRef.current &&
+    vaultReady &&
     vaultBalance >= QUICK_FLIP_CONFIG.entryCost;
   const primaryActionLabel =
     uiState === UI_STATE.IDLE
@@ -649,10 +645,9 @@ export default function QuickFlipPage() {
     <SoloV2GameShell
       title="Quick Flip"
       subtitle="Solo V2 reference game"
-      balanceLabel="Local Vault"
+      balanceLabel="Vault"
       balanceValue={String(vaultBalance)}
-      shellStatus={shellStatus}
-      statusDetails={statusDetails}
+      hideStatusPanel
       onBack={() => {
         if (typeof window !== "undefined") window.location.href = "/arcade-v2";
       }}
@@ -663,6 +658,7 @@ export default function QuickFlipPage() {
           selectedChoice={selectedChoice}
           eventInfo={eventInfo}
           resolvedResult={resolvedResult}
+          sessionNotice={sessionNotice}
           errorMessage={errorMessage}
           onSelectChoice={handleSelectChoice}
           onSubmitChoice={handleSubmitChoice}
@@ -684,7 +680,7 @@ export default function QuickFlipPage() {
         <div className="space-y-2">
           <p>Pick heads or tails and confirm your choice.</p>
           <p>The server generates and validates the final outcome.</p>
-          <p>Reward and stats are applied only after server settlement succeeds.</p>
+          <p>Settlement updates the shared player vault once per resolved session.</p>
         </div>
       }
       statsContent={
@@ -697,8 +693,8 @@ export default function QuickFlipPage() {
         title: uiState === UI_STATE.RESOLVED ? "Server Result" : "Result Pending",
         message:
           uiState === UI_STATE.RESOLVED
-            ? `Choice: ${String(resolvedResult?.choice || "--")} | Outcome: ${String(resolvedResult?.outcome || "--")} | Local settlement applied once per session`
-            : "Result modal is wired, but resolve may remain pending until backend migration is available.",
+            ? `Choice: ${String(resolvedResult?.choice || "--")} | Outcome: ${String(resolvedResult?.outcome || "--")}`
+            : "Result pending.",
         tone: uiState === UI_STATE.RESOLVED ? "resolved_server_authoritative" : "neutral",
       }}
     />

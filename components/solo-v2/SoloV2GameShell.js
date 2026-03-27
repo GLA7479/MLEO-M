@@ -25,6 +25,7 @@ export default function SoloV2GameShell({
   resultState = null,
   helpContent = null,
   statsContent = null,
+  hideStatusPanel = false,
 }) {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
@@ -60,7 +61,7 @@ export default function SoloV2GameShell({
           }
         />
 
-        <SoloV2StatusPanel status={shellStatus} details={statusDetails} />
+        {!hideStatusPanel ? <SoloV2StatusPanel status={shellStatus} details={statusDetails} /> : null}
 
         <section className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-black/20">
           <div className="flex h-full min-h-0 items-center justify-center p-3">
