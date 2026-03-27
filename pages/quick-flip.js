@@ -175,9 +175,9 @@ function QuickFlipPlaceholderPanel({
   primaryActionDisabled,
   primaryActionLoading,
 }) {
-  const isChoiceLocked =
-    uiState === UI_STATE.CHOICE_SUBMITTED || uiState === UI_STATE.RESOLVED;
-  const canChoose = Boolean(session?.id) && !isFlipping && !isChoiceLocked;
+  const isChoiceLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
+  const canChoose =
+    !isFlipping && uiState !== UI_STATE.LOADING && !isChoiceLocked;
   const canEditPlay = !isFlipping;
   const wagerNumeric = parseWagerInput(wagerInput);
 
@@ -339,6 +339,10 @@ export default function QuickFlipPage() {
   const submitInFlightRef = useRef(false);
   const resolveInFlightRef = useRef(false);
   const cycleRef = useRef(0);
+  const sessionRef = useRef(null);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   useEffect(() => {
     let active = true;
@@ -377,23 +381,7 @@ export default function QuickFlipPage() {
     };
   }, []);
 
-  function resetForNewAttempt() {
-    cycleRef.current += 1;
-    createInFlightRef.current = false;
-    submitInFlightRef.current = false;
-    resolveInFlightRef.current = false;
-    lastPresetAmountRef.current = null;
-    setUiState(UI_STATE.IDLE);
-    setSession(null);
-    setSelectedChoice("");
-    setEventInfo(null);
-    setResolvedResult(null);
-    setSessionNotice("");
-    setErrorMessage("");
-    setResultToast(null);
-  }
-
-  /** Clears stale session/round state but keeps wager input so the user can START ROUND again. */
+  /** Clears stale session/round state but keeps wager input so the user can try FLIP COIN again. */
   function recoverStaleRound(message) {
     createInFlightRef.current = false;
     submitInFlightRef.current = false;
@@ -404,7 +392,7 @@ export default function QuickFlipPage() {
     setResolvedResult(null);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
-    setErrorMessage(String(message || "").trim() || "This round is no longer valid. Press START ROUND.");
+    setErrorMessage(String(message || "").trim() || "This round is no longer valid. Choose side and press FLIP COIN.");
   }
 
   useEffect(() => {
@@ -478,7 +466,7 @@ export default function QuickFlipPage() {
   }
 
   function applySessionReadState(sessionPayload, options = {}) {
-    const { resumed = false } = options;
+    const { resumed = false, localChoiceToKeep = null } = options;
     setSession(sessionPayload);
 
     const readState = String(sessionPayload?.readState || "");
@@ -509,7 +497,11 @@ export default function QuickFlipPage() {
     }
 
     if (readState === "choice_required" || readState === "ready") {
-      setSelectedChoice("");
+      if (localChoiceToKeep === "heads" || localChoiceToKeep === "tails") {
+        setSelectedChoice(localChoiceToKeep);
+      } else {
+        setSelectedChoice("");
+      }
       setEventInfo(null);
       setResolvedResult(null);
       setUiState(UI_STATE.SESSION_CREATED);
@@ -531,8 +523,8 @@ export default function QuickFlipPage() {
       setSessionNotice("");
       setErrorMessage(
         sessionPayload?.sessionStatus === "expired"
-          ? "Session expired. Press START ROUND for a fresh session."
-          : "Session ended. Press START ROUND for a fresh session.",
+          ? "Session expired. Choose side and press FLIP COIN."
+          : "Session ended. Choose side and press FLIP COIN.",
       );
       return;
     }
@@ -577,29 +569,15 @@ export default function QuickFlipPage() {
     };
   }
 
-  async function handleStartSession() {
-    if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
-    if (!vaultReady) {
-      setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage("Shared vault unavailable.");
-      setSessionNotice("");
-      return;
-    }
-    const wager = parseWagerInput(wagerInput);
-    if (wager < QUICK_FLIP_MIN_WAGER) return;
-    if (vaultBalance < wager) {
-      setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage(`Insufficient vault balance. Need ${wager} to start this round.`);
-      setSessionNotice("");
-      return;
-    }
+  /**
+   * Create or resume a server session (authoritative). Preserves local pre-selected side via localChoiceToKeep on resume.
+   * @returns {{ ok: true, session: object } | { ok: false }}
+   */
+  async function bootstrapQuickFlipSession(wager, activeCycle, localChoiceToKeep) {
     createInFlightRef.current = true;
-    cycleRef.current += 1;
-    const activeCycle = cycleRef.current;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
     setSession(null);
-    setSelectedChoice("");
     setEventInfo(null);
     setResolvedResult(null);
 
@@ -618,7 +596,7 @@ export default function QuickFlipPage() {
       });
 
       const payload = await response.json().catch(() => null);
-      if (activeCycle !== cycleRef.current) return;
+      if (activeCycle !== cycleRef.current) return { ok: false };
       const result = classifyApiResult(response, payload);
       const status = String(payload?.status || "");
 
@@ -635,12 +613,8 @@ export default function QuickFlipPage() {
         setSessionNotice("");
         setErrorMessage("");
         setUiState(UI_STATE.SESSION_CREATED);
-        qfStartDebug("branch_created", {
-          setUiState: UI_STATE.SESSION_CREATED,
-          sessionId: payload.session?.id,
-          readSessionTruth: "skipped",
-        });
-        return;
+        qfStartDebug("branch_created", { sessionId: payload.session?.id });
+        return { ok: true, session: payload.session };
       }
 
       if (result === API_RESULT.SUCCESS && status === "existing_session" && payload?.session) {
@@ -653,11 +627,9 @@ export default function QuickFlipPage() {
         qfStartDebug("readSessionTruth_result", {
           halted: Boolean(readResult?.halted),
           ok: readResult?.ok,
-          readStatus: readResult?.readStatus,
           readState: readResult?.session?.readState,
-          sessionStatus: readResult?.session?.sessionStatus,
         });
-        if (readResult?.halted) return;
+        if (readResult?.halted) return { ok: false };
         if (!readResult?.ok) {
           setSession(null);
           setSelectedChoice("");
@@ -665,12 +637,91 @@ export default function QuickFlipPage() {
           setResolvedResult(null);
           setUiState(readResult.state);
           setErrorMessage(readResult.message);
-          qfStartDebug("readSessionTruth_failed_cleared_session", { uiState: readResult.state });
-          return;
+          return { ok: false };
         }
 
-        applySessionReadState(readResult.session, { resumed: true });
+        applySessionReadState(readResult.session, { resumed: true, localChoiceToKeep });
         qfStartDebug("after_applySessionReadState", { readState: String(readResult.session?.readState || "") });
+        const rs = String(readResult.session?.readState || "");
+        const st = String(readResult.session?.sessionStatus || "");
+        if (rs === "invalid" || st === "expired" || st === "cancelled") {
+          return { ok: false };
+        }
+        if (rs === "resolved" || st === "resolved") {
+          return { ok: true, session: readResult.session, alreadyTerminal: true };
+        }
+        return { ok: true, session: readResult.session };
+      }
+
+      if (result === API_RESULT.PENDING_MIGRATION) {
+        setUiState(UI_STATE.PENDING_MIGRATION);
+        setErrorMessage(buildApiErrorMessage(payload, "Migration is pending."));
+        return { ok: false };
+      }
+
+      if (result === API_RESULT.UNAVAILABLE) {
+        setUiState(UI_STATE.UNAVAILABLE);
+        setErrorMessage(buildApiErrorMessage(payload, "Session bootstrap unavailable."));
+        return { ok: false };
+      }
+
+      setUiState(UI_STATE.UNAVAILABLE);
+      setErrorMessage(buildApiErrorMessage(payload, "Session bootstrap rejected."));
+      return { ok: false };
+    } catch (_error) {
+      if (activeCycle !== cycleRef.current) return { ok: false };
+      setUiState(UI_STATE.UNAVAILABLE);
+      setErrorMessage("Network error while creating session.");
+      return { ok: false };
+    } finally {
+      if (activeCycle === cycleRef.current) {
+        createInFlightRef.current = false;
+      }
+    }
+  }
+
+  async function submitChoiceAndResolveFlow(sessionId, side, activeCycle) {
+    if (!sessionId || (side !== "heads" && side !== "tails")) return;
+    if (submitInFlightRef.current || resolveInFlightRef.current) return;
+
+    submitInFlightRef.current = true;
+    setUiState(UI_STATE.SUBMITTING_CHOICE);
+    setErrorMessage("");
+
+    try {
+      const response = await fetch(`/api/solo-v2/sessions/${sessionId}/event`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-solo-v2-player": "quick-flip-client",
+        },
+        body: JSON.stringify({
+          eventType: "client_action",
+          eventPayload: {
+            gameKey: "quick_flip",
+            action: "choice_submit",
+            side,
+          },
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (activeCycle !== cycleRef.current) return;
+      const result = classifyApiResult(response, payload);
+      const status = String(payload?.status || "");
+
+      if (result === API_RESULT.SUCCESS && status === "accepted") {
+        setEventInfo({
+          eventId: payload?.event?.id || null,
+          eventType: payload?.event?.eventType || "client_action",
+        });
+        setUiState(UI_STATE.CHOICE_SUBMITTED);
+        if (payload?.idempotent) {
+          setSessionNotice("Choice already accepted. Resolving...");
+        } else {
+          setSessionNotice("Flipping...");
+        }
+        await handleResolveSession({ sessionIdOverride: sessionId });
         return;
       }
 
@@ -682,26 +733,122 @@ export default function QuickFlipPage() {
 
       if (result === API_RESULT.UNAVAILABLE) {
         setUiState(UI_STATE.UNAVAILABLE);
-        setErrorMessage(buildApiErrorMessage(payload, "Session bootstrap unavailable."));
+        setErrorMessage(buildApiErrorMessage(payload, "Choice submission unavailable."));
+        return;
+      }
+
+      if (result === API_RESULT.CONFLICT && status === "choice_already_submitted") {
+        const readResult = await readSessionTruth(sessionId, activeCycle);
+        if (readResult?.halted) return;
+        if (!readResult?.ok) {
+          setUiState(readResult.state);
+          setErrorMessage(readResult.message);
+          return;
+        }
+        applySessionReadState(readResult.session, { resumed: true });
+        if (String(readResult?.readStatus || "") === "choice_submitted") {
+          setSessionNotice("A choice is already locked on server. Resolving locked choice.");
+          await handleResolveSession({ sessionIdOverride: readResult.session.id });
+        }
+        return;
+      }
+
+      if (result === API_RESULT.CONFLICT && status === "invalid_session_state") {
+        const readResult = await readSessionTruth(sessionId, activeCycle);
+        if (readResult?.halted) return;
+        if (readResult?.ok) {
+          applySessionReadState(readResult.session, { resumed: true });
+          if (String(readResult?.readStatus || "") === "choice_submitted") {
+            setSessionNotice("Session already has submitted choice. Resolving now.");
+            await handleResolveSession({ sessionIdOverride: readResult.session.id });
+          }
+          return;
+        }
+        recoverStaleRound(buildApiErrorMessage(payload, "Session no longer accepts choice submit."));
+        return;
+      }
+
+      if (result === API_RESULT.CONFLICT && status === "event_rejected") {
+        const msg = buildApiErrorMessage(payload, "");
+        if (isEventRejectedStaleSessionMessage(msg)) {
+          recoverStaleRound(msg || "Session expired. Choose side and press FLIP COIN.");
+          return;
+        }
+        setUiState(UI_STATE.UNAVAILABLE);
+        setErrorMessage(buildApiErrorMessage(payload, "Choice submission rejected."));
         return;
       }
 
       setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage(buildApiErrorMessage(payload, "Session bootstrap rejected."));
+      setErrorMessage(buildApiErrorMessage(payload, "Choice submission rejected."));
     } catch (_error) {
       if (activeCycle !== cycleRef.current) return;
       setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage("Network error while creating session.");
+      setErrorMessage("Network error while submitting choice.");
     } finally {
       if (activeCycle === cycleRef.current) {
-        createInFlightRef.current = false;
+        submitInFlightRef.current = false;
       }
     }
   }
 
+  async function runOneClickRound() {
+    if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
+    if (!vaultReady) {
+      setUiState(UI_STATE.UNAVAILABLE);
+      setErrorMessage("Shared vault unavailable.");
+      return;
+    }
+    const side = selectedChoice;
+    if (side !== "heads" && side !== "tails") return;
+    const wager = parseWagerInput(wagerInput);
+    if (wager < QUICK_FLIP_MIN_WAGER) return;
+    if (vaultBalance < wager) {
+      setUiState(UI_STATE.UNAVAILABLE);
+      setErrorMessage(`Insufficient vault balance. Need ${wager} for this round.`);
+      return;
+    }
+
+    cycleRef.current += 1;
+    const activeCycle = cycleRef.current;
+
+    const cur = sessionRef.current;
+    let sessionId = cur?.id;
+    const status = cur?.sessionStatus;
+    const needsBootstrap =
+      !sessionId ||
+      status === "resolved" ||
+      [
+        UI_STATE.RESOLVED,
+        UI_STATE.IDLE,
+        UI_STATE.UNAVAILABLE,
+        UI_STATE.RESOLVE_FAILED,
+        UI_STATE.PENDING_MIGRATION,
+      ].includes(uiState);
+
+    let readStateKnown = String(cur?.readState || "");
+
+    if (needsBootstrap) {
+      const boot = await bootstrapQuickFlipSession(wager, activeCycle, side);
+      if (!boot.ok || activeCycle !== cycleRef.current) return;
+      if (boot.alreadyTerminal) return;
+      sessionId = boot.session?.id;
+      readStateKnown = String(boot.session?.readState || "");
+    }
+
+    if (!sessionId || activeCycle !== cycleRef.current) return;
+
+    if (readStateKnown === "choice_submitted") {
+      await handleResolveSession({ sessionIdOverride: sessionId });
+      return;
+    }
+
+    await submitChoiceAndResolveFlow(sessionId, side, activeCycle);
+  }
+
   function handleSelectChoice(choice) {
-    if (!session?.id) return;
     if (
+      uiState === UI_STATE.LOADING ||
       uiState === UI_STATE.SUBMITTING_CHOICE ||
       uiState === UI_STATE.CHOICE_SUBMITTED ||
       uiState === UI_STATE.RESOLVING
@@ -713,7 +860,9 @@ export default function QuickFlipPage() {
     setEventInfo(null);
     setResolvedResult(null);
     setSessionNotice("");
-    setUiState(UI_STATE.CHOICE_SELECTED);
+    if (session?.id && uiState !== UI_STATE.RESOLVED) {
+      setUiState(UI_STATE.CHOICE_SELECTED);
+    }
   }
 
   async function handleResolveSession(options = {}) {
@@ -781,142 +930,17 @@ export default function QuickFlipPage() {
     }
   }
 
-  async function handleSubmitChoice() {
-    if (!session?.id || !selectedChoice) return;
-    if (submitInFlightRef.current || createInFlightRef.current || resolveInFlightRef.current) return;
-    if (uiState === UI_STATE.CHOICE_SUBMITTED || uiState === UI_STATE.RESOLVING || uiState === UI_STATE.RESOLVED) return;
-
-    submitInFlightRef.current = true;
-    const activeCycle = cycleRef.current;
-    setUiState(UI_STATE.SUBMITTING_CHOICE);
-    setErrorMessage("");
-
-    try {
-      const response = await fetch(`/api/solo-v2/sessions/${session.id}/event`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-solo-v2-player": "quick-flip-client",
-        },
-        body: JSON.stringify({
-          eventType: "client_action",
-          eventPayload: {
-            gameKey: "quick_flip",
-            action: "choice_submit",
-            side: selectedChoice,
-          },
-        }),
-      });
-
-      const payload = await response.json().catch(() => null);
-      if (activeCycle !== cycleRef.current) return;
-      const result = classifyApiResult(response, payload);
-      const status = String(payload?.status || "");
-
-      if (result === API_RESULT.SUCCESS && status === "accepted") {
-        setEventInfo({
-          eventId: payload?.event?.id || null,
-          eventType: payload?.event?.eventType || "client_action",
-        });
-        setUiState(UI_STATE.CHOICE_SUBMITTED);
-        if (payload?.idempotent) {
-          setSessionNotice("Choice already accepted. Resolving...");
-        } else {
-          setSessionNotice("Flipping...");
-        }
-        await handleResolveSession();
-        return;
-      }
-
-      if (result === API_RESULT.PENDING_MIGRATION) {
-        setUiState(UI_STATE.PENDING_MIGRATION);
-        setErrorMessage(buildApiErrorMessage(payload, "Migration is pending."));
-        return;
-      }
-
-      if (result === API_RESULT.UNAVAILABLE) {
-        setUiState(UI_STATE.UNAVAILABLE);
-        setErrorMessage(buildApiErrorMessage(payload, "Choice submission unavailable."));
-        return;
-      }
-
-      if (result === API_RESULT.CONFLICT && status === "choice_already_submitted") {
-        const readResult = await readSessionTruth(session.id, activeCycle);
-        if (readResult?.halted) return;
-        if (!readResult?.ok) {
-          setUiState(readResult.state);
-          setErrorMessage(readResult.message);
-          return;
-        }
-        applySessionReadState(readResult.session, { resumed: true });
-        if (String(readResult?.readStatus || "") === "choice_submitted") {
-          setSessionNotice("A choice is already locked on server. Resolving locked choice.");
-          await handleResolveSession({ sessionIdOverride: readResult.session.id });
-        }
-        return;
-      }
-
-      if (result === API_RESULT.CONFLICT && status === "invalid_session_state") {
-        const readResult = await readSessionTruth(session.id, activeCycle);
-        if (readResult?.halted) return;
-        if (readResult?.ok) {
-          applySessionReadState(readResult.session, { resumed: true });
-          if (String(readResult?.readStatus || "") === "choice_submitted") {
-            setSessionNotice("Session already has submitted choice. Resolving now.");
-            await handleResolveSession({ sessionIdOverride: readResult.session.id });
-          }
-          return;
-        }
-        recoverStaleRound(buildApiErrorMessage(payload, "Session no longer accepts choice submit."));
-        return;
-      }
-
-      if (result === API_RESULT.CONFLICT && status === "event_rejected") {
-        const msg = buildApiErrorMessage(payload, "");
-        if (isEventRejectedStaleSessionMessage(msg)) {
-          recoverStaleRound(msg || "Session expired. Press START ROUND.");
-          return;
-        }
-        setUiState(UI_STATE.UNAVAILABLE);
-        setErrorMessage(buildApiErrorMessage(payload, "Choice submission rejected."));
-        return;
-      }
-
-      setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage(buildApiErrorMessage(payload, "Choice submission rejected."));
-    } catch (_error) {
-      if (activeCycle !== cycleRef.current) return;
-      setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage("Network error while submitting choice.");
-    } finally {
-      if (activeCycle === cycleRef.current) {
-        submitInFlightRef.current = false;
-      }
-    }
-  }
-
   const numericWager = parseWagerInput(wagerInput);
-  const canStartSession =
-    [
-      UI_STATE.IDLE,
-      UI_STATE.UNAVAILABLE,
-      UI_STATE.PENDING_MIGRATION,
-      UI_STATE.RESOLVE_FAILED,
-      UI_STATE.RESOLVED,
-    ].includes(uiState) &&
-    !createInFlightRef.current &&
-    !submitInFlightRef.current &&
-    !resolveInFlightRef.current &&
-    vaultReady &&
-    numericWager >= QUICK_FLIP_MIN_WAGER &&
-    vaultBalance >= numericWager;
+  const hasValidSide = selectedChoice === "heads" || selectedChoice === "tails";
+  const wagerPlayable =
+    vaultReady && numericWager >= QUICK_FLIP_MIN_WAGER && vaultBalance >= numericWager;
 
   useEffect(() => {
-    if (!canStartSession || session?.id) return;
+    if (!wagerPlayable) return;
     setErrorMessage(prev => {
       const s = String(prev || "");
       if (
-        /Session expired\. Press START ROUND|Session ended\. Press START ROUND|no longer valid\. Press START ROUND/i.test(
+        /Session expired\. Press START ROUND|Session ended\. Press START ROUND|no longer valid\. Press START ROUND|Session expired\. Choose side and press FLIP COIN|Session ended\. Choose side and press FLIP COIN|no longer valid\. Choose side and press FLIP COIN/i.test(
           s,
         )
       ) {
@@ -924,26 +948,23 @@ export default function QuickFlipPage() {
       }
       return s;
     });
-  }, [canStartSession, session?.id]);
+  }, [wagerPlayable]);
 
-  const canFlipNow =
-    Boolean(session?.id) &&
-    Boolean(selectedChoice) &&
-    !submitInFlightRef.current &&
-    !resolveInFlightRef.current &&
-    !createInFlightRef.current &&
-    ![UI_STATE.RESOLVED, UI_STATE.LOADING, UI_STATE.SUBMITTING_CHOICE, UI_STATE.RESOLVING].includes(uiState);
+  const canFlipCoin =
+    wagerPlayable &&
+    hasValidSide &&
+    ![
+      UI_STATE.LOADING,
+      UI_STATE.SUBMITTING_CHOICE,
+      UI_STATE.CHOICE_SUBMITTED,
+      UI_STATE.RESOLVING,
+      UI_STATE.PENDING_MIGRATION,
+    ].includes(uiState);
 
   const isPrimaryLoading =
     uiState === UI_STATE.LOADING || uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
 
-  const primaryActionLabel = canFlipNow
-    ? "FLIP COIN"
-    : canStartSession
-      ? "START ROUND"
-      : session?.id && !selectedChoice && uiState === UI_STATE.SESSION_CREATED
-        ? "Choose Heads or Tails"
-        : "FLIP COIN";
+  const primaryActionLabel = hasValidSide ? "FLIP COIN" : "Choose Heads or Tails";
 
   function handlePresetClick(presetValue) {
     const v = Number(presetValue);
@@ -965,16 +986,8 @@ export default function QuickFlipPage() {
   }
 
   function handlePrimaryCta() {
-    if (canFlipNow) {
-      handleSubmitChoice();
-      return;
-    }
-    if (canStartSession) {
-      handleStartSession();
-      return;
-    }
-    if ([UI_STATE.RESOLVED, UI_STATE.RESOLVE_FAILED, UI_STATE.UNAVAILABLE, UI_STATE.PENDING_MIGRATION].includes(uiState)) {
-      resetForNewAttempt();
+    if (canFlipCoin) {
+      void runOneClickRound();
     }
   }
 
@@ -1025,7 +1038,7 @@ export default function QuickFlipPage() {
           onSelectChoice={handleSelectChoice}
           onPrimaryAction={handlePrimaryCta}
           primaryActionLabel={primaryActionLabel}
-          primaryActionDisabled={!canFlipNow && !canStartSession}
+          primaryActionDisabled={!canFlipCoin}
           primaryActionLoading={isPrimaryLoading}
         />
       }
