@@ -38,6 +38,10 @@ const STATS_KEY = "solo_v2_high_low_cards_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
 
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
 function parseWagerInput(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
   if (!digits) return 0;
@@ -105,11 +109,19 @@ function clearStoredSessionId() {
   }
 }
 
-function PlayingCard({ rank, suit }) {
+function PlayingCard({ rank, suit, tone = "neutral", className = "" }) {
   const isRed = suit === "♥" || suit === "♦";
   const color = isRed ? "text-red-500" : "text-zinc-100";
+  const ring =
+    tone === "win"
+      ? "ring-2 ring-emerald-400/90 shadow-[0_0_24px_rgba(52,211,153,0.35)]"
+      : tone === "loss"
+        ? "ring-2 ring-rose-500/90 shadow-[0_0_22px_rgba(244,63,94,0.35)]"
+        : "border-white/20 shadow-lg";
   return (
-    <div className="relative flex h-44 w-28 flex-col rounded-xl border-2 border-white/20 bg-zinc-900/90 shadow-lg sm:h-52 sm:w-36">
+    <div
+      className={`relative flex h-44 w-28 flex-col rounded-xl border-2 bg-zinc-900/90 sm:h-52 sm:w-36 ${ring} ${className}`}
+    >
       <div className={`absolute left-2 top-2 flex flex-col leading-none ${color}`}>
         <span className="text-2xl font-serif font-bold sm:text-3xl">{rank}</span>
         <span className="text-xl font-serif sm:text-2xl">{suit}</span>
@@ -122,6 +134,57 @@ function PlayingCard({ rank, suit }) {
   );
 }
 
+function CardBackFace({ className = "" }) {
+  return (
+    <div
+      className={`relative flex h-44 w-28 flex-col rounded-xl border-2 border-indigo-400/50 bg-gradient-to-br from-indigo-950 via-zinc-900 to-violet-950 shadow-inner sm:h-52 sm:w-36 ${className}`}
+    >
+      <div className="pointer-events-none absolute inset-0 rounded-[10px] bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.12),transparent_45%)]" />
+      <span className="m-auto select-none text-4xl opacity-90 drop-shadow-lg sm:text-5xl" aria-hidden>
+        🃏
+      </span>
+      <span className="absolute bottom-2 left-0 right-0 text-center text-[9px] font-bold uppercase tracking-[0.2em] text-indigo-200/50">
+        Hi-Lo
+      </span>
+    </div>
+  );
+}
+
+/** Opacity + scale reveal: back → face, with outcome tint after face-up. */
+function NextCardReveal({ card, faceUp, outcome }) {
+  if (!card?.rank) return null;
+  const tone = faceUp ? (outcome === "win" ? "win" : outcome === "loss" ? "loss" : "neutral") : "neutral";
+  return (
+    <div className="relative flex h-44 w-28 shrink-0 flex-col items-center justify-center sm:h-52 sm:w-36">
+      <div
+        className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ease-out ${
+          faceUp ? "pointer-events-none scale-95 opacity-0" : "scale-100 opacity-100"
+        }`}
+      >
+        <CardBackFace />
+      </div>
+      <div
+        className={`transition-all ease-out ${
+          faceUp ? "scale-100 opacity-100" : "pointer-events-none scale-[0.92] opacity-0"
+        }`}
+        style={{ transitionDuration: "450ms" }}
+      >
+        <PlayingCard rank={card.rank} suit={card.suit || "♠"} tone={tone} />
+      </div>
+      {faceUp && outcome === "win" ? (
+        <div className="pointer-events-none absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-500/95 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white shadow-md ring-1 ring-emerald-200/60">
+          Hit
+        </div>
+      ) : null}
+      {faceUp && outcome === "loss" ? (
+        <div className="pointer-events-none absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-rose-600/95 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white shadow-md ring-1 ring-rose-200/50">
+          Miss
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function HighLowCardsPage() {
   const giftShell = useSoloV2GiftShellState();
   const giftRefreshRef = useRef(() => {});
@@ -130,7 +193,6 @@ export default function HighLowCardsPage() {
   const [session, setSession] = useState(null);
   const [playing, setPlaying] = useState(null);
   const [pendingGuess, setPendingGuess] = useState(null);
-  const [revealCard, setRevealCard] = useState(null);
   const [terminalResult, setTerminalResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [, setSessionNotice] = useState("");
@@ -146,6 +208,13 @@ export default function HighLowCardsPage() {
   const cycleRef = useRef(0);
   const sessionRef = useRef(null);
   const resolveTurnRef = useRef(async () => {});
+  const revealAnimatingRef = useRef(false);
+
+  const [revealAnimating, setRevealAnimating] = useState(false);
+  const [revealFaceUp, setRevealFaceUp] = useState(false);
+  const [revealCardData, setRevealCardData] = useState(null);
+  const [revealOutcome, setRevealOutcome] = useState(null);
+  const [streakPulse, setStreakPulse] = useState(0);
 
   useEffect(() => {
     sessionRef.current = session;
@@ -188,21 +257,29 @@ export default function HighLowCardsPage() {
     };
   }, []);
 
+  function resetRevealVisuals() {
+    revealAnimatingRef.current = false;
+    setRevealAnimating(false);
+    setRevealFaceUp(false);
+    setRevealCardData(null);
+    setRevealOutcome(null);
+  }
+
   function recoverToIdle(message) {
     clearStoredSessionId();
     createInFlightRef.current = false;
     actionInFlightRef.current = false;
+    resetRevealVisuals();
     setSession(null);
     setPlaying(null);
     setPendingGuess(null);
-    setRevealCard(null);
     setTerminalResult(null);
     setUiState(UI_STATE.IDLE);
     setErrorMessage(String(message || "").trim() || "Session reset. Press PLAY to start again.");
   }
 
   function applySessionFromTruth(s, options = {}) {
-    const { resumed = false } = options;
+    const { resumed = false, preserveReveal = false } = options;
     setSession(s);
     const hl = s?.highLowCards;
     const rs = String(s?.readState || "");
@@ -212,7 +289,7 @@ export default function HighLowCardsPage() {
       const rr = hl?.resolvedResult;
       setPlaying(null);
       setPendingGuess(null);
-      setRevealCard(null);
+      if (!preserveReveal) resetRevealVisuals();
       setTerminalResult({
         terminalKind: rr?.terminalKind || "loss",
         streak: Number(rr?.finalStreak ?? rr?.streak ?? 0),
@@ -237,7 +314,9 @@ export default function HighLowCardsPage() {
       setPlaying(hl.playing);
       setPendingGuess(hl.pendingGuess || null);
       setTerminalResult(null);
-      setRevealCard(null);
+      if (!preserveReveal) {
+        resetRevealVisuals();
+      }
       setUiState(UI_STATE.PLAYING);
       setSessionNotice(resumed ? "Resumed your run." : "");
       setErrorMessage("");
@@ -343,11 +422,14 @@ export default function HighLowCardsPage() {
       const delta = Number(settlementSummary.netDelta || 0);
       setResultToast({
         isWin: won,
-        title: won ? "CASHED OUT" : "YOU LOSE",
-        sub: `${delta >= 0 ? "+" : ""}${delta}`,
+        title: won ? "BANKED" : "RUN OVER",
+        sub: `${delta >= 0 ? "+" : ""}${formatCompact(delta)}`,
+        detail: won
+          ? `${tr?.streak ?? 0} streak · +${formatCompact(payoutReturn)}`
+          : "Better luck next run",
       });
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setResultToast(null), 3200);
+      toastTimerRef.current = setTimeout(() => setResultToast(null), 3800);
     });
   }, [uiState, terminalResult?.settlementSummary, session?.id, terminalResult?.isWin, terminalResult?.streak]);
 
@@ -357,7 +439,7 @@ export default function HighLowCardsPage() {
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
     setTerminalResult(null);
-    setRevealCard(null);
+    resetRevealVisuals();
 
     try {
       const body = { gameKey: GAME_KEY, sessionMode: createSessionMode, entryAmount: wager };
@@ -445,7 +527,7 @@ export default function HighLowCardsPage() {
   }
 
   async function handleStartPlay() {
-    if (createInFlightRef.current || actionInFlightRef.current) return;
+    if (createInFlightRef.current || actionInFlightRef.current || revealAnimatingRef.current) return;
     if (!vaultReady) {
       setErrorMessage("Vault unavailable.");
       return;
@@ -474,13 +556,13 @@ export default function HighLowCardsPage() {
 
   async function submitGuessAndResolve(guess) {
     const sid = sessionRef.current?.id;
-    if (!sid || actionInFlightRef.current) return;
+    if (!sid || actionInFlightRef.current || revealAnimatingRef.current) return;
     actionInFlightRef.current = true;
     cycleRef.current += 1;
     const c = cycleRef.current;
     setUiState(UI_STATE.RESOLVING);
     setErrorMessage("");
-    setRevealCard(null);
+    resetRevealVisuals();
 
     try {
       let response = await fetch(`/api/solo-v2/sessions/${sid}/event`, {
@@ -550,37 +632,83 @@ export default function HighLowCardsPage() {
     const status = String(payload?.status || "");
 
     if (result === SOLO_V2_API_RESULT.SUCCESS && status === "turn_complete" && payload?.result?.won) {
-      setRevealCard(payload.result.nextCard);
+      const next = payload.result.nextCard;
+      const newStreak = Number(payload.result.streak ?? 0);
+      revealAnimatingRef.current = true;
+      setRevealAnimating(true);
+      setRevealFaceUp(false);
+      setRevealCardData(next);
+      setRevealOutcome("win");
+      setUiState(UI_STATE.RESOLVING);
+      await sleep(260);
+      if (c !== cycleRef.current) {
+        resetRevealVisuals();
+        return;
+      }
+      setRevealFaceUp(true);
+      await sleep(480);
+      if (c !== cycleRef.current) {
+        resetRevealVisuals();
+        return;
+      }
+      setStreakPulse(newStreak);
+      await sleep(420);
+      if (c !== cycleRef.current) {
+        resetRevealVisuals();
+        return;
+      }
       const truth = await readSessionTruth(sid, c);
-      if (truth?.ok) applySessionFromTruth(truth.session);
+      if (truth?.ok) applySessionFromTruth(truth.session, { preserveReveal: false });
+      resetRevealVisuals();
       setUiState(UI_STATE.PLAYING);
-      setSessionNotice("Correct! Keep going or cash out.");
+      setSessionNotice(`Streak ${newStreak} — nice hit. Cash out or push your luck.`);
+      setTimeout(() => setStreakPulse(0), 900);
       return;
     }
 
     if (result === SOLO_V2_API_RESULT.SUCCESS && status === "session_lost") {
+      const next = payload?.result?.nextCard || null;
+      revealAnimatingRef.current = true;
+      setRevealAnimating(true);
+      setRevealFaceUp(false);
+      setRevealCardData(next);
+      setRevealOutcome("loss");
+      setUiState(UI_STATE.RESOLVING);
+      await sleep(240);
+      if (c !== cycleRef.current) {
+        resetRevealVisuals();
+        return;
+      }
+      setRevealFaceUp(true);
+      await sleep(720);
+      if (c !== cycleRef.current) {
+        resetRevealVisuals();
+        return;
+      }
       clearStoredSessionId();
-      setRevealCard(payload?.result?.nextCard || null);
+      resetRevealVisuals();
       setTerminalResult({
         terminalKind: "loss",
         streak: Number(payload?.result?.streak ?? 0),
         settlementSummary: payload?.result?.settlementSummary,
-        lastNextCard: payload?.result?.nextCard,
+        lastNextCard: next,
         isWin: false,
       });
       setSession(prev => (prev ? { ...prev, sessionStatus: "resolved" } : prev));
       setUiState(UI_STATE.TERMINAL);
-      setSessionNotice("Wrong guess — run over.");
+      setSessionNotice("Wrong call — run ended.");
       return;
     }
 
     if (result === SOLO_V2_API_RESULT.SUCCESS && status === "turn_complete" && payload?.idempotent) {
+      resetRevealVisuals();
       const truth = await readSessionTruth(sid, c);
       if (truth?.ok) applySessionFromTruth(truth.session);
       setUiState(UI_STATE.PLAYING);
       return;
     }
 
+    resetRevealVisuals();
     const truth = await readSessionTruth(sid, c);
     if (truth?.ok) applySessionFromTruth(truth.session);
     setUiState(UI_STATE.PLAYING);
@@ -592,7 +720,7 @@ export default function HighLowCardsPage() {
   useEffect(() => {
     const sid = session?.id;
     const cr = session?.highLowCards?.canResolveTurn;
-    if (!sid || !cr || actionInFlightRef.current || createInFlightRef.current) return;
+    if (!sid || !cr || actionInFlightRef.current || createInFlightRef.current || revealAnimatingRef.current) return;
 
     cycleRef.current += 1;
     const cycle = cycleRef.current;
@@ -612,7 +740,7 @@ export default function HighLowCardsPage() {
 
   async function handleCashOut() {
     const sid = sessionRef.current?.id;
-    if (!sid || actionInFlightRef.current) return;
+    if (!sid || actionInFlightRef.current || revealAnimatingRef.current) return;
     if (!playing?.canCashOut && !session?.highLowCards?.canCashOut) {
       setErrorMessage("Nothing to cash out yet.");
       return;
@@ -670,7 +798,7 @@ export default function HighLowCardsPage() {
     setSession(null);
     setPlaying(null);
     setTerminalResult(null);
-    setRevealCard(null);
+    resetRevealVisuals();
     setUiState(UI_STATE.IDLE);
     setErrorMessage("");
     setSessionNotice("");
@@ -681,6 +809,7 @@ export default function HighLowCardsPage() {
     vaultReady && numericWager >= HIGH_LOW_CARDS_MIN_WAGER && vaultBalance >= numericWager;
   const canStart =
     wagerPlayable &&
+    !revealAnimating &&
     uiState !== UI_STATE.LOADING &&
     uiState !== UI_STATE.RESOLVING &&
     uiState !== UI_STATE.PLAYING &&
@@ -714,6 +843,7 @@ export default function HighLowCardsPage() {
   const handleGiftPlay = useCallback(() => {
     if (!vaultReady || giftShell.giftCount < 1) return;
     if ([UI_STATE.LOADING, UI_STATE.RESOLVING, UI_STATE.PLAYING, UI_STATE.PENDING_MIGRATION].includes(uiState)) return;
+    if (revealAnimatingRef.current) return;
     giftRoundRef.current = true;
     void handleStartPlay();
   }, [vaultReady, giftShell.giftCount, uiState]);
@@ -721,6 +851,8 @@ export default function HighLowCardsPage() {
   const isRunActive = uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING;
   const primaryLabel =
     uiState === UI_STATE.TERMINAL ? "PLAY AGAIN" : uiState === UI_STATE.PLAYING ? "Run in progress" : "PLAY";
+  const guessControlsLocked =
+    Boolean(pendingGuess) || uiState === UI_STATE.RESOLVING || revealAnimating;
 
   return (
     <SoloV2GameShell
@@ -776,8 +908,8 @@ export default function HighLowCardsPage() {
         },
         primaryActionLabel: primaryLabel,
         primaryActionDisabled: uiState === UI_STATE.TERMINAL ? false : !canStart,
-        primaryActionLoading: uiState === UI_STATE.LOADING,
-        primaryLoadingLabel: "STARTING...",
+        primaryActionLoading: uiState === UI_STATE.LOADING || (isRunActive && uiState === UI_STATE.RESOLVING),
+        primaryLoadingLabel: uiState === UI_STATE.LOADING ? "STARTING..." : "RESOLVING...",
         onPrimaryAction: () => {
           if (uiState === UI_STATE.TERMINAL) handlePlayAgain();
           else void handleStartPlay();
@@ -791,41 +923,64 @@ export default function HighLowCardsPage() {
             legacy curve). Cash out anytime after at least one win.
           </p>
 
-          {uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING ? (
-            <div className="mb-2 text-xs text-zinc-500">
-              Streak <span className="font-bold text-amber-200/90">{streak}</span>
-              <span className="mx-1 text-zinc-600">·</span>×{mult.toFixed(3)}
+          {isRunActive ? (
+            <div className="mb-2 flex flex-col items-center gap-0.5 text-xs text-zinc-500">
+              <span>
+                <span className="font-semibold uppercase tracking-wide text-zinc-400">Run active</span>
+                <span className="mx-1 text-zinc-600" aria-hidden>
+                  ·
+                </span>
+                Streak{" "}
+                <span
+                  className={`inline-block font-bold tabular-nums transition-all duration-300 ${
+                    streakPulse > 0 ? "scale-110 text-emerald-300 drop-shadow-[0_0_10px_rgba(52,211,153,0.45)]" : "text-amber-200/90"
+                  }`}
+                >
+                  {streak}
+                </span>
+                <span className="mx-1 text-zinc-600">·</span>×{mult.toFixed(3)}
+              </span>
+              {uiState === UI_STATE.RESOLVING ? (
+                <span className="text-[10px] font-medium uppercase tracking-wider text-indigo-300/90">Resolving turn…</span>
+              ) : null}
             </div>
           ) : null}
 
           <div className="flex min-h-[168px] items-start justify-center gap-3 sm:min-h-[200px]">
             {currentCard?.rank ? <PlayingCard rank={currentCard.rank} suit={currentCard.suit || "♠"} /> : null}
-            {revealCard?.rank ? <PlayingCard rank={revealCard.rank} suit={revealCard.suit || "♠"} /> : null}
+            {revealCardData?.rank ? (
+              <NextCardReveal card={revealCardData} faceUp={revealFaceUp} outcome={revealOutcome} />
+            ) : uiState === UI_STATE.RESOLVING ? (
+              <div className="flex h-44 w-28 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-zinc-600/50 bg-zinc-900/40 sm:h-52 sm:w-36">
+                <span className="px-1 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Next card</span>
+                <span className="mt-1 text-xs text-zinc-400 animate-pulse">Drawing…</span>
+              </div>
+            ) : null}
           </div>
 
-          {uiState === UI_STATE.PLAYING ? (
+          {(uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING) && playing ? (
             <div className="mt-4 grid w-full grid-cols-3 gap-2">
               <button
                 type="button"
-                disabled={Boolean(pendingGuess) || uiState === UI_STATE.RESOLVING}
+                disabled={uiState !== UI_STATE.PLAYING || guessControlsLocked}
                 onClick={() => void submitGuessAndResolve("high")}
-                className="h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-sm font-bold text-white shadow-md disabled:opacity-40"
+                className="h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-sm font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-40"
               >
                 HIGHER
               </button>
               <button
                 type="button"
-                disabled={!playing?.canCashOut || Boolean(pendingGuess) || uiState === UI_STATE.RESOLVING}
+                disabled={uiState !== UI_STATE.PLAYING || !playing?.canCashOut || guessControlsLocked}
                 onClick={() => void handleCashOut()}
-                className="h-12 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-700 text-[10px] font-bold text-white shadow-md disabled:opacity-30"
+                className="h-12 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-700 text-[10px] font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-30"
               >
                 CASH OUT
               </button>
               <button
                 type="button"
-                disabled={Boolean(pendingGuess) || uiState === UI_STATE.RESOLVING}
+                disabled={uiState !== UI_STATE.PLAYING || guessControlsLocked}
                 onClick={() => void submitGuessAndResolve("low")}
-                className="h-12 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 text-sm font-bold text-white shadow-md disabled:opacity-40"
+                className="h-12 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 text-sm font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-40"
               >
                 LOWER
               </button>
@@ -833,12 +988,26 @@ export default function HighLowCardsPage() {
           ) : null}
 
           {uiState === UI_STATE.TERMINAL && terminalResult ? (
-            <div className="mt-4 text-sm">
+            <div className="mt-4 space-y-2 text-sm">
               <p className={terminalResult.isWin ? "font-bold text-emerald-300" : "font-bold text-rose-300"}>
                 {terminalResult.terminalKind === "cashout"
                   ? `Cashed out — ${terminalResult.streak} streak`
-                  : "You lost this run"}
+                  : "Run over — wrong call"}
               </p>
+              {!terminalResult.isWin && terminalResult.lastNextCard?.rank ? (
+                <p className="text-xs text-zinc-400">
+                  Card was{" "}
+                  <span className="font-semibold text-zinc-200">
+                    {terminalResult.lastNextCard.rank}
+                    {terminalResult.lastNextCard.suit || "♠"}
+                  </span>
+                </p>
+              ) : null}
+              {terminalResult.isWin ? (
+                <p className="text-xs text-zinc-400">Vault updated from this run. Play again when you are ready.</p>
+              ) : (
+                <p className="text-xs text-zinc-400">Streak reset. Tap PLAY AGAIN for a new run.</p>
+              )}
             </div>
           ) : null}
 
@@ -850,6 +1019,7 @@ export default function HighLowCardsPage() {
             >
               <div>{resultToast.title}</div>
               <div className="text-sm">{resultToast.sub}</div>
+              {resultToast.detail ? <div className="mt-1 text-[10px] font-normal opacity-90">{resultToast.detail}</div> : null}
             </div>
           ) : null}
         </div>
