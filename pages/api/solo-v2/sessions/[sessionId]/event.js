@@ -86,6 +86,19 @@ export default async function handler(req, res) {
         });
       }
 
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
       const declaredGameKey = String(eventPayload?.gameKey || "");
       if (declaredGameKey !== "quick_flip") {
         return res.status(400).json({

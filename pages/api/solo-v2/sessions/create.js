@@ -3,6 +3,7 @@ import { parseCreateSessionPayload, resolvePlayerRef } from "../../../../lib/sol
 import { SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
 import { getSoloV2GameByKey } from "../../../../lib/solo-v2/server/gameCatalog";
 import { QUICK_FLIP_MIN_WAGER } from "../../../../lib/solo-v2/quickFlipConfig";
+import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -22,6 +23,56 @@ function logCreateBranch(branch, meta = {}) {
     branch,
     ...meta,
   });
+}
+
+function serializeSupabaseError(err) {
+  if (!err || typeof err !== "object") return null;
+  return {
+    code: err.code ?? null,
+    message: err.message ?? null,
+    details: err.details ?? null,
+    hint: err.hint ?? null,
+  };
+}
+
+/**
+ * Single exit for all 503s: logs a unique branch marker + returns full JSON to the browser
+ * (so DevTools / any client that shows payload.message sees branch + supabase hints).
+ */
+function sendCreate503(
+  res,
+  {
+    branch,
+    source,
+    category,
+    status,
+    message,
+    rawBodySnapshot,
+    entryAmount,
+    supabaseError,
+  },
+) {
+  const body = {
+    ok: false,
+    category,
+    status,
+    message: `${message} Branch: ${branch}.`,
+    branch,
+    source,
+    requestBodyRaw: rawBodySnapshot,
+    entryAmount,
+    supabaseError: serializeSupabaseError(supabaseError),
+  };
+  console.error("[solo-v2/create 503]", branch, {
+    category,
+    status,
+    source,
+    message: body.message,
+    requestBodyRaw: rawBodySnapshot,
+    entryAmount,
+    supabaseError: body.supabaseError,
+  });
+  return res.status(503).json(body);
 }
 
 function isUniqueConflict(error) {
@@ -49,6 +100,14 @@ function isLegacyDeviceIdNotNullError(error) {
   return code === "23502" && message.includes("device_id");
 }
 
+/**
+ * Must match DB partial unique index uq_solo_v2_quick_flip_one_active_per_player
+ * (game_key quick_flip + created/in_progress). Do not filter by expires_at here:
+ * a time-expired row can still be created/in_progress in DB and would block RPC with 23505
+ * while an expiry-only precheck would see "no row" and wrongly attempt insert → 503 fallback.
+ */
+const QUICK_FLIP_ACTIVE_SESSION_FETCH_CAP = 40;
+
 async function readActiveQuickFlipSessions(supabase, playerRef) {
   const unresolvedStatuses = [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS];
   const lookup = await supabase
@@ -58,10 +117,70 @@ async function readActiveQuickFlipSessions(supabase, playerRef) {
     .eq("game_key", "quick_flip")
     .in("session_status", unresolvedStatuses)
     .order("created_at", { ascending: false })
-    .limit(2);
+    .limit(QUICK_FLIP_ACTIVE_SESSION_FETCH_CAP);
 
-  if (lookup.error) return { ok: false, error: lookup.error };
-  return { ok: true, rows: lookup.data || [] };
+  if (lookup.error) {
+    logCreateBranch("readActiveQuickFlipSessions.query_failed", {
+      code: lookup.error?.code ?? null,
+      message: lookup.error?.message ?? null,
+      details: lookup.error?.details ?? null,
+      hint: lookup.error?.hint ?? null,
+    });
+    return { ok: false, error: lookup.error };
+  }
+
+  return { ok: true, rows: (lookup.data || []).slice(0, 2) };
+}
+
+async function fetchQuickFlipSessionRowForSnapshot(supabase, sessionId, playerRef) {
+  const { data, error } = await supabase
+    .from("solo_v2_sessions")
+    .select(
+      "id,game_key,player_ref,session_status,session_mode,entry_amount,reward_amount,net_amount,server_outcome_summary,created_at,updated_at,expires_at,resolved_at",
+    )
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "quick_flip")
+    .single();
+
+  if (error || !data) return { ok: false, error: error || new Error("session row not found") };
+  return { ok: true, row: data };
+}
+
+/** Align create with GET/readSessionTruth: only return existing_session when snapshot is playable. */
+async function quickFlipActiveRowPlayableOrExpire(supabase, existingSummary, playerRef) {
+  const fetched = await fetchQuickFlipSessionRowForSnapshot(supabase, existingSummary.id, playerRef);
+  if (!fetched.ok) {
+    return { ok: false, kind: "fetch_row", error: fetched.error };
+  }
+
+  const snap = await buildQuickFlipSessionSnapshot(supabase, fetched.row);
+  if (!snap.ok) {
+    return { ok: false, kind: "snapshot", error: snap.error };
+  }
+
+  const rs = snap.snapshot.readState;
+  if (rs === "choice_required" || rs === "choice_submitted") {
+    return { ok: true, playable: true };
+  }
+
+  const { error: updErr } = await supabase
+    .from("solo_v2_sessions")
+    .update({ session_status: SOLO_V2_SESSION_STATUS.EXPIRED })
+    .eq("id", existingSummary.id)
+    .eq("player_ref", playerRef)
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (updErr) {
+    return { ok: false, kind: "expire_stale", error: updErr };
+  }
+
+  logCreateBranch("quick_flip_stale_row_expired_for_create", {
+    sessionId: existingSummary.id,
+    readState: rs,
+    reason: "snapshot_not_playable_same_rules_as_read_api",
+  });
+  return { ok: true, playable: false };
 }
 
 function createExistingSessionResponse(existing, playerRef) {
@@ -161,6 +280,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, category: "validation_error", status: "method_not_allowed" });
   }
 
+  let rawBodySnapshot = null;
+  try {
+    rawBodySnapshot = JSON.stringify(req.body ?? null);
+  } catch {
+    rawBodySnapshot = "[unserializable req.body]";
+  }
+
   const parsed = parseCreateSessionPayload(req.body);
   if (!parsed.ok) {
     return res.status(400).json({ ok: false, category: "validation_error", status: "invalid_request", message: parsed.message });
@@ -184,25 +310,35 @@ export default async function handler(req, res) {
 
       const existingLookup = await readActiveQuickFlipSessions(supabase, playerRef);
       if (!existingLookup.ok) {
-        if (isMissingTable(existingLookup.error)) {
+        const err = existingLookup.error;
+        const missingTbl = isMissingTable(err);
+        if (missingTbl) {
           logCreateBranch("pending_migration.precheck_existing_sessions", {
             gameKey,
             code: existingLookup.error?.code || null,
             message: existingLookup.error?.message || null,
             details: existingLookup.error?.details || null,
           });
-          return res.status(503).json({
-            ok: false,
+          return sendCreate503(res, {
+            branch: "CREATE_503_QF_PRECHECK_PENDING_MIGRATION",
+            source: "readActiveQuickFlipSessions_precheck_pending_migration_detection",
             category: "pending_migration",
             status: "pending_migration",
             message: "Solo V2 session persistence is not migrated yet.",
+            rawBodySnapshot,
+            entryAmount,
+            supabaseError: err,
           });
         }
-        return res.status(503).json({
-          ok: false,
+        return sendCreate503(res, {
+          branch: "CREATE_503_QF_PRECHECK_UNAVAILABLE",
+          source: "readActiveQuickFlipSessions_precheck_generic_supabase_error",
           category: "unavailable",
           status: "unavailable",
           message: "Create session is temporarily unavailable.",
+          rawBodySnapshot,
+          entryAmount,
+          supabaseError: err,
         });
       }
 
@@ -218,7 +354,22 @@ export default async function handler(req, res) {
 
       const existing = existingRows[0];
       if (existing) {
-        return res.status(200).json(createExistingSessionResponse(existing, playerRef));
+        const playable = await quickFlipActiveRowPlayableOrExpire(supabase, existing, playerRef);
+        if (!playable.ok) {
+          return sendCreate503(res, {
+            branch: "CREATE_503_QF_EXISTING_CLASSIFY_FAILED",
+            source: "quickFlipActiveRowPlayableOrExpire_precheck",
+            category: "unavailable",
+            status: "unavailable",
+            message: "Create session is temporarily unavailable.",
+            rawBodySnapshot,
+            entryAmount,
+            supabaseError: playable.error,
+          });
+        }
+        if (playable.playable) {
+          return res.status(200).json(createExistingSessionResponse(existing, playerRef));
+        }
       }
     }
 
@@ -316,11 +467,15 @@ export default async function handler(req, res) {
           message: error?.message || null,
           details: error?.details || null,
         });
-        return res.status(503).json({
-          ok: false,
+        return sendCreate503(res, {
+          branch: "CREATE_503_RPC_PENDING_MIGRATION",
+          source: "solo_v2_create_session_rpc_missing_table_or_function",
           category: "pending_migration",
           status: "pending_migration",
           message: "Solo V2 session persistence is not migrated yet.",
+          rawBodySnapshot,
+          entryAmount,
+          supabaseError: error,
         });
       }
 
@@ -336,7 +491,56 @@ export default async function handler(req, res) {
             });
           }
           if (conflictLookup.rows[0]) {
-            return res.status(200).json(createExistingSessionResponse(conflictLookup.rows[0], playerRef));
+            const row0 = conflictLookup.rows[0];
+            const playable = await quickFlipActiveRowPlayableOrExpire(supabase, row0, playerRef);
+            if (!playable.ok) {
+              return sendCreate503(res, {
+                branch: "CREATE_503_QF_CONFLICT_CLASSIFY_FAILED",
+                source: "quickFlipActiveRowPlayableOrExpire_post_unique",
+                category: "unavailable",
+                status: "unavailable",
+                message: "Create session is temporarily unavailable.",
+                rawBodySnapshot,
+                entryAmount,
+                supabaseError: playable.error,
+              });
+            }
+            if (playable.playable) {
+              return res.status(200).json(createExistingSessionResponse(row0, playerRef));
+            }
+            const retryCall = await supabase.rpc("solo_v2_create_session", {
+              p_player_ref: playerRef,
+              p_game_key: gameKey,
+              p_session_mode: sessionMode,
+              p_entry_amount: entryAmount,
+              p_client_nonce: clientNonce,
+              p_integrity_token: null,
+              p_idempotency_key: idempotencyKey,
+              p_expires_in_seconds: 900,
+            });
+            if (!retryCall.error) {
+              const retryRow = Array.isArray(retryCall.data) ? retryCall.data[0] : retryCall.data;
+              return res.status(201).json({
+                ok: true,
+                category: "success",
+                status: "created",
+                session: {
+                  id: retryRow?.session_id || null,
+                  gameKey,
+                  playerRef,
+                  sessionMode,
+                  entryAmount,
+                  sessionStatus: retryRow?.session_status || "created",
+                  expiresAt: retryRow?.expires_at || null,
+                },
+                authority: {
+                  sessionTruth: "server",
+                  outcomeTruth: "deferred",
+                  rewardTruth: "deferred",
+                },
+              });
+            }
+            error = retryCall.error;
           }
         } else if (isMissingTable(conflictLookup.error)) {
           logCreateBranch("pending_migration.post_conflict_recheck", {
@@ -345,20 +549,28 @@ export default async function handler(req, res) {
             message: conflictLookup.error?.message || null,
             details: conflictLookup.error?.details || null,
           });
-          return res.status(503).json({
-            ok: false,
+          return sendCreate503(res, {
+            branch: "CREATE_503_POST_CONFLICT_PENDING_MIGRATION",
+            source: "readActiveQuickFlipSessions_after_unique_conflict_recheck",
             category: "pending_migration",
             status: "pending_migration",
             message: "Solo V2 session persistence is not migrated yet.",
+            rawBodySnapshot,
+            entryAmount,
+            supabaseError: conflictLookup.error,
           });
         }
       }
 
-      return res.status(503).json({
-        ok: false,
+      return sendCreate503(res, {
+        branch: "CREATE_503_RPC_UNAVAILABLE_FALLBACK",
+        source: "solo_v2_create_session_or_compat_still_failed_generic",
         category: "unavailable",
         status: "unavailable",
         message: "Create session is temporarily unavailable.",
+        rawBodySnapshot,
+        entryAmount,
+        supabaseError: error,
       });
     }
 

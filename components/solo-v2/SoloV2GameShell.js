@@ -92,15 +92,15 @@ export default function SoloV2GameShell({
         <SoloV2ReservedAdSlot variant="subtle" />
       </div>
 
-      <SoloV2Modal open={isInfoOpen} title="Info" onClose={() => setIsInfoOpen(false)}>
-        <div className="mb-3 flex gap-1">
+      <SoloV2Modal open={isInfoOpen} title="Info" onClose={() => setIsInfoOpen(false)} maxWidthClass="max-w-lg">
+        <div className="mb-5 flex gap-1.5 rounded-2xl border border-white/10 bg-black/35 p-1 sm:gap-2 sm:p-1.5">
           <button
             type="button"
             onClick={() => setInfoTab("help")}
-            className={`flex-1 rounded-lg border px-2 py-2 text-xs font-semibold transition ${
+            className={`min-h-[44px] flex-1 rounded-xl px-3 py-2.5 text-sm font-semibold transition sm:py-3 ${
               infoTab === "help"
-                ? "border-amber-400/40 bg-amber-500/20 text-amber-50"
-                : "border-transparent bg-white/5 text-zinc-400 hover:bg-white/10"
+                ? "border border-amber-400/45 bg-amber-500/25 text-amber-50 shadow-sm shadow-amber-900/20"
+                : "border border-transparent text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
             }`}
           >
             Help
@@ -108,16 +108,16 @@ export default function SoloV2GameShell({
           <button
             type="button"
             onClick={() => setInfoTab("stats")}
-            className={`flex-1 rounded-lg border px-2 py-2 text-xs font-semibold transition ${
+            className={`min-h-[44px] flex-1 rounded-xl px-3 py-2.5 text-sm font-semibold transition sm:py-3 ${
               infoTab === "stats"
-                ? "border-amber-400/40 bg-amber-500/20 text-amber-50"
-                : "border-transparent bg-white/5 text-zinc-400 hover:bg-white/10"
+                ? "border border-amber-400/45 bg-amber-500/25 text-amber-50 shadow-sm shadow-amber-900/20"
+                : "border border-transparent text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
             }`}
           >
             Stats
           </button>
         </div>
-        <div className="text-zinc-200">
+        <div className="text-[15px] leading-[1.65] text-zinc-200/95 [&_p]:mb-3 [&_p:last-child]:mb-0">
           {infoTab === "help"
             ? helpContent || (
                 <p>

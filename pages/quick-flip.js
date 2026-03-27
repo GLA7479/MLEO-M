@@ -47,6 +47,24 @@ function buildApiErrorMessage(payload, fallback) {
   return String(payload?.message || "").trim() || fallback;
 }
 
+/** Dev-only START ROUND tracing (next dev). Prod: set localStorage solo_v2_qf_start_debug=1 to enable. */
+function qfStartDebug(label, data) {
+  const allowProd =
+    typeof window !== "undefined" && window.localStorage?.getItem("solo_v2_qf_start_debug") === "1";
+  if (process.env.NODE_ENV !== "development" && !allowProd) return;
+  console.warn(`[QuickFlip handleStartSession] ${label}`, data);
+}
+
+function isEventRejectedStaleSessionMessage(message) {
+  const m = String(message || "").toLowerCase();
+  if (!m) return false;
+  if (m.includes("session expired")) return true;
+  if (m.includes("session is not writable")) return true;
+  if (m.includes("ownership mismatch")) return true;
+  if (m.includes("session not found")) return true;
+  return false;
+}
+
 const STATS_KEY = "solo_v2_quick_flip_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
@@ -137,6 +155,8 @@ function ChoiceButton({ label, value, selectedChoice, disabled, onSelect }) {
 }
 
 function QuickFlipPlaceholderPanel({
+  session,
+  uiState,
   vaultBalance,
   wagerInput,
   potentialWin,
@@ -155,7 +175,9 @@ function QuickFlipPlaceholderPanel({
   primaryActionDisabled,
   primaryActionLoading,
 }) {
-  const canChoose = !isFlipping;
+  const isChoiceLocked =
+    uiState === UI_STATE.CHOICE_SUBMITTED || uiState === UI_STATE.RESOLVED;
+  const canChoose = Boolean(session?.id) && !isFlipping && !isChoiceLocked;
   const canEditPlay = !isFlipping;
   const wagerNumeric = parseWagerInput(wagerInput);
 
@@ -371,6 +393,20 @@ export default function QuickFlipPage() {
     setResultToast(null);
   }
 
+  /** Clears stale session/round state but keeps wager input so the user can START ROUND again. */
+  function recoverStaleRound(message) {
+    createInFlightRef.current = false;
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setSession(null);
+    setSelectedChoice("");
+    setEventInfo(null);
+    setResolvedResult(null);
+    setSessionNotice("");
+    setUiState(UI_STATE.IDLE);
+    setErrorMessage(String(message || "").trim() || "This round is no longer valid. Press START ROUND.");
+  }
+
   useEffect(() => {
     if (uiState !== UI_STATE.RESOLVED) return;
     const sessionId = resolvedResult?.sessionId || session?.id;
@@ -482,6 +518,25 @@ export default function QuickFlipPage() {
       return;
     }
 
+    if (
+      readState === "invalid" ||
+      sessionPayload?.sessionStatus === "expired" ||
+      sessionPayload?.sessionStatus === "cancelled"
+    ) {
+      setSession(null);
+      setSelectedChoice("");
+      setEventInfo(null);
+      setResolvedResult(null);
+      setUiState(UI_STATE.IDLE);
+      setSessionNotice("");
+      setErrorMessage(
+        sessionPayload?.sessionStatus === "expired"
+          ? "Session expired. Press START ROUND for a fresh session."
+          : "Session ended. Press START ROUND for a fresh session.",
+      );
+      return;
+    }
+
     setUiState(UI_STATE.UNAVAILABLE);
     setErrorMessage("Session state is not resumable.");
   }
@@ -567,10 +622,24 @@ export default function QuickFlipPage() {
       const result = classifyApiResult(response, payload);
       const status = String(payload?.status || "");
 
+      qfStartDebug("fetch_done", {
+        httpStatus: response.status,
+        classify: result,
+        apiStatus: status,
+        sessionId: payload?.session?.id ?? null,
+        rawPayload: payload,
+      });
+
       if (result === API_RESULT.SUCCESS && status === "created" && payload?.session) {
         setSession(payload.session);
         setSessionNotice("");
+        setErrorMessage("");
         setUiState(UI_STATE.SESSION_CREATED);
+        qfStartDebug("branch_created", {
+          setUiState: UI_STATE.SESSION_CREATED,
+          sessionId: payload.session?.id,
+          readSessionTruth: "skipped",
+        });
         return;
       }
 
@@ -578,15 +647,30 @@ export default function QuickFlipPage() {
         setSession(payload.session);
         setSessionNotice("Resumed active round.");
         setUiState(UI_STATE.SESSION_CREATED);
+        setErrorMessage("");
 
         const readResult = await readSessionTruth(payload.session.id, activeCycle);
+        qfStartDebug("readSessionTruth_result", {
+          halted: Boolean(readResult?.halted),
+          ok: readResult?.ok,
+          readStatus: readResult?.readStatus,
+          readState: readResult?.session?.readState,
+          sessionStatus: readResult?.session?.sessionStatus,
+        });
         if (readResult?.halted) return;
         if (!readResult?.ok) {
+          setSession(null);
+          setSelectedChoice("");
+          setEventInfo(null);
+          setResolvedResult(null);
           setUiState(readResult.state);
           setErrorMessage(readResult.message);
+          qfStartDebug("readSessionTruth_failed_cleared_session", { uiState: readResult.state });
           return;
         }
+
         applySessionReadState(readResult.session, { resumed: true });
+        qfStartDebug("after_applySessionReadState", { readState: String(readResult.session?.readState || "") });
         return;
       }
 
@@ -783,8 +867,18 @@ export default function QuickFlipPage() {
           }
           return;
         }
-        setUiState(UI_STATE.RESOLVE_FAILED);
-        setErrorMessage(buildApiErrorMessage(payload, "Session no longer accepts choice submit."));
+        recoverStaleRound(buildApiErrorMessage(payload, "Session no longer accepts choice submit."));
+        return;
+      }
+
+      if (result === API_RESULT.CONFLICT && status === "event_rejected") {
+        const msg = buildApiErrorMessage(payload, "");
+        if (isEventRejectedStaleSessionMessage(msg)) {
+          recoverStaleRound(msg || "Session expired. Press START ROUND.");
+          return;
+        }
+        setUiState(UI_STATE.UNAVAILABLE);
+        setErrorMessage(buildApiErrorMessage(payload, "Choice submission rejected."));
         return;
       }
 
@@ -817,6 +911,21 @@ export default function QuickFlipPage() {
     numericWager >= QUICK_FLIP_MIN_WAGER &&
     vaultBalance >= numericWager;
 
+  useEffect(() => {
+    if (!canStartSession || session?.id) return;
+    setErrorMessage(prev => {
+      const s = String(prev || "");
+      if (
+        /Session expired\. Press START ROUND|Session ended\. Press START ROUND|no longer valid\. Press START ROUND/i.test(
+          s,
+        )
+      ) {
+        return "";
+      }
+      return s;
+    });
+  }, [canStartSession, session?.id]);
+
   const canFlipNow =
     Boolean(session?.id) &&
     Boolean(selectedChoice) &&
@@ -828,7 +937,13 @@ export default function QuickFlipPage() {
   const isPrimaryLoading =
     uiState === UI_STATE.LOADING || uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
 
-  const primaryActionLabel = canFlipNow ? "FLIP COIN" : canStartSession ? "START ROUND" : "FLIP COIN";
+  const primaryActionLabel = canFlipNow
+    ? "FLIP COIN"
+    : canStartSession
+      ? "START ROUND"
+      : session?.id && !selectedChoice && uiState === UI_STATE.SESSION_CREATED
+        ? "Choose Heads or Tails"
+        : "FLIP COIN";
 
   function handlePresetClick(presetValue) {
     const v = Number(presetValue);
@@ -874,6 +989,8 @@ export default function QuickFlipPage() {
       }}
       gameplaySlot={
         <QuickFlipPlaceholderPanel
+          session={session}
+          uiState={uiState}
           vaultBalance={vaultBalance}
           wagerInput={wagerInput}
           potentialWin={Math.floor(parseWagerInput(wagerInput) * QUICK_FLIP_WIN_MULTIPLIER)}
