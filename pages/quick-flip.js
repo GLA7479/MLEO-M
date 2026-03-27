@@ -436,7 +436,7 @@ export default function QuickFlipPage() {
     const { sessionIdOverride = null } = options;
     const targetSessionId = sessionIdOverride || session?.id;
     if (!targetSessionId) return;
-    if (resolveInFlightRef.current || createInFlightRef.current || submitInFlightRef.current) return;
+    if (resolveInFlightRef.current || createInFlightRef.current) return;
     resolveInFlightRef.current = true;
     const activeCycle = cycleRef.current;
     setUiState(UI_STATE.RESOLVING);
