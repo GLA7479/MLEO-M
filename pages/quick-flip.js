@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import QuickFlipCoinDisplay from "../components/solo-v2/QuickFlipCoinDisplay";
+import SoloV2ResultPopup, {
+  SoloV2ResultPopupVaultLine,
+} from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
@@ -140,6 +143,7 @@ function QuickFlipGameplayPanel({
   resultToast,
   onSelectChoice,
   coinResolvedFace,
+  pickedSide,
 }) {
   const isChoiceLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
   const canChoose =
@@ -174,21 +178,27 @@ function QuickFlipGameplayPanel({
         </div>
       </div>
 
-      {resultToast ? (
-        <div
-          className={`pointer-events-none absolute left-1/2 top-[10%] z-20 w-[88%] max-w-xs -translate-x-1/2 rounded-lg border px-3 py-2 text-center text-xs font-bold sm:top-[12%] ${
-            resultToast.isWin
-              ? "border-emerald-400/35 bg-emerald-700/90 text-white"
-              : "border-red-400/35 bg-red-700/90 text-white"
-          }`}
-        >
-          <div className="text-[13px]">{resultToast.isWin ? "YOU WIN" : "YOU LOSE"}</div>
-          <div className="text-sm">{resultToast.deltaLabel}</div>
-          <div className="mt-0.5 text-[10px] font-semibold opacity-90">
-            {String(resultToast.outcome || "--").toUpperCase()}
-          </div>
+      <SoloV2ResultPopup
+        open={Boolean(resultToast)}
+        isWin={Boolean(resultToast?.isWin)}
+        animationKey={`${resultToast?.outcome ?? ""}-${resultToast?.deltaLabel ?? ""}-${pickedSide ?? ""}`}
+        vaultSlot={
+          resultToast ? (
+            <SoloV2ResultPopupVaultLine isWin={resultToast.isWin} deltaLabel={resultToast.deltaLabel} />
+          ) : undefined
+        }
+      >
+        <div className="text-[13px] font-black uppercase tracking-wide">
+          {resultToast?.isWin ? "YOU WIN" : "YOU LOSE"}
         </div>
-      ) : null}
+        <div className="mt-1 text-sm font-bold text-white">
+          Your pick:{" "}
+          <span className="text-amber-100">{String(pickedSide || "—").toUpperCase()}</span>
+        </div>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">
+          Coin: {String(resultToast?.outcome || "—").toUpperCase()}
+        </div>
+      </SoloV2ResultPopup>
     </div>
   );
 }
@@ -328,7 +338,7 @@ export default function QuickFlipPage() {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => {
         setResultToast(null);
-      }, 2600);
+      }, 2000);
     });
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
 
@@ -1023,6 +1033,7 @@ export default function QuickFlipPage() {
               ? normalizeQuickFlipServerOutcome(resolvedResult?.outcome)
               : null
           }
+          pickedSide={resolvedResult?.choice || selectedChoice || ""}
         />
       }
       helpContent={

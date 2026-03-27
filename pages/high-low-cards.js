@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
+import SoloV2ResultPopup, {
+  SoloV2ResultPopupVaultLine,
+} from "../components/solo-v2/SoloV2ResultPopup";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
 import {
@@ -420,16 +423,21 @@ export default function HighLowCardsPage() {
         }));
       }
       const delta = Number(settlementSummary.netDelta || 0);
+      const line2 = won
+        ? tr?.terminalKind === "cashout"
+          ? `Cashed out · ${tr?.streak ?? 0} streak · +${formatCompact(payoutReturn)}`
+          : `Run won · ${tr?.streak ?? 0} streak · +${formatCompact(payoutReturn)}`
+        : tr?.lastNextCard?.rank
+          ? `Next card ${tr.lastNextCard.rank}${tr.lastNextCard.suit || "♠"} · streak lost`
+          : "Better luck next run";
       setResultToast({
         isWin: won,
         title: won ? "BANKED" : "RUN OVER",
-        sub: `${delta >= 0 ? "+" : ""}${formatCompact(delta)}`,
-        detail: won
-          ? `${tr?.streak ?? 0} streak · +${formatCompact(payoutReturn)}`
-          : "Better luck next run",
+        line2,
+        vaultDeltaLabel: `${delta >= 0 ? "+" : ""}${formatCompact(delta)}`,
       });
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setResultToast(null), 3800);
+      toastTimerRef.current = setTimeout(() => setResultToast(null), 2000);
     });
   }, [uiState, terminalResult?.settlementSummary, session?.id, terminalResult?.isWin, terminalResult?.streak]);
 
@@ -1066,17 +1074,24 @@ export default function HighLowCardsPage() {
             </div>
           </div>
 
-          {resultToast ? (
-            <div
-              className={`pointer-events-none absolute left-1/2 top-[8%] z-20 w-[88%] max-w-xs -translate-x-1/2 rounded-lg border px-3 py-2 text-center text-xs font-bold ${
-                resultToast.isWin ? "border-emerald-400/40 bg-emerald-800/95" : "border-rose-400/40 bg-rose-900/95"
-              }`}
-            >
-              <div>{resultToast.title}</div>
-              <div className="text-sm">{resultToast.sub}</div>
-              {resultToast.detail ? <div className="mt-1 text-[10px] font-normal opacity-90">{resultToast.detail}</div> : null}
+          <SoloV2ResultPopup
+            open={Boolean(resultToast)}
+            isWin={Boolean(resultToast?.isWin)}
+            animationKey={`${resultToast?.title ?? ""}-${resultToast?.vaultDeltaLabel ?? ""}`}
+            vaultSlot={
+              resultToast ? (
+                <SoloV2ResultPopupVaultLine
+                  isWin={resultToast.isWin}
+                  deltaLabel={resultToast.vaultDeltaLabel}
+                />
+              ) : undefined
+            }
+          >
+            <div className="text-[13px] font-black uppercase tracking-wide">{resultToast?.title}</div>
+            <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">
+              {resultToast?.line2}
             </div>
-          ) : null}
+          </SoloV2ResultPopup>
         </div>
       }
       helpContent={

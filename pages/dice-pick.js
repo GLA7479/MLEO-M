@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DicePickDisplay from "../components/solo-v2/DicePickDisplay";
+import SoloV2ResultPopup, {
+  SoloV2ResultPopupVaultLine,
+} from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
@@ -144,6 +147,7 @@ function DicePickGameplayPanel({
   resolvedRoll,
   resolvedIsWin,
   pickedZone,
+  resultPopupOpen,
 }) {
   const isChoiceLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
   const canChoose = !isRolling && uiState !== UI_STATE.LOADING && !isChoiceLocked;
@@ -151,7 +155,7 @@ function DicePickGameplayPanel({
   const dicePhase = isRolling ? "rolling" : resolvedRoll != null ? "resolved" : "idle";
 
   const showResultPopup =
-    uiState === UI_STATE.RESOLVED &&
+    resultPopupOpen &&
     resolvedRoll != null &&
     typeof resolvedIsWin === "boolean";
 
@@ -184,48 +188,27 @@ function DicePickGameplayPanel({
         </div>
       </div>
 
-      {showResultPopup ? (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-3 py-2">
-          <div
-            key={`${resolvedRoll}-${resolvedIsWin}`}
-            className="w-[88%] max-w-[17.5rem] animate-dice-land-pop"
-            role="status"
-          >
-            <div
-              className={`rounded-xl border px-3.5 py-2.5 text-center shadow-md shadow-black/30 ${
-                resolvedIsWin
-                  ? "border-emerald-400/40 bg-emerald-950/95 text-emerald-50"
-                  : "border-red-400/40 bg-red-950/95 text-red-50"
-              }`}
-            >
-            <div className="text-[13px] font-black uppercase tracking-wide">
-              {resolvedIsWin ? "YOU WIN" : "YOU LOSE"}
-            </div>
-            <div className="mt-1 text-sm font-bold tabular-nums text-white">
-              Rolled <span className="text-amber-100">{resolvedRoll}</span>
-            </div>
-            <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">
-              {formatPickedZoneLine(pickedZone)}
-            </div>
-            <div className="mt-1.5 min-h-[2rem] border-t border-white/10 pt-1.5">
-              {resultToast ? (
-                <div
-                  className={`text-[11px] font-bold tabular-nums ${
-                    resultToast.isWin ? "text-emerald-200" : "text-red-200"
-                  }`}
-                >
-                  Vault {resultToast.deltaLabel}
-                </div>
-              ) : (
-                <div className="invisible text-[11px] font-bold tabular-nums" aria-hidden>
-                  Vault +0
-                </div>
-              )}
-            </div>
-          </div>
-          </div>
+      <SoloV2ResultPopup
+        open={showResultPopup}
+        isWin={resolvedIsWin}
+        animationKey={`${resolvedRoll}-${resolvedIsWin}`}
+        vaultSlot={
+          <SoloV2ResultPopupVaultLine
+            isWin={resolvedIsWin}
+            deltaLabel={resultToast?.deltaLabel}
+          />
+        }
+      >
+        <div className="text-[13px] font-black uppercase tracking-wide">
+          {resolvedIsWin ? "YOU WIN" : "YOU LOSE"}
         </div>
-      ) : null}
+        <div className="mt-1 text-sm font-bold tabular-nums text-white">
+          Rolled <span className="text-amber-100">{resolvedRoll}</span>
+        </div>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">
+          {formatPickedZoneLine(pickedZone)}
+        </div>
+      </SoloV2ResultPopup>
     </div>
   );
 }
@@ -247,6 +230,7 @@ export default function DicePickPage() {
   const lastPresetAmountRef = useRef(null);
   const [stats, setStats] = useState(readDicePickStats);
   const [resultToast, setResultToast] = useState(null);
+  const [dicePickResultPopupOpen, setDicePickResultPopupOpen] = useState(false);
   const toastTimerRef = useRef(null);
   const createInFlightRef = useRef(false);
   const submitInFlightRef = useRef(false);
@@ -297,6 +281,13 @@ export default function DicePickPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (uiState !== UI_STATE.RESOLVED || !resolvedResult?.sessionId) return undefined;
+    setDicePickResultPopupOpen(true);
+    const t = window.setTimeout(() => setDicePickResultPopupOpen(false), 2000);
+    return () => window.clearTimeout(t);
+  }, [uiState, resolvedResult?.sessionId, resolvedResult?.roll, resolvedResult?.isWin, resolvedResult?.resolvedAt]);
 
   /** Clears stale session/round state but keeps wager input so the user can roll again. */
   function recoverStaleRound(message) {
@@ -367,7 +358,7 @@ export default function DicePickPage() {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => {
         setResultToast(null);
-      }, 2600);
+      }, 2000);
     });
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
 
@@ -1078,6 +1069,7 @@ export default function DicePickPage() {
               ? String(resolvedResult.zone).toLowerCase()
               : selectedZone
           }
+          resultPopupOpen={dicePickResultPopupOpen}
         />
       }
       helpContent={

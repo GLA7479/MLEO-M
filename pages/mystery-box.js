@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
+import SoloV2ResultPopup, {
+  SoloV2ResultPopupVaultLine,
+} from "../components/solo-v2/SoloV2ResultPopup";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
 import {
@@ -110,6 +113,7 @@ function MysteryBoxGameplayPanel({
   resultToast,
   onSelectBox,
   winningBoxIndex,
+  pickedBoxIndex,
 }) {
   const isPickLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
   const canPick = !isOpening && uiState !== UI_STATE.LOADING && !isPickLocked;
@@ -161,19 +165,31 @@ function MysteryBoxGameplayPanel({
         </div>
       </div>
 
-      {resultToast ? (
-        <div
-          className={`pointer-events-none absolute left-1/2 top-[10%] z-20 w-[88%] max-w-xs -translate-x-1/2 rounded-lg border px-3 py-2 text-center text-xs font-bold sm:top-[12%] ${
-            resultToast.isWin
-              ? "border-emerald-400/35 bg-emerald-700/90 text-white"
-              : "border-red-400/35 bg-red-700/90 text-white"
-          }`}
-        >
-          <div className="text-[13px]">{resultToast.isWin ? "YOU WIN" : "YOU LOSE"}</div>
-          <div className="text-sm">{resultToast.deltaLabel}</div>
-          <div className="mt-0.5 text-[10px] font-semibold opacity-90">{resultToast.outcomeLabel}</div>
+      <SoloV2ResultPopup
+        open={Boolean(resultToast)}
+        isWin={Boolean(resultToast?.isWin)}
+        animationKey={`${resultToast?.outcomeLabel ?? ""}-${resultToast?.deltaLabel ?? ""}-${pickedBoxIndex ?? ""}`}
+        vaultSlot={
+          resultToast ? (
+            <SoloV2ResultPopupVaultLine isWin={resultToast.isWin} deltaLabel={resultToast.deltaLabel} />
+          ) : undefined
+        }
+      >
+        <div className="text-[13px] font-black uppercase tracking-wide">
+          {resultToast?.isWin ? "YOU WIN" : "YOU LOSE"}
         </div>
-      ) : null}
+        <div className="mt-1 text-sm font-bold text-white">
+          Your pick:{" "}
+          <span className="text-amber-100">
+            {pickedBoxIndex === 0 || pickedBoxIndex === 1 || pickedBoxIndex === 2
+              ? `Box ${boxLabel(pickedBoxIndex)}`
+              : "—"}
+          </span>
+        </div>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">
+          {resultToast?.outcomeLabel ?? "—"}
+        </div>
+      </SoloV2ResultPopup>
     </div>
   );
 }
@@ -308,7 +324,7 @@ export default function MysteryBoxPage() {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => {
         setResultToast(null);
-      }, 2600);
+      }, 2000);
     });
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
 
@@ -1131,6 +1147,11 @@ export default function MysteryBoxPage() {
           resultToast={resultToast}
           onSelectBox={handleSelectBox}
           winningBoxIndex={Number.isFinite(winningBoxResolved) ? winningBoxResolved : null}
+          pickedBoxIndex={
+            resolvedResult?.choice !== null && resolvedResult?.choice !== undefined
+              ? resolvedResult.choice
+              : selectedBox
+          }
         />
       }
       helpContent={
