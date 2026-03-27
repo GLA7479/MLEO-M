@@ -55,17 +55,19 @@ export default function SoloV2TopHud({
         <h1 className="truncate text-base font-extrabold tracking-tight text-white sm:text-lg">{title}</h1>
         {subtitle ? <p className="truncate text-xs text-zinc-400 sm:text-sm">{subtitle}</p> : null}
         {showVault || topGameStatsSlot ? (
-          <div className="mt-0.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[12px] text-zinc-500 sm:text-[14px]">
+          <div
+            className="mt-0.5 flex w-full min-w-0 flex-nowrap items-center justify-center gap-x-1.5 overflow-x-auto overscroll-x-contain whitespace-nowrap text-[13px] leading-tight text-zinc-500 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-x-2 sm:text-[15px] [&::-webkit-scrollbar]:hidden"
+          >
             {showVault ? (
-              <span>
+              <span className="shrink-0">
                 Vault{" "}
-                <span className="font-semibold text-emerald-300/95">
+                <span className="font-semibold tabular-nums text-emerald-300/95">
                   {formatCompactNumber(headerVaultBalance)}
                 </span>
               </span>
             ) : null}
             {showVault && topGameStatsSlot ? (
-              <span className="text-zinc-600" aria-hidden>
+              <span className="shrink-0 text-zinc-600" aria-hidden>
                 ·
               </span>
             ) : null}

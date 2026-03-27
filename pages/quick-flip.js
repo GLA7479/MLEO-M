@@ -993,14 +993,14 @@ export default function QuickFlipPage() {
       }}
       topGameStatsSlot={
         <>
-          <span className="text-zinc-500">
-            Play <span className="font-semibold text-amber-200/90">{formatCompact(numericWager)}</span>
+          <span className="shrink-0 whitespace-nowrap text-zinc-500">
+            Play <span className="font-semibold tabular-nums text-amber-200/90">{formatCompact(numericWager)}</span>
           </span>
-          <span className="text-zinc-600" aria-hidden>
+          <span className="shrink-0 text-zinc-600" aria-hidden>
             ·
           </span>
-          <span className="text-zinc-500">
-            Win <span className="font-semibold text-lime-200/90">{formatCompact(potentialWin)}</span>
+          <span className="shrink-0 whitespace-nowrap text-zinc-500">
+            Win <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(potentialWin)}</span>
           </span>
         </>
       }
