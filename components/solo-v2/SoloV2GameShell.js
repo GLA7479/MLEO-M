@@ -26,6 +26,7 @@ export default function SoloV2GameShell({
   helpContent = null,
   statsContent = null,
   hideStatusPanel = false,
+  hideActionBar = false,
 }) {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
@@ -75,16 +76,18 @@ export default function SoloV2GameShell({
           </div>
         </section>
 
-        <SoloV2ActionBar
-          primaryLabel={primaryActionLabel}
-          secondaryLabel={secondaryActionLabel}
-          onPrimaryAction={onPrimaryAction}
-          onSecondaryAction={onSecondaryAction}
-          primaryDisabled={primaryDisabled}
-          secondaryDisabled={secondaryDisabled}
-          primaryLoading={primaryLoading}
-          showSecondary={showSecondary}
-        />
+        {!hideActionBar ? (
+          <SoloV2ActionBar
+            primaryLabel={primaryActionLabel}
+            secondaryLabel={secondaryActionLabel}
+            onPrimaryAction={onPrimaryAction}
+            onSecondaryAction={onSecondaryAction}
+            primaryDisabled={primaryDisabled}
+            secondaryDisabled={secondaryDisabled}
+            primaryLoading={primaryLoading}
+            showSecondary={showSecondary}
+          />
+        ) : null}
 
         <SoloV2ReservedAdSlot />
       </div>

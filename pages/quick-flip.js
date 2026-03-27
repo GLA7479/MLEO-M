@@ -47,6 +47,66 @@ function buildApiErrorMessage(payload, fallback) {
   return String(payload?.message || "").trim() || fallback;
 }
 
+const STATS_KEY = "solo_v2_quick_flip_stats_v1";
+const BET_PRESETS = [100, 1000, 10000, 100000];
+
+function formatCompact(value) {
+  const num = Number(value) || 0;
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
+  if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K`;
+  return String(Math.floor(num));
+}
+
+function readQuickFlipStats() {
+  if (typeof window === "undefined") {
+    return {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+      headsWins: 0,
+      tailsWins: 0,
+    };
+  }
+  try {
+    const raw = window.localStorage.getItem(STATS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") throw new Error("invalid");
+    return {
+      totalGames: Number(parsed.totalGames || 0),
+      wins: Number(parsed.wins || 0),
+      losses: Number(parsed.losses || 0),
+      totalPlay: Number(parsed.totalPlay || 0),
+      totalWon: Number(parsed.totalWon || 0),
+      biggestWin: Number(parsed.biggestWin || 0),
+      headsWins: Number(parsed.headsWins || 0),
+      tailsWins: Number(parsed.tailsWins || 0),
+    };
+  } catch {
+    return {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+      headsWins: 0,
+      tailsWins: 0,
+    };
+  }
+}
+
+function writeQuickFlipStats(nextStats) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STATS_KEY, JSON.stringify(nextStats));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 function ChoiceButton({ label, value, selectedChoice, disabled, onSelect }) {
   const isSelected = selectedChoice === value;
 
@@ -68,111 +128,162 @@ function ChoiceButton({ label, value, selectedChoice, disabled, onSelect }) {
 
 function QuickFlipPlaceholderPanel({
   uiState,
-  session,
+  vaultBalance,
+  playAmount,
+  potentialWin,
   selectedChoice,
-  eventInfo,
-  resolvedResult,
+  isFlipping,
+  resultToast,
   sessionNotice,
   errorMessage,
+  onPresetAmount,
+  onDecreaseAmount,
+  onIncreaseAmount,
+  onAmountInput,
+  onResetAmount,
   onSelectChoice,
-  onSubmitChoice,
-  onStartNewSession,
+  onPrimaryAction,
+  primaryActionLabel,
+  primaryActionDisabled,
+  primaryActionLoading,
 }) {
-  const sessionStatusLabel = resolvedResult?.sessionStatus || (uiState === UI_STATE.RESOLVED ? "resolved" : session?.sessionStatus || "created");
-  const isBusy = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
-  const isLocked = uiState === UI_STATE.CHOICE_SUBMITTED || uiState === UI_STATE.RESOLVED;
-  const canChoose = Boolean(session?.id) && !isBusy && !isLocked;
-  const canSubmit = Boolean(session?.id) && Boolean(selectedChoice) && !isBusy && !isLocked;
-  const canRestart = [
-    UI_STATE.RESOLVED,
-    UI_STATE.RESOLVE_FAILED,
-    UI_STATE.UNAVAILABLE,
-    UI_STATE.PENDING_MIGRATION,
-  ].includes(uiState);
+  const canChoose = !isFlipping;
+  const canEditPlay = !isFlipping;
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-4 px-3 text-center">
-      <div className="text-6xl leading-none" aria-hidden>
-        🪙
-      </div>
-      <h2 className="text-lg font-bold text-white">Quick Flip</h2>
-      {session ? (
-        <div className="w-full max-w-sm space-y-2 rounded-lg border border-emerald-300/25 bg-emerald-500/10 px-3 py-3 text-left text-xs text-emerald-100">
-          <p className="font-semibold">Session: {sessionStatusLabel}</p>
-          <p>ID: {session.id || "--"}</p>
+    <div className="relative flex h-full min-h-0 flex-col px-3 pb-1 text-center">
+      <div className="mb-2 grid grid-cols-3 gap-2">
+        <div className="rounded-lg border border-white/15 bg-black/30 px-2 py-1.5">
+          <div className="text-[10px] text-zinc-400">Vault</div>
+          <div className="text-sm font-bold text-emerald-300">{formatCompact(vaultBalance)}</div>
         </div>
-      ) : (
-        <p className="max-w-sm text-sm text-zinc-300">Pick a side and let the server resolve the outcome.</p>
-      )}
-      <div className="grid w-full max-w-sm grid-cols-2 gap-2">
-        <ChoiceButton
-          label="Heads"
-          value="heads"
-          selectedChoice={selectedChoice}
-          disabled={!canChoose}
-          onSelect={onSelectChoice}
-        />
-        <ChoiceButton
-          label="Tails"
-          value="tails"
-          selectedChoice={selectedChoice}
-          disabled={!canChoose}
-          onSelect={onSelectChoice}
-        />
+        <div className="rounded-lg border border-white/15 bg-black/30 px-2 py-1.5">
+          <div className="text-[10px] text-zinc-400">Play</div>
+          <div className="text-sm font-bold text-amber-300">{formatCompact(playAmount)}</div>
+        </div>
+        <div className="rounded-lg border border-white/15 bg-black/30 px-2 py-1.5">
+          <div className="text-[10px] text-zinc-400">Win</div>
+          <div className="text-sm font-bold text-lime-300">{formatCompact(potentialWin)}</div>
+        </div>
       </div>
+
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+        <div
+          className={`mb-3 grid h-40 w-40 place-items-center rounded-full border border-amber-300/35 bg-gradient-to-br from-yellow-300/40 to-amber-700/50 text-7xl shadow-[0_0_35px_rgba(251,191,36,0.2)] transition-transform ${
+            isFlipping ? "animate-spin" : ""
+          }`}
+          aria-hidden
+        >
+          🪙
+        </div>
+
+        <div className="grid w-full max-w-md grid-cols-2 gap-2">
+          <ChoiceButton
+            label="Heads"
+            value="heads"
+            selectedChoice={selectedChoice}
+            disabled={!canChoose}
+            onSelect={onSelectChoice}
+          />
+          <ChoiceButton
+            label="Tails"
+            value="tails"
+            selectedChoice={selectedChoice}
+            disabled={!canChoose}
+            onSelect={onSelectChoice}
+          />
+        </div>
+      </div>
+
+      <div className="mb-2 grid w-full max-w-md grid-cols-4 gap-1.5">
+        {BET_PRESETS.map(value => (
+          <button
+            key={value}
+            type="button"
+            disabled={!canEditPlay}
+            onClick={() => onPresetAmount(value)}
+            className={`min-h-[36px] rounded-md border text-xs font-bold ${
+              playAmount === value
+                ? "border-amber-300/60 bg-amber-500/35 text-black"
+                : "border-white/20 bg-white/10 text-white"
+            } ${!canEditPlay ? "cursor-not-allowed opacity-60" : ""}`}
+          >
+            {value >= 1000 ? `${value / 1000}K` : value}
+          </button>
+        ))}
+      </div>
+
+      <div className="mb-2 flex w-full max-w-md items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onDecreaseAmount}
+          disabled={!canEditPlay}
+          className="h-9 w-9 rounded-md border border-white/20 bg-white/10 text-sm font-bold text-white disabled:opacity-50"
+        >
+          -
+        </button>
+        <input
+          type="text"
+          value={String(playAmount)}
+          onChange={e => onAmountInput(e.target.value)}
+          disabled={!canEditPlay}
+          className="h-9 flex-1 rounded-md border border-white/20 bg-black/35 px-2 text-center text-sm font-bold text-white disabled:opacity-50"
+        />
+        <button
+          type="button"
+          onClick={onResetAmount}
+          disabled={!canEditPlay}
+          className="h-9 w-9 rounded-md border border-red-300/30 bg-red-500/20 text-xs font-bold text-red-100 disabled:opacity-50"
+          title="Reset"
+        >
+          ↺
+        </button>
+        <button
+          type="button"
+          onClick={onIncreaseAmount}
+          disabled={!canEditPlay}
+          className="h-9 w-9 rounded-md border border-white/20 bg-white/10 text-sm font-bold text-white disabled:opacity-50"
+        >
+          +
+        </button>
+      </div>
+
       <button
         type="button"
-        disabled={!canSubmit}
-        onClick={onSubmitChoice}
-        className={`min-h-[44px] w-full max-w-sm rounded-lg border px-3 py-2 text-sm font-semibold ${
-          canSubmit
-            ? "border-violet-300/45 bg-violet-500/30 text-white"
-            : "cursor-not-allowed border-white/20 bg-white/5 text-zinc-300 opacity-70"
+        onClick={onPrimaryAction}
+        disabled={primaryActionDisabled || primaryActionLoading}
+        className={`min-h-[52px] w-full max-w-md rounded-lg border px-4 py-3 text-base font-extrabold ${
+          primaryActionDisabled || primaryActionLoading
+            ? "cursor-not-allowed border-white/20 bg-white/10 text-zinc-300 opacity-70"
+            : "border-emerald-300/45 bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg"
         }`}
       >
-        {uiState === UI_STATE.SUBMITTING_CHOICE
-          ? "Submitting..."
-          : uiState === UI_STATE.RESOLVING
-            ? "Resolving..."
-            : "Submit Choice"}
+        {primaryActionLoading ? "FLIPPING..." : primaryActionLabel}
       </button>
-      {eventInfo?.eventId && !resolvedResult && (uiState === UI_STATE.CHOICE_SUBMITTED || uiState === UI_STATE.RESOLVING) ? (
-        <div className="w-full max-w-sm rounded-lg border border-blue-300/25 bg-blue-500/10 px-3 py-2 text-left text-xs text-blue-100">
-          <p className="font-semibold">Choice submitted to server.</p>
-          <p className="text-blue-100/90">Waiting for server result.</p>
-        </div>
-      ) : null}
-      {resolvedResult ? (
-        <div className="w-full max-w-sm rounded-lg border border-violet-300/25 bg-violet-500/10 px-3 py-2 text-left text-xs text-violet-100">
-          <p className="font-semibold">Server outcome resolved.</p>
-          <p>Choice: {String(resolvedResult.choice || "--")}</p>
-          <p>Outcome: {String(resolvedResult.outcome || "--")}</p>
-          <p>Result: {resolvedResult.isWin ? "Match" : "No match"}</p>
-        </div>
-      ) : null}
+
       {sessionNotice ? (
-        <div className="max-w-sm rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs text-zinc-200">
+        <div className="mt-1 max-w-md rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-zinc-200">
           {sessionNotice}
         </div>
       ) : null}
       {errorMessage ? (
-        <div className="max-w-sm rounded-lg border border-red-300/25 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+        <div className="mt-1 max-w-md rounded-lg border border-red-300/25 bg-red-500/10 px-3 py-1.5 text-xs text-red-100">
           {errorMessage}
         </div>
       ) : null}
-      {canRestart ? (
-        <button
-          type="button"
-          onClick={onStartNewSession}
-          disabled={isBusy}
-          className={`min-h-[44px] w-full max-w-sm rounded-lg border px-3 py-2 text-sm font-semibold ${
-            isBusy
-              ? "cursor-not-allowed border-white/20 bg-white/5 text-zinc-300 opacity-70"
-              : "border-emerald-300/40 bg-emerald-500/20 text-emerald-100"
+
+      {resultToast ? (
+        <div
+          className={`pointer-events-none absolute left-1/2 top-8 z-20 w-[85%] max-w-sm -translate-x-1/2 rounded-xl border px-4 py-3 text-center text-sm font-bold shadow-xl ${
+            resultToast.isWin
+              ? "border-emerald-300/40 bg-emerald-600/85 text-white"
+              : "border-red-300/35 bg-red-600/85 text-white"
           }`}
         >
-          Start New Session
-        </button>
+          <div className="text-base">{resultToast.isWin ? "YOU WIN" : "YOU LOSE"}</div>
+          <div className="text-lg">{resultToast.deltaLabel}</div>
+          <div className="text-xs opacity-90">Result: {String(resultToast.outcome || "--").toUpperCase()}</div>
+        </div>
       ) : null}
     </div>
   );
@@ -188,6 +299,10 @@ export default function QuickFlipPage() {
   const [sessionNotice, setSessionNotice] = useState("");
   const [vaultBalance, setVaultBalance] = useState(0);
   const [vaultReady, setVaultReady] = useState(false);
+  const [playAmount, setPlayAmount] = useState(100);
+  const [stats, setStats] = useState(readQuickFlipStats);
+  const [resultToast, setResultToast] = useState(null);
+  const toastTimerRef = useRef(null);
   const createInFlightRef = useRef(false);
   const submitInFlightRef = useRef(false);
   const resolveInFlightRef = useRef(false);
@@ -218,6 +333,18 @@ export default function QuickFlipPage() {
     };
   }, []);
 
+  useEffect(() => {
+    writeQuickFlipStats(stats);
+  }, [stats]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
   function resetForNewAttempt() {
     cycleRef.current += 1;
     createInFlightRef.current = false;
@@ -230,6 +357,7 @@ export default function QuickFlipPage() {
     setResolvedResult(null);
     setSessionNotice("");
     setErrorMessage("");
+    setResultToast(null);
   }
 
   useEffect(() => {
@@ -251,9 +379,40 @@ export default function QuickFlipPage() {
       const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
       if (settlementResult.applied) {
         setSessionNotice(`Settled (${deltaLabel}). Vault: ${authoritativeBalance}.`);
+        setStats(prev => {
+          const entryCost = Number(settlementSummary.entryCost || QUICK_FLIP_CONFIG.entryCost);
+          const payoutReturn = Number(settlementSummary.payoutReturn || 0);
+          return {
+            ...prev,
+            totalGames: Number(prev.totalGames || 0) + 1,
+            wins: Number(prev.wins || 0) + (resolvedResult?.isWin ? 1 : 0),
+            losses: Number(prev.losses || 0) + (resolvedResult?.isWin ? 0 : 1),
+            totalPlay: Number(prev.totalPlay || 0) + entryCost,
+            totalWon: Number(prev.totalWon || 0) + payoutReturn,
+            biggestWin: Math.max(Number(prev.biggestWin || 0), resolvedResult?.isWin ? payoutReturn : 0),
+            headsWins:
+              Number(prev.headsWins || 0) +
+              (resolvedResult?.isWin && String(resolvedResult?.outcome || "") === "heads" ? 1 : 0),
+            tailsWins:
+              Number(prev.tailsWins || 0) +
+              (resolvedResult?.isWin && String(resolvedResult?.outcome || "") === "tails" ? 1 : 0),
+          };
+        });
       } else {
         setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
       }
+
+      const toastDelta = Number(settlementSummary.netDelta || 0);
+      const toastDeltaLabel = toastDelta >= 0 ? `+${toastDelta}` : `${toastDelta}`;
+      setResultToast({
+        isWin: Boolean(resolvedResult?.isWin),
+        deltaLabel: toastDeltaLabel,
+        outcome: resolvedResult?.outcome || null,
+      });
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => {
+        setResultToast(null);
+      }, 2600);
     });
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
 
@@ -397,14 +556,14 @@ export default function QuickFlipPage() {
 
       if (result === API_RESULT.SUCCESS && status === "created" && payload?.session) {
         setSession(payload.session);
-        setSessionNotice("New session created on server.");
+        setSessionNotice("Choose heads or tails, then flip.");
         setUiState(UI_STATE.SESSION_CREATED);
         return;
       }
 
       if (result === API_RESULT.SUCCESS && status === "existing_session" && payload?.session) {
         setSession(payload.session);
-        setSessionNotice("Resumed existing active session.");
+        setSessionNotice("Resumed active round.");
         setUiState(UI_STATE.SESSION_CREATED);
 
         const readResult = await readSessionTruth(payload.session.id, activeCycle);
@@ -456,7 +615,7 @@ export default function QuickFlipPage() {
     setErrorMessage("");
     setEventInfo(null);
     setResolvedResult(null);
-    setSessionNotice("Choice selected. Submit when ready.");
+    setSessionNotice("Ready to flip.");
     setUiState(UI_STATE.CHOICE_SELECTED);
   }
 
@@ -499,7 +658,7 @@ export default function QuickFlipPage() {
             : previous,
         );
         setUiState(UI_STATE.RESOLVED);
-        setSessionNotice(payload?.idempotent ? "Server returned existing resolved result." : "Server resolved this session.");
+        setSessionNotice(payload?.idempotent ? "Round already resolved." : "Round resolved.");
         return;
       }
 
@@ -564,9 +723,9 @@ export default function QuickFlipPage() {
         });
         setUiState(UI_STATE.CHOICE_SUBMITTED);
         if (payload?.idempotent) {
-          setSessionNotice("Same choice was already accepted. Continuing to resolve.");
+          setSessionNotice("Choice already accepted. Resolving...");
         } else {
-          setSessionNotice("Choice accepted by server. Resolving outcome.");
+          setSessionNotice("Flipping...");
         }
         await handleResolveSession();
         return;
@@ -642,17 +801,43 @@ export default function QuickFlipPage() {
     !resolveInFlightRef.current &&
     vaultReady &&
     vaultBalance >= QUICK_FLIP_CONFIG.entryCost;
-  const primaryActionLabel =
-    uiState === UI_STATE.IDLE
-      ? `Start Session (${QUICK_FLIP_CONFIG.entryCost})`
-      : canStartSession
-        ? `Start New Session (${QUICK_FLIP_CONFIG.entryCost})`
-        : "Session Ready";
+
+  const canFlipNow =
+    Boolean(session?.id) &&
+    Boolean(selectedChoice) &&
+    !submitInFlightRef.current &&
+    !resolveInFlightRef.current &&
+    !createInFlightRef.current &&
+    ![UI_STATE.RESOLVED, UI_STATE.LOADING, UI_STATE.SUBMITTING_CHOICE, UI_STATE.RESOLVING].includes(uiState);
+
+  const isPrimaryLoading =
+    uiState === UI_STATE.LOADING || uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
+
+  const primaryActionLabel = canFlipNow ? "FLIP COIN" : canStartSession ? "START ROUND" : "FLIP COIN";
+
+  function clampPlayAmount(value) {
+    const parsed = Math.floor(Number(value) || 0);
+    return Math.max(100, parsed);
+  }
+
+  function handlePrimaryCta() {
+    if (canFlipNow) {
+      handleSubmitChoice();
+      return;
+    }
+    if (canStartSession) {
+      handleStartSession();
+      return;
+    }
+    if ([UI_STATE.RESOLVED, UI_STATE.RESOLVE_FAILED, UI_STATE.UNAVAILABLE, UI_STATE.PENDING_MIGRATION].includes(uiState)) {
+      resetForNewAttempt();
+    }
+  }
 
   return (
     <SoloV2GameShell
       title="Quick Flip"
-      subtitle="Solo V2 reference game"
+      subtitle="Arcade Solo"
       balanceLabel="Vault"
       balanceValue={String(vaultBalance)}
       hideStatusPanel
@@ -662,49 +847,58 @@ export default function QuickFlipPage() {
       gameplaySlot={
         <QuickFlipPlaceholderPanel
           uiState={uiState}
-          session={session}
+          vaultBalance={vaultBalance}
+          playAmount={playAmount}
+          potentialWin={Math.floor(playAmount * 1.92)}
           selectedChoice={selectedChoice}
-          eventInfo={eventInfo}
-          resolvedResult={resolvedResult}
+          isFlipping={uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING}
+          resultToast={resultToast}
           sessionNotice={sessionNotice}
           errorMessage={errorMessage}
+          onPresetAmount={value => setPlayAmount(value)}
+          onDecreaseAmount={() => setPlayAmount(current => clampPlayAmount(current - 100))}
+          onIncreaseAmount={() => setPlayAmount(current => clampPlayAmount(current + 1000))}
+          onAmountInput={raw => setPlayAmount(clampPlayAmount(String(raw).replace(/[^0-9]/g, "")))}
+          onResetAmount={() => setPlayAmount(100)}
           onSelectChoice={handleSelectChoice}
-          onSubmitChoice={handleSubmitChoice}
-          onStartNewSession={resetForNewAttempt}
+          onPrimaryAction={handlePrimaryCta}
+          primaryActionLabel={primaryActionLabel}
+          primaryActionDisabled={!canFlipNow && !canStartSession}
+          primaryActionLoading={isPrimaryLoading}
         />
       }
-      primaryActionLabel={primaryActionLabel}
-      secondaryActionLabel="Back to Lobby"
-      primaryDisabled={!canStartSession}
+      primaryActionLabel=""
+      secondaryActionLabel=""
+      primaryDisabled
       secondaryDisabled={false}
-      primaryLoading={
-        uiState === UI_STATE.LOADING || uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING
-      }
-      onPrimaryAction={handleStartSession}
+      primaryLoading={false}
+      showSecondary={false}
+      onPrimaryAction={() => {}}
       onSecondaryAction={() => {
         if (typeof window !== "undefined") window.location.href = "/arcade-v2";
       }}
       helpContent={
         <div className="space-y-2">
-          <p>Pick heads or tails and confirm your choice.</p>
-          <p>The server generates and validates the final outcome.</p>
-          <p>Settlement updates the shared player vault once per resolved session.</p>
+          <p>1. Choose Heads or Tails.</p>
+          <p>2. Set your play amount and press FLIP COIN.</p>
+          <p>3. If your side matches the result, you win.</p>
+          <p>Win ratio is x1.92 per round in this release.</p>
+          <p>Result is server-resolved before vault settlement is applied.</p>
         </div>
       }
       statsContent={
         <div className="space-y-2">
-          <p>Quick Flip stats will appear after server-backed sessions are enabled.</p>
-          <p>Plays, wins, losses, reward totals, and last played will be shown here.</p>
+          <p>Total games: {stats.totalGames}</p>
+          <p>Win rate: {stats.totalGames ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : "0.0"}%</p>
+          <p>Total play: {formatCompact(stats.totalPlay)}</p>
+          <p>Total won: {formatCompact(stats.totalWon)}</p>
+          <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
+          <p>Net profit: {formatCompact(stats.totalWon - stats.totalPlay)}</p>
+          <p>Heads wins: {stats.headsWins} | Tails wins: {stats.tailsWins}</p>
         </div>
       }
-      resultState={{
-        title: uiState === UI_STATE.RESOLVED ? "Server Result" : "Result Pending",
-        message:
-          uiState === UI_STATE.RESOLVED
-            ? `Choice: ${String(resolvedResult?.choice || "--")} | Outcome: ${String(resolvedResult?.outcome || "--")}`
-            : "Result pending.",
-        tone: uiState === UI_STATE.RESOLVED ? "resolved_server_authoritative" : "neutral",
-      }}
+      resultState={null}
+      hideActionBar
     />
   );
 }
