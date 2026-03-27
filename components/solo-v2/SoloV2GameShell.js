@@ -1,10 +1,22 @@
 import { useState } from "react";
 import SoloV2ActionBar from "./SoloV2ActionBar";
+import SoloV2GameFooter from "./SoloV2GameFooter";
 import SoloV2Modal from "./SoloV2Modal";
 import SoloV2ReservedAdSlot from "./SoloV2ReservedAdSlot";
 import SoloV2StatusPanel from "./SoloV2StatusPanel";
 import SoloV2TopHud from "./SoloV2TopHud";
 import SoloV2GameUserMenuContent from "./SoloV2GameUserMenuContent";
+
+const DEFAULT_GIFT = {
+  giftCount: 0,
+  giftMax: 5,
+  giftEnabled: true,
+  giftLoading: false,
+  onGiftClick: () => {},
+  giftTitle: "Gifts",
+  giftNextGiftAt: null,
+  giftRegenMs: null,
+};
 
 export default function SoloV2GameShell({
   title,
@@ -27,11 +39,19 @@ export default function SoloV2GameShell({
   hideStatusPanel = false,
   hideActionBar = false,
   menuVaultBalance = 0,
+  /** Game-specific row under title (Play / Win, etc.). Vault is rendered by the shell when menuVaultBalance is set. */
+  topGameStatsSlot = null,
+  /** Gift control props; merged with defaults. Pass from useSoloV2GiftShellState + overrides. */
+  gift = null,
+  /** When set, renders shared wager + CTA footer above the ad slot (Solo V2 master layout). */
+  soloV2Footer = null,
 }) {
   const [infoTab, setInfoTab] = useState("help");
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isResultOpen, setIsResultOpen] = useState(false);
+
+  const giftProps = { ...DEFAULT_GIFT, ...(gift && typeof gift === "object" ? gift : {}) };
 
   function openInfo() {
     setInfoTab("help");
@@ -55,6 +75,16 @@ export default function SoloV2GameShell({
           onBack={onBack}
           onOpenInfo={openInfo}
           onOpenMenu={() => setIsMenuOpen(true)}
+          headerVaultBalance={menuVaultBalance}
+          topGameStatsSlot={topGameStatsSlot}
+          giftCount={giftProps.giftCount}
+          giftMax={giftProps.giftMax}
+          giftEnabled={giftProps.giftEnabled}
+          giftLoading={giftProps.giftLoading}
+          onGiftClick={giftProps.onGiftClick}
+          giftTitle={giftProps.giftTitle}
+          giftNextGiftAt={giftProps.giftNextGiftAt}
+          giftRegenMs={giftProps.giftRegenMs}
           rightSlot={
             resultState ? (
               <button
@@ -76,7 +106,9 @@ export default function SoloV2GameShell({
           </div>
         </section>
 
-        {!hideActionBar ? (
+        {soloV2Footer ? <SoloV2GameFooter {...soloV2Footer} /> : null}
+
+        {!soloV2Footer && !hideActionBar ? (
           <SoloV2ActionBar
             primaryLabel={primaryActionLabel}
             secondaryLabel={secondaryActionLabel}

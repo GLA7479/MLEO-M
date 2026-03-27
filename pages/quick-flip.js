@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
+import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
+import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
 import { QUICK_FLIP_CONFIG, QUICK_FLIP_MIN_WAGER, QUICK_FLIP_WIN_MULTIPLIER } from "../lib/solo-v2/quickFlipConfig";
 import {
   applyQuickFlipSettlementOnce,
@@ -78,13 +80,6 @@ function parseWagerInput(raw) {
   return Math.min(MAX_WAGER, Math.max(0, n));
 }
 
-function formatCompact(value) {
-  const num = Number(value) || 0;
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(2)}M`;
-  if (num >= 1_000) return `${(num / 1_000).toFixed(2)}K`;
-  return String(Math.floor(num));
-}
-
 function readQuickFlipStats() {
   if (typeof window === "undefined") {
     return {
@@ -154,53 +149,14 @@ function ChoiceButton({ label, value, selectedChoice, disabled, onSelect }) {
   );
 }
 
-function QuickFlipPlaceholderPanel({
-  session,
-  uiState,
-  vaultBalance,
-  wagerInput,
-  potentialWin,
-  selectedChoice,
-  isFlipping,
-  resultToast,
-  errorMessage,
-  onPresetAmount,
-  onDecreaseAmount,
-  onIncreaseAmount,
-  onAmountInput,
-  onResetAmount,
-  onSelectChoice,
-  onPrimaryAction,
-  primaryActionLabel,
-  primaryActionDisabled,
-  primaryActionLoading,
-}) {
+/** Center gameplay only — shell owns header stats, wager row, CTA, ad slot. */
+function QuickFlipGameplayPanel({ uiState, selectedChoice, isFlipping, resultToast, onSelectChoice }) {
   const isChoiceLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
   const canChoose =
     !isFlipping && uiState !== UI_STATE.LOADING && !isChoiceLocked;
-  const canEditPlay = !isFlipping;
-  const wagerNumeric = parseWagerInput(wagerInput);
 
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col px-2 pt-1 text-center sm:max-w-lg">
-      <div className="mb-1.5 flex w-full shrink-0 flex-wrap items-center justify-center gap-x-2.5 gap-y-0.5 text-xs sm:text-[13px]">
-        <span className="text-zinc-500">
-          Vault <span className="font-semibold text-emerald-300/95">{formatCompact(vaultBalance)}</span>
-        </span>
-        <span className="text-zinc-600" aria-hidden>
-          ·
-        </span>
-        <span className="text-zinc-500">
-          Play <span className="font-semibold text-amber-200/90">{formatCompact(wagerNumeric)}</span>
-        </span>
-        <span className="text-zinc-600" aria-hidden>
-          ·
-        </span>
-        <span className="text-zinc-500">
-          Win <span className="font-semibold text-lime-200/90">{formatCompact(potentialWin)}</span>
-        </span>
-      </div>
-
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3 sm:py-5">
           <div
@@ -230,74 +186,6 @@ function QuickFlipPlaceholderPanel({
               onSelect={onSelectChoice}
             />
           </div>
-
-          <div className="flex h-9 w-full min-w-0 flex-nowrap items-stretch gap-1 sm:h-10 sm:gap-1.5">
-            {BET_PRESETS.map(value => (
-              <button
-                key={value}
-                type="button"
-                disabled={!canEditPlay}
-                onClick={() => onPresetAmount(value)}
-                className={`min-h-0 min-w-0 flex-1 basis-0 rounded-md border px-1 py-1.5 text-[10px] font-bold leading-none sm:px-2 sm:text-xs ${
-                  wagerNumeric === value
-                    ? "border-amber-400/55 bg-amber-500/30 text-amber-50"
-                    : "border-white/20 bg-white/[0.07] text-zinc-100"
-                } ${!canEditPlay ? "cursor-not-allowed opacity-60" : ""}`}
-              >
-                {value >= 1000 ? `${value / 1000}K` : String(value)}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={onDecreaseAmount}
-              disabled={!canEditPlay}
-              className="h-full w-9 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:w-10"
-            >
-              −
-            </button>
-            <input
-              type="text"
-              inputMode="numeric"
-              value={wagerInput}
-              onChange={e => onAmountInput(e.target.value)}
-              disabled={!canEditPlay}
-              className="h-full min-w-0 flex-[1.15] rounded-md border border-white/20 bg-black/40 px-1.5 text-center text-[11px] font-bold text-white disabled:opacity-50 sm:min-w-[4.5rem] sm:text-sm"
-            />
-            <button
-              type="button"
-              onClick={onResetAmount}
-              disabled={!canEditPlay}
-              className="h-full w-9 shrink-0 rounded-md border border-red-400/35 bg-red-500/15 text-[11px] font-bold text-red-100 disabled:opacity-50 sm:w-10"
-              title="Reset"
-            >
-              ↺
-            </button>
-            <button
-              type="button"
-              onClick={onIncreaseAmount}
-              disabled={!canEditPlay}
-              className="h-full w-9 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:w-10"
-            >
-              +
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={onPrimaryAction}
-            disabled={primaryActionDisabled || primaryActionLoading}
-            className={`min-h-[48px] w-full rounded-lg border px-4 py-2.5 text-base font-extrabold tracking-wide ${
-              primaryActionDisabled || primaryActionLoading
-                ? "cursor-not-allowed border-white/20 bg-white/10 text-zinc-400 opacity-70"
-                : "border-emerald-400/40 bg-gradient-to-r from-emerald-600 to-green-600 text-white"
-            }`}
-          >
-            {primaryActionLoading ? "FLIPPING..." : primaryActionLabel}
-          </button>
-
-          {errorMessage ? (
-            <p className="text-[11px] leading-snug text-red-300/95">{errorMessage}</p>
-          ) : null}
         </div>
       </div>
 
@@ -321,6 +209,7 @@ function QuickFlipPlaceholderPanel({
 }
 
 export default function QuickFlipPage() {
+  const giftShell = useSoloV2GiftShellState();
   const [uiState, setUiState] = useState(UI_STATE.IDLE);
   const [session, setSession] = useState(null);
   const [selectedChoice, setSelectedChoice] = useState("");
@@ -991,67 +880,78 @@ export default function QuickFlipPage() {
     }
   }
 
+  const isFlipping = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
+  const potentialWin = Math.floor(numericWager * QUICK_FLIP_WIN_MULTIPLIER);
+
   return (
     <SoloV2GameShell
       title="Quick Flip"
       subtitle="Arcade Solo"
       menuVaultBalance={vaultBalance}
+      gift={giftShell}
       hideStatusPanel
+      hideActionBar
       onBack={() => {
         if (typeof window !== "undefined") window.location.href = "/arcade-v2";
       }}
+      topGameStatsSlot={
+        <>
+          <span className="text-zinc-500">
+            Play <span className="font-semibold text-amber-200/90">{formatCompact(numericWager)}</span>
+          </span>
+          <span className="text-zinc-600" aria-hidden>
+            ·
+          </span>
+          <span className="text-zinc-500">
+            Win <span className="font-semibold text-lime-200/90">{formatCompact(potentialWin)}</span>
+          </span>
+        </>
+      }
+      soloV2Footer={{
+        betPresets: BET_PRESETS,
+        wagerInput,
+        wagerNumeric: numericWager,
+        canEditPlay: !isFlipping,
+        onPresetAmount: handlePresetClick,
+        onDecreaseAmount: () => {
+          clearPresetChain();
+          setWagerInput(prev => {
+            const c = parseWagerInput(prev);
+            const next = Math.min(MAX_WAGER, Math.max(0, c - QUICK_FLIP_MIN_WAGER));
+            return String(next);
+          });
+        },
+        onIncreaseAmount: () => {
+          clearPresetChain();
+          setWagerInput(prev => {
+            const c = parseWagerInput(prev);
+            return String(Math.min(MAX_WAGER, c + 1000));
+          });
+        },
+        onAmountInput: raw => {
+          clearPresetChain();
+          setWagerInput(String(raw).replace(/\D/g, "").slice(0, 12));
+        },
+        onResetAmount: () => {
+          clearPresetChain();
+          setWagerInput(String(QUICK_FLIP_MIN_WAGER));
+        },
+        primaryActionLabel,
+        primaryActionDisabled: !canFlipCoin,
+        primaryActionLoading: isPrimaryLoading,
+        primaryLoadingLabel: "FLIPPING...",
+        onPrimaryAction: handlePrimaryCta,
+        errorMessage,
+      }}
       gameplaySlot={
-        <QuickFlipPlaceholderPanel
-          session={session}
+        <QuickFlipGameplayPanel
           uiState={uiState}
-          vaultBalance={vaultBalance}
-          wagerInput={wagerInput}
-          potentialWin={Math.floor(parseWagerInput(wagerInput) * QUICK_FLIP_WIN_MULTIPLIER)}
           selectedChoice={selectedChoice}
-          isFlipping={uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING}
+          isFlipping={isFlipping}
           resultToast={resultToast}
-          errorMessage={errorMessage}
-          onPresetAmount={handlePresetClick}
-          onDecreaseAmount={() => {
-            clearPresetChain();
-            setWagerInput(prev => {
-              const c = parseWagerInput(prev);
-              const next = Math.min(MAX_WAGER, Math.max(0, c - QUICK_FLIP_MIN_WAGER));
-              return String(next);
-            });
-          }}
-          onIncreaseAmount={() => {
-            clearPresetChain();
-            setWagerInput(prev => {
-              const c = parseWagerInput(prev);
-              return String(Math.min(MAX_WAGER, c + 1000));
-            });
-          }}
-          onAmountInput={raw => {
-            clearPresetChain();
-            setWagerInput(String(raw).replace(/\D/g, "").slice(0, 12));
-          }}
-          onResetAmount={() => {
-            clearPresetChain();
-            setWagerInput(String(QUICK_FLIP_MIN_WAGER));
-          }}
           onSelectChoice={handleSelectChoice}
-          onPrimaryAction={handlePrimaryCta}
-          primaryActionLabel={primaryActionLabel}
-          primaryActionDisabled={!canFlipCoin}
-          primaryActionLoading={isPrimaryLoading}
         />
       }
-      primaryActionLabel=""
-      secondaryActionLabel=""
-      primaryDisabled
-      secondaryDisabled={false}
-      primaryLoading={false}
-      showSecondary={false}
-      onPrimaryAction={() => {}}
-      onSecondaryAction={() => {
-        if (typeof window !== "undefined") window.location.href = "/arcade-v2";
-      }}
       helpContent={
         <div className="space-y-2">
           <p>1. Choose Heads or Tails.</p>
@@ -1073,7 +973,6 @@ export default function QuickFlipPage() {
         </div>
       }
       resultState={null}
-      hideActionBar
     />
   );
 }
