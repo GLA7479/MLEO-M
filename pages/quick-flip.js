@@ -136,7 +136,7 @@ function QuickFlipPlaceholderPanel({
             ? "Resolving..."
             : "Submit Choice"}
       </button>
-      {eventInfo?.eventId ? (
+      {eventInfo?.eventId && !resolvedResult && (uiState === UI_STATE.CHOICE_SUBMITTED || uiState === UI_STATE.RESOLVING) ? (
         <div className="w-full max-w-sm rounded-lg border border-blue-300/25 bg-blue-500/10 px-3 py-2 text-left text-xs text-blue-100">
           <p className="font-semibold">Choice submitted to server.</p>
           <p className="text-blue-100/90">Waiting for server result.</p>
@@ -488,6 +488,7 @@ export default function QuickFlipPage() {
 
       if (result === API_RESULT.SUCCESS && status === "resolved" && payload?.result) {
         setResolvedResult(payload.result);
+        setEventInfo(null);
         setSession(previous =>
           previous
             ? {
