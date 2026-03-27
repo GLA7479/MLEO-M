@@ -1397,7 +1397,7 @@ BEGIN
   );
 
   v_ore_gain := ((v_quarry * v_quarry_mode) * 1.35) * v_ore_mult;
-  v_gold_gain := ((v_trade * v_trade_mode) * 0.54) * v_gold_mult;
+  v_gold_gain := ((v_trade * v_trade_mode) * 0.432) * v_gold_mult;
   v_scrap_gain := ((v_salvage * v_salvage_mode) * 0.50) * v_scrap_mult;
   v_data_gain :=
       (((v_miner * v_miner_mode) * 0.14)

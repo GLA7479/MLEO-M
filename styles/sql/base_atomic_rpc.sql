@@ -601,7 +601,7 @@ BEGIN
   v_building_config := '{
     "hq": {"baseCost": {"GOLD": 80, "ORE": 40}, "growth": 1.18, "maxLevel": null, "requires": []},
     "quarry": {"baseCost": {"GOLD": 60}, "growth": 1.18, "maxLevel": null, "requires": []},
-    "tradeHub": {"baseCost": {"GOLD": 100, "ORE": 30}, "growth": 1.2, "maxLevel": null, "requires": [{"key":"quarry","lvl":1}]},
+    "tradeHub": {"baseCost": {"GOLD": 130, "ORE": 39}, "growth": 1.2, "maxLevel": null, "requires": [{"key":"quarry","lvl":1}]},
     "salvage": {"baseCost": {"GOLD": 150, "ORE": 90}, "growth": 1.22, "maxLevel": null, "requires": [{"key":"quarry","lvl":2}]},
     "refinery": {"baseCost": {"GOLD": 280, "ORE": 180, "SCRAP": 35}, "growth": 1.25, "maxLevel": null, "requires": [{"key":"salvage","lvl":1},{"key":"tradeHub","lvl":1}]},
     "powerCell": {"baseCost": {"GOLD": 190, "ORE": 70, "SCRAP": 55}, "growth": 1.22, "maxLevel": null, "requires": [{"key":"tradeHub","lvl":1}]},

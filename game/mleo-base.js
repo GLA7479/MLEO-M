@@ -153,6 +153,11 @@ const SHIP_READY_BANKED_THRESHOLD = 100;
 /** Interval for merging server BASE state via `getBaseState` (see `MleoBase` poll `useEffect`). */
 const BASE_STATE_POLL_MS = 5000;
 
+/** Per-second GOLD from Trade Hub before `goldMult` — must match `BUILDINGS` + `base_server_authority.sql` `v_gold_gain`. */
+const TRADE_HUB_GOLD_PER_SECOND = Number(
+  BUILDINGS.find((b) => b.key === "tradeHub")?.outputs?.GOLD ?? 0.48
+);
+
 function worldLaneToneClass(laneKey) {
   if (laneKey === "open") {
     return "border-emerald-400/30 bg-emerald-500/[0.10] text-emerald-100";
@@ -329,7 +334,7 @@ function getBuildingNowNextLines(state, derived, buildingKey, bankedSnapshot) {
     const modeFactor = getBuildingPowerFactor(s, "tradeHub");
     const eff = baseLv * modeFactor;
     if (!eff) return 0;
-    return 0.6 * eff * Number(d?.goldMult || 1) * 3600;
+    return TRADE_HUB_GOLD_PER_SECOND * eff * Number(d?.goldMult || 1) * 3600;
   };
 
   const tradeEnergyBlocked = (s, d, baseLv) => {
@@ -2821,7 +2826,7 @@ function simulate(state, elapsedMs, efficiency = 1) {
     const energyNeed = 0.78 * level * dt * (d.energyUseMult || 1);
     if (next.resources.ENERGY < energyNeed) return;
     next.resources.ENERGY -= energyNeed;
-    next.resources.GOLD += 0.60 * level * d.goldMult * effective;
+    next.resources.GOLD += TRADE_HUB_GOLD_PER_SECOND * level * d.goldMult * effective;
   });
 
   runBuilding("salvage", (level) => {

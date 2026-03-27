@@ -45,10 +45,10 @@ export const BUILDINGS = [
     key: "tradeHub",
     name: "Trade Hub",
     desc: "Keeps the base liquid with steady Gold income.",
-    baseCost: { GOLD: 100, ORE: 30 },
+    baseCost: { GOLD: 130, ORE: 39 },
     growth: 1.2,
     energyUse: 0.78,
-    outputs: { GOLD: 0.60 },
+    outputs: { GOLD: 0.48 },
     requires: [{ key: "quarry", lvl: 1 }],
   },
   {
