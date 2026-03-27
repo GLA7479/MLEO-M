@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
-import { QUICK_FLIP_CONFIG } from "../lib/solo-v2/quickFlipConfig";
+import { QUICK_FLIP_CONFIG, QUICK_FLIP_MIN_WAGER, QUICK_FLIP_WIN_MULTIPLIER } from "../lib/solo-v2/quickFlipConfig";
 import {
   applyQuickFlipSettlementOnce,
   readQuickFlipSharedVaultBalance,
@@ -48,7 +48,17 @@ function buildApiErrorMessage(payload, fallback) {
 }
 
 const STATS_KEY = "solo_v2_quick_flip_stats_v1";
-const BET_PRESETS = [100, 1000, 10000, 100000];
+const BET_PRESETS = [25, 100, 1000, 10000];
+const MAX_WAGER = 1_000_000_000;
+
+/** Parsed numeric wager from the amount field (0 if empty/invalid). No minimum — playability is gated separately. */
+function parseWagerInput(raw) {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  if (!digits) return 0;
+  const n = Math.floor(Number(digits));
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(MAX_WAGER, Math.max(0, n));
+}
 
 function formatCompact(value) {
   const num = Number(value) || 0;
@@ -128,7 +138,7 @@ function ChoiceButton({ label, value, selectedChoice, disabled, onSelect }) {
 
 function QuickFlipPlaceholderPanel({
   vaultBalance,
-  playAmount,
+  wagerInput,
   potentialWin,
   selectedChoice,
   isFlipping,
@@ -147,6 +157,7 @@ function QuickFlipPlaceholderPanel({
 }) {
   const canChoose = !isFlipping;
   const canEditPlay = !isFlipping;
+  const wagerNumeric = parseWagerInput(wagerInput);
 
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col px-2 pt-1 text-center sm:max-w-lg">
@@ -158,7 +169,7 @@ function QuickFlipPlaceholderPanel({
           ·
         </span>
         <span className="text-zinc-500">
-          Play <span className="font-semibold text-amber-200/90">{formatCompact(playAmount)}</span>
+          Play <span className="font-semibold text-amber-200/90">{formatCompact(wagerNumeric)}</span>
         </span>
         <span className="text-zinc-600" aria-hidden>
           ·
@@ -181,7 +192,7 @@ function QuickFlipPlaceholderPanel({
         </div>
 
         <div className="w-full shrink-0 space-y-2.5 pb-2 sm:space-y-3 sm:pb-3">
-          <div className="mx-auto grid w-full max-w-xs grid-cols-2 gap-2 sm:max-w-sm">
+          <div className="grid w-full grid-cols-2 gap-2">
             <ChoiceButton
               label="Heads"
               value="heads"
@@ -198,8 +209,7 @@ function QuickFlipPlaceholderPanel({
             />
           </div>
 
-          <div className="flex w-full justify-center">
-            <div className="inline-flex max-w-full flex-nowrap items-stretch justify-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="w-full flex flex-nowrap items-stretch gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {BET_PRESETS.map(value => (
                 <button
                   key={value}
@@ -207,12 +217,12 @@ function QuickFlipPlaceholderPanel({
                   disabled={!canEditPlay}
                   onClick={() => onPresetAmount(value)}
                   className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold leading-none sm:px-2.5 sm:text-xs ${
-                    playAmount === value
+                    wagerNumeric === value
                       ? "border-amber-400/55 bg-amber-500/30 text-amber-50"
                       : "border-white/20 bg-white/[0.07] text-zinc-100"
                   } ${!canEditPlay ? "cursor-not-allowed opacity-60" : ""}`}
                 >
-                  {value >= 1000 ? `${value / 1000}K` : value}
+                  {value >= 1000 ? `${value / 1000}K` : String(value)}
                 </button>
               ))}
               <button
@@ -226,7 +236,7 @@ function QuickFlipPlaceholderPanel({
               <input
                 type="text"
                 inputMode="numeric"
-                value={String(playAmount)}
+                value={wagerInput}
                 onChange={e => onAmountInput(e.target.value)}
                 disabled={!canEditPlay}
                 className="h-8 min-w-[4.25rem] max-w-[5.5rem] shrink-0 rounded-md border border-white/20 bg-black/40 px-1 text-center text-[11px] font-bold text-white disabled:opacity-50 sm:h-9 sm:min-w-[5rem] sm:text-sm"
@@ -248,7 +258,6 @@ function QuickFlipPlaceholderPanel({
               >
                 +
               </button>
-            </div>
           </div>
 
           <button
@@ -299,7 +308,8 @@ export default function QuickFlipPage() {
   const [, setSessionNotice] = useState("");
   const [vaultBalance, setVaultBalance] = useState(0);
   const [vaultReady, setVaultReady] = useState(false);
-  const [playAmount, setPlayAmount] = useState(100);
+  const [wagerInput, setWagerInput] = useState(String(QUICK_FLIP_MIN_WAGER));
+  const lastPresetAmountRef = useRef(null);
   const [stats, setStats] = useState(readQuickFlipStats);
   const [resultToast, setResultToast] = useState(null);
   const toastTimerRef = useRef(null);
@@ -350,6 +360,7 @@ export default function QuickFlipPage() {
     createInFlightRef.current = false;
     submitInFlightRef.current = false;
     resolveInFlightRef.current = false;
+    lastPresetAmountRef.current = null;
     setUiState(UI_STATE.IDLE);
     setSession(null);
     setSelectedChoice("");
@@ -519,9 +530,11 @@ export default function QuickFlipPage() {
       setSessionNotice("");
       return;
     }
-    if (vaultBalance < QUICK_FLIP_CONFIG.entryCost) {
+    const wager = parseWagerInput(wagerInput);
+    if (wager < QUICK_FLIP_MIN_WAGER) return;
+    if (vaultBalance < wager) {
       setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage(`Insufficient vault balance. Need ${QUICK_FLIP_CONFIG.entryCost} to start.`);
+      setErrorMessage(`Insufficient vault balance. Need ${wager} to start this round.`);
       setSessionNotice("");
       return;
     }
@@ -545,7 +558,7 @@ export default function QuickFlipPage() {
         body: JSON.stringify({
           gameKey: "quick_flip",
           sessionMode: "standard",
-          entryAmount: 0,
+          entryAmount: wager,
         }),
       });
 
@@ -788,6 +801,7 @@ export default function QuickFlipPage() {
     }
   }
 
+  const numericWager = parseWagerInput(wagerInput);
   const canStartSession =
     [
       UI_STATE.IDLE,
@@ -800,7 +814,8 @@ export default function QuickFlipPage() {
     !submitInFlightRef.current &&
     !resolveInFlightRef.current &&
     vaultReady &&
-    vaultBalance >= QUICK_FLIP_CONFIG.entryCost;
+    numericWager >= QUICK_FLIP_MIN_WAGER &&
+    vaultBalance >= numericWager;
 
   const canFlipNow =
     Boolean(session?.id) &&
@@ -815,9 +830,23 @@ export default function QuickFlipPage() {
 
   const primaryActionLabel = canFlipNow ? "FLIP COIN" : canStartSession ? "START ROUND" : "FLIP COIN";
 
-  function clampPlayAmount(value) {
-    const parsed = Math.floor(Number(value) || 0);
-    return Math.max(100, parsed);
+  function handlePresetClick(presetValue) {
+    const v = Number(presetValue);
+    if (!Number.isFinite(v) || !BET_PRESETS.includes(v)) return;
+    const last = lastPresetAmountRef.current;
+    if (last === v) {
+      setWagerInput(prev => {
+        const current = parseWagerInput(prev);
+        return String(Math.min(MAX_WAGER, current + v));
+      });
+      return;
+    }
+    lastPresetAmountRef.current = v;
+    setWagerInput(String(v));
+  }
+
+  function clearPresetChain() {
+    lastPresetAmountRef.current = null;
   }
 
   function handlePrimaryCta() {
@@ -846,17 +875,36 @@ export default function QuickFlipPage() {
       gameplaySlot={
         <QuickFlipPlaceholderPanel
           vaultBalance={vaultBalance}
-          playAmount={playAmount}
-          potentialWin={Math.floor(playAmount * 1.92)}
+          wagerInput={wagerInput}
+          potentialWin={Math.floor(parseWagerInput(wagerInput) * QUICK_FLIP_WIN_MULTIPLIER)}
           selectedChoice={selectedChoice}
           isFlipping={uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING}
           resultToast={resultToast}
           errorMessage={errorMessage}
-          onPresetAmount={value => setPlayAmount(value)}
-          onDecreaseAmount={() => setPlayAmount(current => clampPlayAmount(current - 100))}
-          onIncreaseAmount={() => setPlayAmount(current => clampPlayAmount(current + 1000))}
-          onAmountInput={raw => setPlayAmount(clampPlayAmount(String(raw).replace(/[^0-9]/g, "")))}
-          onResetAmount={() => setPlayAmount(100)}
+          onPresetAmount={handlePresetClick}
+          onDecreaseAmount={() => {
+            clearPresetChain();
+            setWagerInput(prev => {
+              const c = parseWagerInput(prev);
+              const next = Math.min(MAX_WAGER, Math.max(0, c - QUICK_FLIP_MIN_WAGER));
+              return String(next);
+            });
+          }}
+          onIncreaseAmount={() => {
+            clearPresetChain();
+            setWagerInput(prev => {
+              const c = parseWagerInput(prev);
+              return String(Math.min(MAX_WAGER, c + 1000));
+            });
+          }}
+          onAmountInput={raw => {
+            clearPresetChain();
+            setWagerInput(String(raw).replace(/\D/g, "").slice(0, 12));
+          }}
+          onResetAmount={() => {
+            clearPresetChain();
+            setWagerInput(String(QUICK_FLIP_MIN_WAGER));
+          }}
           onSelectChoice={handleSelectChoice}
           onPrimaryAction={handlePrimaryCta}
           primaryActionLabel={primaryActionLabel}

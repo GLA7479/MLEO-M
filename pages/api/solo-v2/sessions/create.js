@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { parseCreateSessionPayload, resolvePlayerRef } from "../../../../lib/solo-v2/server/contracts";
 import { SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
 import { getSoloV2GameByKey } from "../../../../lib/solo-v2/server/gameCatalog";
+import { QUICK_FLIP_MIN_WAGER } from "../../../../lib/solo-v2/quickFlipConfig";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -172,6 +173,15 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin();
 
     if (gameKey === "quick_flip") {
+      if (!Number.isFinite(entryAmount) || entryAmount < QUICK_FLIP_MIN_WAGER) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_entry_amount",
+          message: `entryAmount must be at least ${QUICK_FLIP_MIN_WAGER}`,
+        });
+      }
+
       const existingLookup = await readActiveQuickFlipSessions(supabase, playerRef);
       if (!existingLookup.ok) {
         if (isMissingTable(existingLookup.error)) {

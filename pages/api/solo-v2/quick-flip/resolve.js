@@ -3,7 +3,11 @@ import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { parseSessionId, resolvePlayerRef } from "../../../../lib/solo-v2/server/contracts";
 import { SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
 import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
-import { buildQuickFlipSettlementSummary } from "../../../../lib/solo-v2/quickFlipConfig";
+import {
+  buildQuickFlipSettlementSummary,
+  QUICK_FLIP_CONFIG,
+  QUICK_FLIP_MIN_WAGER,
+} from "../../../../lib/solo-v2/quickFlipConfig";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -18,8 +22,14 @@ function isMissingTable(error) {
   );
 }
 
+function entryCostFromSessionRow(sessionRow) {
+  const stake = Math.floor(Number(sessionRow?.entry_amount || 0));
+  return stake >= QUICK_FLIP_MIN_WAGER ? stake : QUICK_FLIP_CONFIG.entryCost;
+}
+
 function createResolvedPayload(sessionRow) {
   const summary = sessionRow?.server_outcome_summary || {};
+  const entryCost = entryCostFromSessionRow(sessionRow);
   return {
     sessionId: sessionRow?.id || null,
     sessionStatus: sessionRow?.session_status || SOLO_V2_SESSION_STATUS.RESOLVED,
@@ -33,6 +43,7 @@ function createResolvedPayload(sessionRow) {
         choice: summary.choice || null,
         outcome: summary.outcome || null,
         isWin: Boolean(summary.isWin),
+        entryCost,
       }),
   };
 }
@@ -155,13 +166,14 @@ export default async function handler(req, res) {
     const outcome = resolveServerOutcome(choice);
     const isWin = choice === outcome;
     const resolvedAt = new Date().toISOString();
+    const entryCost = entryCostFromSessionRow(sessionRow);
     const resolvedSummary = {
       phase: "quick_flip_resolved",
       choice,
       outcome,
       isWin,
       resolvedAt,
-      settlementSummary: buildQuickFlipSettlementSummary({ choice, outcome, isWin }),
+      settlementSummary: buildQuickFlipSettlementSummary({ choice, outcome, isWin, entryCost }),
       stats: "deferred",
     };
 
@@ -259,7 +271,7 @@ export default async function handler(req, res) {
         outcome,
         isWin,
         resolvedAt,
-        settlementSummary: buildQuickFlipSettlementSummary({ choice, outcome, isWin }),
+        settlementSummary: buildQuickFlipSettlementSummary({ choice, outcome, isWin, entryCost }),
       },
       authority: {
         outcomeTruth: "server",
