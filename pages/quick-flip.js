@@ -209,55 +209,55 @@ function QuickFlipPlaceholderPanel({
             />
           </div>
 
-          <div className="w-full flex flex-nowrap items-stretch gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {BET_PRESETS.map(value => (
-                <button
-                  key={value}
-                  type="button"
-                  disabled={!canEditPlay}
-                  onClick={() => onPresetAmount(value)}
-                  className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold leading-none sm:px-2.5 sm:text-xs ${
-                    wagerNumeric === value
-                      ? "border-amber-400/55 bg-amber-500/30 text-amber-50"
-                      : "border-white/20 bg-white/[0.07] text-zinc-100"
-                  } ${!canEditPlay ? "cursor-not-allowed opacity-60" : ""}`}
-                >
-                  {value >= 1000 ? `${value / 1000}K` : String(value)}
-                </button>
-              ))}
+          <div className="flex h-9 w-full min-w-0 flex-nowrap items-stretch gap-1 sm:h-10 sm:gap-1.5">
+            {BET_PRESETS.map(value => (
               <button
+                key={value}
                 type="button"
-                onClick={onDecreaseAmount}
                 disabled={!canEditPlay}
-                className="h-8 w-8 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:h-9 sm:w-9"
+                onClick={() => onPresetAmount(value)}
+                className={`min-h-0 min-w-0 flex-1 basis-0 rounded-md border px-1 py-1.5 text-[10px] font-bold leading-none sm:px-2 sm:text-xs ${
+                  wagerNumeric === value
+                    ? "border-amber-400/55 bg-amber-500/30 text-amber-50"
+                    : "border-white/20 bg-white/[0.07] text-zinc-100"
+                } ${!canEditPlay ? "cursor-not-allowed opacity-60" : ""}`}
               >
-                −
+                {value >= 1000 ? `${value / 1000}K` : String(value)}
               </button>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={wagerInput}
-                onChange={e => onAmountInput(e.target.value)}
-                disabled={!canEditPlay}
-                className="h-8 min-w-[4.25rem] max-w-[5.5rem] shrink-0 rounded-md border border-white/20 bg-black/40 px-1 text-center text-[11px] font-bold text-white disabled:opacity-50 sm:h-9 sm:min-w-[5rem] sm:text-sm"
-              />
-              <button
-                type="button"
-                onClick={onResetAmount}
-                disabled={!canEditPlay}
-                className="h-8 w-8 shrink-0 rounded-md border border-red-400/35 bg-red-500/15 text-[11px] font-bold text-red-100 disabled:opacity-50 sm:h-9 sm:w-9"
-                title="Reset"
-              >
-                ↺
-              </button>
-              <button
-                type="button"
-                onClick={onIncreaseAmount}
-                disabled={!canEditPlay}
-                className="h-8 w-8 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:h-9 sm:w-9"
-              >
-                +
-              </button>
+            ))}
+            <button
+              type="button"
+              onClick={onDecreaseAmount}
+              disabled={!canEditPlay}
+              className="h-full w-9 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:w-10"
+            >
+              −
+            </button>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={wagerInput}
+              onChange={e => onAmountInput(e.target.value)}
+              disabled={!canEditPlay}
+              className="h-full min-w-0 flex-[1.15] rounded-md border border-white/20 bg-black/40 px-1.5 text-center text-[11px] font-bold text-white disabled:opacity-50 sm:min-w-[4.5rem] sm:text-sm"
+            />
+            <button
+              type="button"
+              onClick={onResetAmount}
+              disabled={!canEditPlay}
+              className="h-full w-9 shrink-0 rounded-md border border-red-400/35 bg-red-500/15 text-[11px] font-bold text-red-100 disabled:opacity-50 sm:w-10"
+              title="Reset"
+            >
+              ↺
+            </button>
+            <button
+              type="button"
+              onClick={onIncreaseAmount}
+              disabled={!canEditPlay}
+              className="h-full w-9 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:w-10"
+            >
+              +
+            </button>
           </div>
 
           <button
