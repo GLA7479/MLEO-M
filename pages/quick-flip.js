@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import QuickFlipCoinDisplay from "../components/solo-v2/QuickFlipCoinDisplay";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
+import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
+import {
+  SOLO_V2_GIFT_ROUND_STAKE,
+  soloV2GiftConsumeOne,
+} from "../lib/solo-v2/soloV2GiftStorage";
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
 import { QUICK_FLIP_CONFIG, QUICK_FLIP_MIN_WAGER, QUICK_FLIP_WIN_MULTIPLIER } from "../lib/solo-v2/quickFlipConfig";
 import {
@@ -220,6 +225,8 @@ function QuickFlipGameplayPanel({
 
 export default function QuickFlipPage() {
   const giftShell = useSoloV2GiftShellState();
+  const giftRefreshRef = useRef(() => {});
+  const giftRoundRef = useRef(false);
   const [uiState, setUiState] = useState(UI_STATE.IDLE);
   const [session, setSession] = useState(null);
   const [selectedChoice, setSelectedChoice] = useState("");
@@ -242,6 +249,10 @@ export default function QuickFlipPage() {
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    giftRefreshRef.current = giftShell.refresh;
+  }, [giftShell.refresh]);
 
   useEffect(() => {
     let active = true;
@@ -321,7 +332,8 @@ export default function QuickFlipPage() {
             totalGames: Number(prev.totalGames || 0) + 1,
             wins: Number(prev.wins || 0) + (resolvedResult?.isWin ? 1 : 0),
             losses: Number(prev.losses || 0) + (resolvedResult?.isWin ? 0 : 1),
-            totalPlay: Number(prev.totalPlay || 0) + entryCost,
+            totalPlay:
+              Number(prev.totalPlay || 0) + (settlementSummary.fundingSource === "gift" ? 0 : entryCost),
             totalWon: Number(prev.totalWon || 0) + payoutReturn,
             biggestWin: Math.max(Number(prev.biggestWin || 0), resolvedResult?.isWin ? payoutReturn : 0),
             headsWins:
@@ -470,9 +482,11 @@ export default function QuickFlipPage() {
 
   /**
    * Create or resume a server session (authoritative). Preserves local pre-selected side via localChoiceToKeep on resume.
+   * Gift rounds: sessionMode freeplay, stake SOLO_V2_GIFT_ROUND_STAKE; consume one gift only after status "created".
    * @returns {{ ok: true, session: object } | { ok: false }}
    */
-  async function bootstrapQuickFlipSession(wager, activeCycle, localChoiceToKeep) {
+  async function bootstrapQuickFlipSession(wager, activeCycle, localChoiceToKeep, createSessionMode, giftRoundMeta) {
+    const isGiftRound = Boolean(giftRoundMeta?.isGiftRound);
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
@@ -489,7 +503,7 @@ export default function QuickFlipPage() {
         },
         body: JSON.stringify({
           gameKey: "quick_flip",
-          sessionMode: "standard",
+          sessionMode: createSessionMode,
           entryAmount: wager,
         }),
       });
@@ -508,6 +522,15 @@ export default function QuickFlipPage() {
       });
 
       if (result === API_RESULT.SUCCESS && status === "created" && payload?.session) {
+        if (isGiftRound) {
+          if (!soloV2GiftConsumeOne()) {
+            setSession(null);
+            setUiState(UI_STATE.IDLE);
+            setErrorMessage("No gift available. Try again after the next recharge.");
+            return { ok: false };
+          }
+          giftRoundMeta?.onGiftConsumed?.();
+        }
         setSession(payload.session);
         setSessionNotice("");
         setErrorMessage("");
@@ -517,6 +540,12 @@ export default function QuickFlipPage() {
       }
 
       if (result === API_RESULT.SUCCESS && status === "existing_session" && payload?.session) {
+        if (isGiftRound && payload.session.sessionMode !== SOLO_V2_SESSION_MODE.FREEPLAY) {
+          setSession(null);
+          setUiState(UI_STATE.IDLE);
+          setErrorMessage("Finish your current paid round before using a gift.");
+          return { ok: false };
+        }
         setSession(payload.session);
         setSessionNotice("Resumed active round.");
         setUiState(UI_STATE.SESSION_CREATED);
@@ -693,56 +722,88 @@ export default function QuickFlipPage() {
 
   async function runOneClickRound() {
     if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
+    const isGiftRound = giftRoundRef.current;
+
     if (!vaultReady) {
       setUiState(UI_STATE.UNAVAILABLE);
       setErrorMessage("Shared vault unavailable.");
+      if (isGiftRound) giftRoundRef.current = false;
       return;
     }
     const side = selectedChoice;
-    if (side !== "heads" && side !== "tails") return;
-    const wager = parseWagerInput(wagerInput);
-    if (wager < QUICK_FLIP_MIN_WAGER) return;
-    if (vaultBalance < wager) {
+    if (side !== "heads" && side !== "tails") {
+      if (isGiftRound) giftRoundRef.current = false;
+      return;
+    }
+
+    const wager = isGiftRound ? SOLO_V2_GIFT_ROUND_STAKE : parseWagerInput(wagerInput);
+    if (!isGiftRound && wager < QUICK_FLIP_MIN_WAGER) return;
+    if (!isGiftRound && vaultBalance < wager) {
       setUiState(UI_STATE.UNAVAILABLE);
       setErrorMessage(`Insufficient vault balance. Need ${wager} for this round.`);
       return;
     }
 
-    cycleRef.current += 1;
-    const activeCycle = cycleRef.current;
-
-    const cur = sessionRef.current;
-    let sessionId = cur?.id;
-    const status = cur?.sessionStatus;
-    const needsBootstrap =
-      !sessionId ||
-      status === "resolved" ||
-      [
-        UI_STATE.RESOLVED,
-        UI_STATE.IDLE,
-        UI_STATE.UNAVAILABLE,
-        UI_STATE.RESOLVE_FAILED,
-        UI_STATE.PENDING_MIGRATION,
-      ].includes(uiState);
-
-    let readStateKnown = String(cur?.readState || "");
-
-    if (needsBootstrap) {
-      const boot = await bootstrapQuickFlipSession(wager, activeCycle, side);
-      if (!boot.ok || activeCycle !== cycleRef.current) return;
-      if (boot.alreadyTerminal) return;
-      sessionId = boot.session?.id;
-      readStateKnown = String(boot.session?.readState || "");
+    if (isGiftRound) {
+      const cur = sessionRef.current;
+      if (
+        cur?.id &&
+        cur.sessionStatus !== "resolved" &&
+        cur.sessionMode !== SOLO_V2_SESSION_MODE.FREEPLAY
+      ) {
+        setErrorMessage("Finish your current round before using a gift.");
+        giftRoundRef.current = false;
+        return;
+      }
     }
 
-    if (!sessionId || activeCycle !== cycleRef.current) return;
+    try {
+      cycleRef.current += 1;
+      const activeCycle = cycleRef.current;
+      const createSessionMode = isGiftRound
+        ? SOLO_V2_SESSION_MODE.FREEPLAY
+        : SOLO_V2_SESSION_MODE.STANDARD;
 
-    if (readStateKnown === "choice_submitted") {
-      await handleResolveSession({ sessionIdOverride: sessionId });
-      return;
+      const cur = sessionRef.current;
+      let sessionId = cur?.id;
+      const status = cur?.sessionStatus;
+      const needsBootstrap =
+        !sessionId ||
+        status === "resolved" ||
+        [
+          UI_STATE.RESOLVED,
+          UI_STATE.IDLE,
+          UI_STATE.UNAVAILABLE,
+          UI_STATE.RESOLVE_FAILED,
+          UI_STATE.PENDING_MIGRATION,
+        ].includes(uiState);
+
+      let readStateKnown = String(cur?.readState || "");
+
+      if (needsBootstrap) {
+        const boot = await bootstrapQuickFlipSession(wager, activeCycle, side, createSessionMode, {
+          isGiftRound,
+          onGiftConsumed: () => giftRefreshRef.current?.(),
+        });
+        if (!boot.ok || activeCycle !== cycleRef.current) return;
+        if (boot.alreadyTerminal) return;
+        sessionId = boot.session?.id;
+        readStateKnown = String(boot.session?.readState || "");
+      }
+
+      if (!sessionId || activeCycle !== cycleRef.current) return;
+
+      if (readStateKnown === "choice_submitted") {
+        await handleResolveSession({ sessionIdOverride: sessionId });
+        return;
+      }
+
+      await submitChoiceAndResolveFlow(sessionId, side, activeCycle);
+    } finally {
+      if (isGiftRound) {
+        giftRoundRef.current = false;
+      }
     }
-
-    await submitChoiceAndResolveFlow(sessionId, side, activeCycle);
   }
 
   function handleSelectChoice(choice) {
@@ -893,12 +954,38 @@ export default function QuickFlipPage() {
   const isFlipping = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
   const potentialWin = Math.floor(numericWager * QUICK_FLIP_WIN_MULTIPLIER);
 
+  const handleGiftPlay = useCallback(() => {
+    if (!vaultReady) {
+      setErrorMessage("Shared vault unavailable.");
+      return;
+    }
+    if (!hasValidSide) {
+      setErrorMessage("Choose Heads or Tails to play a gift round.");
+      return;
+    }
+    if (giftShell.giftCount < 1) return;
+    if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
+    if (
+      [
+        UI_STATE.LOADING,
+        UI_STATE.SUBMITTING_CHOICE,
+        UI_STATE.CHOICE_SUBMITTED,
+        UI_STATE.RESOLVING,
+        UI_STATE.PENDING_MIGRATION,
+      ].includes(uiState)
+    ) {
+      return;
+    }
+    giftRoundRef.current = true;
+    void runOneClickRound();
+  }, [vaultReady, hasValidSide, giftShell.giftCount, uiState]);
+
   return (
     <SoloV2GameShell
       title="Quick Flip"
       subtitle="Arcade Solo"
       menuVaultBalance={vaultBalance}
-      gift={giftShell}
+      gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
       hideActionBar
       onBack={() => {
