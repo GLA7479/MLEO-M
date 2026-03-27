@@ -172,12 +172,12 @@ function NextCardReveal({ card, faceUp, outcome }) {
         <PlayingCard rank={card.rank} suit={card.suit || "♠"} tone={tone} />
       </div>
       {faceUp && outcome === "win" ? (
-        <div className="pointer-events-none absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-500/95 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white shadow-md ring-1 ring-emerald-200/60">
+        <div className="pointer-events-none absolute -top-1.5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-500/95 px-1.5 py-px text-[9px] font-black uppercase tracking-wide text-white shadow-md ring-1 ring-emerald-200/60">
           Hit
         </div>
       ) : null}
       {faceUp && outcome === "loss" ? (
-        <div className="pointer-events-none absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-rose-600/95 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white shadow-md ring-1 ring-rose-200/50">
+        <div className="pointer-events-none absolute -top-1.5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-rose-600/95 px-1.5 py-px text-[9px] font-black uppercase tracking-wide text-white shadow-md ring-1 ring-rose-200/50">
           Miss
         </div>
       ) : null}
@@ -853,11 +853,11 @@ export default function HighLowCardsPage() {
     uiState === UI_STATE.TERMINAL ? "PLAY AGAIN" : uiState === UI_STATE.PLAYING ? "Run in progress" : "PLAY";
   const guessControlsLocked =
     Boolean(pendingGuess) || uiState === UI_STATE.RESOLVING || revealAnimating;
-
   return (
     <SoloV2GameShell
       title="Hi-Lo Cards"
       subtitle="Arcade Solo"
+      gameplayScrollable={false}
       menuVaultBalance={vaultBalance}
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
@@ -917,99 +917,137 @@ export default function HighLowCardsPage() {
         errorMessage,
       }}
       gameplaySlot={
-        <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col px-2 pt-1 text-center sm:max-w-lg">
-          <p className="mb-2 text-xs text-zinc-400 sm:text-sm">
-            See the base card, then call higher or lower. Each win raises your streak and multiplier (+0.206 per win,
-            legacy curve). Cash out anytime after at least one win.
-          </p>
+        <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg">
+          {/* Same column contract as quick-flip: flex-1 main stage + shrink-0 control strip with only pb-2/sm:pb-3 above footer */}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <p className="mb-1 shrink-0 text-[10px] leading-snug text-zinc-400 sm:text-xs">
+              See the base card, then call higher or lower. Each win raises your streak and multiplier (+0.206 per win,
+              legacy curve). Cash out anytime after at least one win.
+            </p>
 
-          {isRunActive ? (
-            <div className="mb-2 flex flex-col items-center gap-0.5 text-xs text-zinc-500">
-              <span>
-                <span className="font-semibold uppercase tracking-wide text-zinc-400">Run active</span>
-                <span className="mx-1 text-zinc-600" aria-hidden>
-                  ·
-                </span>
-                Streak{" "}
-                <span
-                  className={`inline-block font-bold tabular-nums transition-all duration-300 ${
-                    streakPulse > 0 ? "scale-110 text-emerald-300 drop-shadow-[0_0_10px_rgba(52,211,153,0.45)]" : "text-amber-200/90"
-                  }`}
-                >
-                  {streak}
-                </span>
-                <span className="mx-1 text-zinc-600">·</span>×{mult.toFixed(3)}
-              </span>
-              {uiState === UI_STATE.RESOLVING ? (
-                <span className="text-[10px] font-medium uppercase tracking-wider text-indigo-300/90">Resolving turn…</span>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div className="flex min-h-[168px] items-start justify-center gap-3 sm:min-h-[200px]">
-            {currentCard?.rank ? <PlayingCard rank={currentCard.rank} suit={currentCard.suit || "♠"} /> : null}
-            {revealCardData?.rank ? (
-              <NextCardReveal card={revealCardData} faceUp={revealFaceUp} outcome={revealOutcome} />
-            ) : uiState === UI_STATE.RESOLVING ? (
-              <div className="flex h-44 w-28 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-zinc-600/50 bg-zinc-900/40 sm:h-52 sm:w-36">
-                <span className="px-1 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Next card</span>
-                <span className="mt-1 text-xs text-zinc-400 animate-pulse">Drawing…</span>
-              </div>
-            ) : null}
-          </div>
-
-          {(uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING) && playing ? (
-            <div className="mt-4 grid w-full grid-cols-3 gap-2">
-              <button
-                type="button"
-                disabled={uiState !== UI_STATE.PLAYING || guessControlsLocked}
-                onClick={() => void submitGuessAndResolve("high")}
-                className="h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-sm font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-40"
-              >
-                HIGHER
-              </button>
-              <button
-                type="button"
-                disabled={uiState !== UI_STATE.PLAYING || !playing?.canCashOut || guessControlsLocked}
-                onClick={() => void handleCashOut()}
-                className="h-12 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-700 text-[10px] font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-30"
-              >
-                CASH OUT
-              </button>
-              <button
-                type="button"
-                disabled={uiState !== UI_STATE.PLAYING || guessControlsLocked}
-                onClick={() => void submitGuessAndResolve("low")}
-                className="h-12 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 text-sm font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-40"
-              >
-                LOWER
-              </button>
-            </div>
-          ) : null}
-
-          {uiState === UI_STATE.TERMINAL && terminalResult ? (
-            <div className="mt-4 space-y-2 text-sm">
-              <p className={terminalResult.isWin ? "font-bold text-emerald-300" : "font-bold text-rose-300"}>
-                {terminalResult.terminalKind === "cashout"
-                  ? `Cashed out — ${terminalResult.streak} streak`
-                  : "Run over — wrong call"}
-              </p>
-              {!terminalResult.isWin && terminalResult.lastNextCard?.rank ? (
-                <p className="text-xs text-zinc-400">
-                  Card was{" "}
-                  <span className="font-semibold text-zinc-200">
-                    {terminalResult.lastNextCard.rank}
-                    {terminalResult.lastNextCard.suit || "♠"}
+            {/* Fixed-height status band: streak / resolving never change layout height */}
+            <div
+              className="relative mx-auto w-full max-w-sm shrink-0 text-zinc-500"
+              style={{ minHeight: "2.875rem" }}
+              aria-live="polite"
+            >
+              <div className="flex h-5 items-center justify-center gap-1 text-[11px] leading-none sm:text-xs">
+                {isRunActive ? (
+                  <>
+                    <span className="font-semibold uppercase tracking-wide text-zinc-400">Run active</span>
+                    <span className="text-zinc-600" aria-hidden>
+                      ·
+                    </span>
+                    <span>
+                      Streak{" "}
+                      <span
+                        className={`inline-block font-bold tabular-nums transition-all duration-300 ${
+                          streakPulse > 0
+                            ? "scale-110 text-emerald-300 drop-shadow-[0_0_10px_rgba(52,211,153,0.45)]"
+                            : "text-amber-200/90"
+                        }`}
+                      >
+                        {streak}
+                      </span>
+                    </span>
+                    <span className="text-zinc-600" aria-hidden>
+                      ·
+                    </span>
+                    <span className="tabular-nums">×{mult.toFixed(3)}</span>
+                  </>
+                ) : (
+                  <span className="invisible select-none tabular-nums" aria-hidden>
+                    Run active · Streak 0 · ×1.000
                   </span>
-                </p>
-              ) : null}
-              {terminalResult.isWin ? (
-                <p className="text-xs text-zinc-400">Vault updated from this run. Play again when you are ready.</p>
-              ) : (
-                <p className="text-xs text-zinc-400">Streak reset. Tap PLAY AGAIN for a new run.</p>
-              )}
+                )}
+              </div>
+              <div className="relative flex h-4 items-center justify-center">
+                {isRunActive && uiState === UI_STATE.RESOLVING ? (
+                  <span className="text-[9px] font-medium uppercase tracking-wider text-indigo-300/90 sm:text-[10px]">
+                    Resolving turn…
+                  </span>
+                ) : (
+                  <span className="invisible text-[9px] leading-none sm:text-[10px]" aria-hidden>
+                    Resolving
+                  </span>
+                )}
+              </div>
             </div>
-          ) : null}
+
+            <div className="flex min-h-0 flex-1 flex-col justify-center py-3 sm:py-5">
+              <div className="flex w-full shrink-0 items-start justify-center gap-2 sm:gap-3">
+                {currentCard?.rank ? <PlayingCard rank={currentCard.rank} suit={currentCard.suit || "♠"} /> : null}
+                {revealCardData?.rank ? (
+                  <NextCardReveal card={revealCardData} faceUp={revealFaceUp} outcome={revealOutcome} />
+                ) : uiState === UI_STATE.RESOLVING ? (
+                  <div className="flex h-44 w-28 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-zinc-600/50 bg-zinc-900/40 sm:h-52 sm:w-36">
+                    <span className="px-1 text-[9px] font-medium uppercase tracking-wide text-zinc-500">Next card</span>
+                    <span className="mt-0.5 text-[10px] text-zinc-400 animate-pulse sm:text-xs">Drawing…</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {/* quick-flip parity: shrink-0 strip, no extra min-height — only pb-2/sm:pb-3 before shell footer gap */}
+            <div className="w-full shrink-0 space-y-2 pb-2 sm:space-y-2.5 sm:pb-3">
+              {(uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING) && playing ? (
+                <div className="grid w-full grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    disabled={uiState !== UI_STATE.PLAYING || guessControlsLocked}
+                    onClick={() => void submitGuessAndResolve("high")}
+                    className="h-11 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-xs font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-40 sm:h-12 sm:text-sm"
+                  >
+                    HIGHER
+                  </button>
+                  <button
+                    type="button"
+                    disabled={uiState !== UI_STATE.PLAYING || !playing?.canCashOut || guessControlsLocked}
+                    onClick={() => void handleCashOut()}
+                    className="h-11 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-700 text-[9px] font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-30 sm:h-12 sm:text-[10px]"
+                  >
+                    CASH OUT
+                  </button>
+                  <button
+                    type="button"
+                    disabled={uiState !== UI_STATE.PLAYING || guessControlsLocked}
+                    onClick={() => void submitGuessAndResolve("low")}
+                    className="h-11 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 text-xs font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-40 sm:h-12 sm:text-sm"
+                  >
+                    LOWER
+                  </button>
+                </div>
+              ) : null}
+
+              {uiState === UI_STATE.TERMINAL && terminalResult ? (
+                <div className="overflow-hidden rounded-xl bg-zinc-950/90 px-2 py-1.5 text-left ring-1 ring-zinc-700/60 backdrop-blur-sm">
+                  <p
+                    className={`text-xs font-bold leading-tight sm:text-sm ${
+                      terminalResult.isWin ? "text-emerald-300" : "text-rose-300"
+                    }`}
+                  >
+                    {terminalResult.terminalKind === "cashout"
+                      ? `Cashed out — ${terminalResult.streak} streak`
+                      : "Run over — wrong call"}
+                  </p>
+                  {!terminalResult.isWin && terminalResult.lastNextCard?.rank ? (
+                    <p className="text-[10px] leading-tight text-zinc-400">
+                      Card:{" "}
+                      <span className="font-semibold text-zinc-200">
+                        {terminalResult.lastNextCard.rank}
+                        {terminalResult.lastNextCard.suit || "♠"}
+                      </span>
+                    </p>
+                  ) : null}
+                  {terminalResult.isWin ? (
+                    <p className="text-[10px] leading-tight text-zinc-400">Vault updated — PLAY AGAIN when ready.</p>
+                  ) : (
+                    <p className="text-[10px] leading-tight text-zinc-400">Streak reset — PLAY AGAIN for a new run.</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
 
           {resultToast ? (
             <div

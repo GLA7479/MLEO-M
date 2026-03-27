@@ -45,6 +45,8 @@ export default function SoloV2GameShell({
   gift = null,
   /** When set, renders shared wager + CTA footer above the ad slot (Solo V2 master layout). */
   soloV2Footer = null,
+  /** When false, gameplay area does not scroll (games that fit entirely in the viewport). */
+  gameplayScrollable = true,
 }) {
   const [infoTab, setInfoTab] = useState("help");
   const [isInfoOpen, setIsInfoOpen] = useState(false);
@@ -102,7 +104,13 @@ export default function SoloV2GameShell({
 
         <section className="min-h-0 flex-1 overflow-hidden">
           <div className="flex h-full min-h-0 items-stretch justify-center">
-            <div className="h-full w-full min-h-0 overflow-y-auto overflow-x-hidden">{gameplaySlot}</div>
+            <div
+              className={`h-full w-full min-h-0 overflow-x-hidden ${
+                gameplayScrollable ? "overflow-y-auto" : "overflow-y-hidden"
+              }`}
+            >
+              {gameplaySlot}
+            </div>
           </div>
         </section>
 
