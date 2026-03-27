@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { parseSessionId, resolvePlayerRef } from "../../../../lib/solo-v2/server/contracts";
 import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
 import { buildMysteryBoxSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryBoxSnapshot";
+import { buildHighLowCardsSessionSnapshot } from "../../../../lib/solo-v2/server/highLowCardsSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -61,6 +62,7 @@ export default async function handler(req, res) {
     let sessionReadState = "ready";
     let quickFlipPayload = null;
     let mysteryBoxPayload = null;
+    let highLowCardsPayload = null;
 
     if (row.game_key === "quick_flip") {
       const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
@@ -116,6 +118,33 @@ export default async function handler(req, res) {
         canResolve: mysterySnapshot.canResolve,
         resolvedResult: mysterySnapshot.resolvedResult,
       };
+    } else if (row.game_key === "high_low_cards") {
+      const highLowSnapshotResult = await buildHighLowCardsSessionSnapshot(supabase, row);
+      if (!highLowSnapshotResult.ok) {
+        if (isMissingTable(highLowSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const highLowSnapshot = highLowSnapshotResult.snapshot;
+      sessionReadState = highLowSnapshot.readState;
+      highLowCardsPayload = {
+        guess: highLowSnapshot.guess,
+        guessEventId: highLowSnapshot.guessEventId,
+        guessSubmittedAt: highLowSnapshot.guessSubmittedAt,
+        canResolve: highLowSnapshot.canResolve,
+        resolvedResult: highLowSnapshot.resolvedResult,
+      };
     }
 
     return res.status(200).json({
@@ -139,6 +168,7 @@ export default async function handler(req, res) {
         readState: sessionReadState,
         quickFlip: quickFlipPayload,
         mysteryBox: mysteryBoxPayload,
+        highLowCards: highLowCardsPayload,
       },
       authority: {
         sessionTruth: "server",

@@ -6,6 +6,7 @@ import { QUICK_FLIP_MIN_WAGER } from "../../../../lib/solo-v2/quickFlipConfig";
 import { MYSTERY_BOX_MIN_WAGER } from "../../../../lib/solo-v2/mysteryBoxConfig";
 import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
 import { buildMysteryBoxSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryBoxSnapshot";
+import { buildHighLowCardsSessionSnapshot } from "../../../../lib/solo-v2/server/highLowCardsSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -104,7 +105,8 @@ function isLegacyDeviceIdNotNullError(error) {
 
 /**
  * Must match DB partial unique indexes (one active session per player per game), e.g.
- * uq_solo_v2_quick_flip_one_active_per_player, uq_solo_v2_mystery_box_one_active_per_player.
+ * uq_solo_v2_quick_flip_one_active_per_player, uq_solo_v2_mystery_box_one_active_per_player,
+ * uq_solo_v2_high_low_cards_one_active_per_player.
  * Do not filter by expires_at here: a time-expired row can still be created/in_progress in DB.
  */
 const SINGLE_ACTIVE_GAME_SESSION_FETCH_CAP = 40;
@@ -416,10 +418,14 @@ export default async function handler(req, res) {
   try {
     const supabase = getSupabaseAdmin();
 
-    if (gameKey === "quick_flip" || gameKey === "mystery_box") {
+    if (gameKey === "quick_flip" || gameKey === "mystery_box" || gameKey === "high_low_cards") {
       const minWager = gameKey === "mystery_box" ? MYSTERY_BOX_MIN_WAGER : QUICK_FLIP_MIN_WAGER;
       const buildSnapshot =
-        gameKey === "mystery_box" ? buildMysteryBoxSessionSnapshot : buildQuickFlipSessionSnapshot;
+        gameKey === "mystery_box"
+          ? buildMysteryBoxSessionSnapshot
+          : gameKey === "high_low_cards"
+            ? buildHighLowCardsSessionSnapshot
+            : buildQuickFlipSessionSnapshot;
 
       if (!Number.isFinite(entryAmount) || entryAmount < minWager) {
         return res.status(400).json({
@@ -465,8 +471,8 @@ export default async function handler(req, res) {
       }
 
       const existingRows = existingLookup.rows;
-      if (gameKey === "mystery_box" && existingRows.length > 1) {
-        console.error("[solo-v2/create mystery_box] unrecoverable_multiple_active_after_heal", {
+      if ((gameKey === "mystery_box" || gameKey === "high_low_cards") && existingRows.length > 1) {
+        console.error(`[solo-v2/create ${gameKey}] unrecoverable_multiple_active_after_heal`, {
           playerRef,
           phase: "precheck",
           count: existingRows.length,
@@ -476,7 +482,7 @@ export default async function handler(req, res) {
           ok: false,
           category: "conflict",
           status: "conflict_active_sessions",
-          message: "Multiple active mystery_box sessions could not be merged. Try again in a moment.",
+          message: `Multiple active ${gameKey} sessions could not be merged. Try again in a moment.`,
         });
       }
 
@@ -524,7 +530,7 @@ export default async function handler(req, res) {
     });
     let { data, error } = createCall;
 
-    if (error && (gameKey === "quick_flip" || gameKey === "mystery_box") && isGameNotEnabled(error)) {
+    if (error && (gameKey === "quick_flip" || gameKey === "mystery_box" || gameKey === "high_low_cards") && isGameNotEnabled(error)) {
       console.warn(`solo-v2 create: ${gameKey} missing/disabled in solo_v2_games, attempting catalog bootstrap`);
       const catalogFix = await ensureSoloV2GameCatalogRow(supabase, gameKey);
       if (catalogFix.ok) {
@@ -559,7 +565,7 @@ export default async function handler(req, res) {
       });
 
       if (
-        (gameKey === "quick_flip" || gameKey === "mystery_box") &&
+        (gameKey === "quick_flip" || gameKey === "mystery_box" || gameKey === "high_low_cards") &&
         isLegacyDeviceIdNotNullError(error)
       ) {
         console.warn("solo-v2 create: legacy device_id constraint detected, using compat insert path");
@@ -621,14 +627,18 @@ export default async function handler(req, res) {
         });
       }
 
-      if ((gameKey === "quick_flip" || gameKey === "mystery_box") && isUniqueConflict(error)) {
+      if ((gameKey === "quick_flip" || gameKey === "mystery_box" || gameKey === "high_low_cards") && isUniqueConflict(error)) {
         const buildSnapshot =
-          gameKey === "mystery_box" ? buildMysteryBoxSessionSnapshot : buildQuickFlipSessionSnapshot;
+          gameKey === "mystery_box"
+            ? buildMysteryBoxSessionSnapshot
+            : gameKey === "high_low_cards"
+              ? buildHighLowCardsSessionSnapshot
+              : buildQuickFlipSessionSnapshot;
         const conflictLookup = await healAndReReadActiveSessions(supabase, playerRef, gameKey, "post_unique_conflict");
         if (conflictLookup.ok) {
           const conflictRows = conflictLookup.rows;
-          if (gameKey === "mystery_box" && conflictRows.length > 1) {
-            console.error("[solo-v2/create mystery_box] unrecoverable_multiple_active_after_heal", {
+          if ((gameKey === "mystery_box" || gameKey === "high_low_cards") && conflictRows.length > 1) {
+            console.error(`[solo-v2/create ${gameKey}] unrecoverable_multiple_active_after_heal`, {
               playerRef,
               phase: "post_unique_conflict",
               count: conflictRows.length,
@@ -638,7 +648,7 @@ export default async function handler(req, res) {
               ok: false,
               category: "conflict",
               status: "conflict_active_sessions",
-              message: "Multiple active mystery_box sessions could not be merged. Try again in a moment.",
+              message: `Multiple active ${gameKey} sessions could not be merged. Try again in a moment.`,
             });
           }
           if (conflictRows[0]) {

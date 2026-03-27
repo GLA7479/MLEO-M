@@ -7,6 +7,7 @@ import {
 import { SOLO_V2_SESSION_STATUS } from "../../../../../lib/solo-v2/server/sessionTypes";
 import { buildQuickFlipSessionSnapshot, normalizeQuickFlipChoice } from "../../../../../lib/solo-v2/server/quickFlipSnapshot";
 import { buildMysteryBoxSessionSnapshot, normalizeMysteryBoxIndex } from "../../../../../lib/solo-v2/server/mysteryBoxSnapshot";
+import { buildHighLowCardsSessionSnapshot, normalizeHighLowGuess } from "../../../../../lib/solo-v2/server/highLowCardsSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -271,6 +272,110 @@ export default async function handler(req, res) {
           category: "conflict",
           status: "choice_already_submitted",
           message: "Mystery Box pick is already locked for this session.",
+        });
+      }
+    }
+
+    const isHighLowGuess =
+      sessionRow.game_key === "high_low_cards" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "high_low_cards_guess";
+
+    if (isHighLowGuess) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Hi-Lo guess is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "high_low_cards") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Hi-Lo guess requires gameKey high_low_cards.",
+        });
+      }
+
+      const selectedGuess = normalizeHighLowGuess(eventPayload?.guess);
+      if (selectedGuess !== "high" && selectedGuess !== "low") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Hi-Lo guess must be high or low.",
+        });
+      }
+
+      const snapshotResult = await buildHighLowCardsSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Guess submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      const priorGuess = normalizeHighLowGuess(snapshot.guess);
+      const priorGuessEventId = snapshot.guessEventId != null ? Number(snapshot.guessEventId) : null;
+      const hasPersistedGuessRow =
+        (priorGuess === "high" || priorGuess === "low") &&
+        Number.isFinite(priorGuessEventId) &&
+        priorGuessEventId > 0;
+      if (hasPersistedGuessRow && priorGuess === selectedGuess) {
+        return res.status(200).json({
+          ok: true,
+          category: "success",
+          status: "accepted",
+          idempotent: true,
+          event: {
+            id: priorGuessEventId,
+            eventType,
+          },
+          session: {
+            id: sessionId,
+            sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+          },
+          authority: {
+            eventValidation: "server",
+            gameplayResolution: "deferred",
+          },
+        });
+      }
+
+      if (priorGuess !== null && priorGuess !== selectedGuess) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "choice_already_submitted",
+          message: "Hi-Lo guess is already locked for this session.",
         });
       }
     }
