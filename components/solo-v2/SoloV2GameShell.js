@@ -48,7 +48,7 @@ export default function SoloV2GameShell({
           "radial-gradient(ellipse 85% 60% at 50% 22%, rgba(180, 83, 9, 0.14), transparent 55%), radial-gradient(ellipse 90% 45% at 50% 92%, rgba(0, 0, 0, 0.45), transparent 50%), linear-gradient(180deg, #0a0908 0%, #171717 42%, #0c0a09 100%)",
       }}
     >
-      <div className="mx-auto flex h-full w-full max-w-lg min-h-0 flex-col gap-1.5 px-3 sm:gap-2 sm:px-4">
+      <div className="mx-auto flex h-full w-full max-w-lg min-h-0 flex-col gap-1.5 px-3 sm:gap-3 sm:px-4">
         <SoloV2TopHud
           title={title}
           subtitle={subtitle}

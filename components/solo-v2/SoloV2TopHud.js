@@ -14,8 +14,8 @@ export default function SoloV2TopHud({ title, subtitle = "", onBack, onOpenInfo,
       </div>
 
       <div className="pointer-events-none absolute left-1/2 top-1/2 min-w-0 max-w-[58%] -translate-x-1/2 -translate-y-1/2 text-center sm:max-w-[65%]">
-        <h1 className="truncate text-sm font-extrabold tracking-tight text-white sm:text-base">{title}</h1>
-        {subtitle ? <p className="truncate text-[11px] text-zinc-400">{subtitle}</p> : null}
+        <h1 className="truncate text-base font-extrabold tracking-tight text-white sm:text-lg">{title}</h1>
+        {subtitle ? <p className="truncate text-xs text-zinc-400 sm:text-sm">{subtitle}</p> : null}
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1">
