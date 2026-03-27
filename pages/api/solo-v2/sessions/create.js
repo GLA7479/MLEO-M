@@ -113,7 +113,7 @@ async function readActiveSessionsForGame(supabase, playerRef, gameKey) {
   const unresolvedStatuses = [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS];
   const lookup = await supabase
     .from("solo_v2_sessions")
-    .select("id,session_status,session_mode,entry_amount,expires_at")
+    .select("id,session_status,session_mode,entry_amount,expires_at,created_at")
     .eq("player_ref", playerRef)
     .eq("game_key", gameKey)
     .in("session_status", unresolvedStatuses)
@@ -131,7 +131,122 @@ async function readActiveSessionsForGame(supabase, playerRef, gameKey) {
     return { ok: false, error: lookup.error };
   }
 
-  return { ok: true, rows: (lookup.data || []).slice(0, 2) };
+  return { ok: true, rows: lookup.data || [] };
+}
+
+function summarizeActiveSessionRows(rows) {
+  return (rows || []).map(r => ({
+    id: r.id,
+    session_status: r.session_status,
+    created_at: r.created_at ?? null,
+  }));
+}
+
+/**
+ * Expire duplicate active sessions, re-read from DB, optional bulk sweep (mystery_box diagnostics).
+ * Returns latest read result { ok, rows } or { ok: false, error }.
+ */
+async function healAndReReadActiveSessions(supabase, playerRef, gameKey, phaseLabel) {
+  const logMystery = gameKey === "mystery_box";
+  const read1 = await readActiveSessionsForGame(supabase, playerRef, gameKey);
+  if (!read1.ok) return read1;
+
+  if (logMystery) {
+    console.warn("[solo-v2/create mystery_box]", phaseLabel, "active_rows_before_heal", {
+      playerRef,
+      count: read1.rows.length,
+      rows: summarizeActiveSessionRows(read1.rows),
+    });
+  }
+
+  if (read1.rows.length <= 1) {
+    if (logMystery) {
+      console.warn("[solo-v2/create mystery_box]", phaseLabel, "no_duplicate_heal_needed", {
+        expireUpdatedRowCount: 0,
+        activeCount: read1.rows.length,
+        rows: summarizeActiveSessionRows(read1.rows),
+      });
+    }
+    return read1;
+  }
+
+  const keeperId = read1.rows[0].id;
+  const extras = read1.rows.slice(1);
+  let expireUpdatedRowCount = 0;
+
+  for (const row of extras) {
+    const upd = await supabase
+      .from("solo_v2_sessions")
+      .update({ session_status: SOLO_V2_SESSION_STATUS.EXPIRED })
+      .eq("id", row.id)
+      .eq("player_ref", playerRef)
+      .eq("game_key", gameKey)
+      .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS])
+      .select("id");
+
+    if (upd.error) {
+      logCreateBranch("expire_duplicate_active_session_failed", {
+        gameKey,
+        sessionId: row.id,
+        code: upd.error?.code ?? null,
+        message: upd.error?.message ?? null,
+      });
+    } else if (Array.isArray(upd.data) && upd.data.length > 0) {
+      expireUpdatedRowCount += 1;
+    }
+  }
+
+  let read2 = await readActiveSessionsForGame(supabase, playerRef, gameKey);
+  if (!read2.ok) return read2;
+
+  if (logMystery) {
+    console.warn("[solo-v2/create mystery_box]", phaseLabel, "after_per_row_expire", {
+      expireUpdatedRowCount,
+      activeCount: read2.rows.length,
+      rows: summarizeActiveSessionRows(read2.rows),
+    });
+  }
+
+  if (read2.rows.length > 1) {
+    const { data: bulkExpired, error: bulkErr } = await supabase
+      .from("solo_v2_sessions")
+      .update({ session_status: SOLO_V2_SESSION_STATUS.EXPIRED })
+      .eq("player_ref", playerRef)
+      .eq("game_key", gameKey)
+      .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS])
+      .neq("id", keeperId)
+      .select("id");
+
+    if (logMystery) {
+      console.warn("[solo-v2/create mystery_box]", phaseLabel, "bulk_expire_non_keeper", {
+        keeperId,
+        error: bulkErr ? serializeSupabaseError(bulkErr) : null,
+        expiredIds: (bulkExpired || []).map(r => r.id),
+        expiredCount: bulkExpired?.length ?? 0,
+      });
+    }
+
+    read2 = await readActiveSessionsForGame(supabase, playerRef, gameKey);
+    if (!read2.ok) return read2;
+
+    if (logMystery) {
+      console.warn("[solo-v2/create mystery_box]", phaseLabel, "after_bulk_expire_re_read", {
+        activeCount: read2.rows.length,
+        rows: summarizeActiveSessionRows(read2.rows),
+      });
+    }
+  }
+
+  if (logMystery) {
+    console.warn("[solo-v2/create mystery_box]", phaseLabel, "after_heal_summary", {
+      expireUpdatedRowCount,
+      activeCount: read2.rows.length,
+      rows: summarizeActiveSessionRows(read2.rows),
+      stillMultipleAfterHeal: read2.rows.length > 1,
+    });
+  }
+
+  return read2;
 }
 
 async function fetchSessionRowForSnapshotByGame(supabase, sessionId, playerRef, gameKey) {
@@ -315,7 +430,7 @@ export default async function handler(req, res) {
         });
       }
 
-      const existingLookup = await readActiveSessionsForGame(supabase, playerRef, gameKey);
+      const existingLookup = await healAndReReadActiveSessions(supabase, playerRef, gameKey, "precheck");
       if (!existingLookup.ok) {
         const err = existingLookup.error;
         const missingTbl = isMissingTable(err);
@@ -350,12 +465,18 @@ export default async function handler(req, res) {
       }
 
       const existingRows = existingLookup.rows;
-      if (existingRows.length > 1) {
+      if (gameKey === "mystery_box" && existingRows.length > 1) {
+        console.error("[solo-v2/create mystery_box] unrecoverable_multiple_active_after_heal", {
+          playerRef,
+          phase: "precheck",
+          count: existingRows.length,
+          rows: summarizeActiveSessionRows(existingRows),
+        });
         return res.status(409).json({
           ok: false,
           category: "conflict",
           status: "conflict_active_sessions",
-          message: `Multiple active ${gameKey} sessions exist for this player.`,
+          message: "Multiple active mystery_box sessions could not be merged. Try again in a moment.",
         });
       }
 
@@ -375,8 +496,19 @@ export default async function handler(req, res) {
           });
         }
         if (playable.playable) {
+          if (gameKey === "mystery_box") {
+            console.warn("[solo-v2/create mystery_box] precheck http_response_branch", {
+              branch: "200_existing_session",
+              sessionId: existing.id,
+            });
+          }
           return res.status(200).json(createExistingSessionResponse(existing, playerRef, gameKey));
         }
+      }
+      if (gameKey === "mystery_box") {
+        console.warn("[solo-v2/create mystery_box] precheck http_response_branch", {
+          branch: "fallthrough_rpc_create",
+        });
       }
     }
 
@@ -492,18 +624,25 @@ export default async function handler(req, res) {
       if ((gameKey === "quick_flip" || gameKey === "mystery_box") && isUniqueConflict(error)) {
         const buildSnapshot =
           gameKey === "mystery_box" ? buildMysteryBoxSessionSnapshot : buildQuickFlipSessionSnapshot;
-        const conflictLookup = await readActiveSessionsForGame(supabase, playerRef, gameKey);
+        const conflictLookup = await healAndReReadActiveSessions(supabase, playerRef, gameKey, "post_unique_conflict");
         if (conflictLookup.ok) {
-          if (conflictLookup.rows.length > 1) {
+          const conflictRows = conflictLookup.rows;
+          if (gameKey === "mystery_box" && conflictRows.length > 1) {
+            console.error("[solo-v2/create mystery_box] unrecoverable_multiple_active_after_heal", {
+              playerRef,
+              phase: "post_unique_conflict",
+              count: conflictRows.length,
+              rows: summarizeActiveSessionRows(conflictRows),
+            });
             return res.status(409).json({
               ok: false,
               category: "conflict",
               status: "conflict_active_sessions",
-              message: `Multiple active ${gameKey} sessions exist for this player.`,
+              message: "Multiple active mystery_box sessions could not be merged. Try again in a moment.",
             });
           }
-          if (conflictLookup.rows[0]) {
-            const row0 = conflictLookup.rows[0];
+          if (conflictRows[0]) {
+            const row0 = conflictRows[0];
             const playable = await singleActiveGameRowPlayableOrExpire(supabase, row0, playerRef, gameKey, buildSnapshot);
             if (!playable.ok) {
               return sendCreate503(res, {
@@ -518,6 +657,12 @@ export default async function handler(req, res) {
               });
             }
             if (playable.playable) {
+              if (gameKey === "mystery_box") {
+                console.warn("[solo-v2/create mystery_box] post_unique_conflict http_response_branch", {
+                  branch: "200_existing_session",
+                  sessionId: row0.id,
+                });
+              }
               return res.status(200).json(createExistingSessionResponse(row0, playerRef, gameKey));
             }
             const retryCall = await supabase.rpc("solo_v2_create_session", {
@@ -532,6 +677,12 @@ export default async function handler(req, res) {
             });
             if (!retryCall.error) {
               const retryRow = Array.isArray(retryCall.data) ? retryCall.data[0] : retryCall.data;
+              if (gameKey === "mystery_box") {
+                console.warn("[solo-v2/create mystery_box] post_unique_conflict http_response_branch", {
+                  branch: "201_created_after_retry",
+                  sessionId: retryRow?.session_id ?? null,
+                });
+              }
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -553,6 +704,46 @@ export default async function handler(req, res) {
               });
             }
             error = retryCall.error;
+          } else {
+            const retryAfterHealCall = await supabase.rpc("solo_v2_create_session", {
+              p_player_ref: playerRef,
+              p_game_key: gameKey,
+              p_session_mode: sessionMode,
+              p_entry_amount: entryAmount,
+              p_client_nonce: clientNonce,
+              p_integrity_token: null,
+              p_idempotency_key: idempotencyKey,
+              p_expires_in_seconds: 900,
+            });
+            if (!retryAfterHealCall.error) {
+              const retryRow = Array.isArray(retryAfterHealCall.data) ? retryAfterHealCall.data[0] : retryAfterHealCall.data;
+              if (gameKey === "mystery_box") {
+                console.warn("[solo-v2/create mystery_box] post_unique_conflict http_response_branch", {
+                  branch: "201_created_zero_active_after_heal",
+                  sessionId: retryRow?.session_id ?? null,
+                });
+              }
+              return res.status(201).json({
+                ok: true,
+                category: "success",
+                status: "created",
+                session: {
+                  id: retryRow?.session_id || null,
+                  gameKey,
+                  playerRef,
+                  sessionMode,
+                  entryAmount,
+                  sessionStatus: retryRow?.session_status || "created",
+                  expiresAt: retryRow?.expires_at || null,
+                },
+                authority: {
+                  sessionTruth: "server",
+                  outcomeTruth: "deferred",
+                  rewardTruth: "deferred",
+                },
+              });
+            }
+            error = retryAfterHealCall.error;
           }
         } else if (isMissingTable(conflictLookup.error)) {
           logCreateBranch("pending_migration.post_conflict_recheck", {

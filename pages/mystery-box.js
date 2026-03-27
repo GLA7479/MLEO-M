@@ -238,8 +238,9 @@ export default function MysteryBoxPage() {
     };
   }, []);
 
-  function recoverStaleRound(message) {
-    createInFlightRef.current = false;
+  function recoverStaleRound(message, opts = {}) {
+    const releaseCreateLock = opts.releaseCreateLock !== false;
+    if (releaseCreateLock) createInFlightRef.current = false;
     submitInFlightRef.current = false;
     resolveInFlightRef.current = false;
     setSession(null);
@@ -367,6 +368,9 @@ export default function MysteryBoxPage() {
       sessionPayload?.sessionStatus === "expired" ||
       sessionPayload?.sessionStatus === "cancelled"
     ) {
+      createInFlightRef.current = false;
+      submitInFlightRef.current = false;
+      resolveInFlightRef.current = false;
       setSession(null);
       setSelectedBox(null);
       setEventInfo(null);
@@ -421,6 +425,33 @@ export default function MysteryBoxPage() {
     };
   }
 
+  function hasPersistedMysteryPick(session) {
+    const c = session?.mysteryBox?.boxChoice;
+    return c === 0 || c === 1 || c === 2;
+  }
+
+  function sessionTruthIsDead(sessionPayload, readStatus) {
+    const rs = String(sessionPayload?.readState || "");
+    const rss = String(readStatus || "");
+    const st = String(sessionPayload?.sessionStatus || "");
+    return (
+      rss === "invalid" ||
+      rs === "invalid" ||
+      st === "expired" ||
+      st === "cancelled"
+    );
+  }
+
+  async function verifyMysteryPickPersisted(sessionId, activeCycle) {
+    const readResult = await readSessionTruth(sessionId, activeCycle);
+    if (readResult?.halted) return { halted: true };
+    if (!readResult?.ok) return { ok: false, readResult };
+    if (!hasPersistedMysteryPick(readResult.session)) {
+      return { ok: false, readResult, missingPick: true };
+    }
+    return { ok: true, session: readResult.session };
+  }
+
   async function bootstrapMysteryBoxSession(wager, activeCycle, localBoxToKeep, createSessionMode, giftRoundMeta) {
     const isGiftRound = Boolean(giftRoundMeta?.isGiftRound);
     createInFlightRef.current = true;
@@ -431,23 +462,44 @@ export default function MysteryBoxPage() {
     setResolvedResult(null);
 
     try {
-      const response = await fetch("/api/solo-v2/sessions/create", {
+      const createBody = {
+        gameKey: GAME_KEY,
+        sessionMode: createSessionMode,
+        entryAmount: wager,
+      };
+
+      let response = await fetch("/api/solo-v2/sessions/create", {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "x-solo-v2-player": SOLO_V2_PLAYER,
         },
-        body: JSON.stringify({
-          gameKey: GAME_KEY,
-          sessionMode: createSessionMode,
-          entryAmount: wager,
-        }),
+        body: JSON.stringify(createBody),
       });
 
-      const payload = await response.json().catch(() => null);
+      let payload = await response.json().catch(() => null);
       if (activeCycle !== cycleRef.current) return { ok: false };
-      const result = classifySoloV2ApiResult(response, payload);
-      const status = String(payload?.status || "");
+      let result = classifySoloV2ApiResult(response, payload);
+      let status = String(payload?.status || "");
+
+      if (result === SOLO_V2_API_RESULT.CONFLICT && status === "conflict_active_sessions") {
+        recoverStaleRound("", { releaseCreateLock: false });
+        setErrorMessage("Session sync issue — retrying…");
+        await new Promise(r => setTimeout(r, 480));
+        if (activeCycle !== cycleRef.current) return { ok: false };
+        response = await fetch("/api/solo-v2/sessions/create", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-solo-v2-player": SOLO_V2_PLAYER,
+          },
+          body: JSON.stringify(createBody),
+        });
+        payload = await response.json().catch(() => null);
+        if (activeCycle !== cycleRef.current) return { ok: false };
+        result = classifySoloV2ApiResult(response, payload);
+        status = String(payload?.status || "");
+      }
 
       if (result === SOLO_V2_API_RESULT.SUCCESS && status === "created" && payload?.session) {
         if (isGiftRound) {
@@ -493,7 +545,8 @@ export default function MysteryBoxPage() {
         applySessionReadState(readResult.session, { resumed: true, localChoiceToKeep: localBoxToKeep });
         const rs = String(readResult.session?.readState || "");
         const st = String(readResult.session?.sessionStatus || "");
-        if (rs === "invalid" || st === "expired" || st === "cancelled") {
+        const rss = String(readResult.readStatus || "");
+        if (sessionTruthIsDead(readResult.session, rss)) {
           return { ok: false };
         }
         if (rs === "resolved" || st === "resolved") {
@@ -511,6 +564,11 @@ export default function MysteryBoxPage() {
       if (result === SOLO_V2_API_RESULT.UNAVAILABLE) {
         setUiState(UI_STATE.UNAVAILABLE);
         setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Session bootstrap unavailable."));
+        return { ok: false };
+      }
+
+      if (result === SOLO_V2_API_RESULT.CONFLICT && status === "conflict_active_sessions") {
+        recoverStaleRound("Couldn’t merge sessions. Tap OPEN BOX again.");
         return { ok: false };
       }
 
@@ -570,6 +628,17 @@ export default function MysteryBoxPage() {
         } else {
           setSessionNotice("Opening...");
         }
+        const verified = await verifyMysteryPickPersisted(sessionId, activeCycle);
+        if (verified?.halted) return;
+        if (!verified?.ok) {
+          if (verified?.missingPick) {
+            recoverStaleRound("Pick did not persist. Pick a box and press OPEN BOX again.");
+            return;
+          }
+          setUiState(verified.readResult.state);
+          setErrorMessage(verified.readResult.message);
+          return;
+        }
         await handleResolveSession({ sessionIdOverride: sessionId });
         return;
       }
@@ -590,15 +659,38 @@ export default function MysteryBoxPage() {
         const readResult = await readSessionTruth(sessionId, activeCycle);
         if (readResult?.halted) return;
         if (!readResult?.ok) {
-          setUiState(readResult.state);
-          setErrorMessage(readResult.message);
+          recoverStaleRound(readResult.message || "Session no longer available.");
           return;
         }
-        applySessionReadState(readResult.session, { resumed: true });
-        if (String(readResult?.readStatus || "") === "choice_submitted") {
+        const rss = String(readResult.readStatus || "");
+        const rs = String(readResult.session?.readState || "");
+        const st = String(readResult.session?.sessionStatus || "");
+
+        if (sessionTruthIsDead(readResult.session, rss)) {
+          recoverStaleRound(
+            st === "expired"
+              ? "Session expired. Pick a box and press OPEN BOX."
+              : "Session ended. Pick a box and press OPEN BOX.",
+          );
+          return;
+        }
+
+        if (st === "resolved" || rs === "resolved") {
+          applySessionReadState(readResult.session, { resumed: true });
+          return;
+        }
+
+        if (
+          (rss === "choice_submitted" || rs === "choice_submitted") &&
+          hasPersistedMysteryPick(readResult.session)
+        ) {
+          applySessionReadState(readResult.session, { resumed: true });
           setSessionNotice("Pick already locked on server. Resolving.");
           await handleResolveSession({ sessionIdOverride: readResult.session.id });
+          return;
         }
+
+        recoverStaleRound("Session state mismatch. Pick a box and press OPEN BOX again.");
         return;
       }
 
@@ -606,8 +698,29 @@ export default function MysteryBoxPage() {
         const readResult = await readSessionTruth(sessionId, activeCycle);
         if (readResult?.halted) return;
         if (readResult?.ok) {
+          const rss = String(readResult.readStatus || "");
+          const rs = String(readResult.session?.readState || "");
+          const st = String(readResult.session?.sessionStatus || "");
+
+          if (sessionTruthIsDead(readResult.session, rss)) {
+            recoverStaleRound(
+              st === "expired"
+                ? "Session expired. Pick a box and press OPEN BOX."
+                : "Session ended. Pick a box and press OPEN BOX.",
+            );
+            return;
+          }
+
           applySessionReadState(readResult.session, { resumed: true });
-          if (String(readResult?.readStatus || "") === "choice_submitted") {
+
+          if (st === "resolved" || rs === "resolved") {
+            return;
+          }
+
+          if (
+            (rss === "choice_submitted" || rs === "choice_submitted") &&
+            hasPersistedMysteryPick(readResult.session)
+          ) {
             setSessionNotice("Session already has a pick. Opening now.");
             await handleResolveSession({ sessionIdOverride: readResult.session.id });
           }
@@ -710,12 +823,49 @@ export default function MysteryBoxPage() {
         if (boot.alreadyTerminal) return;
         sessionId = boot.session?.id;
         readStateKnown = String(boot.session?.readState || "");
+      } else if (sessionId) {
+        const truth = await readSessionTruth(sessionId, activeCycle);
+        if (truth?.halted) return;
+        if (!truth?.ok) {
+          recoverStaleRound(truth.message || "Session no longer available.");
+          return;
+        }
+        if (sessionTruthIsDead(truth.session, truth.readStatus)) {
+          recoverStaleRound(
+            String(truth.session?.sessionStatus || "") === "expired"
+              ? "Session expired. Pick a box and press OPEN BOX."
+              : "Session ended. Pick a box and press OPEN BOX.",
+          );
+          return;
+        }
+
+        const trs = String(truth.session?.readState || "");
+        const tst = String(truth.session?.sessionStatus || "");
+        if (trs === "resolved" || tst === "resolved") {
+          applySessionReadState(truth.session, { resumed: true, localChoiceToKeep: box });
+          return;
+        }
+
+        applySessionReadState(truth.session, { resumed: true, localChoiceToKeep: box });
+        sessionId = truth.session?.id;
+        readStateKnown = String(truth.session?.readState || "");
       }
 
       if (!sessionId || activeCycle !== cycleRef.current) return;
 
       if (readStateKnown === "choice_submitted") {
-        await handleResolveSession({ sessionIdOverride: sessionId });
+        const verified = await verifyMysteryPickPersisted(sessionId, activeCycle);
+        if (verified?.halted) return;
+        if (verified?.ok) {
+          await handleResolveSession({ sessionIdOverride: sessionId });
+          return;
+        }
+        if (verified?.missingPick) {
+          recoverStaleRound("Pick did not persist. Pick a box and press OPEN BOX again.");
+          return;
+        }
+        setUiState(verified.readResult.state);
+        setErrorMessage(verified.readResult.message);
         return;
       }
 

@@ -239,14 +239,19 @@ export default async function handler(req, res) {
 
       const snapshot = snapshotResult.snapshot;
       const priorPick = normalizeMysteryBoxIndex(snapshot.boxChoice);
-      if (priorPick !== null && priorPick === selectedBox) {
+      const priorPickEventId = snapshot.pickEventId != null ? Number(snapshot.pickEventId) : null;
+      const hasPersistedPickRow =
+        priorPick !== null &&
+        Number.isFinite(priorPickEventId) &&
+        priorPickEventId > 0;
+      if (hasPersistedPickRow && priorPick === selectedBox) {
         return res.status(200).json({
           ok: true,
           category: "success",
           status: "accepted",
           idempotent: true,
           event: {
-            id: snapshot.pickEventId || null,
+            id: priorPickEventId,
             eventType,
           },
           session: {
