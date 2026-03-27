@@ -7,6 +7,7 @@ import { MYSTERY_BOX_MIN_WAGER } from "../../../../lib/solo-v2/mysteryBoxConfig"
 import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
 import { buildMysteryBoxSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 import { buildHighLowCardsSessionSnapshot } from "../../../../lib/solo-v2/server/highLowCardsSnapshot";
+import { drawServerCard, buildActiveSummaryPatch } from "../../../../lib/solo-v2/server/highLowCardsEngine";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -345,6 +346,26 @@ async function ensureSoloV2GameCatalogRow(supabase, gameKey) {
   return { ok: true };
 }
 
+async function seedHighLowCardsSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "high_low_cards" || !sessionId) return;
+  const card = drawServerCard();
+  const summary = buildActiveSummaryPatch(card);
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "high_low_cards")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create high_low_cards] seed failed", { sessionId, error });
+  }
+}
+
 async function createSessionLegacyCompat(supabase, payload) {
   const startedAt = new Date();
   const expiresAt = new Date(startedAt.getTime() + 900 * 1000).toISOString();
@@ -587,6 +608,7 @@ export default async function handler(req, res) {
 
       if (!error) {
         const row = Array.isArray(data) ? data[0] : data;
+        await seedHighLowCardsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         return res.status(201).json({
           ok: true,
           category: "success",
@@ -693,6 +715,7 @@ export default async function handler(req, res) {
                   sessionId: retryRow?.session_id ?? null,
                 });
               }
+              await seedHighLowCardsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -733,6 +756,7 @@ export default async function handler(req, res) {
                   sessionId: retryRow?.session_id ?? null,
                 });
               }
+              await seedHighLowCardsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -788,6 +812,7 @@ export default async function handler(req, res) {
     }
 
     const row = Array.isArray(data) ? data[0] : data;
+    await seedHighLowCardsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     return res.status(201).json({
       ok: true,
       category: "success",

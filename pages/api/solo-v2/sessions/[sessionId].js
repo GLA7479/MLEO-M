@@ -139,10 +139,10 @@ export default async function handler(req, res) {
       const highLowSnapshot = highLowSnapshotResult.snapshot;
       sessionReadState = highLowSnapshot.readState;
       highLowCardsPayload = {
-        guess: highLowSnapshot.guess,
-        guessEventId: highLowSnapshot.guessEventId,
-        guessSubmittedAt: highLowSnapshot.guessSubmittedAt,
-        canResolve: highLowSnapshot.canResolve,
+        playing: highLowSnapshot.playing,
+        pendingGuess: highLowSnapshot.pendingGuess,
+        canResolveTurn: highLowSnapshot.canResolveTurn,
+        canCashOut: highLowSnapshot.canCashOut,
         resolvedResult: highLowSnapshot.resolvedResult,
       };
     }

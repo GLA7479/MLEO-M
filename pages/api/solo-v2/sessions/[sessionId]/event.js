@@ -343,39 +343,34 @@ export default async function handler(req, res) {
       }
 
       const snapshot = snapshotResult.snapshot;
-      const priorGuess = normalizeHighLowGuess(snapshot.guess);
-      const priorGuessEventId = snapshot.guessEventId != null ? Number(snapshot.guessEventId) : null;
-      const hasPersistedGuessRow =
-        (priorGuess === "high" || priorGuess === "low") &&
-        Number.isFinite(priorGuessEventId) &&
-        priorGuessEventId > 0;
-      if (hasPersistedGuessRow && priorGuess === selectedGuess) {
-        return res.status(200).json({
-          ok: true,
-          category: "success",
-          status: "accepted",
-          idempotent: true,
-          event: {
-            id: priorGuessEventId,
-            eventType,
-          },
-          session: {
-            id: sessionId,
-            sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
-          },
-          authority: {
-            eventValidation: "server",
-            gameplayResolution: "deferred",
-          },
-        });
-      }
-
-      if (priorGuess !== null && priorGuess !== selectedGuess) {
+      if (snapshot.readState === "choice_submitted" && snapshot.pendingGuess) {
+        const pg = snapshot.pendingGuess;
+        const pendingId = pg.guessEventId != null ? Number(pg.guessEventId) : null;
+        if (pg.guess === selectedGuess && Number.isFinite(pendingId) && pendingId > 0) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pendingId,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
         return res.status(409).json({
           ok: false,
           category: "conflict",
-          status: "choice_already_submitted",
-          message: "Hi-Lo guess is already locked for this session.",
+          status: "turn_pending",
+          message: "Resolve the current guess before submitting a new one.",
         });
       }
     }

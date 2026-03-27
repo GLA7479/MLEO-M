@@ -7,7 +7,7 @@ import {
   soloV2GiftConsumeOne,
 } from "../lib/solo-v2/soloV2GiftStorage";
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
-import { HIGH_LOW_CARDS_MIN_WAGER, HIGH_LOW_CARDS_WIN_MULTIPLIER } from "../lib/solo-v2/highLowCardsConfig";
+import { HIGH_LOW_CARDS_MIN_WAGER, payoutFromEntryAndStreak } from "../lib/solo-v2/highLowCardsConfig";
 import {
   applyHighLowCardsSettlementOnce,
   readQuickFlipSharedVaultBalance,
@@ -22,19 +22,16 @@ import {
 
 const SOLO_V2_PLAYER = "high-low-cards-client";
 const GAME_KEY = "high_low_cards";
+const SESSION_STORAGE_KEY = "solo_v2_high_low_session_v1";
 
 const UI_STATE = {
   IDLE: "idle",
   LOADING: "loading",
   PENDING_MIGRATION: "pending_migration",
   UNAVAILABLE: "unavailable",
-  SESSION_CREATED: "session_created",
-  CHOICE_SELECTED: "choice_selected",
-  SUBMITTING_CHOICE: "submitting_choice",
-  CHOICE_SUBMITTED: "choice_submitted",
+  PLAYING: "playing",
   RESOLVING: "resolving",
-  RESOLVED: "resolved",
-  RESOLVE_FAILED: "resolve_failed",
+  TERMINAL: "terminal",
 };
 
 const STATS_KEY = "solo_v2_high_low_cards_stats_v1";
@@ -49,9 +46,9 @@ function parseWagerInput(raw) {
   return Math.min(MAX_WAGER, Math.max(0, n));
 }
 
-function readHighLowStats() {
+function readStats() {
   if (typeof window === "undefined") {
-    return { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0 };
+    return { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, maxStreak: 0 };
   }
   try {
     const raw = window.localStorage.getItem(STATS_KEY);
@@ -64,111 +61,63 @@ function readHighLowStats() {
       totalPlay: Number(parsed.totalPlay || 0),
       totalWon: Number(parsed.totalWon || 0),
       biggestWin: Number(parsed.biggestWin || 0),
+      maxStreak: Number(parsed.maxStreak || 0),
     };
   } catch {
-    return { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0 };
+    return { totalGames: 0, wins: 0, losses: 0, totalPlay: 0, totalWon: 0, biggestWin: 0, maxStreak: 0 };
   }
 }
 
-function writeHighLowStats(nextStats) {
+function writeStats(next) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STATS_KEY, JSON.stringify(nextStats));
+    window.localStorage.setItem(STATS_KEY, JSON.stringify(next));
   } catch {
     // ignore
   }
 }
 
-function rankLabel(n) {
-  if (!Number.isFinite(Number(n))) return "—";
-  const r = Math.floor(Number(n));
-  if (r === 1) return "A";
-  if (r >= 2 && r <= 10) return String(r);
-  if (r === 11) return "J";
-  if (r === 12) return "Q";
-  if (r === 13) return "K";
-  return String(r);
+function readStoredSessionId() {
+  if (typeof window === "undefined") return null;
+  try {
+    const id = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    return id && String(id).length >= 8 ? String(id) : null;
+  } catch {
+    return null;
+  }
 }
 
-function GuessButton({ value, label, selectedGuess, disabled, onSelect }) {
-  const isSelected = selectedGuess === value;
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onSelect(value)}
-      className={`flex min-h-[72px] flex-1 flex-col items-center justify-center rounded-xl border px-2 py-2 text-sm font-extrabold transition sm:min-h-[84px] ${
-        isSelected
-          ? "border-sky-400/55 bg-sky-500/25 text-sky-50 shadow-md shadow-sky-900/25"
-          : "border-white/25 bg-white/[0.06] text-zinc-100 hover:bg-white/12"
-      } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
-    >
-      <span className="text-xl sm:text-2xl">{label}</span>
-      <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Guess</span>
-    </button>
-  );
+function writeStoredSessionId(id) {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    window.localStorage.setItem(SESSION_STORAGE_KEY, String(id));
+  } catch {
+    // ignore
+  }
 }
 
-function HighLowGameplayPanel({ uiState, selectedGuess, isOpening, resultToast, onSelectGuess, resolvedResult }) {
-  const guessLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
-  const canGuess = !isOpening && uiState !== UI_STATE.LOADING && !guessLocked;
+function clearStoredSessionId() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
-  const showCards =
-    uiState === UI_STATE.RESOLVED &&
-    resolvedResult?.baseRank != null &&
-    resolvedResult?.nextRank != null;
-
+function PlayingCard({ rank, suit }) {
+  const isRed = suit === "♥" || suit === "♦";
+  const color = isRed ? "text-red-500" : "text-zinc-100";
   return (
-    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col px-2 pt-1 text-center sm:max-w-lg">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-2 sm:py-4">
-          <p className="mb-3 max-w-xs text-xs leading-relaxed text-zinc-400 sm:text-sm">
-            The server draws two distinct ranks (A–K). Guess whether the next card is higher or lower than the base.
-          </p>
-          <div className="grid w-full grid-cols-2 gap-2 sm:gap-3">
-            <GuessButton
-              value="high"
-              label="Higher"
-              selectedGuess={selectedGuess}
-              disabled={!canGuess}
-              onSelect={onSelectGuess}
-            />
-            <GuessButton
-              value="low"
-              label="Lower"
-              selectedGuess={selectedGuess}
-              disabled={!canGuess}
-              onSelect={onSelectGuess}
-            />
-          </div>
-          {showCards ? (
-            <p className="mt-4 text-xs text-zinc-400">
-              Base <span className="font-bold text-sky-200/95">{rankLabel(resolvedResult.baseRank)}</span>
-              {" → "}
-              Next <span className="font-bold text-sky-200/95">{rankLabel(resolvedResult.nextRank)}</span>
-              {" · "}
-              Actual:{" "}
-              <span className="font-bold text-zinc-200">
-                {resolvedResult.outcome === "high" ? "Higher" : resolvedResult.outcome === "low" ? "Lower" : "—"}
-              </span>
-            </p>
-          ) : null}
-        </div>
+    <div className="relative flex h-44 w-28 flex-col rounded-xl border-2 border-white/20 bg-zinc-900/90 shadow-lg sm:h-52 sm:w-36">
+      <div className={`absolute left-2 top-2 flex flex-col leading-none ${color}`}>
+        <span className="text-2xl font-serif font-bold sm:text-3xl">{rank}</span>
+        <span className="text-xl font-serif sm:text-2xl">{suit}</span>
       </div>
-
-      {resultToast ? (
-        <div
-          className={`pointer-events-none absolute left-1/2 top-[10%] z-20 w-[88%] max-w-xs -translate-x-1/2 rounded-lg border px-3 py-2 text-center text-xs font-bold sm:top-[12%] ${
-            resultToast.isWin
-              ? "border-emerald-400/35 bg-emerald-700/90 text-white"
-              : "border-red-400/35 bg-red-700/90 text-white"
-          }`}
-        >
-          <div className="text-[13px]">{resultToast.isWin ? "YOU WIN" : "YOU LOSE"}</div>
-          <div className="text-sm">{resultToast.deltaLabel}</div>
-          <div className="mt-0.5 text-[10px] font-semibold opacity-90">{resultToast.outcomeLabel}</div>
-        </div>
-      ) : null}
+      <div className={`absolute bottom-2 right-2 flex rotate-180 flex-col leading-none ${color}`}>
+        <span className="text-2xl font-serif font-bold sm:text-3xl">{rank}</span>
+        <span className="text-xl font-serif sm:text-2xl">{suit}</span>
+      </div>
     </div>
   );
 }
@@ -179,23 +128,25 @@ export default function HighLowCardsPage() {
   const giftRoundRef = useRef(false);
   const [uiState, setUiState] = useState(UI_STATE.IDLE);
   const [session, setSession] = useState(null);
-  const [selectedGuess, setSelectedGuess] = useState(null);
-  const [, setEventInfo] = useState(null);
-  const [resolvedResult, setResolvedResult] = useState(null);
+  const [playing, setPlaying] = useState(null);
+  const [pendingGuess, setPendingGuess] = useState(null);
+  const [revealCard, setRevealCard] = useState(null);
+  const [terminalResult, setTerminalResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [, setSessionNotice] = useState("");
   const [vaultBalance, setVaultBalance] = useState(0);
   const [vaultReady, setVaultReady] = useState(false);
   const [wagerInput, setWagerInput] = useState(String(HIGH_LOW_CARDS_MIN_WAGER));
   const lastPresetAmountRef = useRef(null);
-  const [stats, setStats] = useState(readHighLowStats);
+  const [stats, setStats] = useState(readStats);
   const [resultToast, setResultToast] = useState(null);
   const toastTimerRef = useRef(null);
   const createInFlightRef = useRef(false);
-  const submitInFlightRef = useRef(false);
-  const resolveInFlightRef = useRef(false);
+  const actionInFlightRef = useRef(false);
   const cycleRef = useRef(0);
   const sessionRef = useRef(null);
+  const resolveTurnRef = useRef(async () => {});
+
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
@@ -203,6 +154,10 @@ export default function HighLowCardsPage() {
   useEffect(() => {
     giftRefreshRef.current = giftShell.refresh;
   }, [giftShell.refresh]);
+
+  useEffect(() => {
+    writeStats(stats);
+  }, [stats]);
 
   useEffect(() => {
     let active = true;
@@ -217,12 +172,10 @@ export default function HighLowCardsPage() {
       setVaultBalance(Number(result.balance || 0));
       setVaultReady(true);
     });
-
     const unsubscribe = subscribeQuickFlipSharedVault(snapshot => {
       if (!active) return;
       setVaultBalance(Number(snapshot?.balance || 0));
     });
-
     return () => {
       active = false;
       unsubscribe();
@@ -230,186 +183,79 @@ export default function HighLowCardsPage() {
   }, []);
 
   useEffect(() => {
-    writeHighLowStats(stats);
-  }, [stats]);
-
-  useEffect(() => {
     return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
-      }
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
 
-  function recoverStaleRound(message, opts = {}) {
-    const releaseCreateLock = opts.releaseCreateLock !== false;
-    if (releaseCreateLock) createInFlightRef.current = false;
-    submitInFlightRef.current = false;
-    resolveInFlightRef.current = false;
+  function recoverToIdle(message) {
+    clearStoredSessionId();
+    createInFlightRef.current = false;
+    actionInFlightRef.current = false;
     setSession(null);
-    setSelectedGuess(null);
-    setEventInfo(null);
-    setResolvedResult(null);
-    setSessionNotice("");
+    setPlaying(null);
+    setPendingGuess(null);
+    setRevealCard(null);
+    setTerminalResult(null);
     setUiState(UI_STATE.IDLE);
-    setErrorMessage(String(message || "").trim() || "This round is no longer valid. Choose High or Low and press PLAY.");
+    setErrorMessage(String(message || "").trim() || "Session reset. Press PLAY to start again.");
   }
 
-  useEffect(() => {
-    if (uiState !== UI_STATE.RESOLVED) return;
-    const sessionId = resolvedResult?.sessionId || session?.id;
-    const settlementSummary = resolvedResult?.settlementSummary;
-    if (!sessionId || !settlementSummary) return;
-    applyHighLowCardsSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
-      if (!settlementResult) return;
-      const authoritativeBalance = Number(settlementResult.nextBalance || 0);
-      setVaultBalance(authoritativeBalance);
-      if (settlementResult.error) {
-        setErrorMessage(settlementResult.error);
-        setSessionNotice("Result resolved, but vault update failed.");
-        return;
-      }
+  function applySessionFromTruth(s, options = {}) {
+    const { resumed = false } = options;
+    setSession(s);
+    const hl = s?.highLowCards;
+    const rs = String(s?.readState || "");
+    const st = String(s?.sessionStatus || "");
 
-      const delta = Number(settlementSummary.netDelta || 0);
-      const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
-      if (settlementResult.applied) {
-        setSessionNotice(`Settled (${deltaLabel}). Vault: ${authoritativeBalance}.`);
-        const entryCost = Number(settlementSummary.entryCost || HIGH_LOW_CARDS_MIN_WAGER);
-        const payoutReturn = Number(settlementSummary.payoutReturn || 0);
-        setStats(prev => ({
-          ...prev,
-          totalGames: Number(prev.totalGames || 0) + 1,
-          wins: Number(prev.wins || 0) + (resolvedResult?.isWin ? 1 : 0),
-          losses: Number(prev.losses || 0) + (resolvedResult?.isWin ? 0 : 1),
-          totalPlay:
-            Number(prev.totalPlay || 0) + (settlementSummary.fundingSource === "gift" ? 0 : entryCost),
-          totalWon: Number(prev.totalWon || 0) + payoutReturn,
-          biggestWin: Math.max(Number(prev.biggestWin || 0), resolvedResult?.isWin ? payoutReturn : 0),
-        }));
-      } else {
-        setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
-      }
-
-      const toastDelta = Number(settlementSummary.netDelta || 0);
-      const toastDeltaLabel = toastDelta >= 0 ? `+${toastDelta}` : `${toastDelta}`;
-      const ob = resolvedResult?.outcome;
-      const br = resolvedResult?.baseRank;
-      const nr = resolvedResult?.nextRank;
-      const outcomeLabel =
-        br != null && nr != null
-          ? `${rankLabel(br)} → ${rankLabel(nr)} (${ob === "high" ? "higher" : ob === "low" ? "lower" : "—"})`
-          : "Round complete";
-      setResultToast({
-        isWin: Boolean(resolvedResult?.isWin),
-        deltaLabel: toastDeltaLabel,
-        outcomeLabel,
+    if (st === "resolved" || rs === "resolved") {
+      const rr = hl?.resolvedResult;
+      setPlaying(null);
+      setPendingGuess(null);
+      setRevealCard(null);
+      setTerminalResult({
+        terminalKind: rr?.terminalKind || "loss",
+        streak: Number(rr?.finalStreak ?? rr?.streak ?? 0),
+        settlementSummary: rr?.settlementSummary || null,
+        lastNextCard: rr?.lastNextCard || null,
+        isWin: Boolean(rr?.isWin),
       });
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => {
-        setResultToast(null);
-      }, 2600);
-    });
-  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
-
-  function hydrateResolvedFromSession(sessionPayload) {
-    const summary = sessionPayload?.highLowCards?.resolvedResult || {};
-    if (sessionPayload?.sessionStatus !== "resolved") return null;
-    return {
-      sessionId: sessionPayload?.id || null,
-      sessionStatus: sessionPayload?.sessionStatus || "resolved",
-      guess: summary.guess ?? null,
-      outcome: summary.outcome ?? null,
-      baseRank: summary.baseRank != null ? Number(summary.baseRank) : null,
-      nextRank: summary.nextRank != null ? Number(summary.nextRank) : null,
-      isWin: Boolean(summary.isWin),
-      resolvedAt: summary.resolvedAt || sessionPayload?.resolvedAt || null,
-      settlementSummary: summary.settlementSummary || null,
-    };
-  }
-
-  function applySessionReadState(sessionPayload, options = {}) {
-    const { resumed = false, localChoiceToKeep = null } = options;
-    setSession(sessionPayload);
-
-    const readState = String(sessionPayload?.readState || "");
-    const serverGuess = sessionPayload?.highLowCards?.guess;
-    const guessEventId = sessionPayload?.highLowCards?.guessEventId || null;
-    const resolved = hydrateResolvedFromSession(sessionPayload);
-
-    if (readState === "resolved" || resolved) {
-      if (resolved) setResolvedResult(resolved);
-      setEventInfo(null);
-      setSelectedGuess(null);
-      setUiState(UI_STATE.RESOLVED);
-      setSessionNotice(resumed ? "Resumed already resolved session." : "Session already resolved on server.");
+      setUiState(UI_STATE.TERMINAL);
+      setSessionNotice(resumed ? "Resumed finished session." : "Round complete.");
       setErrorMessage("");
       return;
     }
 
-    if (readState === "choice_submitted") {
-      setSelectedGuess(serverGuess === "high" || serverGuess === "low" ? serverGuess : null);
-      setEventInfo({
-        eventId: guessEventId,
-        eventType: "client_action",
-      });
-      setUiState(UI_STATE.CHOICE_SUBMITTED);
-      setSessionNotice("Resumed session with locked guess. Ready to reveal.");
-      setErrorMessage("");
-      return;
-    }
-
-    if (readState === "choice_required" || readState === "ready") {
-      if (localChoiceToKeep === "high" || localChoiceToKeep === "low") {
-        setSelectedGuess(localChoiceToKeep);
-      } else {
-        setSelectedGuess(null);
-      }
-      setEventInfo(null);
-      setResolvedResult(null);
-      setUiState(UI_STATE.SESSION_CREATED);
-      setSessionNotice(resumed ? "Resumed active session." : "Session ready.");
-      setErrorMessage("");
-      return;
-    }
-
-    if (
-      readState === "invalid" ||
-      sessionPayload?.sessionStatus === "expired" ||
-      sessionPayload?.sessionStatus === "cancelled"
-    ) {
-      createInFlightRef.current = false;
-      submitInFlightRef.current = false;
-      resolveInFlightRef.current = false;
-      setSession(null);
-      setSelectedGuess(null);
-      setEventInfo(null);
-      setResolvedResult(null);
-      setUiState(UI_STATE.IDLE);
-      setSessionNotice("");
-      setErrorMessage(
-        sessionPayload?.sessionStatus === "expired"
-          ? "Session expired. Choose High or Low and press PLAY."
-          : "Session ended. Choose High or Low and press PLAY.",
+    if (rs === "invalid" || st === "expired" || st === "cancelled") {
+      recoverToIdle(
+        st === "expired" ? "Session expired. Press PLAY to start again." : "Session ended. Press PLAY to start again.",
       );
       return;
     }
 
+    if (hl?.playing) {
+      setPlaying(hl.playing);
+      setPendingGuess(hl.pendingGuess || null);
+      setTerminalResult(null);
+      setRevealCard(null);
+      setUiState(UI_STATE.PLAYING);
+      setSessionNotice(resumed ? "Resumed your run." : "");
+      setErrorMessage("");
+      return;
+    }
+
     setUiState(UI_STATE.UNAVAILABLE);
-    setErrorMessage("Session state is not resumable.");
+    setErrorMessage("Session state is not playable.");
   }
 
   async function readSessionTruth(sessionId, activeCycle) {
     const response = await fetch(`/api/solo-v2/sessions/${sessionId}`, {
       method: "GET",
-      headers: {
-        "x-solo-v2-player": SOLO_V2_PLAYER,
-      },
+      headers: { "x-solo-v2-player": SOLO_V2_PLAYER },
     });
-
     const payload = await response.json().catch(() => null);
     if (activeCycle !== cycleRef.current) return { halted: true };
     const result = classifySoloV2ApiResult(response, payload);
-
     if (result === SOLO_V2_API_RESULT.SUCCESS && payload?.session) {
       return { ok: true, session: payload.session, readStatus: String(payload?.status || "") };
     }
@@ -434,70 +280,106 @@ export default function HighLowCardsPage() {
     };
   }
 
-  function hasPersistedHighLowGuess(sessionPayload) {
-    const g = sessionPayload?.highLowCards?.guess;
-    return g === "high" || g === "low";
-  }
-
-  function sessionTruthIsDead(sessionPayload, readStatus) {
-    const rs = String(sessionPayload?.readState || "");
+  function sessionTruthIsDead(sPayload, readStatus) {
+    const rs = String(sPayload?.readState || "");
     const rss = String(readStatus || "");
-    const st = String(sessionPayload?.sessionStatus || "");
+    const st = String(sPayload?.sessionStatus || "");
     return rss === "invalid" || rs === "invalid" || st === "expired" || st === "cancelled";
   }
 
-  async function verifyHighLowGuessPersisted(sessionId, activeCycle) {
-    const readResult = await readSessionTruth(sessionId, activeCycle);
-    if (readResult?.halted) return { halted: true };
-    if (!readResult?.ok) return { ok: false, readResult };
-    if (!hasPersistedHighLowGuess(readResult.session)) {
-      return { ok: false, readResult, missingGuess: true };
+  const tryResumeStoredSession = useCallback(async () => {
+    const sid = readStoredSessionId();
+    if (!sid) return;
+    cycleRef.current += 1;
+    const c = cycleRef.current;
+    const truth = await readSessionTruth(sid, c);
+    if (truth?.halted || c !== cycleRef.current) return;
+    if (!truth?.ok) {
+      clearStoredSessionId();
+      return;
     }
-    return { ok: true, session: readResult.session };
-  }
+    if (sessionTruthIsDead(truth.session, truth.readStatus)) {
+      clearStoredSessionId();
+      return;
+    }
+    writeStoredSessionId(sid);
+    applySessionFromTruth(truth.session, { resumed: true });
+  }, []);
 
-  async function bootstrapHighLowSession(wager, activeCycle, localGuessToKeep, createSessionMode, giftRoundMeta) {
-    const isGiftRound = Boolean(giftRoundMeta?.isGiftRound);
+  useEffect(() => {
+    if (!vaultReady) return;
+    void tryResumeStoredSession();
+  }, [vaultReady, tryResumeStoredSession]);
+
+  useEffect(() => {
+    if (uiState !== UI_STATE.TERMINAL) return;
+    const tr = terminalResult;
+    const sid = session?.id;
+    const settlementSummary = tr?.settlementSummary;
+    if (!sid || !settlementSummary) return;
+    applyHighLowCardsSettlementOnce(sid, settlementSummary).then(sr => {
+      if (!sr) return;
+      setVaultBalance(Number(sr.nextBalance || 0));
+      if (sr.error) {
+        setErrorMessage(sr.error);
+        setSessionNotice("Round ended, but vault update failed.");
+        return;
+      }
+      const entryCost = Number(settlementSummary.entryCost || HIGH_LOW_CARDS_MIN_WAGER);
+      const payoutReturn = Number(settlementSummary.payoutReturn || 0);
+      const won = Boolean(tr?.isWin);
+      if (sr.applied) {
+        setStats(prev => ({
+          ...prev,
+          totalGames: prev.totalGames + 1,
+          wins: prev.wins + (won ? 1 : 0),
+          losses: prev.losses + (won ? 0 : 1),
+          totalPlay: prev.totalPlay + (settlementSummary.fundingSource === "gift" ? 0 : entryCost),
+          totalWon: prev.totalWon + payoutReturn,
+          biggestWin: Math.max(prev.biggestWin, won ? payoutReturn : 0),
+          maxStreak: Math.max(prev.maxStreak, Number(tr?.streak || 0)),
+        }));
+      }
+      const delta = Number(settlementSummary.netDelta || 0);
+      setResultToast({
+        isWin: won,
+        title: won ? "CASHED OUT" : "YOU LOSE",
+        sub: `${delta >= 0 ? "+" : ""}${delta}`,
+      });
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setResultToast(null), 3200);
+    });
+  }, [uiState, terminalResult?.settlementSummary, session?.id, terminalResult?.isWin, terminalResult?.streak]);
+
+  async function bootstrapSession(wager, activeCycle, createSessionMode, giftMeta) {
+    const isGiftRound = Boolean(giftMeta?.isGiftRound);
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
-    setSession(null);
-    setEventInfo(null);
-    setResolvedResult(null);
+    setTerminalResult(null);
+    setRevealCard(null);
 
     try {
-      const createBody = {
-        gameKey: GAME_KEY,
-        sessionMode: createSessionMode,
-        entryAmount: wager,
-      };
-
+      const body = { gameKey: GAME_KEY, sessionMode: createSessionMode, entryAmount: wager };
       let response = await fetch("/api/solo-v2/sessions/create", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-solo-v2-player": SOLO_V2_PLAYER,
-        },
-        body: JSON.stringify(createBody),
+        headers: { "content-type": "application/json", "x-solo-v2-player": SOLO_V2_PLAYER },
+        body: JSON.stringify(body),
       });
-
       let payload = await response.json().catch(() => null);
       if (activeCycle !== cycleRef.current) return { ok: false };
       let result = classifySoloV2ApiResult(response, payload);
       let status = String(payload?.status || "");
 
       if (result === SOLO_V2_API_RESULT.CONFLICT && status === "conflict_active_sessions") {
-        recoverStaleRound("", { releaseCreateLock: false });
+        recoverToIdle("");
         setErrorMessage("Session sync issue — retrying…");
         await new Promise(r => setTimeout(r, 480));
         if (activeCycle !== cycleRef.current) return { ok: false };
         response = await fetch("/api/solo-v2/sessions/create", {
           method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-solo-v2-player": SOLO_V2_PLAYER,
-          },
-          body: JSON.stringify(createBody),
+          headers: { "content-type": "application/json", "x-solo-v2-player": SOLO_V2_PLAYER },
+          body: JSON.stringify(body),
         });
         payload = await response.json().catch(() => null);
         if (activeCycle !== cycleRef.current) return { ok: false };
@@ -505,58 +387,38 @@ export default function HighLowCardsPage() {
         status = String(payload?.status || "");
       }
 
-      if (result === SOLO_V2_API_RESULT.SUCCESS && status === "created" && payload?.session) {
+      if (result === SOLO_V2_API_RESULT.SUCCESS && (status === "created" || status === "existing_session") && payload?.session) {
         if (isGiftRound) {
-          if (!soloV2GiftConsumeOne()) {
-            setSession(null);
+          if (status === "created" && !soloV2GiftConsumeOne()) {
             setUiState(UI_STATE.IDLE);
-            setErrorMessage("No gift available. Try again after the next recharge.");
+            setErrorMessage("No gift available.");
             return { ok: false };
           }
-          giftRoundMeta?.onGiftConsumed?.();
-        }
-        setSession(payload.session);
-        setSessionNotice("");
-        setErrorMessage("");
-        setUiState(UI_STATE.SESSION_CREATED);
-        return { ok: true, session: payload.session };
-      }
-
-      if (result === SOLO_V2_API_RESULT.SUCCESS && status === "existing_session" && payload?.session) {
-        if (isGiftRound && payload.session.sessionMode !== SOLO_V2_SESSION_MODE.FREEPLAY) {
-          setSession(null);
-          setUiState(UI_STATE.IDLE);
-          setErrorMessage("Finish your current paid round before using a gift.");
-          return { ok: false };
-        }
-        setSession(payload.session);
-        setSessionNotice("Resumed active round.");
-        setUiState(UI_STATE.SESSION_CREATED);
-        setErrorMessage("");
-
-        const readResult = await readSessionTruth(payload.session.id, activeCycle);
-        if (readResult?.halted) return { ok: false };
-        if (!readResult?.ok) {
-          setSession(null);
-          setSelectedGuess(null);
-          setEventInfo(null);
-          setResolvedResult(null);
-          setUiState(readResult.state);
-          setErrorMessage(readResult.message);
-          return { ok: false };
+          if (status === "existing_session" && payload.session.sessionMode !== SOLO_V2_SESSION_MODE.FREEPLAY) {
+            setUiState(UI_STATE.IDLE);
+            setErrorMessage("Finish your paid run before using a gift.");
+            return { ok: false };
+          }
+          giftMeta?.onGiftConsumed?.();
         }
 
-        applySessionReadState(readResult.session, { resumed: true, localChoiceToKeep: localGuessToKeep });
-        const rs = String(readResult.session?.readState || "");
-        const st = String(readResult.session?.sessionStatus || "");
-        const rss = String(readResult.readStatus || "");
-        if (sessionTruthIsDead(readResult.session, rss)) {
+        const sid = payload.session.id;
+        writeStoredSessionId(sid);
+        const truth = await readSessionTruth(sid, activeCycle);
+        if (truth?.halted || activeCycle !== cycleRef.current) return { ok: false };
+        if (!truth?.ok) {
+          clearStoredSessionId();
+          setUiState(truth.state);
+          setErrorMessage(truth.message);
           return { ok: false };
         }
-        if (rs === "resolved" || st === "resolved") {
-          return { ok: true, session: readResult.session, alreadyTerminal: true };
+        if (sessionTruthIsDead(truth.session, truth.readStatus)) {
+          clearStoredSessionId();
+          recoverToIdle("Session not usable.");
+          return { ok: false };
         }
-        return { ok: true, session: readResult.session };
+        applySessionFromTruth(truth.session);
+        return { ok: true };
       }
 
       if (result === SOLO_V2_API_RESULT.PENDING_MIGRATION) {
@@ -564,434 +426,271 @@ export default function HighLowCardsPage() {
         setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Migration is pending."));
         return { ok: false };
       }
-
       if (result === SOLO_V2_API_RESULT.UNAVAILABLE) {
         setUiState(UI_STATE.UNAVAILABLE);
-        setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Session bootstrap unavailable."));
+        setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Create unavailable."));
         return { ok: false };
       }
-
-      if (result === SOLO_V2_API_RESULT.CONFLICT && status === "conflict_active_sessions") {
-        recoverStaleRound("Couldn’t merge sessions. Tap PLAY again.");
-        return { ok: false };
-      }
-
       setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Session bootstrap rejected."));
+      setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Create rejected."));
       return { ok: false };
-    } catch (_error) {
+    } catch {
       if (activeCycle !== cycleRef.current) return { ok: false };
       setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage("Network error while creating session.");
+      setErrorMessage("Network error.");
       return { ok: false };
     } finally {
-      if (activeCycle === cycleRef.current) {
-        createInFlightRef.current = false;
-      }
+      if (activeCycle === cycleRef.current) createInFlightRef.current = false;
     }
   }
 
-  async function submitGuessAndResolveFlow(sessionId, guess, activeCycle) {
-    if (!sessionId || (guess !== "high" && guess !== "low")) return;
-    if (submitInFlightRef.current || resolveInFlightRef.current) return;
+  async function handleStartPlay() {
+    if (createInFlightRef.current || actionInFlightRef.current) return;
+    if (!vaultReady) {
+      setErrorMessage("Vault unavailable.");
+      return;
+    }
+    const isGiftRound = giftRoundRef.current;
+    const wager = isGiftRound ? SOLO_V2_GIFT_ROUND_STAKE : parseWagerInput(wagerInput);
+    if (!isGiftRound && wager < HIGH_LOW_CARDS_MIN_WAGER) return;
+    if (!isGiftRound && vaultBalance < wager) {
+      setErrorMessage(`Need at least ${wager} in vault.`);
+      return;
+    }
 
-    submitInFlightRef.current = true;
-    setUiState(UI_STATE.SUBMITTING_CHOICE);
-    setErrorMessage("");
+    cycleRef.current += 1;
+    const c = cycleRef.current;
+    const mode = isGiftRound ? SOLO_V2_SESSION_MODE.FREEPLAY : SOLO_V2_SESSION_MODE.STANDARD;
 
     try {
-      const response = await fetch(`/api/solo-v2/sessions/${sessionId}/event`, {
+      await bootstrapSession(wager, c, mode, {
+        isGiftRound,
+        onGiftConsumed: () => giftRefreshRef.current?.(),
+      });
+    } finally {
+      if (isGiftRound) giftRoundRef.current = false;
+    }
+  }
+
+  async function submitGuessAndResolve(guess) {
+    const sid = sessionRef.current?.id;
+    if (!sid || actionInFlightRef.current) return;
+    actionInFlightRef.current = true;
+    cycleRef.current += 1;
+    const c = cycleRef.current;
+    setUiState(UI_STATE.RESOLVING);
+    setErrorMessage("");
+    setRevealCard(null);
+
+    try {
+      let response = await fetch(`/api/solo-v2/sessions/${sid}/event`, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-solo-v2-player": SOLO_V2_PLAYER,
-        },
+        headers: { "content-type": "application/json", "x-solo-v2-player": SOLO_V2_PLAYER },
         body: JSON.stringify({
           eventType: "client_action",
-          eventPayload: {
-            gameKey: GAME_KEY,
-            action: "high_low_cards_guess",
-            guess,
-          },
+          eventPayload: { gameKey: GAME_KEY, action: "high_low_cards_guess", guess },
         }),
       });
+      let payload = await response.json().catch(() => null);
+      if (c !== cycleRef.current) return;
+      let result = classifySoloV2ApiResult(response, payload);
+      let status = String(payload?.status || "");
 
-      const payload = await response.json().catch(() => null);
-      if (activeCycle !== cycleRef.current) return;
-      const result = classifySoloV2ApiResult(response, payload);
-      const status = String(payload?.status || "");
-
-      if (result === SOLO_V2_API_RESULT.SUCCESS && status === "accepted") {
-        setEventInfo({
-          eventId: payload?.event?.id || null,
-          eventType: payload?.event?.eventType || "client_action",
-        });
-        setUiState(UI_STATE.CHOICE_SUBMITTED);
-        if (payload?.idempotent) {
-          setSessionNotice("Guess already accepted. Revealing…");
-        } else {
-          setSessionNotice("Revealing…");
+      if (result === SOLO_V2_API_RESULT.CONFLICT && status === "turn_pending") {
+        const truth = await readSessionTruth(sid, c);
+        if (truth?.ok && !sessionTruthIsDead(truth.session, truth.readStatus)) {
+          applySessionFromTruth(truth.session);
+          setSessionNotice("Finish the pending turn first.");
         }
-        const verified = await verifyHighLowGuessPersisted(sessionId, activeCycle);
-        if (verified?.halted) return;
-        if (!verified?.ok) {
-          if (verified?.missingGuess) {
-            recoverStaleRound("Guess did not persist. Choose again and press PLAY.");
-            return;
-          }
-          setUiState(verified.readResult.state);
-          setErrorMessage(verified.readResult.message);
-          return;
-        }
-        await handleResolveSession({ sessionIdOverride: sessionId });
-        return;
-      }
-
-      if (result === SOLO_V2_API_RESULT.PENDING_MIGRATION) {
-        setUiState(UI_STATE.PENDING_MIGRATION);
-        setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Migration is pending."));
-        return;
-      }
-
-      if (result === SOLO_V2_API_RESULT.UNAVAILABLE) {
-        setUiState(UI_STATE.UNAVAILABLE);
-        setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Guess submission unavailable."));
+        setUiState(UI_STATE.PLAYING);
         return;
       }
 
       if (result === SOLO_V2_API_RESULT.CONFLICT && status === "choice_already_submitted") {
-        const readResult = await readSessionTruth(sessionId, activeCycle);
-        if (readResult?.halted) return;
-        if (!readResult?.ok) {
-          recoverStaleRound(readResult.message || "Session no longer available.");
+        const truth = await readSessionTruth(sid, c);
+        if (!truth?.ok || sessionTruthIsDead(truth.session, truth.readStatus)) {
+          recoverToIdle(truth?.message || "Session no longer valid.");
           return;
         }
-        const rss = String(readResult.readStatus || "");
-        const rs = String(readResult.session?.readState || "");
-        const st = String(readResult.session?.sessionStatus || "");
-
-        if (sessionTruthIsDead(readResult.session, rss)) {
-          recoverStaleRound(
-            st === "expired"
-              ? "Session expired. Choose High or Low and press PLAY."
-              : "Session ended. Choose High or Low and press PLAY.",
-          );
-          return;
+        applySessionFromTruth(truth.session);
+        if (truth.session?.highLowCards?.canResolveTurn) {
+          await resolveTurn(sid, c);
         }
-
-        if (st === "resolved" || rs === "resolved") {
-          applySessionReadState(readResult.session, { resumed: true });
-          return;
-        }
-
-        if ((rss === "choice_submitted" || rs === "choice_submitted") && hasPersistedHighLowGuess(readResult.session)) {
-          applySessionReadState(readResult.session, { resumed: true });
-          setSessionNotice("Guess already locked on server. Resolving.");
-          await handleResolveSession({ sessionIdOverride: readResult.session.id });
-          return;
-        }
-
-        recoverStaleRound("Session state mismatch. Choose again and press PLAY.");
         return;
       }
 
-      if (result === SOLO_V2_API_RESULT.CONFLICT && status === "invalid_session_state") {
-        const readResult = await readSessionTruth(sessionId, activeCycle);
-        if (readResult?.halted) return;
-        if (readResult?.ok) {
-          const rss = String(readResult.readStatus || "");
-          const rs = String(readResult.session?.readState || "");
-          const st = String(readResult.session?.sessionStatus || "");
-
-          if (sessionTruthIsDead(readResult.session, rss)) {
-            recoverStaleRound(
-              st === "expired"
-                ? "Session expired. Choose High or Low and press PLAY."
-                : "Session ended. Choose High or Low and press PLAY.",
-            );
+      if (!(result === SOLO_V2_API_RESULT.SUCCESS && status === "accepted")) {
+        if (result === SOLO_V2_API_RESULT.CONFLICT && status === "event_rejected") {
+          const msg = buildSoloV2ApiErrorMessage(payload, "");
+          if (isSoloV2EventRejectedStaleSessionMessage(msg)) {
+            recoverToIdle(msg);
             return;
           }
-
-          applySessionReadState(readResult.session, { resumed: true });
-
-          if (st === "resolved" || rs === "resolved") {
-            return;
-          }
-
-          if ((rss === "choice_submitted" || rs === "choice_submitted") && hasPersistedHighLowGuess(readResult.session)) {
-            setSessionNotice("Session already has a guess. Revealing now.");
-            await handleResolveSession({ sessionIdOverride: readResult.session.id });
-          }
-          return;
         }
-        recoverStaleRound(buildSoloV2ApiErrorMessage(payload, "Session no longer accepts guesses."));
+        setUiState(UI_STATE.PLAYING);
+        setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Guess rejected."));
         return;
       }
 
-      if (result === SOLO_V2_API_RESULT.CONFLICT && status === "event_rejected") {
-        const msg = buildSoloV2ApiErrorMessage(payload, "");
-        if (isSoloV2EventRejectedStaleSessionMessage(msg)) {
-          recoverStaleRound(msg || "Session expired. Choose High or Low and press PLAY.");
-          return;
-        }
-        setUiState(UI_STATE.UNAVAILABLE);
-        setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Guess submission rejected."));
-        return;
-      }
-
-      setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Guess submission rejected."));
-    } catch (_error) {
-      if (activeCycle !== cycleRef.current) return;
-      setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage("Network error while submitting guess.");
+      await resolveTurn(sid, c);
     } finally {
-      if (activeCycle === cycleRef.current) {
-        submitInFlightRef.current = false;
-      }
+      if (c === cycleRef.current) actionInFlightRef.current = false;
     }
   }
 
-  async function runOneClickRound() {
-    if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
-    const isGiftRound = giftRoundRef.current;
+  async function resolveTurn(sid, c) {
+    const response = await fetch("/api/solo-v2/high-low-cards/resolve", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-solo-v2-player": SOLO_V2_PLAYER },
+      body: JSON.stringify({ sessionId: sid }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (c !== cycleRef.current) return;
+    const result = classifySoloV2ApiResult(response, payload);
+    const status = String(payload?.status || "");
 
-    if (!vaultReady) {
-      setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage("Shared vault unavailable.");
-      if (isGiftRound) giftRoundRef.current = false;
-      return;
-    }
-    const guess = selectedGuess;
-    if (guess !== "high" && guess !== "low") {
-      if (isGiftRound) giftRoundRef.current = false;
-      return;
-    }
-
-    const wager = isGiftRound ? SOLO_V2_GIFT_ROUND_STAKE : parseWagerInput(wagerInput);
-    if (!isGiftRound && wager < HIGH_LOW_CARDS_MIN_WAGER) return;
-    if (!isGiftRound && vaultBalance < wager) {
-      setUiState(UI_STATE.UNAVAILABLE);
-      setErrorMessage(`Insufficient vault balance. Need ${wager} for this round.`);
+    if (result === SOLO_V2_API_RESULT.SUCCESS && status === "turn_complete" && payload?.result?.won) {
+      setRevealCard(payload.result.nextCard);
+      const truth = await readSessionTruth(sid, c);
+      if (truth?.ok) applySessionFromTruth(truth.session);
+      setUiState(UI_STATE.PLAYING);
+      setSessionNotice("Correct! Keep going or cash out.");
       return;
     }
 
-    if (isGiftRound) {
-      const cur = sessionRef.current;
-      if (
-        cur?.id &&
-        cur.sessionStatus !== "resolved" &&
-        cur.sessionMode !== SOLO_V2_SESSION_MODE.FREEPLAY
-      ) {
-        setErrorMessage("Finish your current round before using a gift.");
-        giftRoundRef.current = false;
-        return;
-      }
+    if (result === SOLO_V2_API_RESULT.SUCCESS && status === "session_lost") {
+      clearStoredSessionId();
+      setRevealCard(payload?.result?.nextCard || null);
+      setTerminalResult({
+        terminalKind: "loss",
+        streak: Number(payload?.result?.streak ?? 0),
+        settlementSummary: payload?.result?.settlementSummary,
+        lastNextCard: payload?.result?.nextCard,
+        isWin: false,
+      });
+      setSession(prev => (prev ? { ...prev, sessionStatus: "resolved" } : prev));
+      setUiState(UI_STATE.TERMINAL);
+      setSessionNotice("Wrong guess — run over.");
+      return;
     }
 
-    try {
-      cycleRef.current += 1;
-      const activeCycle = cycleRef.current;
-      const createSessionMode = isGiftRound
-        ? SOLO_V2_SESSION_MODE.FREEPLAY
-        : SOLO_V2_SESSION_MODE.STANDARD;
-
-      const cur = sessionRef.current;
-      let sessionId = cur?.id;
-      const status = cur?.sessionStatus;
-      const needsBootstrap =
-        !sessionId ||
-        status === "resolved" ||
-        [
-          UI_STATE.RESOLVED,
-          UI_STATE.IDLE,
-          UI_STATE.UNAVAILABLE,
-          UI_STATE.RESOLVE_FAILED,
-          UI_STATE.PENDING_MIGRATION,
-        ].includes(uiState);
-
-      let readStateKnown = String(cur?.readState || "");
-
-      if (needsBootstrap) {
-        const boot = await bootstrapHighLowSession(wager, activeCycle, guess, createSessionMode, {
-          isGiftRound,
-          onGiftConsumed: () => giftRefreshRef.current?.(),
-        });
-        if (!boot.ok || activeCycle !== cycleRef.current) return;
-        if (boot.alreadyTerminal) return;
-        sessionId = boot.session?.id;
-        readStateKnown = String(boot.session?.readState || "");
-      } else if (sessionId) {
-        const truth = await readSessionTruth(sessionId, activeCycle);
-        if (truth?.halted) return;
-        if (!truth?.ok) {
-          recoverStaleRound(truth.message || "Session no longer available.");
-          return;
-        }
-        if (sessionTruthIsDead(truth.session, truth.readStatus)) {
-          recoverStaleRound(
-            String(truth.session?.sessionStatus || "") === "expired"
-              ? "Session expired. Choose High or Low and press PLAY."
-              : "Session ended. Choose High or Low and press PLAY.",
-          );
-          return;
-        }
-
-        const trs = String(truth.session?.readState || "");
-        const tst = String(truth.session?.sessionStatus || "");
-        if (trs === "resolved" || tst === "resolved") {
-          applySessionReadState(truth.session, { resumed: true, localChoiceToKeep: guess });
-          return;
-        }
-
-        applySessionReadState(truth.session, { resumed: true, localChoiceToKeep: guess });
-        sessionId = truth.session?.id;
-        readStateKnown = String(truth.session?.readState || "");
-      }
-
-      if (!sessionId || activeCycle !== cycleRef.current) return;
-
-      if (readStateKnown === "choice_submitted") {
-        const verified = await verifyHighLowGuessPersisted(sessionId, activeCycle);
-        if (verified?.halted) return;
-        if (verified?.ok) {
-          await handleResolveSession({ sessionIdOverride: sessionId });
-          return;
-        }
-        if (verified?.missingGuess) {
-          recoverStaleRound("Guess did not persist. Choose again and press PLAY.");
-          return;
-        }
-        setUiState(verified.readResult.state);
-        setErrorMessage(verified.readResult.message);
-        return;
-      }
-
-      await submitGuessAndResolveFlow(sessionId, guess, activeCycle);
-    } finally {
-      if (isGiftRound) {
-        giftRoundRef.current = false;
-      }
+    if (result === SOLO_V2_API_RESULT.SUCCESS && status === "turn_complete" && payload?.idempotent) {
+      const truth = await readSessionTruth(sid, c);
+      if (truth?.ok) applySessionFromTruth(truth.session);
+      setUiState(UI_STATE.PLAYING);
+      return;
     }
+
+    const truth = await readSessionTruth(sid, c);
+    if (truth?.ok) applySessionFromTruth(truth.session);
+    setUiState(UI_STATE.PLAYING);
+    setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Could not resolve turn."));
   }
 
-  function handleSelectGuess(value) {
-    if (
-      uiState === UI_STATE.LOADING ||
-      uiState === UI_STATE.SUBMITTING_CHOICE ||
-      uiState === UI_STATE.CHOICE_SUBMITTED ||
-      uiState === UI_STATE.RESOLVING
-    ) {
+  resolveTurnRef.current = resolveTurn;
+
+  useEffect(() => {
+    const sid = session?.id;
+    const cr = session?.highLowCards?.canResolveTurn;
+    if (!sid || !cr || actionInFlightRef.current || createInFlightRef.current) return;
+
+    cycleRef.current += 1;
+    const cycle = cycleRef.current;
+    actionInFlightRef.current = true;
+    setUiState(UI_STATE.RESOLVING);
+
+    let cancelled = false;
+    (async () => {
+      await resolveTurnRef.current(sid, cycle);
+      if (!cancelled && cycle === cycleRef.current) actionInFlightRef.current = false;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.id, session?.highLowCards?.canResolveTurn]);
+
+  async function handleCashOut() {
+    const sid = sessionRef.current?.id;
+    if (!sid || actionInFlightRef.current) return;
+    if (!playing?.canCashOut && !session?.highLowCards?.canCashOut) {
+      setErrorMessage("Nothing to cash out yet.");
       return;
     }
-    setSelectedGuess(value);
-    setErrorMessage("");
-    setEventInfo(null);
-    setResolvedResult(null);
-    setSessionNotice("");
-    if (session?.id && uiState !== UI_STATE.RESOLVED) {
-      setUiState(UI_STATE.CHOICE_SELECTED);
-    }
-  }
-
-  async function handleResolveSession(options = {}) {
-    const { sessionIdOverride = null } = options;
-    const targetSessionId = sessionIdOverride || session?.id;
-    if (!targetSessionId) return;
-    if (resolveInFlightRef.current || createInFlightRef.current) return;
-    resolveInFlightRef.current = true;
-    const activeCycle = cycleRef.current;
+    actionInFlightRef.current = true;
+    cycleRef.current += 1;
+    const c = cycleRef.current;
     setUiState(UI_STATE.RESOLVING);
     setErrorMessage("");
 
     try {
-      const response = await fetch("/api/solo-v2/high-low-cards/resolve", {
+      const response = await fetch("/api/solo-v2/high-low-cards/cash-out", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-solo-v2-player": SOLO_V2_PLAYER,
-        },
-        body: JSON.stringify({
-          sessionId: targetSessionId,
-        }),
+        headers: { "content-type": "application/json", "x-solo-v2-player": SOLO_V2_PLAYER },
+        body: JSON.stringify({ sessionId: sid }),
       });
-
       const payload = await response.json().catch(() => null);
-      if (activeCycle !== cycleRef.current) return;
-      const status = String(payload?.status || "");
+      if (c !== cycleRef.current) return;
       const result = classifySoloV2ApiResult(response, payload);
+      const status = String(payload?.status || "");
 
-      if (result === SOLO_V2_API_RESULT.SUCCESS && status === "resolved" && payload?.result) {
-        setResolvedResult(payload.result);
-        setEventInfo(null);
-        setSession(previous =>
-          previous
-            ? {
-                ...previous,
-                sessionStatus: "resolved",
-              }
-            : previous,
-        );
-        setUiState(UI_STATE.RESOLVED);
-        setSessionNotice(payload?.idempotent ? "Round already resolved." : "Round resolved.");
+      if (result === SOLO_V2_API_RESULT.SUCCESS && status === "cashed_out" && payload?.result) {
+        clearStoredSessionId();
+        setTerminalResult({
+          terminalKind: "cashout",
+          streak: Number(payload.result.streak ?? 0),
+          settlementSummary: payload.result.settlementSummary,
+          isWin: true,
+        });
+        setSession(prev => (prev ? { ...prev, sessionStatus: "resolved" } : prev));
+        setUiState(UI_STATE.TERMINAL);
+        setSessionNotice("Cashed out.");
         return;
       }
 
-      if (result === SOLO_V2_API_RESULT.PENDING_MIGRATION) {
-        setResolvedResult(null);
-        setUiState(UI_STATE.PENDING_MIGRATION);
-        setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Migration is pending."));
+      if (result === SOLO_V2_API_RESULT.CONFLICT && status === "turn_pending") {
+        const truth = await readSessionTruth(sid, c);
+        if (truth?.ok) applySessionFromTruth(truth.session);
+        setErrorMessage("Resolve your current guess before cashing out.");
+        setUiState(UI_STATE.PLAYING);
         return;
       }
 
-      setResolvedResult(null);
-      setUiState(UI_STATE.RESOLVE_FAILED);
-      setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Resolve unavailable."));
-    } catch (_error) {
-      if (activeCycle !== cycleRef.current) return;
-      setResolvedResult(null);
-      setUiState(UI_STATE.RESOLVE_FAILED);
-      setErrorMessage("Network error while resolving outcome.");
+      const truth = await readSessionTruth(sid, c);
+      if (truth?.ok) applySessionFromTruth(truth.session);
+      setUiState(UI_STATE.PLAYING);
+      setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Cash-out failed."));
     } finally {
-      if (activeCycle === cycleRef.current) {
-        resolveInFlightRef.current = false;
-      }
+      if (c === cycleRef.current) actionInFlightRef.current = false;
     }
   }
 
+  function handlePlayAgain() {
+    clearStoredSessionId();
+    setSession(null);
+    setPlaying(null);
+    setTerminalResult(null);
+    setRevealCard(null);
+    setUiState(UI_STATE.IDLE);
+    setErrorMessage("");
+    setSessionNotice("");
+  }
+
   const numericWager = parseWagerInput(wagerInput);
-  const hasValidGuess = selectedGuess === "high" || selectedGuess === "low";
   const wagerPlayable =
     vaultReady && numericWager >= HIGH_LOW_CARDS_MIN_WAGER && vaultBalance >= numericWager;
-
-  useEffect(() => {
-    if (!wagerPlayable) return;
-    setErrorMessage(prev => {
-      const s = String(prev || "");
-      if (
-        /Session expired\. Choose High or Low|Session ended\. Choose High or Low|no longer valid\. Choose/i.test(s)
-      ) {
-        return "";
-      }
-      return s;
-    });
-  }, [wagerPlayable]);
-
-  const canPlayRound =
+  const canStart =
     wagerPlayable &&
-    hasValidGuess &&
-    ![
-      UI_STATE.LOADING,
-      UI_STATE.SUBMITTING_CHOICE,
-      UI_STATE.CHOICE_SUBMITTED,
-      UI_STATE.RESOLVING,
-      UI_STATE.PENDING_MIGRATION,
-    ].includes(uiState);
+    uiState !== UI_STATE.LOADING &&
+    uiState !== UI_STATE.RESOLVING &&
+    uiState !== UI_STATE.PLAYING &&
+    uiState !== UI_STATE.TERMINAL;
 
-  const isPrimaryLoading =
-    uiState === UI_STATE.LOADING || uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
-
-  const primaryActionLabel = hasValidGuess ? "PLAY" : "Choose High or Low";
+  const currentCard = playing?.currentCard;
+  const streak = Number(playing?.streak ?? 0);
+  const mult = Number(playing?.multiplier ?? 1);
+  const potentialWin =
+    session?.entryAmount != null ? payoutFromEntryAndStreak(Number(session.entryAmount), streak) : 0;
 
   function handlePresetClick(presetValue) {
     const v = Number(presetValue);
@@ -1012,40 +711,16 @@ export default function HighLowCardsPage() {
     lastPresetAmountRef.current = null;
   }
 
-  function handlePrimaryCta() {
-    if (canPlayRound) {
-      void runOneClickRound();
-    }
-  }
-
-  const isOpening = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
-  const potentialWin = Math.floor(numericWager * HIGH_LOW_CARDS_WIN_MULTIPLIER);
-
   const handleGiftPlay = useCallback(() => {
-    if (!vaultReady) {
-      setErrorMessage("Shared vault unavailable.");
-      return;
-    }
-    if (!hasValidGuess) {
-      setErrorMessage("Choose High or Low to play a gift round.");
-      return;
-    }
-    if (giftShell.giftCount < 1) return;
-    if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
-    if (
-      [
-        UI_STATE.LOADING,
-        UI_STATE.SUBMITTING_CHOICE,
-        UI_STATE.CHOICE_SUBMITTED,
-        UI_STATE.RESOLVING,
-        UI_STATE.PENDING_MIGRATION,
-      ].includes(uiState)
-    ) {
-      return;
-    }
+    if (!vaultReady || giftShell.giftCount < 1) return;
+    if ([UI_STATE.LOADING, UI_STATE.RESOLVING, UI_STATE.PLAYING, UI_STATE.PENDING_MIGRATION].includes(uiState)) return;
     giftRoundRef.current = true;
-    void runOneClickRound();
-  }, [vaultReady, hasValidGuess, giftShell.giftCount, uiState]);
+    void handleStartPlay();
+  }, [vaultReady, giftShell.giftCount, uiState]);
+
+  const isRunActive = uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING;
+  const primaryLabel =
+    uiState === UI_STATE.TERMINAL ? "PLAY AGAIN" : uiState === UI_STATE.PLAYING ? "Run in progress" : "PLAY";
 
   return (
     <SoloV2GameShell
@@ -1075,14 +750,13 @@ export default function HighLowCardsPage() {
         betPresets: BET_PRESETS,
         wagerInput,
         wagerNumeric: numericWager,
-        canEditPlay: !isOpening,
+        canEditPlay: !isRunActive && uiState !== UI_STATE.TERMINAL,
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
           setWagerInput(prev => {
             const c = parseWagerInput(prev);
-            const next = Math.min(MAX_WAGER, Math.max(0, c - HIGH_LOW_CARDS_MIN_WAGER));
-            return String(next);
+            return String(Math.min(MAX_WAGER, Math.max(0, c - HIGH_LOW_CARDS_MIN_WAGER)));
           });
         },
         onIncreaseAmount: () => {
@@ -1100,40 +774,101 @@ export default function HighLowCardsPage() {
           clearPresetChain();
           setWagerInput(String(HIGH_LOW_CARDS_MIN_WAGER));
         },
-        primaryActionLabel,
-        primaryActionDisabled: !canPlayRound,
-        primaryActionLoading: isPrimaryLoading,
-        primaryLoadingLabel: "PLAYING...",
-        onPrimaryAction: handlePrimaryCta,
+        primaryActionLabel: primaryLabel,
+        primaryActionDisabled: uiState === UI_STATE.TERMINAL ? false : !canStart,
+        primaryActionLoading: uiState === UI_STATE.LOADING,
+        primaryLoadingLabel: "STARTING...",
+        onPrimaryAction: () => {
+          if (uiState === UI_STATE.TERMINAL) handlePlayAgain();
+          else void handleStartPlay();
+        },
         errorMessage,
       }}
       gameplaySlot={
-        <HighLowGameplayPanel
-          uiState={uiState}
-          selectedGuess={selectedGuess}
-          isOpening={isOpening}
-          resultToast={resultToast}
-          onSelectGuess={handleSelectGuess}
-          resolvedResult={resolvedResult}
-        />
+        <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col px-2 pt-1 text-center sm:max-w-lg">
+          <p className="mb-2 text-xs text-zinc-400 sm:text-sm">
+            See the base card, then call higher or lower. Each win raises your streak and multiplier (+0.206 per win,
+            legacy curve). Cash out anytime after at least one win.
+          </p>
+
+          {uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING ? (
+            <div className="mb-2 text-xs text-zinc-500">
+              Streak <span className="font-bold text-amber-200/90">{streak}</span>
+              <span className="mx-1 text-zinc-600">·</span>×{mult.toFixed(3)}
+            </div>
+          ) : null}
+
+          <div className="flex min-h-[168px] items-start justify-center gap-3 sm:min-h-[200px]">
+            {currentCard?.rank ? <PlayingCard rank={currentCard.rank} suit={currentCard.suit || "♠"} /> : null}
+            {revealCard?.rank ? <PlayingCard rank={revealCard.rank} suit={revealCard.suit || "♠"} /> : null}
+          </div>
+
+          {uiState === UI_STATE.PLAYING ? (
+            <div className="mt-4 grid w-full grid-cols-3 gap-2">
+              <button
+                type="button"
+                disabled={Boolean(pendingGuess) || uiState === UI_STATE.RESOLVING}
+                onClick={() => void submitGuessAndResolve("high")}
+                className="h-12 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-sm font-bold text-white shadow-md disabled:opacity-40"
+              >
+                HIGHER
+              </button>
+              <button
+                type="button"
+                disabled={!playing?.canCashOut || Boolean(pendingGuess) || uiState === UI_STATE.RESOLVING}
+                onClick={() => void handleCashOut()}
+                className="h-12 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-700 text-[10px] font-bold text-white shadow-md disabled:opacity-30"
+              >
+                CASH OUT
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(pendingGuess) || uiState === UI_STATE.RESOLVING}
+                onClick={() => void submitGuessAndResolve("low")}
+                className="h-12 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 text-sm font-bold text-white shadow-md disabled:opacity-40"
+              >
+                LOWER
+              </button>
+            </div>
+          ) : null}
+
+          {uiState === UI_STATE.TERMINAL && terminalResult ? (
+            <div className="mt-4 text-sm">
+              <p className={terminalResult.isWin ? "font-bold text-emerald-300" : "font-bold text-rose-300"}>
+                {terminalResult.terminalKind === "cashout"
+                  ? `Cashed out — ${terminalResult.streak} streak`
+                  : "You lost this run"}
+              </p>
+            </div>
+          ) : null}
+
+          {resultToast ? (
+            <div
+              className={`pointer-events-none absolute left-1/2 top-[8%] z-20 w-[88%] max-w-xs -translate-x-1/2 rounded-lg border px-3 py-2 text-center text-xs font-bold ${
+                resultToast.isWin ? "border-emerald-400/40 bg-emerald-800/95" : "border-rose-400/40 bg-rose-900/95"
+              }`}
+            >
+              <div>{resultToast.title}</div>
+              <div className="text-sm">{resultToast.sub}</div>
+            </div>
+          ) : null}
+        </div>
       }
       helpContent={
         <div className="space-y-2">
-          <p>1. Tap Higher or Lower.</p>
-          <p>2. Set your play amount and press PLAY.</p>
-          <p>3. The server draws base and next ranks; you win if your guess matches whether the next rank is higher.</p>
-          <p>Win pays about ×1.92 on your play (~96% RTP target).</p>
-          <p>Vault updates after the server result, same shared vault as other Solo V2 games.</p>
+          <p>1. Set play and press PLAY — server deals your starting card.</p>
+          <p>2. Tap HIGHER or LOWER (or CASH OUT after at least one win).</p>
+          <p>3. Each correct guess advances streak; multiplier grows by +0.206 per win (legacy rule).</p>
+          <p>4. Wrong guess ends the run; vault settles from server result.</p>
         </div>
       }
       statsContent={
         <div className="space-y-2">
           <p>Total games: {stats.totalGames}</p>
           <p>Win rate: {stats.totalGames ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : "0.0"}%</p>
+          <p>Max streak: {stats.maxStreak}</p>
           <p>Total play: {formatCompact(stats.totalPlay)}</p>
           <p>Total won: {formatCompact(stats.totalWon)}</p>
-          <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
-          <p>Net profit: {formatCompact(stats.totalWon - stats.totalPlay)}</p>
         </div>
       }
       resultState={null}
