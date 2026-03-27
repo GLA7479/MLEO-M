@@ -78,6 +78,7 @@ function QuickFlipPlaceholderPanel({
   onSubmitChoice,
   onStartNewSession,
 }) {
+  const sessionStatusLabel = resolvedResult?.sessionStatus || (uiState === UI_STATE.RESOLVED ? "resolved" : session?.sessionStatus || "created");
   const isBusy = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
   const isLocked = uiState === UI_STATE.CHOICE_SUBMITTED || uiState === UI_STATE.RESOLVED;
   const canChoose = Boolean(session?.id) && !isBusy && !isLocked;
@@ -97,10 +98,8 @@ function QuickFlipPlaceholderPanel({
       <h2 className="text-lg font-bold text-white">Quick Flip</h2>
       {session ? (
         <div className="w-full max-w-sm space-y-2 rounded-lg border border-emerald-300/25 bg-emerald-500/10 px-3 py-3 text-left text-xs text-emerald-100">
-          <p className="font-semibold">Session active.</p>
-          <p>Session ID: {session.id || "--"}</p>
-          <p>Status: {session.sessionStatus || "created"}</p>
-          <p>Pick heads or tails, then submit.</p>
+          <p className="font-semibold">Session: {sessionStatusLabel}</p>
+          <p>ID: {session.id || "--"}</p>
         </div>
       ) : (
         <p className="max-w-sm text-sm text-zinc-300">Pick a side and let the server resolve the outcome.</p>
@@ -140,7 +139,6 @@ function QuickFlipPlaceholderPanel({
       {eventInfo?.eventId ? (
         <div className="w-full max-w-sm rounded-lg border border-blue-300/25 bg-blue-500/10 px-3 py-2 text-left text-xs text-blue-100">
           <p className="font-semibold">Choice submitted to server.</p>
-          <p>Event ID: {eventInfo.eventId}</p>
           <p className="text-blue-100/90">Waiting for server result.</p>
         </div>
       ) : null}
@@ -490,6 +488,14 @@ export default function QuickFlipPage() {
 
       if (result === API_RESULT.SUCCESS && status === "resolved" && payload?.result) {
         setResolvedResult(payload.result);
+        setSession(previous =>
+          previous
+            ? {
+                ...previous,
+                sessionStatus: "resolved",
+              }
+            : previous,
+        );
         setUiState(UI_STATE.RESOLVED);
         setSessionNotice(payload?.idempotent ? "Server returned existing resolved result." : "Server resolved this session.");
         return;
