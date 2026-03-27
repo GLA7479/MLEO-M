@@ -9,6 +9,11 @@ import { buildQuickFlipSessionSnapshot, normalizeQuickFlipChoice } from "../../.
 import { buildMysteryBoxSessionSnapshot, normalizeMysteryBoxIndex } from "../../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 import { buildHighLowCardsSessionSnapshot, normalizeHighLowGuess } from "../../../../../lib/solo-v2/server/highLowCardsSnapshot";
 import { buildDicePickSessionSnapshot, normalizeDicePickZone } from "../../../../../lib/solo-v2/server/dicePickSnapshot";
+import {
+  buildGoldRushDiggerSessionSnapshot,
+  normalizeGoldRushColumn,
+  normalizeGoldRushRowIndex,
+} from "../../../../../lib/solo-v2/server/goldRushDiggerSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -268,6 +273,126 @@ export default async function handler(req, res) {
           category: "conflict",
           status: "choice_already_submitted",
           message: "Dice Pick zone is already locked for this session.",
+        });
+      }
+    }
+
+    const isGoldRushPick =
+      sessionRow.game_key === "gold_rush_digger" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "gold_rush_pick";
+
+    if (isGoldRushPick) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Gold Rush pick is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "gold_rush_digger") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Gold Rush pick requires gameKey gold_rush_digger.",
+        });
+      }
+
+      const rowIndex = normalizeGoldRushRowIndex(eventPayload?.rowIndex);
+      const column = normalizeGoldRushColumn(eventPayload?.column);
+      if (rowIndex === null || column === null) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Gold Rush pick requires rowIndex 0..5 and column 0..2.",
+        });
+      }
+
+      const snapshotResult = await buildGoldRushDiggerSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Gold Rush pick submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.pickConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "Conflicting dig picks for this row. Refresh session state.",
+        });
+      }
+
+      const playing = snapshot.playing;
+      const expectedRow = playing?.currentRowIndex;
+      if (!Number.isFinite(Number(expectedRow)) || rowIndex !== expectedRow) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_row",
+          message: "Pick must target the current dig row.",
+        });
+      }
+
+      if (snapshot.pendingPick) {
+        const pp = snapshot.pendingPick;
+        const same = pp.rowIndex === rowIndex && pp.column === column;
+        if (same) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pp.pickEventId || null,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "A different dig spot is already pending for this row.",
         });
       }
     }

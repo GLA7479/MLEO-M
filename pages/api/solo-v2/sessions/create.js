@@ -8,7 +8,12 @@ import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/qu
 import { buildMysteryBoxSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 import { buildHighLowCardsSessionSnapshot } from "../../../../lib/solo-v2/server/highLowCardsSnapshot";
 import { buildDicePickSessionSnapshot } from "../../../../lib/solo-v2/server/dicePickSnapshot";
+import { buildGoldRushDiggerSessionSnapshot } from "../../../../lib/solo-v2/server/goldRushDiggerSnapshot";
 import { drawServerCard, buildActiveSummaryPatch } from "../../../../lib/solo-v2/server/highLowCardsEngine";
+import {
+  buildInitialActiveSummary,
+  generateBombColumns,
+} from "../../../../lib/solo-v2/server/goldRushDiggerEngine";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -281,7 +286,7 @@ async function singleActiveGameRowPlayableOrExpire(supabase, existingSummary, pl
   }
 
   const rs = snap.snapshot.readState;
-  if (rs === "choice_required" || rs === "choice_submitted") {
+  if (rs === "choice_required" || rs === "choice_submitted" || rs === "pick_conflict") {
     return { ok: true, playable: true };
   }
 
@@ -367,6 +372,25 @@ async function seedHighLowCardsSessionOrWarn(supabase, gameKey, sessionId, playe
   }
 }
 
+async function seedGoldRushDiggerSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "gold_rush_digger" || !sessionId) return;
+  const summary = buildInitialActiveSummary(generateBombColumns());
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "gold_rush_digger")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create gold_rush_digger] seed failed", { sessionId, error });
+  }
+}
+
 async function createSessionLegacyCompat(supabase, payload) {
   const startedAt = new Date();
   const expiresAt = new Date(startedAt.getTime() + 900 * 1000).toISOString();
@@ -440,7 +464,11 @@ export default async function handler(req, res) {
   try {
     const supabase = getSupabaseAdmin();
 
-    if (gameKey === "quick_flip" || gameKey === "dice_pick" || gameKey === "mystery_box" || gameKey === "high_low_cards") {
+    if (gameKey === "quick_flip" ||
+      gameKey === "dice_pick" ||
+      gameKey === "mystery_box" ||
+      gameKey === "high_low_cards" ||
+      gameKey === "gold_rush_digger") {
       const minWager = gameKey === "mystery_box" ? MYSTERY_BOX_MIN_WAGER : QUICK_FLIP_MIN_WAGER;
       const buildSnapshot =
         gameKey === "mystery_box"
@@ -449,7 +477,9 @@ export default async function handler(req, res) {
             ? buildHighLowCardsSessionSnapshot
             : gameKey === "dice_pick"
               ? buildDicePickSessionSnapshot
-              : buildQuickFlipSessionSnapshot;
+              : gameKey === "gold_rush_digger"
+                ? buildGoldRushDiggerSessionSnapshot
+                : buildQuickFlipSessionSnapshot;
 
       if (!Number.isFinite(entryAmount) || entryAmount < minWager) {
         return res.status(400).json({
@@ -556,7 +586,11 @@ export default async function handler(req, res) {
 
     if (
       error &&
-      (gameKey === "quick_flip" || gameKey === "dice_pick" || gameKey === "mystery_box" || gameKey === "high_low_cards") &&
+      (gameKey === "quick_flip" ||
+      gameKey === "dice_pick" ||
+      gameKey === "mystery_box" ||
+      gameKey === "high_low_cards" ||
+      gameKey === "gold_rush_digger") &&
       isGameNotEnabled(error)
     ) {
       console.warn(`solo-v2 create: ${gameKey} missing/disabled in solo_v2_games, attempting catalog bootstrap`);
@@ -593,7 +627,11 @@ export default async function handler(req, res) {
       });
 
       if (
-        (gameKey === "quick_flip" || gameKey === "dice_pick" || gameKey === "mystery_box" || gameKey === "high_low_cards") &&
+        (gameKey === "quick_flip" ||
+      gameKey === "dice_pick" ||
+      gameKey === "mystery_box" ||
+      gameKey === "high_low_cards" ||
+      gameKey === "gold_rush_digger") &&
         isLegacyDeviceIdNotNullError(error)
       ) {
         console.warn("solo-v2 create: legacy device_id constraint detected, using compat insert path");
@@ -616,6 +654,7 @@ export default async function handler(req, res) {
       if (!error) {
         const row = Array.isArray(data) ? data[0] : data;
         await seedHighLowCardsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         return res.status(201).json({
           ok: true,
           category: "success",
@@ -657,7 +696,11 @@ export default async function handler(req, res) {
       }
 
       if (
-        (gameKey === "quick_flip" || gameKey === "dice_pick" || gameKey === "mystery_box" || gameKey === "high_low_cards") &&
+        (gameKey === "quick_flip" ||
+      gameKey === "dice_pick" ||
+      gameKey === "mystery_box" ||
+      gameKey === "high_low_cards" ||
+      gameKey === "gold_rush_digger") &&
         isUniqueConflict(error)
       ) {
         const buildSnapshot =
@@ -667,7 +710,9 @@ export default async function handler(req, res) {
               ? buildHighLowCardsSessionSnapshot
               : gameKey === "dice_pick"
                 ? buildDicePickSessionSnapshot
-                : buildQuickFlipSessionSnapshot;
+                : gameKey === "gold_rush_digger"
+                  ? buildGoldRushDiggerSessionSnapshot
+                  : buildQuickFlipSessionSnapshot;
         const conflictLookup = await healAndReReadActiveSessions(supabase, playerRef, gameKey, "post_unique_conflict");
         if (conflictLookup.ok) {
           const conflictRows = conflictLookup.rows;
@@ -728,6 +773,7 @@ export default async function handler(req, res) {
                 });
               }
               await seedHighLowCardsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -769,6 +815,7 @@ export default async function handler(req, res) {
                 });
               }
               await seedHighLowCardsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -825,6 +872,7 @@ export default async function handler(req, res) {
 
     const row = Array.isArray(data) ? data[0] : data;
     await seedHighLowCardsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     return res.status(201).json({
       ok: true,
       category: "success",

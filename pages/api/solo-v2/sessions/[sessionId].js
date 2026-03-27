@@ -4,6 +4,7 @@ import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/qu
 import { buildMysteryBoxSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 import { buildHighLowCardsSessionSnapshot } from "../../../../lib/solo-v2/server/highLowCardsSnapshot";
 import { buildDicePickSessionSnapshot } from "../../../../lib/solo-v2/server/dicePickSnapshot";
+import { buildGoldRushDiggerSessionSnapshot } from "../../../../lib/solo-v2/server/goldRushDiggerSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -65,6 +66,7 @@ export default async function handler(req, res) {
     let mysteryBoxPayload = null;
     let highLowCardsPayload = null;
     let dicePickPayload = null;
+    let goldRushDiggerPayload = null;
 
     if (row.game_key === "quick_flip") {
       const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
@@ -174,6 +176,35 @@ export default async function handler(req, res) {
         canResolve: dicePickSnapshot.canResolve,
         resolvedResult: dicePickSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "gold_rush_digger") {
+      const grSnapshotResult = await buildGoldRushDiggerSessionSnapshot(supabase, row);
+      if (!grSnapshotResult.ok) {
+        if (isMissingTable(grSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const grSnapshot = grSnapshotResult.snapshot;
+      sessionReadState = grSnapshot.readState;
+      goldRushDiggerPayload = {
+        readState: grSnapshot.readState,
+        playing: grSnapshot.playing,
+        pendingPick: grSnapshot.pendingPick,
+        pickConflict: grSnapshot.pickConflict,
+        canResolveTurn: grSnapshot.canResolveTurn,
+        canCashOut: grSnapshot.canCashOut,
+        resolvedResult: grSnapshot.resolvedResult,
+      };
     }
 
     return res.status(200).json({
@@ -199,6 +230,7 @@ export default async function handler(req, res) {
         mysteryBox: mysteryBoxPayload,
         highLowCards: highLowCardsPayload,
         dicePick: dicePickPayload,
+        goldRushDigger: goldRushDiggerPayload,
       },
       authority: {
         sessionTruth: "server",
