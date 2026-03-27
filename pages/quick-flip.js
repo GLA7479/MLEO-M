@@ -239,7 +239,8 @@ export default function QuickFlipPage() {
     if (!sessionId || !settlementSummary) return;
     applyQuickFlipSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
       if (!settlementResult) return;
-      setVaultBalance(settlementResult.nextBalance);
+      const authoritativeBalance = Number(settlementResult.nextBalance || 0);
+      setVaultBalance(authoritativeBalance);
       if (settlementResult.error) {
         setErrorMessage(settlementResult.error);
         setSessionNotice("Result resolved, but vault update failed.");
@@ -249,9 +250,9 @@ export default function QuickFlipPage() {
       const delta = Number(settlementSummary.netDelta || 0);
       const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
       if (settlementResult.applied) {
-        setSessionNotice(`Settled (${deltaLabel}). Vault: ${settlementResult.nextBalance}.`);
+        setSessionNotice(`Settled (${deltaLabel}). Vault: ${authoritativeBalance}.`);
       } else {
-        setSessionNotice(`Settlement already applied. Vault: ${settlementResult.nextBalance}.`);
+        setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
       }
     });
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
