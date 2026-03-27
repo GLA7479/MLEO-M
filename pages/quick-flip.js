@@ -115,10 +115,10 @@ function ChoiceButton({ label, value, selectedChoice, disabled, onSelect }) {
       type="button"
       disabled={disabled}
       onClick={() => onSelect(value)}
-      className={`min-h-[44px] rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+      className={`min-h-[42px] rounded-lg border px-3 py-2 text-sm font-bold transition ${
         isSelected
-          ? "border-violet-300/45 bg-violet-500/30 text-white"
-          : "border-white/20 bg-white/5 text-zinc-200 hover:bg-white/10"
+          ? "border-amber-400/50 bg-amber-500/25 text-amber-50"
+          : "border-white/25 bg-white/[0.06] text-zinc-100 hover:bg-white/12"
       } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
     >
       {label}
@@ -151,25 +151,28 @@ function QuickFlipPlaceholderPanel({
   const canEditPlay = !isFlipping;
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col px-3 pb-1 text-center">
-      <div className="mb-2 grid grid-cols-3 gap-2">
-        <div className="rounded-lg border border-white/15 bg-black/30 px-2 py-1.5">
-          <div className="text-[10px] text-zinc-400">Vault</div>
-          <div className="text-sm font-bold text-emerald-300">{formatCompact(vaultBalance)}</div>
-        </div>
-        <div className="rounded-lg border border-white/15 bg-black/30 px-2 py-1.5">
-          <div className="text-[10px] text-zinc-400">Play</div>
-          <div className="text-sm font-bold text-amber-300">{formatCompact(playAmount)}</div>
-        </div>
-        <div className="rounded-lg border border-white/15 bg-black/30 px-2 py-1.5">
-          <div className="text-[10px] text-zinc-400">Win</div>
-          <div className="text-sm font-bold text-lime-300">{formatCompact(potentialWin)}</div>
-        </div>
+    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col px-1 pb-1 pt-0 text-center sm:max-w-lg">
+      <div className="mb-1.5 flex w-full shrink-0 items-center justify-center gap-x-3 gap-y-0.5 text-[11px] sm:text-xs">
+        <span className="text-zinc-500">
+          Vault <span className="font-semibold text-emerald-300/95">{formatCompact(vaultBalance)}</span>
+        </span>
+        <span className="text-zinc-700" aria-hidden>
+          ·
+        </span>
+        <span className="text-zinc-500">
+          Play <span className="font-semibold text-amber-200/90">{formatCompact(playAmount)}</span>
+        </span>
+        <span className="text-zinc-700" aria-hidden>
+          ·
+        </span>
+        <span className="text-zinc-500">
+          Win <span className="font-semibold text-lime-200/90">{formatCompact(potentialWin)}</span>
+        </span>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-1">
         <div
-          className={`mb-3 grid h-40 w-40 place-items-center rounded-full border border-amber-300/35 bg-gradient-to-br from-yellow-300/40 to-amber-700/50 text-7xl shadow-[0_0_35px_rgba(251,191,36,0.2)] transition-transform ${
+          className={`mb-2 grid h-[10.5rem] w-[10.5rem] place-items-center rounded-full border-2 border-amber-400/35 bg-amber-950/30 text-8xl transition-transform sm:h-52 sm:w-52 sm:text-9xl ${
             isFlipping ? "animate-spin" : ""
           }`}
           aria-hidden
@@ -177,7 +180,7 @@ function QuickFlipPlaceholderPanel({
           🪙
         </div>
 
-        <div className="grid w-full max-w-md grid-cols-2 gap-2">
+        <div className="grid w-full max-w-xs grid-cols-2 gap-1.5 sm:max-w-sm">
           <ChoiceButton
             label="Heads"
             value="heads"
@@ -195,94 +198,92 @@ function QuickFlipPlaceholderPanel({
         </div>
       </div>
 
-      <div className="mb-2 grid w-full max-w-md grid-cols-4 gap-1.5">
-        {BET_PRESETS.map(value => (
+      <div className="mt-1 shrink-0 rounded-md bg-white/[0.03] px-1 py-1 sm:px-1.5">
+        <div className="flex w-full flex-nowrap items-stretch gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {BET_PRESETS.map(value => (
+            <button
+              key={value}
+              type="button"
+              disabled={!canEditPlay}
+              onClick={() => onPresetAmount(value)}
+              className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold leading-none sm:px-2.5 sm:text-xs ${
+                playAmount === value
+                  ? "border-amber-400/55 bg-amber-500/30 text-amber-50"
+                  : "border-white/20 bg-white/[0.07] text-zinc-100"
+              } ${!canEditPlay ? "cursor-not-allowed opacity-60" : ""}`}
+            >
+              {value >= 1000 ? `${value / 1000}K` : value}
+            </button>
+          ))}
           <button
-            key={value}
             type="button"
+            onClick={onDecreaseAmount}
             disabled={!canEditPlay}
-            onClick={() => onPresetAmount(value)}
-            className={`min-h-[36px] rounded-md border text-xs font-bold ${
-              playAmount === value
-                ? "border-amber-300/60 bg-amber-500/35 text-black"
-                : "border-white/20 bg-white/10 text-white"
-            } ${!canEditPlay ? "cursor-not-allowed opacity-60" : ""}`}
+            className="h-8 w-8 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:h-9 sm:w-9"
           >
-            {value >= 1000 ? `${value / 1000}K` : value}
+            −
           </button>
-        ))}
-      </div>
-
-      <div className="mb-2 flex w-full max-w-md items-center gap-1.5">
-        <button
-          type="button"
-          onClick={onDecreaseAmount}
-          disabled={!canEditPlay}
-          className="h-9 w-9 rounded-md border border-white/20 bg-white/10 text-sm font-bold text-white disabled:opacity-50"
-        >
-          -
-        </button>
-        <input
-          type="text"
-          value={String(playAmount)}
-          onChange={e => onAmountInput(e.target.value)}
-          disabled={!canEditPlay}
-          className="h-9 flex-1 rounded-md border border-white/20 bg-black/35 px-2 text-center text-sm font-bold text-white disabled:opacity-50"
-        />
-        <button
-          type="button"
-          onClick={onResetAmount}
-          disabled={!canEditPlay}
-          className="h-9 w-9 rounded-md border border-red-300/30 bg-red-500/20 text-xs font-bold text-red-100 disabled:opacity-50"
-          title="Reset"
-        >
-          ↺
-        </button>
-        <button
-          type="button"
-          onClick={onIncreaseAmount}
-          disabled={!canEditPlay}
-          className="h-9 w-9 rounded-md border border-white/20 bg-white/10 text-sm font-bold text-white disabled:opacity-50"
-        >
-          +
-        </button>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={String(playAmount)}
+            onChange={e => onAmountInput(e.target.value)}
+            disabled={!canEditPlay}
+            className="h-8 min-w-[4.25rem] max-w-[5.5rem] shrink-0 rounded-md border border-white/20 bg-black/40 px-1 text-center text-[11px] font-bold text-white disabled:opacity-50 sm:h-9 sm:min-w-[5rem] sm:text-sm"
+          />
+          <button
+            type="button"
+            onClick={onResetAmount}
+            disabled={!canEditPlay}
+            className="h-8 w-8 shrink-0 rounded-md border border-red-400/35 bg-red-500/15 text-[11px] font-bold text-red-100 disabled:opacity-50 sm:h-9 sm:w-9"
+            title="Reset"
+          >
+            ↺
+          </button>
+          <button
+            type="button"
+            onClick={onIncreaseAmount}
+            disabled={!canEditPlay}
+            className="h-8 w-8 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:h-9 sm:w-9"
+          >
+            +
+          </button>
+        </div>
       </div>
 
       <button
         type="button"
         onClick={onPrimaryAction}
         disabled={primaryActionDisabled || primaryActionLoading}
-        className={`min-h-[52px] w-full max-w-md rounded-lg border px-4 py-3 text-base font-extrabold ${
+        className={`mt-2 min-h-[48px] w-full shrink-0 rounded-lg border px-4 py-2.5 text-base font-extrabold tracking-wide ${
           primaryActionDisabled || primaryActionLoading
-            ? "cursor-not-allowed border-white/20 bg-white/10 text-zinc-300 opacity-70"
-            : "border-emerald-300/45 bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg"
+            ? "cursor-not-allowed border-white/20 bg-white/10 text-zinc-400 opacity-70"
+            : "border-emerald-400/40 bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-md shadow-emerald-900/30"
         }`}
       >
         {primaryActionLoading ? "FLIPPING..." : primaryActionLabel}
       </button>
 
       {sessionNotice ? (
-        <div className="mt-1 max-w-md rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-zinc-200">
-          {sessionNotice}
-        </div>
+        <p className="mt-1.5 px-1 text-[11px] leading-snug text-zinc-400">{sessionNotice}</p>
       ) : null}
       {errorMessage ? (
-        <div className="mt-1 max-w-md rounded-lg border border-red-300/25 bg-red-500/10 px-3 py-1.5 text-xs text-red-100">
-          {errorMessage}
-        </div>
+        <p className="mt-1.5 px-1 text-[11px] leading-snug text-red-300/95">{errorMessage}</p>
       ) : null}
 
       {resultToast ? (
         <div
-          className={`pointer-events-none absolute left-1/2 top-8 z-20 w-[85%] max-w-sm -translate-x-1/2 rounded-xl border px-4 py-3 text-center text-sm font-bold shadow-xl ${
+          className={`pointer-events-none absolute left-1/2 top-[10%] z-20 w-[88%] max-w-xs -translate-x-1/2 rounded-lg border px-3 py-2 text-center text-xs font-bold shadow-lg sm:top-[12%] ${
             resultToast.isWin
-              ? "border-emerald-300/40 bg-emerald-600/85 text-white"
-              : "border-red-300/35 bg-red-600/85 text-white"
+              ? "border-emerald-400/35 bg-emerald-700/90 text-white"
+              : "border-red-400/35 bg-red-700/90 text-white"
           }`}
         >
-          <div className="text-base">{resultToast.isWin ? "YOU WIN" : "YOU LOSE"}</div>
-          <div className="text-lg">{resultToast.deltaLabel}</div>
-          <div className="text-xs opacity-90">Result: {String(resultToast.outcome || "--").toUpperCase()}</div>
+          <div className="text-[13px]">{resultToast.isWin ? "YOU WIN" : "YOU LOSE"}</div>
+          <div className="text-sm">{resultToast.deltaLabel}</div>
+          <div className="mt-0.5 text-[10px] font-semibold opacity-90">
+            {String(resultToast.outcome || "--").toUpperCase()}
+          </div>
         </div>
       ) : null}
     </div>
@@ -556,7 +557,7 @@ export default function QuickFlipPage() {
 
       if (result === API_RESULT.SUCCESS && status === "created" && payload?.session) {
         setSession(payload.session);
-        setSessionNotice("Choose heads or tails, then flip.");
+        setSessionNotice("");
         setUiState(UI_STATE.SESSION_CREATED);
         return;
       }
@@ -615,7 +616,7 @@ export default function QuickFlipPage() {
     setErrorMessage("");
     setEventInfo(null);
     setResolvedResult(null);
-    setSessionNotice("Ready to flip.");
+    setSessionNotice("");
     setUiState(UI_STATE.CHOICE_SELECTED);
   }
 
@@ -838,8 +839,7 @@ export default function QuickFlipPage() {
     <SoloV2GameShell
       title="Quick Flip"
       subtitle="Arcade Solo"
-      balanceLabel="Vault"
-      balanceValue={String(vaultBalance)}
+      menuVaultBalance={vaultBalance}
       hideStatusPanel
       onBack={() => {
         if (typeof window !== "undefined") window.location.href = "/arcade-v2";

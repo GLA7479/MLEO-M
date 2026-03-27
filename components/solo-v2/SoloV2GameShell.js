@@ -4,12 +4,11 @@ import SoloV2Modal from "./SoloV2Modal";
 import SoloV2ReservedAdSlot from "./SoloV2ReservedAdSlot";
 import SoloV2StatusPanel from "./SoloV2StatusPanel";
 import SoloV2TopHud from "./SoloV2TopHud";
+import SoloV2GameUserMenuContent from "./SoloV2GameUserMenuContent";
 
 export default function SoloV2GameShell({
   title,
   subtitle = "",
-  balanceLabel = "Vault",
-  balanceValue = "--",
   shellStatus = "idle",
   statusDetails = "",
   onBack,
@@ -27,28 +26,35 @@ export default function SoloV2GameShell({
   statsContent = null,
   hideStatusPanel = false,
   hideActionBar = false,
+  menuVaultBalance = 0,
 }) {
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [infoTab, setInfoTab] = useState("help");
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isResultOpen, setIsResultOpen] = useState(false);
+
+  function openInfo() {
+    setInfoTab("help");
+    setIsInfoOpen(true);
+  }
 
   return (
     <main
-      className="relative h-[100dvh] max-h-[100dvh] overflow-hidden bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white"
+      className="relative h-[100dvh] max-h-[100dvh] overflow-hidden text-white"
       style={{
         paddingTop: "max(8px, env(safe-area-inset-top))",
         paddingBottom: "max(8px, env(safe-area-inset-bottom))",
+        background:
+          "radial-gradient(ellipse 85% 60% at 50% 22%, rgba(180, 83, 9, 0.14), transparent 55%), radial-gradient(ellipse 90% 45% at 50% 92%, rgba(0, 0, 0, 0.45), transparent 50%), linear-gradient(180deg, #0a0908 0%, #171717 42%, #0c0a09 100%)",
       }}
     >
-      <div className="mx-auto flex h-full max-w-2xl min-h-0 flex-col gap-2 px-2">
+      <div className="mx-auto flex h-full w-full max-w-lg min-h-0 flex-col gap-1.5 px-3 sm:gap-2 sm:px-4">
         <SoloV2TopHud
           title={title}
           subtitle={subtitle}
-          balanceLabel={balanceLabel}
-          balanceValue={balanceValue}
           onBack={onBack}
-          onOpenStats={() => setIsStatsOpen(true)}
-          onOpenHelp={() => setIsHelpOpen(true)}
+          onOpenInfo={openInfo}
+          onOpenMenu={() => setIsMenuOpen(true)}
           rightSlot={
             resultState ? (
               <button
@@ -64,15 +70,9 @@ export default function SoloV2GameShell({
 
         {!hideStatusPanel ? <SoloV2StatusPanel status={shellStatus} details={statusDetails} /> : null}
 
-        <section className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-black/20">
-          <div className="flex h-full min-h-0 items-center justify-center p-3">
-            <div className="h-full w-full min-h-0 overflow-hidden rounded-lg border border-white/10 bg-zinc-900/50 p-2">
-              {gameplaySlot || (
-                <div className="flex h-full items-center justify-center text-center text-sm text-zinc-300">
-                  Gameplay panel placeholder
-                </div>
-              )}
-            </div>
+        <section className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex h-full min-h-0 items-stretch justify-center">
+            <div className="h-full w-full min-h-0 overflow-y-auto overflow-x-hidden">{gameplaySlot}</div>
           </div>
         </section>
 
@@ -89,25 +89,53 @@ export default function SoloV2GameShell({
           />
         ) : null}
 
-        <SoloV2ReservedAdSlot />
+        <SoloV2ReservedAdSlot variant="subtle" />
       </div>
 
-      <SoloV2Modal open={isHelpOpen} title="Help" onClose={() => setIsHelpOpen(false)}>
-        {helpContent || (
-          <p>
-            This game module is in foundation stage. Gameplay rules and server-backed actions will be added in
-            upcoming deliverables.
-          </p>
-        )}
+      <SoloV2Modal open={isInfoOpen} title="Info" onClose={() => setIsInfoOpen(false)}>
+        <div className="mb-3 flex gap-1">
+          <button
+            type="button"
+            onClick={() => setInfoTab("help")}
+            className={`flex-1 rounded-lg border px-2 py-2 text-xs font-semibold transition ${
+              infoTab === "help"
+                ? "border-amber-400/40 bg-amber-500/20 text-amber-50"
+                : "border-transparent bg-white/5 text-zinc-400 hover:bg-white/10"
+            }`}
+          >
+            Help
+          </button>
+          <button
+            type="button"
+            onClick={() => setInfoTab("stats")}
+            className={`flex-1 rounded-lg border px-2 py-2 text-xs font-semibold transition ${
+              infoTab === "stats"
+                ? "border-amber-400/40 bg-amber-500/20 text-amber-50"
+                : "border-transparent bg-white/5 text-zinc-400 hover:bg-white/10"
+            }`}
+          >
+            Stats
+          </button>
+        </div>
+        <div className="text-zinc-200">
+          {infoTab === "help"
+            ? helpContent || (
+                <p>
+                  This game module is in foundation stage. Gameplay rules and server-backed actions will be added in
+                  upcoming deliverables.
+                </p>
+              )
+            : statsContent || (
+                <p>
+                  Stats are not available yet. Server-authoritative session and player aggregates will appear after
+                  backend integration is activated.
+                </p>
+              )}
+        </div>
       </SoloV2Modal>
 
-      <SoloV2Modal open={isStatsOpen} title="Stats" onClose={() => setIsStatsOpen(false)}>
-        {statsContent || (
-          <p>
-            Stats are not available yet. Server-authoritative session and player aggregates will appear after backend
-            integration is activated.
-          </p>
-        )}
+      <SoloV2Modal open={isMenuOpen} title="Menu" onClose={() => setIsMenuOpen(false)}>
+        <SoloV2GameUserMenuContent vaultBalance={menuVaultBalance} onClose={() => setIsMenuOpen(false)} />
       </SoloV2Modal>
 
       <SoloV2Modal
