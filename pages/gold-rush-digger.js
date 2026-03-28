@@ -13,7 +13,11 @@ import {
 } from "../lib/solo-v2/soloV2GiftStorage";
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
 import { QUICK_FLIP_CONFIG } from "../lib/solo-v2/quickFlipConfig";
-import { GOLD_RUSH_DIGGER_MIN_WAGER } from "../lib/solo-v2/goldRushDiggerConfig";
+import {
+  GOLD_RUSH_DIGGER_MIN_WAGER,
+  GOLD_RUSH_MULTIPLIER_LADDER,
+  payoutForMultiplier,
+} from "../lib/solo-v2/goldRushDiggerConfig";
 import {
   applyGoldRushDiggerSettlementOnce,
   readQuickFlipSharedVaultBalance,
@@ -107,7 +111,7 @@ function GoldRushGameplayPanel({
             onDigColumn={onDigColumn}
           />
         </div>
-        <div className="h-11 shrink-0">
+        <div className="h-11 shrink-0 sm:mt-3">
           <button
             type="button"
             disabled={!canCashOut || cashOutLoading || busy || isTerminal}
@@ -654,8 +658,47 @@ export default function GoldRushDiggerPage() {
 
   const gr = session?.goldRushDigger;
   const playing = gr?.playing;
-  const nextMult = playing?.nextMultiplier;
-  const nextPay = playing?.nextPayout;
+
+  const runEntryFromSession =
+    session != null &&
+    Number(session.entryAmount) >= GOLD_RUSH_DIGGER_MIN_WAGER &&
+    Number.isFinite(Number(session.entryAmount))
+      ? Math.floor(Number(session.entryAmount))
+      : null;
+
+  const firstStepWinPreview = payoutForMultiplier(
+    Math.max(GOLD_RUSH_DIGGER_MIN_WAGER, numericWager),
+    GOLD_RUSH_MULTIPLIER_LADDER[0],
+  );
+
+  let summaryPlay = numericWager;
+  let summaryWin = firstStepWinPreview;
+
+  const inActiveRunUi =
+    uiState === UI_STATE.SESSION_ACTIVE ||
+    uiState === UI_STATE.SUBMITTING_PICK ||
+    uiState === UI_STATE.RESOLVING ||
+    uiState === UI_STATE.LOADING;
+
+  if (runEntryFromSession != null && (inActiveRunUi || uiState === UI_STATE.RESOLVED)) {
+    summaryPlay = runEntryFromSession;
+  }
+
+  if (playing && (uiState === UI_STATE.SESSION_ACTIVE || uiState === UI_STATE.SUBMITTING_PICK || uiState === UI_STATE.RESOLVING)) {
+    const np = playing.nextPayout;
+    const cp = playing.currentPayout;
+    if (np != null && Number.isFinite(Number(np))) {
+      summaryWin = Math.floor(Number(np));
+    } else if (cp != null && Number.isFinite(Number(cp))) {
+      summaryWin = Math.floor(Number(cp));
+    }
+  }
+
+  if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
+    const ss = resolvedResult.settlementSummary;
+    summaryPlay = Math.max(0, Math.floor(Number(ss.entryCost) || summaryPlay));
+    summaryWin = Math.max(0, Math.floor(Number(ss.payoutReturn) || 0));
+  }
 
   const terminalKind = resolvedResult?.terminalKind;
   let resultTitle = "Run complete";
@@ -713,32 +756,29 @@ export default function GoldRushDiggerPage() {
         if (typeof window !== "undefined") window.location.href = "/arcade-v2";
       }}
       topGameStatsSlot={
-        playing && uiState !== UI_STATE.RESOLVED ? (
-          <>
-            <span className="shrink-0 whitespace-nowrap text-zinc-500">
-              Next{" "}
-              <span className="font-semibold tabular-nums text-amber-200/90">
-                {nextMult != null ? `${nextMult}x` : "—"}
-              </span>
-            </span>
-            <span className="shrink-0 text-zinc-600" aria-hidden>
-              ·
-            </span>
-            <span className="shrink-0 whitespace-nowrap text-zinc-500">
-              Pay{" "}
-              <span className="font-semibold tabular-nums text-lime-200/90">
-                {nextPay != null ? formatCompact(nextPay) : "—"}
-              </span>
-            </span>
-          </>
-        ) : null
+        <>
+          <span className="shrink-0 whitespace-nowrap text-zinc-500">
+            Play <span className="font-semibold tabular-nums text-amber-200/90">{formatCompact(summaryPlay)}</span>
+          </span>
+          <span className="shrink-0 text-zinc-600" aria-hidden>
+            ·
+          </span>
+          <span className="shrink-0 whitespace-nowrap text-zinc-500">
+            Win <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
+          </span>
+        </>
       }
       soloV2Footer={{
         betPresets: BET_PRESETS,
         wagerInput,
         wagerNumeric: numericWager,
-        canEditPlay:
-          uiState !== UI_STATE.RESOLVING && uiState !== UI_STATE.SUBMITTING_PICK && canStart,
+        canEditPlay: ![
+          UI_STATE.SESSION_ACTIVE,
+          UI_STATE.SUBMITTING_PICK,
+          UI_STATE.RESOLVING,
+          UI_STATE.LOADING,
+          UI_STATE.PENDING_MIGRATION,
+        ].includes(uiState),
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
