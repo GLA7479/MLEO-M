@@ -3,14 +3,16 @@ import {
   DROP_RUN_BAY_MULTIPLIERS,
   DROP_RUN_DRIFT_ROWS,
   DROP_RUN_GATES,
+  DROP_RUN_PEG_ROWS,
 } from "../../lib/solo-v2/dropRunConfig";
 
 /**
- * Board geometry from mleo-plinko-v2 (pegGapX, row+2 pegs, bucket strip). ~15 peg rows (cap 16) for readability.
- * Landing is always snapped to server finalBay bucket center — highlight, ball, and payout stay 1:1.
+ * Peg lattice from mleo-plinko-v2 (pegGapX, row+2 pegs). PEG_ROWS from config = DROP_RUN_PEG_ROWS (15).
+ * Fall playback: requestAnimationFrame + continuous integration only (no step/lerp targets).
+ * finalBay → targetBoxIndex = finalBay - 1; snap ball center to that bucket center; highlight matches payout.
  */
 
-const REF_ROWS = 15;
+const PEG_ROWS = DROP_RUN_PEG_ROWS;
 const REF_PAD_LR = 20;
 const REF_H_INSET = 40;
 
@@ -19,11 +21,10 @@ const DRAG = 0.995;
 const MAX_SPEED = 1500;
 const PEG_RESTITUTION = 0.6;
 const CENTER_BIAS = 0.05;
+/** Target steering: shallower above 55% board height, stronger at/after 55%. */
 const STEER_SHALLOW = 0.03;
 const STEER_DEEP = 0.14;
-const STEER_Y_FRAC = 0.55;
-const STEER_DEEP_FRAC = 0.72;
-const PATH_PULL = 0.014;
+const STEER_SPLIT_Y_FRAC = 0.55;
 
 const LAND_HOLD_MS = 480;
 const MAX_FALL_MS = 9000;
@@ -35,22 +36,18 @@ function formatMult(m) {
   return String(x);
 }
 
-function xForAuthColumn(col, w, gates) {
-  const c = Math.max(1, Math.min(gates, Math.floor(Number(col)) || 1));
-  const inner = w - REF_H_INSET;
-  return REF_PAD_LR + (c - 0.5) * (inner / gates);
-}
-
-/** Same peg lattice as mleo-plinko-v2: pegCount = row + 2, pegGapX = (w-40)/(ROWS+2), centered rows. */
+/** Same peg lattice as mleo-plinko-v2: pegCount = row + 2, pegGapX = (w-40)/(PEG_ROWS+2), centered rows. */
 function buildReferencePegLayout(w, h, bucketY) {
-  const pegGapX = (w - REF_H_INSET) / (REF_ROWS + 2);
+  const pegGapX = (w - REF_H_INSET) / (PEG_ROWS + 2);
   const topY = Math.max(6, Math.min(36, Math.round(h * 0.062)));
-  const pegFieldBottom = bucketY - Math.max(5, Math.min(12, h * 0.022));
-  const pegGapY = (pegFieldBottom - topY) / Math.max(1, REF_ROWS - 1);
+  /** End peg field well above payout row so the bottom peg row is not crowded against the boxes. */
+  const gapAboveBuckets = Math.max(18, Math.min(44, Math.round(h * 0.052)));
+  const pegFieldBottom = bucketY - gapAboveBuckets;
+  const pegGapY = (pegFieldBottom - topY) / Math.max(1, PEG_ROWS - 1);
   const pr = Math.max(2.2, Math.min(3.6, pegGapX * 0.052));
 
   const pegs = [];
-  for (let row = 0; row < REF_ROWS; row++) {
+  for (let row = 0; row < PEG_ROWS; row++) {
     const pegCount = row + 2;
     const rowY = topY + row * pegGapY;
     const rowWidth = pegCount * pegGapX;
@@ -102,21 +99,10 @@ function hashRunKey(s) {
 }
 
 /**
- * One physics step — ported from mleo-plinko-v2 step() (ball integration, peg hits, steer to target bucket).
- * pathPositions adds a weak horizontal pull toward the authoritative column vs current height (continuous, not stepped motion).
+ * One physics step — continuous RAF playback (gravity, drag, center bias, target steering, peg bounce).
+ * No discrete step/lerp between path waypoints; landing snaps to authoritative targetBoxIndex only.
  */
-function stepPlaybackBall(
-  ball,
-  pegs,
-  buckets,
-  w,
-  h,
-  dt,
-  targetBucketIndex,
-  pathPositions,
-  topY,
-  pegFieldBottom,
-) {
+function stepPlaybackBall(ball, pegs, buckets, w, h, dt, targetBoxIndex) {
   ball.vy += GRAVITY * dt;
   ball.vx *= DRAG;
   ball.vy *= DRAG;
@@ -133,23 +119,11 @@ function stepPlaybackBall(
   const centerX = w / 2;
   ball.vx += (centerX - ball.x) * CENTER_BIAS * dt * 60;
 
-  const targetBucket = buckets[targetBucketIndex];
-  if (targetBucket && ball.y >= h * STEER_Y_FRAC) {
+  const targetBucket = buckets[targetBoxIndex];
+  if (targetBucket) {
     const tcx = targetBucket.x + targetBucket.w / 2;
-    const steer = ball.y >= h * STEER_DEEP_FRAC ? STEER_DEEP : STEER_SHALLOW;
+    const steer = ball.y < h * STEER_SPLIT_Y_FRAC ? STEER_SHALLOW : STEER_DEEP;
     ball.vx += (tcx - ball.x) * steer * dt * 60;
-  }
-
-  if (
-    Array.isArray(pathPositions) &&
-    pathPositions.length > 1 &&
-    ball.y >= topY &&
-    ball.y <= pegFieldBottom
-  ) {
-    const t = (ball.y - topY) / Math.max(1e-6, pegFieldBottom - topY);
-    const pi = Math.min(pathPositions.length - 1, Math.max(0, Math.floor(t * (pathPositions.length - 1))));
-    const wantX = xForAuthColumn(pathPositions[pi], w, DROP_RUN_GATES);
-    ball.vx += (wantX - ball.x) * PATH_PULL * dt * 60;
   }
 
   if (ball.x - ball.r < 0) {
@@ -342,16 +316,16 @@ export default function DropRunFieldCanvas({
       return;
     }
 
-    const { w, h, topY, pegFieldBottom } = layoutRef.current;
+    const { w, h, topY } = layoutRef.current;
     if (!w || !h) return;
 
     const pegs = pegsRef.current;
     const buckets = bucketsRef.current;
-    const tb = Math.max(0, Math.min(DROP_RUN_GATES - 1, Math.floor(Number(finalBay)) - 1));
+    const targetBoxIndex = Math.max(0, Math.min(DROP_RUN_GATES - 1, Math.floor(Number(finalBay)) - 1));
     const seed = hashRunKey(runKey);
     const jx = ((seed % 41) / 41 - 0.5) * 18;
     const jvx = ((seed >>> 8) % 41) / 41 - 0.5;
-    const pegGapX = (w - REF_H_INSET) / (REF_ROWS + 2);
+    const pegGapX = (w - REF_H_INSET) / (PEG_ROWS + 2);
     const br = Math.max(2.4, Math.min(4, pegGapX * 0.065));
 
     ballRef.current = {
@@ -368,12 +342,10 @@ export default function DropRunFieldCanvas({
     let landTime = 0;
     let last = performance.now();
     const startTime = last;
-    const path = pathRef.current.slice();
-
     function snapBallToTargetBucket(timeNow) {
       landRef.current = true;
       landTime = timeNow;
-      const bucket = buckets[tb];
+      const bucket = buckets[targetBoxIndex];
       if (bucket) {
         ballRef.current.x = bucket.x + bucket.w / 2;
         ballRef.current.y = bucket.y + bucket.h / 2;
@@ -400,18 +372,7 @@ export default function DropRunFieldCanvas({
         if (dt > 0.034) dt = 0.034;
         if (dt <= 0) dt = 0.016;
 
-        const landed = stepPlaybackBall(
-          ballRef.current,
-          pegs,
-          buckets,
-          w,
-          h,
-          dt,
-          tb,
-          path,
-          topY,
-          pegFieldBottom,
-        );
+        const landed = stepPlaybackBall(ballRef.current, pegs, buckets, w, h, dt, targetBoxIndex);
         draw();
         if (landed) {
           landRef.current = true;
