@@ -1,4 +1,4 @@
-import { DROP_RUN_DRIFT_ROWS } from "../../lib/solo-v2/dropRunConfig";
+import { DROP_RUN_DRIFT_ROWS, DROP_RUN_GATES } from "../../lib/solo-v2/dropRunConfig";
 import DropRunFieldCanvas from "./DropRunFieldCanvas";
 
 /**
@@ -24,9 +24,12 @@ export default function DropRunBoard({
   else if (dropPlayback) headline = "Dropping…";
   else if (readState === "gate_submitted") headline = "Starting drop…";
 
-  const finalBay = dropPlayback?.finalBay != null ? Math.floor(Number(dropPlayback.finalBay)) : null;
+  const finalBayRaw = dropPlayback?.finalBay != null ? Math.floor(Number(dropPlayback.finalBay)) : NaN;
+  const finalBayOk =
+    Number.isFinite(finalBayRaw) && finalBayRaw >= 1 && finalBayRaw <= DROP_RUN_GATES;
+  const finalBay = finalBayOk ? finalBayRaw : null;
   const pathOk = pathPositions.length === DROP_RUN_DRIFT_ROWS + 1;
-  const boardActive = Boolean(dropPlayback && pathOk);
+  const boardActive = Boolean(dropPlayback && pathOk && finalBayOk);
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border-2 border-violet-600/40 bg-zinc-900">

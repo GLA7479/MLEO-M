@@ -6,11 +6,11 @@ import {
 } from "../../lib/solo-v2/dropRunConfig";
 
 /**
- * Board geometry ported from game/mleo-plinko-v2.js (buildBoard): ROWS, pegGapX, row+2 pegs, margins, bucket strip.
- * Physics step ported from the same file (gravity, drag, peg bounce, steer-to-target). Visual playback only; server is authoritative.
+ * Board geometry from mleo-plinko-v2 (pegGapX, row+2 pegs, bucket strip). ~15 peg rows (cap 16) for readability.
+ * Landing is always snapped to server finalBay bucket center — highlight, ball, and payout stay 1:1.
  */
 
-const REF_ROWS = 18;
+const REF_ROWS = 15;
 const REF_PAD_LR = 20;
 const REF_H_INSET = 40;
 
@@ -26,7 +26,7 @@ const STEER_DEEP_FRAC = 0.72;
 const PATH_PULL = 0.014;
 
 const LAND_HOLD_MS = 480;
-const MAX_FALL_MS = 12000;
+const MAX_FALL_MS = 9000;
 
 function formatMult(m) {
   const x = Number(m);
@@ -62,9 +62,14 @@ function buildReferencePegLayout(w, h, bucketY) {
   return { pegs, pegGapX, topY, pegGapY, pegFieldBottom };
 }
 
-/** Bucket strip: (w-40)/count, x = 20 + i*w — same as reference. */
-function buildReferenceBuckets(w, h, bucketCount, bucketH) {
-  const bucketY = h - bucketH - Math.max(6, Math.min(14, Math.round(h * 0.028)));
+/**
+ * Payout strip — reserve space from canvas bottom so the full row stays visible (desktop + mobile).
+ * bucketY + bucketH + bottomPad <= h always.
+ */
+function buildReferenceBuckets(w, h, bucketCount) {
+  const bottomPad = Math.max(6, Math.min(12, Math.round(h * 0.022)));
+  const bucketH = Math.max(20, Math.min(28, Math.round(h * 0.056)));
+  const bucketY = h - bottomPad - bucketH;
   const bucketWidth = (w - REF_H_INSET) / bucketCount;
   const buckets = [];
   for (let i = 0; i < bucketCount; i++) {
@@ -76,7 +81,7 @@ function buildReferenceBuckets(w, h, bucketCount, bucketH) {
       index: i,
     });
   }
-  return { buckets, bucketY, bucketH, bucketWidth };
+  return { buckets, bucketY, bucketH, bucketWidth, bottomPad };
 }
 
 /** Symmetric strip — center emphasis like reference multi-color buckets. */
@@ -173,15 +178,13 @@ function stepPlaybackBall(
     }
   }
 
-  if (targetBucket && ball.vy > 0 && ball.y + ball.r >= targetBucket.y) {
-    const cx = ball.x;
-    if (cx >= targetBucket.x && cx <= targetBucket.x + targetBucket.w) {
-      ball.x = targetBucket.x + targetBucket.w / 2;
-      ball.y = targetBucket.y + ball.r * 0.35;
-      ball.vx = 0;
-      ball.vy = 0;
-      return true;
-    }
+  /** Authoritative landing only: when the ball reaches the payout band, snap to server bucket center (no horizontal hit-test). */
+  if (targetBucket && ball.y + ball.r >= targetBucket.y) {
+    ball.x = targetBucket.x + targetBucket.w / 2;
+    ball.y = targetBucket.y + targetBucket.h / 2;
+    ball.vx = 0;
+    ball.vy = 0;
+    return true;
   }
 
   return false;
@@ -219,8 +222,7 @@ export default function DropRunFieldCanvas({
   const expectedPathLen = DROP_RUN_DRIFT_ROWS + 1;
 
   const buildBoard = useCallback((w, h) => {
-    const bucketH = Math.max(15, Math.min(24, Math.round(h * 0.048)));
-    const { buckets, bucketY, bucketH: bh } = buildReferenceBuckets(w, h, DROP_RUN_GATES, bucketH);
+    const { buckets, bucketY, bucketH: bh, bottomPad } = buildReferenceBuckets(w, h, DROP_RUN_GATES);
     const { pegs, topY, pegFieldBottom } = buildReferencePegLayout(w, h, bucketY);
 
     pegsRef.current = pegs;
@@ -232,6 +234,7 @@ export default function DropRunFieldCanvas({
       pegFieldBottom,
       bucketY,
       bucketH: bh,
+      bottomPad,
     };
   }, []);
 
@@ -273,7 +276,7 @@ export default function DropRunFieldCanvas({
         grad.addColorStop(1, c1);
       }
       ctx.fillStyle = grad;
-      ctx.fillRect(bucket.x + 0.5, bucket.y, bucket.w - 1, bucket.h);
+      ctx.fillRect(bucket.x + 0.5, bucket.y, Math.max(1, bucket.w - 1), bucket.h);
       if (land) {
         ctx.strokeStyle = "rgba(254, 240, 138, 0.9)";
         ctx.lineWidth = 1.5;
@@ -314,7 +317,8 @@ export default function DropRunFieldCanvas({
     const ro = new ResizeObserver(() => {
       const rect = wrap.getBoundingClientRect();
       const w = Math.max(120, Math.floor(rect.width));
-      const h = Math.max(160, Math.floor(rect.height));
+      const minH = rect.width >= 640 ? 228 : 168;
+      const h = Math.max(minH, Math.floor(rect.height));
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.floor(w * dpr);
       canvas.height = Math.floor(h * dpr);
@@ -372,7 +376,7 @@ export default function DropRunFieldCanvas({
       const bucket = buckets[tb];
       if (bucket) {
         ballRef.current.x = bucket.x + bucket.w / 2;
-        ballRef.current.y = bucket.y + ballRef.current.r * 0.35;
+        ballRef.current.y = bucket.y + bucket.h / 2;
         ballRef.current.vx = 0;
         ballRef.current.vy = 0;
       }
@@ -438,7 +442,7 @@ export default function DropRunFieldCanvas({
   return (
     <div
       ref={wrapRef}
-      className="relative h-full min-h-0 w-full min-w-0 flex-1 [min-height:clamp(13rem,48vmin,22rem)] sm:[min-height:clamp(14rem,52vmin,24rem)]"
+      className="relative h-full min-h-0 w-full min-w-0 flex-1 [min-height:clamp(14rem,46vmin,20rem)] sm:[min-height:clamp(17rem,42vmin,26rem)]"
     >
       <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full touch-none" aria-hidden />
     </div>
