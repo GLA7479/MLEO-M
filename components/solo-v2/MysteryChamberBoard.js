@@ -107,49 +107,42 @@ export default function MysteryChamberBoard({
       </div>
 
       <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1.5">
-        <div className="mb-1 flex items-center justify-between gap-2 px-0.5">
-          <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/40 sm:text-[9px]">
-            Run progress
+        <div className="mb-0.5 flex items-center justify-between px-0.5">
+          <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">
+            Chambers
           </span>
-          <span className="text-[10px] font-bold tabular-nums text-white/85 sm:text-[11px]">
-            Step {Math.min(currentChamberIndex + 1, total)} of {total}
+          <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
+            {Math.min(chambersCleared + 1, total)} / {total}
           </span>
         </div>
         <div
-          className="relative h-2 w-full overflow-hidden rounded-full bg-zinc-800/90 shadow-inner sm:h-2.5"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={total}
-          aria-valuenow={chambersCleared}
-          aria-label={`${chambersCleared} of ${total} steps cleared`}
+          className="flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
+          aria-label="Chamber progress"
         >
-          <div className="pointer-events-none absolute inset-0 z-0 flex">
-            {Array.from({ length: total }, (_, i) => (
-              <div key={`tick-${i}`} className="flex-1 border-r border-zinc-600/25 last:border-r-0" />
-            ))}
-          </div>
-          <div
-            className="relative z-[1] h-full rounded-full bg-gradient-to-r from-emerald-600/85 to-emerald-500/75 transition-[width] duration-300 ease-out"
-            style={{ width: `${Math.min(100, Math.max(0, (chambersCleared / total) * 100))}%` }}
-          />
-          {chambersCleared < total ? (
-            <div
-              className="pointer-events-none absolute top-1/2 z-[2] h-2.5 w-0.5 -translate-y-1/2 rounded-full bg-amber-400/90 shadow-[0_0_6px_rgba(251,191,36,0.35)] sm:h-3"
-              style={{
-                left: `calc(${((chambersCleared + 0.5) / total) * 100}% - 1px)`,
-              }}
-              aria-hidden
-            />
-          ) : null}
+          {Array.from({ length: total }, (_, i) => {
+            const done = i < chambersCleared;
+            const active = i === currentChamberIndex && !done;
+            return (
+              <div
+                key={`ch-${i}`}
+                className={`flex min-w-0 flex-1 flex-col items-center justify-center rounded-[5px] py-1 sm:rounded-md sm:py-1.5 ${
+                  done
+                    ? "bg-emerald-600/35 text-emerald-100"
+                    : active
+                      ? "bg-amber-500/25 text-amber-100 ring-1 ring-inset ring-amber-400/35"
+                      : "bg-zinc-900/90 text-zinc-500"
+                }`}
+              >
+                <span className="text-[10px] font-black tabular-nums sm:text-[11px]">{i + 1}</span>
+              </div>
+            );
+          })}
         </div>
-        <p className="mt-1 text-center text-[8px] font-medium leading-tight text-zinc-500 sm:text-[9px]">
-          {chambersCleared} of {total} steps cleared · 4 sigils below are for this step only
-        </p>
       </div>
 
       <div className="shrink-0 px-2.5 pb-1.5 pt-0 sm:px-3 sm:pb-2">
-        <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 px-2.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl sm:px-3 sm:py-1.5">
-          <div className="flex items-center justify-between gap-2">
+        <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
+          <div className="flex items-center justify-between gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5">
             <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
               Secured return
             </span>
@@ -158,7 +151,7 @@ export default function MysteryChamberBoard({
             </span>
           </div>
           {securedCaption ? (
-            <p className="mt-0.5 border-t border-white/5 pt-0.5 text-right text-[8px] font-medium leading-snug text-zinc-500 sm:text-[9px]">
+            <p className="border-t border-white/5 px-2.5 pb-1 pt-0.5 text-right text-[8px] font-medium leading-snug text-zinc-500 sm:px-3 sm:pb-1.5 sm:pt-0.5 sm:text-[9px]">
               {securedCaption}
             </p>
           ) : null}

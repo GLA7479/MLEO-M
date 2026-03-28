@@ -834,7 +834,7 @@ export default function MysteryChamberPage() {
   const exitDisabled = busyFooter;
 
   let statusTop = "Press START MYSTERY CHAMBER to begin.";
-  let statusSub = `${MYSTERY_CHAMBER_CHAMBER_COUNT} total steps, four sigils each — only one sigil per step is the safe path.`;
+  let statusSub = "Four chambers, four sigils each — only one sigil per chamber is safe.";
   let hintLine = "\u00a0";
 
   const cleared = playing?.chambersCleared ?? 0;
@@ -844,8 +844,8 @@ export default function MysteryChamberPage() {
     statusTop = "Resolving…";
     statusSub = "Checking your sigil on the server.";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_required" && !localAnim) {
-    statusTop = `Step ${curCh + 1} of ${MYSTERY_CHAMBER_CHAMBER_COUNT}`;
-    statusSub = "Choose 1 of 4 sigils. Only one is the safe path.";
+    statusTop = `Chamber ${curCh + 1} of ${MYSTERY_CHAMBER_CHAMBER_COUNT}. Exit now or continue.`;
+    statusSub = "Secured return updates after each safe path.";
     if (cleared >= 1) {
       hintLine = "Exit now keeps your secured return, or choose a sigil to continue the run.";
     }
@@ -853,24 +853,24 @@ export default function MysteryChamberPage() {
   if (localAnim?.phase === "success") {
     statusTop = "Safe path found.";
     const nextHuman = (playing?.currentChamberIndex ?? curCh) + 1;
-    statusSub = `Next: step ${Math.min(MYSTERY_CHAMBER_CHAMBER_COUNT, Math.max(1, nextHuman))} of ${MYSTERY_CHAMBER_CHAMBER_COUNT} — choose 1 of 4 sigils.`;
+    statusSub = `Chamber ${Math.min(MYSTERY_CHAMBER_CHAMBER_COUNT, Math.max(1, nextHuman))} — choose your next sigil.`;
   }
   if (localAnim?.phase === "fail") {
     const fc = persistedBoard?.finalChamberIndex ?? 0;
-    statusTop = `Wrong sigil. The run ended on step ${fc + 1}.`;
+    statusTop = `Wrong sigil. The run ended in Chamber ${fc + 1}.`;
     statusSub = "Safe sigil revealed.";
   }
   if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "cashout") {
-    statusTop = `Exited after ${persistedBoard.chambersCleared || cleared || 0} step(s) cleared.`;
+    statusTop = `Exited after ${persistedBoard.chambersCleared || cleared || 0} chamber(s) cleared.`;
     statusSub = "Secured return paid.";
   }
   if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "full_clear") {
-    statusTop = "Final step cleared.";
+    statusTop = "Final chamber cleared.";
     statusSub = "Maximum secured return.";
   }
   if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "fail" && !localAnim) {
     const fc = persistedBoard?.finalChamberIndex ?? 0;
-    statusTop = `Wrong sigil. The run ended on step ${fc + 1}.`;
+    statusTop = `Wrong sigil. The run ended in Chamber ${fc + 1}.`;
     statusSub = "Safe sigil revealed.";
   }
   if (
@@ -898,13 +898,13 @@ export default function MysteryChamberPage() {
     popupLine2 = `Return ${ret}`;
     if (tk === "fail") {
       popupTitle = "RUN ENDED";
-      popupLine3 = `Failed on a step · ${ch} cleared before loss`;
+      popupLine3 = `Failed in chamber · ${ch} cleared before loss`;
     } else if (tk === "cashout") {
       popupTitle = "EXITED";
-      popupLine3 = `${ch} step(s) cleared · secured return`;
+      popupLine3 = `${ch} chamber(s) cleared · secured return`;
     } else if (tk === "full_clear") {
       popupTitle = "FULL CLEAR";
-      popupLine3 = `All ${MYSTERY_CHAMBER_CHAMBER_COUNT} steps · maximum return`;
+      popupLine3 = "All four chambers · maximum return";
     }
   }
 
@@ -968,13 +968,13 @@ export default function MysteryChamberPage() {
   const boardShowsIdlePreview =
     !sessionLocksSummary && !(uiState === UI_STATE.RESOLVED && persistedBoard);
   const securedCaptionBoard = boardShowsIdlePreview
-    ? `Full clear (${MYSTERY_CHAMBER_CHAMBER_COUNT} steps): ${formatCompact(previewMaxClear)}`
+    ? `Full clear (${MYSTERY_CHAMBER_CHAMBER_COUNT} chambers): ${formatCompact(previewMaxClear)}`
     : "";
 
   return (
     <SoloV2GameShell
       title="Mystery Chamber"
-      subtitle={`Advance through ${MYSTERY_CHAMBER_CHAMBER_COUNT} server-sealed steps.`}
+      subtitle="Advance through the chamber run."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl"
       gameplayScrollable={false}
       gameplayDesktopUnclipVertical
@@ -1063,11 +1063,11 @@ export default function MysteryChamberPage() {
       helpContent={
         <div className="space-y-2">
           <p>
-            Four total steps; each step offers four sigils. Exactly one sigil per step is the safe path. Each safe step
-            multiplies your secured return on the ladder (×1.2 → ×1½ → ×2 → ×3). A wrong sigil ends the run.
+            Four chambers, four sigils each. Exactly one sigil per chamber is the safe path. Each safe chamber multiplies
+            your secured return on the ladder (×1.2 → ×1½ → ×2 → ×3). A wrong sigil ends the run.
           </p>
           <p>
-            After any safe step you may exit with your secured return or continue. Outcomes are sealed on the server;
+            After any safe chamber you may exit with your secured return or continue. Outcomes are sealed on the server;
             picks are validated and resolved there.
           </p>
         </div>
