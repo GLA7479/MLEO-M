@@ -6,7 +6,13 @@ import SoloV2ResultPopup, {
 } from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
-import { MYSTERY_CHAMBER_MIN_WAGER, MYSTERY_CHAMBER_SIGIL_GLYPHS } from "../lib/solo-v2/mysteryChamberConfig";
+import {
+  MYSTERY_CHAMBER_CHAMBER_COUNT,
+  MYSTERY_CHAMBER_MIN_WAGER,
+  MYSTERY_CHAMBER_SIGIL_GLYPHS,
+  mysteryChamberMaxPotentialReturn,
+  mysteryChamberStartingSecured,
+} from "../lib/solo-v2/mysteryChamberConfig";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
 import { SOLO_V2_GIFT_ROUND_STAKE, soloV2GiftConsumeOne } from "../lib/solo-v2/soloV2GiftStorage";
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
@@ -121,8 +127,9 @@ function MysteryChamberGameplayPanel({
   popupLine2,
   popupLine3,
   resultVaultLabel,
+  securedCaption = "",
 }) {
-  const ch = playing?.chamberCount ?? 5;
+  const ch = playing?.chamberCount ?? MYSTERY_CHAMBER_CHAMBER_COUNT;
   const cur = Math.max(0, Math.floor(Number(playing?.currentChamberIndex) || 0));
   const cleared = Math.max(0, Math.floor(Number(playing?.chambersCleared) || 0));
   const sec = playing?.securedReturn != null ? Math.floor(Number(playing.securedReturn)) : 0;
@@ -138,6 +145,7 @@ function MysteryChamberGameplayPanel({
           currentChamberIndex={cur}
           chambersCleared={cleared}
           securedReturnLabel={formatCompact(sec)}
+          securedCaption={securedCaption}
           sigilVisuals={sigilVisuals}
           sigilPickDisabled={sigilPickDisabled}
           onSigilPick={onSigilPick}
@@ -186,7 +194,6 @@ export default function MysteryChamberPage() {
   const [revealPulse, setRevealPulse] = useState(false);
 
   const inMysteryLoopRef = useRef(false);
-  const preserveBoardAfterRoundRef = useRef(false);
   const wagerInputRef = useRef(wagerInput);
   const vaultBalanceRef = useRef(vaultBalance);
   const cycleRef = useRef(0);
@@ -273,11 +280,12 @@ export default function MysteryChamberPage() {
     setResultPopupOpen(true);
     resultPopupTimerRef.current = window.setTimeout(() => {
       resultPopupTimerRef.current = null;
-      void prepareNextMysteryRound();
+      dismissResultPopupAfterTerminalRun();
     }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
   }
 
-  async function prepareNextMysteryRound() {
+  /** After a terminal run, close popup only — keep resolved board; next run starts only on START. */
+  function dismissResultPopupAfterTerminalRun() {
     if (resultPopupTimerRef.current) {
       clearTimeout(resultPopupTimerRef.current);
       resultPopupTimerRef.current = null;
@@ -285,62 +293,9 @@ export default function MysteryChamberPage() {
     submitInFlightRef.current = false;
     resolveInFlightRef.current = false;
     setResultPopupOpen(false);
-    setResolvedResult(null);
+    setInMysteryLoop(false);
     setLocalAnim(null);
     setRevealPulse(false);
-    setSessionNotice("");
-
-    if (!inMysteryLoopRef.current) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setPersistedBoard(null);
-      setUiState(UI_STATE.IDLE);
-      return;
-    }
-
-    if (!vaultReady) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setPersistedBoard(null);
-      setInMysteryLoop(false);
-      setErrorMessage("Shared vault unavailable.");
-      return;
-    }
-
-    const wager = parseWagerInput(wagerInputRef.current);
-    if (wager < MYSTERY_CHAMBER_MIN_WAGER) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setPersistedBoard(null);
-      setInMysteryLoop(false);
-      setErrorMessage(`Minimum stake is ${MYSTERY_CHAMBER_MIN_WAGER}.`);
-      return;
-    }
-    if (vaultBalanceRef.current < wager) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setPersistedBoard(null);
-      setInMysteryLoop(false);
-      setErrorMessage(`Insufficient vault balance. Need ${wager} for this round.`);
-      return;
-    }
-
-    cycleRef.current += 1;
-    const activeCycle = cycleRef.current;
-    preserveBoardAfterRoundRef.current = true;
-    const boot = await bootstrapSession(wager, activeCycle, SOLO_V2_SESSION_MODE.STANDARD, {
-      isGiftRound: false,
-      preserveBoardAfterRound: true,
-    });
-    if (!boot.ok || boot.alreadyTerminal) {
-      setInMysteryLoop(false);
-      preserveBoardAfterRoundRef.current = false;
-      return;
-    }
-    const mc = boot.session?.mysteryChamber;
-    if (mc?.readState === "choice_submitted" && mc?.canResolveTurn) {
-      void handleResolvePick(boot.session.id, activeCycle);
-    }
   }
 
   function applySessionReadState(sessionPayload, { resumed = false } = {}) {
@@ -381,17 +336,9 @@ export default function MysteryChamberPage() {
       setInMysteryLoop(true);
       setResolvedResult(null);
       setUiState(UI_STATE.SESSION_ACTIVE);
-      if (preserveBoardAfterRoundRef.current) {
-        preserveBoardAfterRoundRef.current = false;
-        setPersistedBoard(null);
-        setLocalAnim(null);
-        setSessionNotice("");
-        setErrorMessage("");
-        return;
-      }
       setPersistedBoard(null);
       setLocalAnim(null);
-      setSessionNotice(resumed ? "Session restored — choose a sigil." : "Choose 1 sigil to search the chamber.");
+      setSessionNotice(resumed ? "Session restored." : "");
       setErrorMessage("");
       return;
     }
@@ -814,7 +761,8 @@ export default function MysteryChamberPage() {
   const idleLike =
     uiState === UI_STATE.IDLE ||
     uiState === UI_STATE.UNAVAILABLE ||
-    uiState === UI_STATE.PENDING_MIGRATION;
+    uiState === UI_STATE.PENDING_MIGRATION ||
+    uiState === UI_STATE.RESOLVED;
   const stakeExceedsVault =
     vaultReady &&
     idleLike &&
@@ -828,7 +776,9 @@ export default function MysteryChamberPage() {
     !inMysteryLoop &&
     wagerPlayable &&
     ![UI_STATE.LOADING, UI_STATE.SUBMITTING_PICK, UI_STATE.RESOLVING, UI_STATE.PENDING_MIGRATION].includes(uiState) &&
-    (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE);
+    (uiState === UI_STATE.IDLE ||
+      uiState === UI_STATE.UNAVAILABLE ||
+      uiState === UI_STATE.RESOLVED);
 
   const isPrimaryLoading = uiState === UI_STATE.LOADING;
 
@@ -843,25 +793,25 @@ export default function MysteryChamberPage() {
       ? Math.floor(Number(session.entryAmount))
       : null;
 
-  let summaryPlay = numericWager;
-  let summaryWin = numericWager;
   const inActiveRunUi =
     uiState === UI_STATE.SESSION_ACTIVE ||
     uiState === UI_STATE.SUBMITTING_PICK ||
     uiState === UI_STATE.RESOLVING ||
     uiState === UI_STATE.LOADING;
 
-  if (runEntryFromSession != null && (inActiveRunUi || uiState === UI_STATE.RESOLVING)) {
-    summaryPlay = runEntryFromSession;
-  }
-  if (playing?.securedReturn != null && (inActiveRunUi || uiState === UI_STATE.RESOLVING)) {
-    summaryWin = Math.floor(Number(playing.securedReturn));
-  }
-  if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
-    const ss = resolvedResult.settlementSummary;
-    summaryPlay = Math.max(0, Math.floor(Number(ss.entryCost) || summaryPlay));
-    summaryWin = Math.max(0, Math.floor(Number(ss.payoutReturn) || 0));
-  }
+  const sessionLocksSummary =
+    runEntryFromSession != null && (inActiveRunUi || uiState === UI_STATE.RESOLVING);
+
+  const previewMaxClear = mysteryChamberMaxPotentialReturn(numericWager);
+  const previewStartingSecured = mysteryChamberStartingSecured(numericWager);
+
+  let summaryPlay = sessionLocksSummary ? runEntryFromSession : numericWager;
+  let summaryWin = sessionLocksSummary
+    ? playing?.securedReturn != null
+      ? Math.floor(Number(playing.securedReturn))
+      : mysteryChamberStartingSecured(runEntryFromSession)
+    : previewMaxClear;
+  const summarySecondStatLabel = sessionLocksSummary ? "Secured" : "Max clear";
 
   const busyFooter =
     uiState === UI_STATE.SUBMITTING_PICK || uiState === UI_STATE.RESOLVING || uiState === UI_STATE.LOADING;
@@ -883,40 +833,44 @@ export default function MysteryChamberPage() {
     !localAnim;
   const exitDisabled = busyFooter;
 
-  let statusTop = "Choose 1 sigil to search the chamber.";
-  let statusSub = "One sigil is the safe path; the other three end the run.";
+  let statusTop = "Press START MYSTERY CHAMBER to begin.";
+  let statusSub = `${MYSTERY_CHAMBER_CHAMBER_COUNT} total steps, four sigils each — only one sigil per step is the safe path.`;
   let hintLine = "\u00a0";
 
   const cleared = playing?.chambersCleared ?? 0;
   const curCh = playing?.currentChamberIndex ?? 0;
 
-  if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_required" && !localAnim) {
-    if (cleared > 0) {
-      statusTop = `Chamber ${curCh + 1} of 5. Exit now or continue.`;
-      statusSub = "Secured return updates after each safe path.";
+  if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_submitted") {
+    statusTop = "Resolving…";
+    statusSub = "Checking your sigil on the server.";
+  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_required" && !localAnim) {
+    statusTop = `Step ${curCh + 1} of ${MYSTERY_CHAMBER_CHAMBER_COUNT}`;
+    statusSub = "Choose 1 of 4 sigils. Only one is the safe path.";
+    if (cleared >= 1) {
+      hintLine = "Exit now keeps your secured return, or choose a sigil to continue the run.";
     }
   }
   if (localAnim?.phase === "success") {
     statusTop = "Safe path found.";
     const nextHuman = (playing?.currentChamberIndex ?? curCh) + 1;
-    statusSub = `Chamber ${Math.min(5, Math.max(1, nextHuman))} — choose your next sigil.`;
+    statusSub = `Next: step ${Math.min(MYSTERY_CHAMBER_CHAMBER_COUNT, Math.max(1, nextHuman))} of ${MYSTERY_CHAMBER_CHAMBER_COUNT} — choose 1 of 4 sigils.`;
   }
   if (localAnim?.phase === "fail") {
     const fc = persistedBoard?.finalChamberIndex ?? 0;
-    statusTop = `Wrong sigil. The run ended in Chamber ${fc + 1}.`;
+    statusTop = `Wrong sigil. The run ended on step ${fc + 1}.`;
     statusSub = "Safe sigil revealed.";
   }
   if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "cashout") {
-    statusTop = `Exited after ${persistedBoard.chambersCleared || cleared || 0} chamber(s) cleared.`;
+    statusTop = `Exited after ${persistedBoard.chambersCleared || cleared || 0} step(s) cleared.`;
     statusSub = "Secured return paid.";
   }
   if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "full_clear") {
-    statusTop = "Final chamber cleared.";
+    statusTop = "Final step cleared.";
     statusSub = "Maximum secured return.";
   }
   if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "fail" && !localAnim) {
     const fc = persistedBoard?.finalChamberIndex ?? 0;
-    statusTop = `Wrong sigil. The run ended in Chamber ${fc + 1}.`;
+    statusTop = `Wrong sigil. The run ended on step ${fc + 1}.`;
     statusSub = "Safe sigil revealed.";
   }
   if (
@@ -944,13 +898,13 @@ export default function MysteryChamberPage() {
     popupLine2 = `Return ${ret}`;
     if (tk === "fail") {
       popupTitle = "RUN ENDED";
-      popupLine3 = `Failed in chamber · ${ch} cleared before loss`;
+      popupLine3 = `Failed on a step · ${ch} cleared before loss`;
     } else if (tk === "cashout") {
       popupTitle = "EXITED";
-      popupLine3 = `${ch} chamber(s) cleared · secured return`;
+      popupLine3 = `${ch} step(s) cleared · secured return`;
     } else if (tk === "full_clear") {
       popupTitle = "FULL CLEAR";
-      popupLine3 = "All five chambers · maximum return";
+      popupLine3 = `All ${MYSTERY_CHAMBER_CHAMBER_COUNT} steps · maximum return`;
     }
   }
 
@@ -984,12 +938,19 @@ export default function MysteryChamberPage() {
     lastPresetAmountRef.current = null;
   }
 
+  const previewPlayingForPanel = {
+    chamberCount: MYSTERY_CHAMBER_CHAMBER_COUNT,
+    currentChamberIndex: 0,
+    chambersCleared: 0,
+    securedReturn: previewStartingSecured,
+  };
+
   const playingForPanel =
     uiState === UI_STATE.RESOLVED && persistedBoard
       ? {
-          chamberCount: 5,
+          chamberCount: MYSTERY_CHAMBER_CHAMBER_COUNT,
           currentChamberIndex: Math.min(
-            4,
+            MYSTERY_CHAMBER_CHAMBER_COUNT - 1,
             Math.floor(
               Number(resolvedResult?.finalChamberIndex ?? persistedBoard.finalChamberIndex) || 0,
             ),
@@ -1000,12 +961,20 @@ export default function MysteryChamberPage() {
           ),
           securedReturn: Math.max(0, Math.floor(Number(resolvedResult?.payoutReturn) || 0)),
         }
-      : playing;
+      : sessionLocksSummary
+        ? playing
+        : previewPlayingForPanel;
+
+  const boardShowsIdlePreview =
+    !sessionLocksSummary && !(uiState === UI_STATE.RESOLVED && persistedBoard);
+  const securedCaptionBoard = boardShowsIdlePreview
+    ? `Full clear (${MYSTERY_CHAMBER_CHAMBER_COUNT} steps): ${formatCompact(previewMaxClear)}`
+    : "";
 
   return (
     <SoloV2GameShell
       title="Mystery Chamber"
-      subtitle="Advance through the chamber run."
+      subtitle={`Advance through ${MYSTERY_CHAMBER_CHAMBER_COUNT} server-sealed steps.`}
       layoutMaxWidthClass="max-w-full sm:max-w-2xl"
       gameplayScrollable={false}
       gameplayDesktopUnclipVertical
@@ -1025,7 +994,7 @@ export default function MysteryChamberPage() {
             ·
           </span>
           <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Secured{" "}
+            {summarySecondStatLabel}{" "}
             <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
           </span>
         </>
@@ -1088,17 +1057,18 @@ export default function MysteryChamberPage() {
           popupLine2={popupLine2}
           popupLine3={popupLine3}
           resultVaultLabel={resultVaultLabel}
+          securedCaption={securedCaptionBoard}
         />
       }
       helpContent={
         <div className="space-y-2">
           <p>
-            Five chambers, four sigils each. Exactly one sigil per chamber is the safe path. Each safe step multiplies
-            your secured return on the ladder (1.2× → 1.5× → 2× → 3× → 5×). A wrong sigil ends the run.
+            Four total steps; each step offers four sigils. Exactly one sigil per step is the safe path. Each safe step
+            multiplies your secured return on the ladder (×1.2 → ×1½ → ×2 → ×3). A wrong sigil ends the run.
           </p>
           <p>
-            After any safe chamber you may exit with your secured return or continue. Outcomes are sealed on the
-            server; picks are validated and resolved there.
+            After any safe step you may exit with your secured return or continue. Outcomes are sealed on the server;
+            picks are validated and resolved there.
           </p>
         </div>
       }
