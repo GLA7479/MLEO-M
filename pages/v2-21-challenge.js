@@ -43,6 +43,17 @@ const UI_STATE = {
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
 
+/** Card reveal pacing (ms): visible but not sluggish */
+const C21_REVEAL_CARD_MS = 420;
+const C21_REVEAL_GAP_MS = 180;
+const C21_POST_SEQUENCE_BEAT_MS = 520;
+
+function sleep(ms) {
+  return new Promise(resolve => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 function parseWagerInput(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
   if (!digits) return 0;
@@ -74,6 +85,7 @@ function Challenge21GameplayPanel({
   opponentVisibleHand,
   opponentHandResolved,
   holeHidden,
+  presentation,
   allowedDecisions,
   insurancePending,
   entryAmount,
@@ -100,6 +112,7 @@ function Challenge21GameplayPanel({
           opponentVisibleHand={opponentVisibleHand}
           opponentHandResolved={opponentHandResolved}
           holeHidden={holeHidden}
+          presentation={presentation}
           allowedDecisions={allowedDecisions}
           insurancePending={insurancePending}
           entryAmount={entryAmount}
@@ -156,6 +169,13 @@ export default function Challenge21Page() {
   const giftRefreshRef = useRef(() => {});
   const lastPresetAmountRef = useRef(null);
   const resultPopupTimerRef = useRef(null);
+  const presentationRunIdRef = useRef(0);
+  const dealAnimatedKeyRef = useRef(null);
+  const splitAnimatedKeyRef = useRef(null);
+  const presentationLockRef = useRef(false);
+
+  const [boardPresentation, setBoardPresentation] = useState(null);
+  const [resolveAnimating, setResolveAnimating] = useState(false);
 
   const giftShell = useSoloV2GiftShellState();
 
@@ -235,6 +255,10 @@ export default function Challenge21Page() {
       clearTimeout(resultPopupTimerRef.current);
       resultPopupTimerRef.current = null;
     }
+    presentationRunIdRef.current += 1;
+    presentationLockRef.current = false;
+    setBoardPresentation(null);
+    setResolveAnimating(false);
     submitInFlightRef.current = false;
     resolveInFlightRef.current = false;
     setResultPopupOpen(false);
@@ -306,6 +330,322 @@ export default function Challenge21Page() {
     }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
   }
 
+  function dealerSlotsFromPlayingSnapshot(p) {
+    const up = p?.opponentVisibleHand?.[0];
+    if (!up) return [];
+    const holeHidden = p?.holeHidden !== false;
+    if (holeHidden) return [{ code: up, hidden: false }, { code: null, hidden: true }];
+    return (p.opponentVisibleHand || []).map(c => ({ code: c, hidden: false }));
+  }
+
+  function clonePlayingSnapshot(p) {
+    if (!p || typeof p !== "object") return null;
+    return {
+      opponentVisibleHand: Array.isArray(p.opponentVisibleHand) ? [...p.opponentVisibleHand] : [],
+      playerHands: Array.isArray(p.playerHands) ? p.playerHands.map(h => [...h]) : [],
+      playerHand: Array.isArray(p.playerHand) ? [...p.playerHand] : [],
+      holeHidden: p.holeHidden !== false,
+      activeHandIndex: p.activeHandIndex,
+    };
+  }
+
+  function applyRoundOutcomeToUi(r, sid, { openPopup = true } = {}) {
+    setResolvedResult({
+      ...r,
+      sessionId: r.sessionId || sid,
+      settlementSummary: r.settlementSummary,
+    });
+    const ph = Array.isArray(r.playerHand) ? [...r.playerHand] : [];
+    const phs =
+      Array.isArray(r.playerHands) && r.playerHands.length > 0
+        ? r.playerHands.map(h => (Array.isArray(h) ? [...h] : []))
+        : [ph];
+    setPersistedLastRound({
+      playerHands: phs,
+      playerHand: ph,
+      opponentHand: Array.isArray(r.opponentHand) ? [...r.opponentHand] : [],
+      playerTotal: r.playerTotal,
+      opponentTotal: r.opponentTotal,
+      isWin: Boolean(r.isWin),
+      isPush: Boolean(r.isPush),
+      outcome: r.outcome,
+      handResults: r.handResults,
+      insuranceReturn: r.insuranceReturn,
+      insuranceStake: r.insuranceStake,
+      blackjackWin: Boolean(r.blackjackWin),
+    });
+    setUiState(UI_STATE.RESOLVED);
+    setResolveAnimating(false);
+    setBoardPresentation(null);
+    if (openPopup) openResultPopup();
+  }
+
+  async function runDealerRevealThenFinish(prevPlaying, result, sessionId, runId) {
+    const finalOpp = Array.isArray(result.opponentHand) ? result.opponentHand : [];
+    const ph = Array.isArray(result.playerHand) ? [...result.playerHand] : [];
+    const phs =
+      Array.isArray(result.playerHands) && result.playerHands.length > 0
+        ? result.playerHands.map(h => (Array.isArray(h) ? [...h] : []))
+        : [ph];
+    const activeIdx = Math.max(0, Math.floor(Number(prevPlaying?.activeHandIndex) || 0));
+    if (finalOpp.length === 0) {
+      applyRoundOutcomeToUi(result, sessionId, { openPopup: true });
+      return;
+    }
+    if (finalOpp.length === 1) {
+      presentationLockRef.current = true;
+      setResolveAnimating(true);
+      setBoardPresentation({
+        dealerSlots: [{ code: finalOpp[0], hidden: false }],
+        playerHands: phs,
+        pulseKeys: [],
+        activeHandIndex: activeIdx,
+      });
+      await sleep(C21_POST_SEQUENCE_BEAT_MS);
+      if (runId !== presentationRunIdRef.current) return;
+      presentationLockRef.current = false;
+      setBoardPresentation(null);
+      applyRoundOutcomeToUi(result, sessionId, { openPopup: true });
+      return;
+    }
+    presentationLockRef.current = true;
+    setResolveAnimating(true);
+    let startSlots = dealerSlotsFromPlayingSnapshot(prevPlaying);
+    if (startSlots.length === 0) {
+      if (finalOpp.length >= 2) {
+        startSlots = [
+          { code: finalOpp[0], hidden: false },
+          { code: null, hidden: true },
+        ];
+      } else if (finalOpp.length === 1) {
+        startSlots = [{ code: finalOpp[0], hidden: false }];
+      }
+    }
+    setBoardPresentation({
+      dealerSlots: startSlots,
+      playerHands: phs,
+      pulseKeys: [],
+      activeHandIndex: activeIdx,
+    });
+    await sleep(C21_REVEAL_GAP_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    const hadHoleHidden =
+      prevPlaying != null ? prevPlaying.holeHidden !== false : finalOpp.length >= 2;
+    if (hadHoleHidden) {
+      setBoardPresentation({
+        dealerSlots: [
+          { code: finalOpp[0], hidden: false },
+          { code: null, hidden: true },
+        ],
+        playerHands: phs,
+        pulseKeys: [],
+        activeHandIndex: activeIdx,
+      });
+      await sleep(C21_REVEAL_GAP_MS + 120);
+      if (runId !== presentationRunIdRef.current) return;
+    }
+    let slots = [
+      { code: finalOpp[0], hidden: false },
+      { code: finalOpp[1], hidden: false },
+    ];
+    setBoardPresentation({ dealerSlots: slots, playerHands: phs, pulseKeys: [`o-1`], activeHandIndex: activeIdx });
+    await sleep(C21_REVEAL_CARD_MS + C21_REVEAL_GAP_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    for (let i = 2; i < finalOpp.length; i++) {
+      slots = [...slots, { code: finalOpp[i], hidden: false }];
+      setBoardPresentation({
+        dealerSlots: slots,
+        playerHands: phs,
+        pulseKeys: [`o-${i}`],
+        activeHandIndex: activeIdx,
+      });
+      await sleep(C21_REVEAL_CARD_MS + C21_REVEAL_GAP_MS);
+      if (runId !== presentationRunIdRef.current) return;
+    }
+    await sleep(C21_POST_SEQUENCE_BEAT_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    presentationLockRef.current = false;
+    setBoardPresentation(null);
+    applyRoundOutcomeToUi(result, sessionId, { openPopup: true });
+  }
+
+  async function runBootstrapResolvedPresentation(rr, sessionPayload) {
+    const runId = ++presentationRunIdRef.current;
+    const opp = Array.isArray(rr.opponentHand) ? rr.opponentHand : [];
+    const ph = Array.isArray(rr.playerHand) ? [...rr.playerHand] : [];
+    const phs =
+      Array.isArray(rr.playerHands) && rr.playerHands.length > 0
+        ? rr.playerHands.map(h => (Array.isArray(h) ? [...h] : []))
+        : [ph];
+    const p0 = phs[0]?.[0];
+    const p1 = phs[0]?.[1];
+    const up = opp[0];
+    if (!up || !p0) {
+      applyRoundOutcomeToUi({ ...rr, sessionId: sessionPayload.id }, sessionPayload.id, { openPopup: true });
+      return;
+    }
+    presentationLockRef.current = true;
+    setResolveAnimating(true);
+    setBoardPresentation({
+      dealerSlots: [{ code: up, hidden: false }],
+      playerHands: [[]],
+      pulseKeys: [`o-0`],
+      activeHandIndex: 0,
+    });
+    await sleep(C21_REVEAL_CARD_MS + C21_REVEAL_GAP_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    setBoardPresentation({
+      dealerSlots: [{ code: up, hidden: false }],
+      playerHands: [[p0]],
+      pulseKeys: [`p-0-0`],
+      activeHandIndex: 0,
+    });
+    await sleep(C21_REVEAL_CARD_MS + C21_REVEAL_GAP_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    setBoardPresentation({
+      dealerSlots: [
+        { code: up, hidden: false },
+        { code: null, hidden: true },
+      ],
+      playerHands: [[p0]],
+      pulseKeys: ["o-hole"],
+      activeHandIndex: 0,
+    });
+    await sleep(C21_REVEAL_CARD_MS + C21_REVEAL_GAP_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    const handsAfterP2 = p1 != null ? [[p0, p1]] : [[p0]];
+    setBoardPresentation({
+      dealerSlots: [
+        { code: up, hidden: false },
+        { code: null, hidden: true },
+      ],
+      playerHands: handsAfterP2,
+      pulseKeys: p1 != null ? [`p-0-1`] : [],
+      activeHandIndex: 0,
+    });
+    await sleep(C21_REVEAL_CARD_MS + C21_REVEAL_GAP_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    const synthPrev = {
+      opponentVisibleHand: [up],
+      holeHidden: true,
+    };
+    await runDealerRevealThenFinish(synthPrev, { ...rr, playerHands: phs, playerHand: ph }, sessionPayload.id, runId);
+  }
+
+  async function runInitialDealPresentation(playing, runId) {
+    const up = playing?.opponentVisibleHand?.[0];
+    const hands = Array.isArray(playing?.playerHands) && playing.playerHands.length > 0 ? playing.playerHands : [];
+    const h0 = hands[0] || playing?.playerHand || [];
+    const p0 = h0[0];
+    const p1 = h0[1];
+    if (!up || !p0 || p1 == null) return;
+    presentationLockRef.current = true;
+    setBoardPresentation({
+      dealerSlots: [{ code: up, hidden: false }],
+      playerHands: [[]],
+      pulseKeys: [`o-0`],
+      activeHandIndex: 0,
+    });
+    await sleep(C21_REVEAL_CARD_MS + C21_REVEAL_GAP_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    setBoardPresentation({
+      dealerSlots: [{ code: up, hidden: false }],
+      playerHands: [[p0]],
+      pulseKeys: [`p-0-0`],
+      activeHandIndex: 0,
+    });
+    await sleep(C21_REVEAL_CARD_MS + C21_REVEAL_GAP_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    setBoardPresentation({
+      dealerSlots: [
+        { code: up, hidden: false },
+        { code: null, hidden: true },
+      ],
+      playerHands: [[p0]],
+      pulseKeys: ["o-hole"],
+      activeHandIndex: 0,
+    });
+    await sleep(C21_REVEAL_CARD_MS + C21_REVEAL_GAP_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    setBoardPresentation({
+      dealerSlots: [
+        { code: up, hidden: false },
+        { code: null, hidden: true },
+      ],
+      playerHands: [[p0, p1]],
+      pulseKeys: [`p-0-1`],
+      activeHandIndex: 0,
+    });
+    await sleep(C21_REVEAL_CARD_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    presentationLockRef.current = false;
+    setBoardPresentation(null);
+  }
+
+  async function runHitOrDoublePresentation(prev, next, runId) {
+    const prevHands = Array.isArray(prev.playerHands) && prev.playerHands.length ? prev.playerHands : [prev.playerHand || []];
+    const nextHands = Array.isArray(next.playerHands) && next.playerHands.length ? next.playerHands : [next.playerHand || []];
+    const ai = Math.max(0, Math.floor(Number(next.activeHandIndex) || 0));
+    const before = (prevHands[ai] || []).length;
+    const after = (nextHands[ai] || []).length;
+    if (after <= before || after !== before + 1) return;
+    presentationLockRef.current = true;
+    const trunc = nextHands.map((h, i) => (i === ai ? h.slice(0, -1) : [...h]));
+    setBoardPresentation({
+      dealerSlots: dealerSlotsFromPlayingSnapshot(next),
+      playerHands: trunc,
+      pulseKeys: [],
+      activeHandIndex: ai,
+    });
+    await sleep(C21_REVEAL_GAP_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    const newKey = `p-${ai}-${after - 1}`;
+    setBoardPresentation({
+      dealerSlots: dealerSlotsFromPlayingSnapshot(next),
+      playerHands: nextHands.map(h => [...h]),
+      pulseKeys: [newKey],
+      activeHandIndex: ai,
+    });
+    await sleep(C21_REVEAL_CARD_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    presentationLockRef.current = false;
+    setBoardPresentation(null);
+  }
+
+  async function runSplitPresentation(prev, next, runId) {
+    const nextHands = Array.isArray(next.playerHands) ? next.playerHands : [];
+    if (nextHands.length !== 2) return;
+    const c00 = nextHands[0]?.[0];
+    const c10 = nextHands[1]?.[0];
+    const c01 = nextHands[0]?.[1];
+    const c11 = nextHands[1]?.[1];
+    if (!c00 || !c10) return;
+    presentationLockRef.current = true;
+    setBoardPresentation({
+      dealerSlots: dealerSlotsFromPlayingSnapshot(next),
+      playerHands: [[c00], [c10]],
+      pulseKeys: ["p-0-0", "p-1-0"],
+      activeHandIndex: 0,
+    });
+    await sleep(C21_REVEAL_CARD_MS + C21_REVEAL_GAP_MS);
+    if (runId !== presentationRunIdRef.current) return;
+    if (c01 != null && c11 != null) {
+      setBoardPresentation({
+        dealerSlots: dealerSlotsFromPlayingSnapshot(next),
+        playerHands: [
+          [c00, c01],
+          [c10, c11],
+        ],
+        pulseKeys: ["p-0-1", "p-1-1"],
+        activeHandIndex: 0,
+      });
+      await sleep(C21_REVEAL_CARD_MS);
+    }
+    if (runId !== presentationRunIdRef.current) return;
+    presentationLockRef.current = false;
+    setBoardPresentation(null);
+  }
+
   function applySessionReadState(sessionPayload, { resumed = false, immediateOutcomePresentation = false } = {}) {
     const c21 = sessionPayload?.challenge21;
     const readState = String(c21?.readState || sessionPayload?.readState || "");
@@ -313,15 +653,20 @@ export default function Challenge21Page() {
 
     if (st === "resolved" && c21?.resolvedResult) {
       setInChallengeLoop(!resumed);
+      setSessionNotice(resumed ? "Round finished (restored)." : "");
+      setErrorMessage("");
       const rr = {
         ...c21.resolvedResult,
         sessionId: sessionPayload.id,
         settlementSummary: c21.resolvedResult.settlementSummary,
       };
+      if (immediateOutcomePresentation && !resumed) {
+        setUiState(UI_STATE.RESOLVING);
+        void runBootstrapResolvedPresentation(rr, sessionPayload);
+        return;
+      }
       setResolvedResult(rr);
       setUiState(UI_STATE.RESOLVED);
-      setSessionNotice(resumed ? "Round finished (restored)." : "");
-      setErrorMessage("");
       if (immediateOutcomePresentation) {
         const ph = Array.isArray(rr.playerHand) ? [...rr.playerHand] : [];
         const phs =
@@ -547,39 +892,11 @@ export default function Challenge21Page() {
     return { response, payload };
   }
 
-  function applyRoundOutcomeToUi(r, sid) {
-    setResolvedResult({
-      ...r,
-      sessionId: r.sessionId || sid,
-      settlementSummary: r.settlementSummary,
-    });
-    const ph = Array.isArray(r.playerHand) ? [...r.playerHand] : [];
-    const phs =
-      Array.isArray(r.playerHands) && r.playerHands.length > 0
-        ? r.playerHands.map(h => (Array.isArray(h) ? [...h] : []))
-        : [ph];
-    setPersistedLastRound({
-      playerHands: phs,
-      playerHand: ph,
-      opponentHand: Array.isArray(r.opponentHand) ? [...r.opponentHand] : [],
-      playerTotal: r.playerTotal,
-      opponentTotal: r.opponentTotal,
-      isWin: Boolean(r.isWin),
-      isPush: Boolean(r.isPush),
-      outcome: r.outcome,
-      handResults: r.handResults,
-      insuranceReturn: r.insuranceReturn,
-      insuranceStake: r.insuranceStake,
-      blackjackWin: Boolean(r.blackjackWin),
-    });
-    setUiState(UI_STATE.RESOLVED);
-    openResultPopup();
-  }
-
   async function handleResolvePendingAction(sessionId, activeCycle) {
     if (resolveInFlightRef.current) return;
     resolveInFlightRef.current = true;
     setUiState(UI_STATE.RESOLVING);
+    const playingBefore = clonePlayingSnapshot(sessionRef.current?.challenge21?.playing);
     try {
       const { response, payload, halted } = await postResolve(sessionId, {}, activeCycle);
       if (halted) return;
@@ -595,12 +912,28 @@ export default function Challenge21Page() {
             applySessionReadState(readResult.session, { resumed: true });
           }
         }
-        applyRoundOutcomeToUi(r, sessionId);
+        const runId = ++presentationRunIdRef.current;
+        await runDealerRevealThenFinish(playingBefore, r, sessionId, runId);
         return;
       }
 
       if (api === SOLO_V2_API_RESULT.SUCCESS && status === "in_progress" && payload?.result) {
+        const runId = ++presentationRunIdRef.current;
         const readResult = await readSessionTruth(sessionId, activeCycle);
+        const nextPlaying = readResult?.ok ? readResult.session?.challenge21?.playing : null;
+        if (playingBefore && nextPlaying) {
+          const prevN = playingBefore.playerHands?.length || 0;
+          const nextN = nextPlaying.playerHands?.length || 0;
+          if (prevN === 1 && nextN === 2) {
+            const sk = `split-${sessionId}-${JSON.stringify(nextPlaying.playerHands)}`;
+            if (splitAnimatedKeyRef.current !== sk) {
+              splitAnimatedKeyRef.current = sk;
+              await runSplitPresentation(playingBefore, nextPlaying, runId);
+            }
+          } else {
+            await runHitOrDoublePresentation(playingBefore, nextPlaying, runId);
+          }
+        }
         if (readResult?.ok && readResult.session) {
           setSession(readResult.session);
           applySessionReadState(readResult.session, { resumed: true });
@@ -735,9 +1068,41 @@ export default function Challenge21Page() {
 
   function handleNextHand() {
     if (!persistedLastRound) return;
+    presentationRunIdRef.current += 1;
+    presentationLockRef.current = false;
+    setBoardPresentation(null);
+    setResolveAnimating(false);
     setPersistedLastRound(null);
     setSessionNotice("");
   }
+
+  useEffect(() => {
+    dealAnimatedKeyRef.current = null;
+    splitAnimatedKeyRef.current = null;
+  }, [session?.id]);
+
+  useEffect(() => {
+    const rs = String(session?.challenge21?.readState || "");
+    if (!session?.id || rs !== "ready") return;
+    if (persistedLastRound || resolvedResult || resolveAnimating) return;
+    if (uiState !== UI_STATE.SESSION_ACTIVE) return;
+    const p = session?.challenge21?.playing;
+    if (!p?.playerHands?.[0] || p.playerHands[0].length < 2) return;
+    const fp = `deal-${session.id}`;
+    if (dealAnimatedKeyRef.current === fp) return;
+    dealAnimatedKeyRef.current = fp;
+    const runId = ++presentationRunIdRef.current;
+    void runInitialDealPresentation(p, runId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: deal once per session when ready
+  }, [
+    session?.id,
+    session?.challenge21?.readState,
+    session?.challenge21?.playing,
+    persistedLastRound,
+    resolvedResult,
+    resolveAnimating,
+    uiState,
+  ]);
 
   useEffect(() => {
     const sid = session?.id;
@@ -887,7 +1252,9 @@ export default function Challenge21Page() {
   const busyFooter =
     uiState === UI_STATE.SUBMITTING_PICK ||
     uiState === UI_STATE.RESOLVING ||
-    uiState === UI_STATE.LOADING;
+    uiState === UI_STATE.LOADING ||
+    Boolean(boardPresentation) ||
+    resolveAnimating;
 
   const readState = String(c21Snap?.readState || "");
   const needsNextHand =
@@ -936,11 +1303,17 @@ export default function Challenge21Page() {
     holeHidden = playing.holeHidden !== false;
   }
 
+  const panelPlayerHands = boardPresentation?.playerHands ?? displayPlayerHands;
+  const panelActiveIndex =
+    boardPresentation?.activeHandIndex != null ? boardPresentation.activeHandIndex : displayActiveIndex;
+
   const actionsHidden =
     Boolean(persisted) ||
     resolved ||
     uiState !== UI_STATE.SESSION_ACTIVE ||
-    readState !== "ready";
+    readState !== "ready" ||
+    Boolean(boardPresentation) ||
+    resolveAnimating;
 
   let statusTop = "Reach 21 without going over.";
   let statusSub = "Press START 21 CHALLENGE to begin.";
@@ -1052,12 +1425,13 @@ export default function Challenge21Page() {
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          playerHands={displayPlayerHands}
-          activeHandIndex={displayActiveIndex}
+          playerHands={panelPlayerHands}
+          activeHandIndex={panelActiveIndex}
           playerHand={displayPlayer}
           opponentVisibleHand={displayOppVisible}
           opponentHandResolved={displayOppResolved}
           holeHidden={holeHidden}
+          presentation={boardPresentation}
           allowedDecisions={actionsHidden ? [] : allowedDecisionsLive}
           insurancePending={insurancePendingLive}
           entryAmount={runEntryFromSession ?? numericWager}
