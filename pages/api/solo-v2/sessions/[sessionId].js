@@ -13,6 +13,7 @@ import {
   stripNumberHuntSecretFromSummary,
 } from "../../../../lib/solo-v2/server/numberHuntSnapshot";
 import { buildDropRunSessionSnapshot } from "../../../../lib/solo-v2/server/dropRunSnapshot";
+import { buildTripleDiceSessionSnapshot } from "../../../../lib/solo-v2/server/tripleDiceSnapshot";
 import { SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
 
 function isMissingTable(error) {
@@ -80,6 +81,7 @@ export default async function handler(req, res) {
     let speedTrackPayload = null;
     let limitRunPayload = null;
     let numberHuntPayload = null;
+    let tripleDicePayload = null;
     let dropRunPayload = null;
 
     if (row.game_key === "quick_flip") {
@@ -337,6 +339,35 @@ export default async function handler(req, res) {
         canCashOut: nhSnapshot.canCashOut,
         resolvedResult: nhSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "triple_dice") {
+      const tdSnapshotResult = await buildTripleDiceSessionSnapshot(supabase, row);
+      if (!tdSnapshotResult.ok) {
+        if (isMissingTable(tdSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const tdSnapshot = tdSnapshotResult.snapshot;
+      sessionReadState = tdSnapshot.readState;
+      tripleDicePayload = {
+        readState: tdSnapshot.readState,
+        playing: tdSnapshot.playing,
+        pendingRoll: tdSnapshot.pendingRoll,
+        rollConflict: tdSnapshot.rollConflict,
+        canResolveTurn: tdSnapshot.canResolveTurn,
+        canCashOut: tdSnapshot.canCashOut,
+        resolvedResult: tdSnapshot.resolvedResult,
+      };
     } else if (row.game_key === "drop_run") {
       const drSnapshotResult = await buildDropRunSessionSnapshot(supabase, row);
       if (!drSnapshotResult.ok) {
@@ -402,6 +433,7 @@ export default async function handler(req, res) {
         speedTrack: speedTrackPayload,
         limitRun: limitRunPayload,
         numberHunt: numberHuntPayload,
+        tripleDice: tripleDicePayload,
         dropRun: dropRunPayload,
       },
       authority: {

@@ -28,6 +28,8 @@ import { buildLimitRunSessionSnapshot } from "../../../../lib/solo-v2/server/lim
 import { buildLimitRunInitialActiveSummary } from "../../../../lib/solo-v2/server/limitRunEngine";
 import { buildNumberHuntSessionSnapshot } from "../../../../lib/solo-v2/server/numberHuntSnapshot";
 import { buildNumberHuntInitialActiveSummary } from "../../../../lib/solo-v2/server/numberHuntEngine";
+import { buildTripleDiceSessionSnapshot } from "../../../../lib/solo-v2/server/tripleDiceSnapshot";
+import { buildTripleDiceInitialActiveSummary } from "../../../../lib/solo-v2/server/tripleDiceEngine";
 import { buildDropRunSessionSnapshot } from "../../../../lib/solo-v2/server/dropRunSnapshot";
 import { buildDropRunInitialActiveSummary } from "../../../../lib/solo-v2/server/dropRunEngine";
 
@@ -494,6 +496,25 @@ async function seedNumberHuntSessionOrWarn(supabase, gameKey, sessionId, playerR
   }
 }
 
+async function seedTripleDiceSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "triple_dice" || !sessionId) return;
+  const summary = buildTripleDiceInitialActiveSummary();
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "triple_dice")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create triple_dice] seed failed", { sessionId, error });
+  }
+}
+
 async function seedDropRunSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
   if (gameKey !== "drop_run" || !sessionId) return;
   const summary = buildDropRunInitialActiveSummary();
@@ -595,6 +616,7 @@ export default async function handler(req, res) {
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
+      gameKey === "triple_dice" ||
       gameKey === "drop_run") {
       const minWager = gameKey === "mystery_box" ? MYSTERY_BOX_MIN_WAGER : QUICK_FLIP_MIN_WAGER;
       const buildSnapshot =
@@ -614,9 +636,11 @@ export default async function handler(req, res) {
                       ? buildLimitRunSessionSnapshot
                       : gameKey === "number_hunt"
                         ? buildNumberHuntSessionSnapshot
-                        : gameKey === "drop_run"
-                          ? buildDropRunSessionSnapshot
-                          : buildQuickFlipSessionSnapshot;
+                        : gameKey === "triple_dice"
+                          ? buildTripleDiceSessionSnapshot
+                          : gameKey === "drop_run"
+                            ? buildDropRunSessionSnapshot
+                            : buildQuickFlipSessionSnapshot;
 
       if (!Number.isFinite(entryAmount) || entryAmount < minWager) {
         return res.status(400).json({
@@ -732,6 +756,7 @@ export default async function handler(req, res) {
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
+      gameKey === "triple_dice" ||
       gameKey === "drop_run") &&
       isGameNotEnabled(error)
     ) {
@@ -778,6 +803,7 @@ export default async function handler(req, res) {
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
+      gameKey === "triple_dice" ||
       gameKey === "drop_run") &&
         isLegacyDeviceIdNotNullError(error)
       ) {
@@ -806,6 +832,7 @@ export default async function handler(req, res) {
         await seedSpeedTrackSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedLimitRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedNumberHuntSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedTripleDiceSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedDropRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         return res.status(201).json({
           ok: true,
@@ -857,6 +884,7 @@ export default async function handler(req, res) {
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
+      gameKey === "triple_dice" ||
       gameKey === "drop_run") &&
         isUniqueConflict(error)
       ) {
@@ -877,9 +905,11 @@ export default async function handler(req, res) {
                         ? buildLimitRunSessionSnapshot
                         : gameKey === "number_hunt"
                           ? buildNumberHuntSessionSnapshot
-                          : gameKey === "drop_run"
-                            ? buildDropRunSessionSnapshot
-                            : buildQuickFlipSessionSnapshot;
+                          : gameKey === "triple_dice"
+                            ? buildTripleDiceSessionSnapshot
+                            : gameKey === "drop_run"
+                              ? buildDropRunSessionSnapshot
+                              : buildQuickFlipSessionSnapshot;
         const conflictLookup = await healAndReReadActiveSessions(supabase, playerRef, gameKey, "post_unique_conflict");
         if (conflictLookup.ok) {
           const conflictRows = conflictLookup.rows;
@@ -945,6 +975,7 @@ export default async function handler(req, res) {
               await seedSpeedTrackSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedLimitRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedNumberHuntSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedTripleDiceSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedDropRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
@@ -992,6 +1023,7 @@ export default async function handler(req, res) {
               await seedSpeedTrackSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedLimitRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedNumberHuntSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedTripleDiceSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedDropRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
@@ -1054,6 +1086,7 @@ export default async function handler(req, res) {
     await seedSpeedTrackSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedLimitRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedNumberHuntSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedTripleDiceSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedDropRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     return res.status(201).json({
       ok: true,
