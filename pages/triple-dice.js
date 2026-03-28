@@ -50,6 +50,30 @@ const MAX_WAGER = 1_000_000_000;
 
 const NEUTRAL_DICE = [2, 3, 4];
 
+function buildOutcomeStatusLines(rolledTotal, dice, selectedZoneNorm, resolvedIsWin, showNextRoundHint) {
+  const t = Math.floor(Number(rolledTotal));
+  const d = Array.isArray(dice) ? dice : [];
+  const pz = normalizeTripleDiceZone(selectedZoneNorm);
+  const pickUp = pz ? pz.toUpperCase() : "—";
+  if (!Number.isFinite(t) || d.length !== 3) {
+    return { statusTop: "Round finished.", statusSub: "\u00a0" };
+  }
+  let statusTop = "";
+  if (resolvedIsWin) {
+    if (pz === "triple") {
+      const face = Math.floor(Number(d[0]));
+      statusTop = Number.isFinite(face) ? `Triple ${face}s. TRIPLE wins.` : "TRIPLE wins.";
+    } else {
+      statusTop = `Total ${t}. ${pickUp} wins.`;
+    }
+  } else {
+    statusTop = `Total ${t}. Your pick was ${pickUp}.`;
+  }
+  const statusSub =
+    showNextRoundHint && pz ? `Played ${pickUp} · tap Roll for next round` : "\u00a0";
+  return { statusTop, statusSub };
+}
+
 function parseWagerInput(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
   if (!digits) return 0;
@@ -137,7 +161,9 @@ export default function TripleDicePage() {
   const [rollingUi, setRollingUi] = useState(false);
   const [totalDisplay, setTotalDisplay] = useState("—");
   const [inTripleDiceLoop, setInTripleDiceLoop] = useState(false);
+  const [persistedLastRound, setPersistedLastRound] = useState(null);
   const inTripleDiceLoopRef = useRef(false);
+  const preserveBoardAfterRoundRef = useRef(false);
   const wagerInputRef = useRef(wagerInput);
   const vaultBalanceRef = useRef(vaultBalance);
 
@@ -244,13 +270,14 @@ export default function TripleDicePage() {
     setResolvedResult(null);
     setSessionNotice("");
     setRollingUi(false);
-    setTotalDisplay("—");
-    setDiceValues([...NEUTRAL_DICE]);
 
     if (!inTripleDiceLoopRef.current) {
       createInFlightRef.current = false;
       setSession(null);
       setUiState(UI_STATE.IDLE);
+      setPersistedLastRound(null);
+      setDiceValues([...NEUTRAL_DICE]);
+      setTotalDisplay("—");
       return;
     }
 
@@ -260,6 +287,9 @@ export default function TripleDicePage() {
       setUiState(UI_STATE.IDLE);
       setInTripleDiceLoop(false);
       setErrorMessage("Shared vault unavailable.");
+      setPersistedLastRound(null);
+      setDiceValues([...NEUTRAL_DICE]);
+      setTotalDisplay("—");
       return;
     }
 
@@ -270,6 +300,9 @@ export default function TripleDicePage() {
       setUiState(UI_STATE.IDLE);
       setInTripleDiceLoop(false);
       setErrorMessage(`Minimum stake is ${TRIPLE_DICE_MIN_WAGER}.`);
+      setPersistedLastRound(null);
+      setDiceValues([...NEUTRAL_DICE]);
+      setTotalDisplay("—");
       return;
     }
     if (vaultBalanceRef.current < wager) {
@@ -278,14 +311,22 @@ export default function TripleDicePage() {
       setUiState(UI_STATE.IDLE);
       setInTripleDiceLoop(false);
       setErrorMessage(`Insufficient vault balance. Need ${wager} for this round.`);
+      setPersistedLastRound(null);
+      setDiceValues([...NEUTRAL_DICE]);
+      setTotalDisplay("—");
       return;
     }
 
     cycleRef.current += 1;
     const activeCycle = cycleRef.current;
-    const boot = await bootstrapSession(wager, activeCycle, SOLO_V2_SESSION_MODE.STANDARD, { isGiftRound: false });
+    preserveBoardAfterRoundRef.current = true;
+    const boot = await bootstrapSession(wager, activeCycle, SOLO_V2_SESSION_MODE.STANDARD, {
+      isGiftRound: false,
+      preserveBoardAfterRound: true,
+    });
     if (!boot.ok || boot.alreadyTerminal) {
       setInTripleDiceLoop(false);
+      preserveBoardAfterRoundRef.current = false;
       return;
     }
     const tdBoot = boot.session?.tripleDice;
@@ -341,9 +382,16 @@ export default function TripleDicePage() {
       setInTripleDiceLoop(true);
       setResolvedResult(null);
       setUiState(UI_STATE.SESSION_ACTIVE);
-      setDiceValues([...NEUTRAL_DICE]);
       setRollingUi(false);
+      if (preserveBoardAfterRoundRef.current) {
+        preserveBoardAfterRoundRef.current = false;
+        setSessionNotice("");
+        setErrorMessage("");
+        return;
+      }
+      setDiceValues([...NEUTRAL_DICE]);
       setTotalDisplay("—");
+      setPersistedLastRound(null);
       setSessionNotice(resumed ? "Session restored — adjust target and roll." : "Set your target, then tap Roll.");
       setErrorMessage("");
       return;
@@ -353,6 +401,9 @@ export default function TripleDicePage() {
       setInTripleDiceLoop(false);
       setSession(null);
       setResolvedResult(null);
+      setPersistedLastRound(null);
+      setDiceValues([...NEUTRAL_DICE]);
+      setTotalDisplay("—");
       setUiState(UI_STATE.IDLE);
       setSessionNotice("");
       setErrorMessage(
@@ -400,13 +451,17 @@ export default function TripleDicePage() {
 
   async function bootstrapSession(wager, activeCycle, createSessionMode, giftRoundMeta) {
     const isGiftRound = Boolean(giftRoundMeta?.isGiftRound);
+    const preserveBoard = Boolean(giftRoundMeta?.preserveBoardAfterRound);
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
     setSession(null);
     setResolvedResult(null);
-    setDiceValues([...NEUTRAL_DICE]);
-    setTotalDisplay("—");
+    if (!preserveBoard) {
+      setDiceValues([...NEUTRAL_DICE]);
+      setTotalDisplay("—");
+      setPersistedLastRound(null);
+    }
 
     try {
       const response = await fetch("/api/solo-v2/sessions/create", {
@@ -515,13 +570,22 @@ export default function TripleDicePage() {
     const won = Boolean(r.won ?? r.isWin ?? r.terminalKind === "full_clear");
 
     const finalize = () => {
+      const totalStr = Number.isFinite(tot) ? String(tot) : "—";
       setDiceValues(dice);
       setRollingUi(false);
-      setTotalDisplay(Number.isFinite(tot) ? String(tot) : "—");
+      setTotalDisplay(totalStr);
       setResolvedResult({
         ...r,
         sessionId: r.sessionId || sid,
         settlementSummary: r.settlementSummary,
+      });
+      const pz = normalizeTripleDiceZone(r.selectedZone);
+      setPersistedLastRound({
+        dice: [...dice],
+        totalStr,
+        playedZone: pz,
+        isWin: won,
+        rolledTotal: tot,
       });
       setUiState(UI_STATE.RESOLVED);
       openResultPopup();
@@ -599,6 +663,7 @@ export default function TripleDicePage() {
     if (zone === null) return;
 
     submitInFlightRef.current = true;
+    setPersistedLastRound(null);
     setUiState(UI_STATE.SUBMITTING_PICK);
     setErrorMessage("");
     setRollingUi(true);
@@ -840,32 +905,38 @@ export default function TripleDicePage() {
 
   let statusTop = "Choose 1 of 4 options, then roll.";
   let statusSub = "Pick LOW, MID, HIGH, or TRIPLE — then START TRIPLE DICE.";
-  if (inTripleDiceLoop && uiState === UI_STATE.SESSION_ACTIVE && readState === "ready" && !rollingUi) {
-    statusTop = "Tap Roll when ready.";
-    statusSub = `${normZone.toUpperCase()} · ${winChance.toFixed(2)}% hit rate`;
-  }
   if (rollingUi) {
     statusTop = "Rolling…";
     statusSub = "\u00a0";
-  }
-  if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    const t = Math.floor(Number(resolvedResult.rolledTotal));
-    const d = Array.isArray(resolvedResult.dice) ? resolvedResult.dice : [];
-    const pz = normalizeTripleDiceZone(resolvedResult.selectedZone);
-    const pickUp = pz ? pz.toUpperCase() : "—";
-    if (Number.isFinite(t) && d.length === 3) {
-      if (resolvedIsWin) {
-        if (pz === "triple") {
-          const face = Math.floor(Number(d[0]));
-          statusTop = Number.isFinite(face) ? `Triple ${face}s. TRIPLE wins.` : "TRIPLE wins.";
-        } else {
-          statusTop = `Total ${t}. ${pickUp} wins.`;
-        }
-      } else {
-        statusTop = `Total ${t}. Your pick was ${pickUp}.`;
-      }
-      statusSub = "\u00a0";
-    }
+  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    const lines = buildOutcomeStatusLines(
+      resolvedResult.rolledTotal,
+      resolvedResult.dice,
+      resolvedResult.selectedZone,
+      resolvedIsWin,
+      false,
+    );
+    statusTop = lines.statusTop;
+    statusSub = lines.statusSub;
+  } else if (
+    persistedLastRound &&
+    inTripleDiceLoop &&
+    uiState === UI_STATE.SESSION_ACTIVE &&
+    readState === "ready" &&
+    !rollingUi
+  ) {
+    const pl = buildOutcomeStatusLines(
+      persistedLastRound.rolledTotal,
+      persistedLastRound.dice,
+      persistedLastRound.playedZone,
+      persistedLastRound.isWin,
+      true,
+    );
+    statusTop = pl.statusTop;
+    statusSub = pl.statusSub;
+  } else if (inTripleDiceLoop && uiState === UI_STATE.SESSION_ACTIVE && readState === "ready" && !rollingUi) {
+    statusTop = "Tap Roll when ready.";
+    statusSub = `${normZone.toUpperCase()} · ${winChance.toFixed(2)}% hit rate`;
   }
 
   const diceMuted = !inTripleDiceLoop && idleLike;
