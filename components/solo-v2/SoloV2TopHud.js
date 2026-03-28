@@ -8,6 +8,7 @@ import SoloV2GiftButton from "./SoloV2GiftButton";
 export default function SoloV2TopHud({
   title,
   subtitle = "",
+  mobileHeaderBreathingRoom = false,
   onBack,
   onOpenInfo,
   onOpenMenu,
@@ -28,7 +29,11 @@ export default function SoloV2TopHud({
   const showVault = headerVaultBalance !== null && headerVaultBalance !== undefined;
 
   return (
-    <header className="grid w-full shrink-0 grid-cols-[auto_1fr_auto] items-start gap-x-2 gap-y-0.5 py-1.5 sm:gap-x-3 sm:py-2">
+    <header
+      className={`grid w-full shrink-0 grid-cols-[auto_1fr_auto] items-start gap-x-2 gap-y-0.5 sm:gap-x-3 sm:py-2 ${
+        mobileHeaderBreathingRoom ? "py-2" : "py-1.5"
+      }`}
+    >
       <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
         {onBack ? (
           <button
@@ -51,12 +56,38 @@ export default function SoloV2TopHud({
         />
       </div>
 
-      <div className="min-w-0 justify-self-center px-1 text-center">
-        <h1 className="truncate text-base font-extrabold tracking-tight text-white sm:text-lg">{title}</h1>
-        {subtitle ? <p className="truncate text-xs text-zinc-400 sm:text-sm">{subtitle}</p> : null}
+      <div
+        className={`min-w-0 justify-self-center px-1 text-center ${
+          mobileHeaderBreathingRoom ? "mt-2.5 sm:mt-0" : ""
+        }`}
+      >
+        <h1
+          className={
+            mobileHeaderBreathingRoom
+              ? "truncate text-lg font-extrabold leading-snug tracking-tight text-white sm:text-lg sm:leading-normal"
+              : "truncate text-base font-extrabold tracking-tight text-white sm:text-lg"
+          }
+        >
+          {title}
+        </h1>
+        {subtitle ? (
+          <p
+            className={
+              mobileHeaderBreathingRoom
+                ? "truncate text-[13px] leading-snug text-zinc-400 sm:text-sm sm:leading-normal"
+                : "truncate text-xs text-zinc-400 sm:text-sm"
+            }
+          >
+            {subtitle}
+          </p>
+        ) : null}
         {showVault || topGameStatsSlot ? (
           <div
-            className="mt-0.5 flex w-full min-w-0 flex-nowrap items-center justify-center gap-x-1.5 overflow-x-auto overscroll-x-contain whitespace-nowrap text-[13px] leading-tight text-zinc-500 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-x-2 sm:text-[15px] [&::-webkit-scrollbar]:hidden"
+            className={`flex w-full min-w-0 flex-nowrap items-center justify-center gap-x-1.5 overflow-x-auto overscroll-x-contain whitespace-nowrap text-zinc-500 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-x-2 sm:text-[15px] [&::-webkit-scrollbar]:hidden ${
+              mobileHeaderBreathingRoom
+                ? "mt-1 text-[13px] leading-snug sm:mt-0.5 sm:leading-tight"
+                : "mt-0.5 text-[13px] leading-tight"
+            }`}
           >
             {showVault ? (
               <span className="shrink-0">

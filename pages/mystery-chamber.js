@@ -135,7 +135,7 @@ function MysteryChamberGameplayPanel({
   const sec = playing?.securedReturn != null ? Math.floor(Number(playing.securedReturn)) : 0;
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-1 text-center sm:px-2">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1">
       <div className="flex min-h-0 flex-1 flex-col">
         <MysteryChamberBoard
           sessionNotice={sessionNotice}
@@ -996,6 +996,7 @@ export default function MysteryChamberPage() {
       title="Mystery Chamber"
       subtitle="Advance through the chamber run."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl"
+      mobileHeaderBreathingRoom
       gameplayScrollable={false}
       gameplayDesktopUnclipVertical
       menuVaultBalance={vaultBalance}

@@ -87,7 +87,7 @@ export default function MysteryChamberBoard({
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border-2 border-amber-900/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="flex h-[1.125rem] shrink-0 items-center justify-center px-2 sm:h-5">
+      <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-5 sm:min-h-0">
         <p
           className={`truncate text-center text-[9px] font-semibold text-amber-200/85 sm:text-[10px] ${
             showSession ? "opacity-100" : "opacity-0"
@@ -97,17 +97,17 @@ export default function MysteryChamberBoard({
         </p>
       </div>
 
-      <div className="shrink-0 px-2.5 pb-0.5 pt-0.5 text-center sm:px-3 sm:pb-1 sm:pt-1">
-        <p className="min-h-[1.1rem] text-[11px] font-bold leading-tight text-white sm:min-h-[1.2rem] sm:text-[13px]">
+      <div className="shrink-0 px-2.5 pb-0 pt-0 text-center sm:px-3 sm:pb-1 sm:pt-1">
+        <p className="min-h-[1.05rem] text-[11px] font-bold leading-tight text-white sm:min-h-[1.2rem] sm:text-[13px]">
           {statusTop}
         </p>
-        <p className="mt-0 min-h-[0.85rem] text-[9px] leading-snug text-zinc-400 sm:mt-0.5 sm:min-h-[1rem] sm:text-[10px]">
+        <p className="mt-0 min-h-[0.8rem] text-[9px] leading-snug text-zinc-400 sm:mt-0.5 sm:min-h-[1rem] sm:text-[10px]">
           {statusSub}
         </p>
       </div>
 
-      <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1.5">
-        <div className="mb-0.5 flex items-center justify-between px-0.5">
+      <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1.5">
+        <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
           <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">
             Chambers
           </span>
@@ -140,7 +140,7 @@ export default function MysteryChamberBoard({
         </div>
       </div>
 
-      <div className="shrink-0 px-2.5 pb-1.5 pt-0 sm:px-3 sm:pb-2">
+      <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-2">
         <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
           <div className="flex items-center justify-between gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5">
             <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
@@ -159,9 +159,9 @@ export default function MysteryChamberBoard({
       </div>
 
       {/* Mobile: 2×2 centered in flex-1. Desktop (sm+): single horizontal row, full width — uses canvas width, not a shrunk mobile block. */}
-      <div className="flex min-h-0 flex-1 flex-col justify-center px-2 pb-1 pt-0 sm:flex-none sm:justify-start sm:px-4 sm:pb-2 sm:pt-1">
+      <div className="flex min-h-0 flex-1 flex-col justify-center px-2 pb-0.5 pt-0 sm:flex-none sm:justify-start sm:px-4 sm:pb-2 sm:pt-1">
         <div
-          className="mx-auto grid w-full max-w-[17.75rem] grid-cols-2 grid-rows-2 gap-2.5 sm:mx-0 sm:max-w-none sm:grid-cols-4 sm:grid-rows-1 sm:gap-3 lg:gap-3.5"
+          className="mx-auto grid w-full max-w-[17.75rem] grid-cols-2 grid-rows-2 gap-2 sm:mx-0 sm:max-w-none sm:grid-cols-4 sm:grid-rows-1 sm:gap-3 lg:gap-3.5"
           role="group"
           aria-label="Sigils"
         >

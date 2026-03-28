@@ -56,6 +56,11 @@ export default function SoloV2GameShell({
   gameplayDesktopUnclipVertical = false,
   /** Optional outer column max-width (Tailwind classes). Default keeps existing Solo V2 width. */
   layoutMaxWidthClass = "max-w-lg",
+  /**
+   * Mobile-only: extra separation between top controls and title/stats, slightly larger title type,
+   * and a touch more space before gameplay (redistribute vertical space without scroll).
+   */
+  mobileHeaderBreathingRoom = false,
 }) {
   const [infoTab, setInfoTab] = useState("help");
   const [isInfoOpen, setIsInfoOpen] = useState(false);
@@ -80,11 +85,14 @@ export default function SoloV2GameShell({
       }}
     >
       <div
-        className={`mx-auto flex h-full w-full min-h-0 flex-col gap-1.5 px-3 sm:gap-3 sm:px-4 ${layoutMaxWidthClass}`}
+        className={`mx-auto flex h-full w-full min-h-0 flex-col px-3 sm:px-4 ${layoutMaxWidthClass} ${
+          mobileHeaderBreathingRoom ? "gap-2.5 sm:gap-3" : "gap-1.5 sm:gap-3"
+        }`}
       >
         <SoloV2TopHud
           title={title}
           subtitle={subtitle}
+          mobileHeaderBreathingRoom={mobileHeaderBreathingRoom}
           onBack={onBack}
           onOpenInfo={openInfo}
           onOpenMenu={() => setIsMenuOpen(true)}
@@ -120,7 +128,11 @@ export default function SoloV2GameShell({
               : "min-h-0 flex-1 overflow-hidden"
           }
         >
-          <div className="flex h-full min-h-0 items-stretch justify-center">
+          <div
+            className={`flex h-full min-h-0 items-stretch justify-center ${
+              mobileHeaderBreathingRoom ? "max-sm:pt-1.5" : ""
+            }`}
+          >
             <div
               className={`h-full w-full min-h-0 overflow-x-hidden ${
                 gameplayScrollable
