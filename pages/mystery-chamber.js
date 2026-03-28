@@ -28,6 +28,20 @@ import {
   classifySoloV2ApiResult,
   isSoloV2EventRejectedStaleSessionMessage,
 } from "../lib/solo-v2/soloV2ApiResult";
+import {
+  averageChamberReached,
+  chamberClearRatePercent,
+  loadMysteryChamberPickDedupe,
+  mysteryChamberTerminalAlreadyRecorded,
+  readMysteryChamberStats,
+  recordMysteryChamberTerminal,
+  recordMysteryChamberTurnComplete,
+  rememberMysteryChamberPickDedupe,
+  rememberMysteryChamberTerminal,
+  runsWithReturn,
+  totalSuccessfulSafePicks,
+  writeMysteryChamberStats,
+} from "../lib/solo-v2/mysteryChamberLocalStats";
 
 const GAME_KEY = "mystery_chamber";
 const PLAYER_HEADER = "mystery-chamber-client";
@@ -219,6 +233,7 @@ export default function MysteryChamberPage() {
   const [persistedBoard, setPersistedBoard] = useState(null);
   const [localAnim, setLocalAnim] = useState(null);
   const [revealPulse, setRevealPulse] = useState(false);
+  const [mcLocalStats, setMcLocalStats] = useState(() => readMysteryChamberStats());
 
   const inMysteryLoopRef = useRef(false);
   const wagerInputRef = useRef(wagerInput);
@@ -262,6 +277,10 @@ export default function MysteryChamberPage() {
   useEffect(() => {
     vaultBalanceRef.current = vaultBalance;
   }, [vaultBalance]);
+
+  useEffect(() => {
+    writeMysteryChamberStats(mcLocalStats);
+  }, [mcLocalStats]);
 
   useEffect(() => {
     let cancelled = false;
@@ -554,6 +573,22 @@ export default function MysteryChamberPage() {
 
       if (api === SOLO_V2_API_RESULT.SUCCESS && status === "turn_complete" && payload?.result) {
         const r = payload.result;
+        const peid = Number(r.pickEventId);
+        if (
+          Number.isFinite(peid) &&
+          peid > 0 &&
+          r.chamberIndex != null &&
+          r.sigilIndex != null &&
+          !loadMysteryChamberPickDedupe(sessionId).has(peid)
+        ) {
+          rememberMysteryChamberPickDedupe(sessionId, peid);
+          setMcLocalStats(prev =>
+            recordMysteryChamberTurnComplete(prev, {
+              chamberIndex: r.chamberIndex,
+              sigilIndex: r.sigilIndex,
+            }),
+          );
+        }
         setLocalAnim({ chosen: r.sigilIndex, phase: "success" });
         const readResult = await readSessionTruth(sessionId, activeCycle);
         if (readResult?.ok && readResult.session) {
@@ -584,6 +619,38 @@ export default function MysteryChamberPage() {
         }
 
         const revealedSet = safeSigilSetFromApiResult(r);
+
+        if (!mysteryChamberTerminalAlreadyRecorded(sessionId)) {
+          rememberMysteryChamberTerminal(sessionId);
+          const entry = Math.max(
+            0,
+            Math.floor(Number(r.settlementSummary?.entryCost ?? sessionRef.current?.entryAmount ?? 0)),
+          );
+          const payout = Math.max(
+            0,
+            Math.floor(Number(r.payoutReturn ?? r.settlementSummary?.payoutReturn ?? 0)),
+          );
+          const fc = r.finalChamberIndex ?? r.chamberIndex ?? 0;
+          const cc = Math.max(
+            0,
+            Math.floor(
+              Number(r.chambersCleared ?? readResult?.session?.serverOutcomeSummary?.chambersCleared) || 0,
+            ),
+          );
+          const tk = r.terminalKind;
+          const chosen = r.chosenSigil ?? r.lastChosenSigil;
+          setMcLocalStats(prev =>
+            recordMysteryChamberTerminal(prev, {
+              terminalKind: tk,
+              entryCost: entry,
+              payoutReturn: payout,
+              finalChamberIndex: fc,
+              chambersCleared: cc,
+              chosenSigil: chosen,
+              safeSigilSet: tk === "fail" ? revealedSet : [],
+            }),
+          );
+        }
 
         if (r.terminalKind === "fail") {
           setLocalAnim({
@@ -730,6 +797,35 @@ export default function MysteryChamberPage() {
         const readResult = await readSessionTruth(sid, activeCycle);
         if (readResult?.ok && readResult.session) {
           setSession(readResult.session);
+        }
+        if (!mysteryChamberTerminalAlreadyRecorded(sid)) {
+          rememberMysteryChamberTerminal(sid);
+          const entry = Math.max(
+            0,
+            Math.floor(Number(r.settlementSummary?.entryCost ?? sessionRef.current?.entryAmount ?? 0)),
+          );
+          const payout = Math.max(
+            0,
+            Math.floor(Number(r.payoutReturn ?? r.settlementSummary?.payoutReturn ?? 0)),
+          );
+          const fc = r.finalChamberIndex ?? r.chamberIndex ?? 0;
+          const cc = Math.max(
+            0,
+            Math.floor(
+              Number(r.chambersCleared ?? readResult?.session?.serverOutcomeSummary?.chambersCleared) || 0,
+            ),
+          );
+          setMcLocalStats(prev =>
+            recordMysteryChamberTerminal(prev, {
+              terminalKind: "cashout",
+              entryCost: entry,
+              payoutReturn: payout,
+              finalChamberIndex: fc,
+              chambersCleared: cc,
+              chosenSigil: r.chosenSigil ?? r.lastChosenSigil,
+              safeSigilSet: [],
+            }),
+          );
         }
         setPersistedBoard({
           terminalKind: "cashout",
@@ -1029,6 +1125,14 @@ export default function MysteryChamberPage() {
     ? `Full clear (${MYSTERY_CHAMBER_CHAMBER_COUNT} chambers): ${formatCompact(previewMaxClear)}`
     : "";
 
+  const mcSt = mcLocalStats;
+  const safePickTotal = totalSuccessfulSafePicks(mcSt);
+  const runsReturned = runsWithReturn(mcSt);
+  const avgDepth = averageChamberReached(mcSt);
+  const netFlow = mcSt.totalReturned - mcSt.totalPlayed;
+  const fmtMcPct = p => (p == null || Number.isNaN(p) ? "—" : `${p.toFixed(1)}%`);
+  const revealFailTotal = mcSt.revealedSafeHits.reduce((a, b) => a + (Number(b) || 0), 0);
+
   return (
     <SoloV2GameShell
       title="Mystery Chamber"
@@ -1130,6 +1234,35 @@ export default function MysteryChamberPage() {
             After any safe chamber you may exit with your secured return or continue. Outcomes are sealed on the server;
             picks are validated and resolved there.
           </p>
+        </div>
+      }
+      statsContent={
+        <div className="space-y-2">
+          <p>Total runs: {mcSt.totalRuns}</p>
+          <p>Successful safe picks: {safePickTotal}</p>
+          <p>Runs with a return: {runsReturned}</p>
+          <p>Full clears: {mcSt.fullClears}</p>
+          <p>Exit now: {mcSt.cashouts}</p>
+          <p>Failed runs: {mcSt.failures}</p>
+          <p>Chamber 1 safe-pick rate: {fmtMcPct(chamberClearRatePercent(mcSt, 0))}</p>
+          <p>Chamber 2 safe-pick rate: {fmtMcPct(chamberClearRatePercent(mcSt, 1))}</p>
+          <p>Chamber 3 safe-pick rate: {fmtMcPct(chamberClearRatePercent(mcSt, 2))}</p>
+          <p>Chamber 4 safe-pick rate: {fmtMcPct(chamberClearRatePercent(mcSt, 3))}</p>
+          <p>Average deepest chamber: {avgDepth == null ? "—" : avgDepth.toFixed(2)}</p>
+          <p>Total played: {formatCompact(mcSt.totalPlayed)}</p>
+          <p>Total returned: {formatCompact(mcSt.totalReturned)}</p>
+          <p>Best return: {formatCompact(mcSt.bestReturn)}</p>
+          <p>Net flow (returned − played): {formatCompact(netFlow)}</p>
+          <p>
+            Picks by sigil:{" "}
+            {MYSTERY_CHAMBER_SIGIL_GLYPHS.map((g, i) => `${g} ${mcSt.picksBySigil[i] || 0}`).join(" · ")}
+          </p>
+          {revealFailTotal > 0 ? (
+            <p>
+              Safe sigils revealed after a wrong pick:{" "}
+              {MYSTERY_CHAMBER_SIGIL_GLYPHS.map((g, i) => `${g} ${mcSt.revealedSafeHits[i] || 0}`).join(" · ")}
+            </p>
+          ) : null}
         </div>
       }
       resultState={null}
