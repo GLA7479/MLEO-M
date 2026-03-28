@@ -2,7 +2,7 @@ const ZONE_TILES = [
   { zone: "low", label: "LOW", hint: "3–8" },
   { zone: "mid", label: "MID", hint: "9–11" },
   { zone: "high", label: "HIGH", hint: "12–18" },
-  { zone: "triple", label: "TRIPLE", hint: "Same face" },
+  { zone: "triple", label: "TRIPLE", hint: "SAME FACE" },
 ];
 
 /** @param {{ zone: string, label: string, hint: string }} t */
@@ -26,7 +26,7 @@ function PipDie({ value, rolling, muted }) {
   };
   return (
     <div
-      className={`grid w-[3.85rem] shrink-0 grid-cols-3 gap-px rounded-xl border-2 p-1.5 sm:w-[4.35rem] sm:p-1.5 ${
+      className={`grid w-[4.95rem] shrink-0 grid-cols-3 gap-px rounded-xl border-2 p-2 sm:w-[4.6rem] sm:p-1.5 ${
         muted
           ? "border-zinc-700 bg-zinc-950"
           : rolling
@@ -37,7 +37,7 @@ function PipDie({ value, rolling, muted }) {
       {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(pos => (
         <div key={pos} className="flex aspect-square items-center justify-center">
           <span
-            className={`h-1.5 w-1.5 rounded-full sm:h-1.5 sm:w-1.5 ${
+            className={`h-2 w-2 rounded-full ${
               on(pos)
                 ? muted
                   ? "bg-zinc-500"
@@ -91,8 +91,8 @@ export default function TripleDiceBoard({
         <p className="mt-0.5 min-h-[1rem] text-[10px] leading-snug text-zinc-400 sm:text-xs">{statusSub}</p>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-0.5 px-2 py-0.5 sm:gap-1 sm:px-3 sm:py-1">
-        <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-3">
+      <div className="flex min-h-0 flex-1 flex-col justify-center gap-0 px-2 py-0 sm:gap-0.5 sm:px-3 sm:py-0.5">
+        <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-2.5">
           <PipDie value={d0} rolling={rolling} muted={diceMuted} />
           <PipDie value={d1} rolling={rolling} muted={diceMuted} />
           <PipDie value={d2} rolling={rolling} muted={diceMuted} />
@@ -106,7 +106,7 @@ export default function TripleDiceBoard({
       </div>
 
       <div className="shrink-0 border-t border-violet-600/30 bg-zinc-950 px-2 pb-2 pt-1.5 sm:px-3 sm:pb-2 sm:pt-2">
-        <div className="mx-auto grid w-full max-w-[16rem] grid-cols-2 gap-1.5 sm:max-w-[17rem] sm:gap-2">
+        <div className="mx-auto grid w-full max-w-[17.5rem] grid-cols-2 gap-2 sm:max-w-[17.75rem] sm:gap-2">
           {ZONE_TILES.map(t => {
             const active = zoneTileMatches(t, selectedZone);
             return (
@@ -115,14 +115,24 @@ export default function TripleDiceBoard({
                 type="button"
                 disabled={optionPickerDisabled}
                 onClick={() => onZoneChange?.(t.zone)}
-                className={`flex min-h-[2.5rem] flex-col items-center justify-center rounded-lg border-2 px-1 py-1 text-center transition sm:min-h-[2.65rem] sm:py-1 ${
+                className={`flex min-h-[3.35rem] flex-col items-center justify-center rounded-xl border-2 px-2 py-2 text-center shadow-sm transition sm:min-h-[3rem] sm:rounded-lg sm:px-2.5 sm:py-1.5 ${
                   active
-                    ? "border-violet-400 bg-violet-950/60 text-violet-50"
-                    : "border-violet-800/60 bg-zinc-800 text-violet-100 hover:border-violet-600"
+                    ? "border-violet-300 bg-violet-600/25 text-white shadow-violet-900/30 ring-1 ring-violet-400/35"
+                    : "border-zinc-500/70 bg-zinc-800/95 text-zinc-50 hover:border-violet-500/70 hover:bg-zinc-800"
                 } disabled:cursor-not-allowed disabled:opacity-45`}
               >
-                <span className="text-[11px] font-black leading-none sm:text-xs">{t.label}</span>
-                <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[9px]">
+                <span
+                  className={`text-[13px] font-black leading-tight tracking-wide sm:text-sm ${
+                    active ? "text-white" : "text-violet-50"
+                  }`}
+                >
+                  {t.label}
+                </span>
+                <span
+                  className={`mt-1 text-[10px] font-bold uppercase leading-tight tracking-wide sm:mt-0.5 sm:text-[11px] ${
+                    active ? "text-violet-100" : "text-zinc-300"
+                  }`}
+                >
                   {t.hint}
                 </span>
               </button>
@@ -134,7 +144,7 @@ export default function TripleDiceBoard({
           type="button"
           disabled={rollDisabled || rolling}
           onClick={() => onRoll?.()}
-          className={`mx-auto mt-1.5 flex min-h-[44px] w-full max-w-[16rem] flex-col items-center justify-center rounded-xl border-2 px-2 py-1.5 text-center transition-colors sm:mt-2 sm:max-w-[17rem] sm:min-h-[46px] sm:py-2 ${
+          className={`mx-auto mt-1.5 flex min-h-[44px] w-full max-w-[17.5rem] flex-col items-center justify-center rounded-xl border-2 px-2 py-1.5 text-center transition-colors sm:mt-2 sm:max-w-[17.75rem] sm:min-h-[46px] sm:py-2 ${
             rollDisabled || rolling
               ? "cursor-not-allowed border-zinc-700 bg-zinc-900/50 text-zinc-500"
               : "border-violet-400 bg-violet-950/50 text-violet-50 ring-2 ring-violet-500/25 hover:bg-violet-900/40"
