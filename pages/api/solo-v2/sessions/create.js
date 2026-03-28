@@ -1,8 +1,9 @@
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { parseCreateSessionPayload, resolvePlayerRef } from "../../../../lib/solo-v2/server/contracts";
-import { SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
+import { SOLO_V2_SESSION_MODE, SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
 import { getSoloV2GameByKey } from "../../../../lib/solo-v2/server/gameCatalog";
-import { QUICK_FLIP_MIN_WAGER } from "../../../../lib/solo-v2/quickFlipConfig";
+import { QUICK_FLIP_CONFIG, QUICK_FLIP_MIN_WAGER } from "../../../../lib/solo-v2/quickFlipConfig";
+import { CHALLENGE_21_MIN_WAGER } from "../../../../lib/solo-v2/challenge21Config";
 import { MYSTERY_BOX_MIN_WAGER } from "../../../../lib/solo-v2/mysteryBoxConfig";
 import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
 import { buildMysteryBoxSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryBoxSnapshot";
@@ -30,6 +31,8 @@ import { buildNumberHuntSessionSnapshot } from "../../../../lib/solo-v2/server/n
 import { buildNumberHuntInitialActiveSummary } from "../../../../lib/solo-v2/server/numberHuntEngine";
 import { buildTripleDiceSessionSnapshot } from "../../../../lib/solo-v2/server/tripleDiceSnapshot";
 import { buildTripleDiceInitialActiveSummary } from "../../../../lib/solo-v2/server/tripleDiceEngine";
+import { buildChallenge21SessionSnapshot } from "../../../../lib/solo-v2/server/challenge21Snapshot";
+import { buildChallenge21DealState } from "../../../../lib/solo-v2/server/challenge21Play";
 import { buildDropRunSessionSnapshot } from "../../../../lib/solo-v2/server/dropRunSnapshot";
 import { buildDropRunInitialActiveSummary } from "../../../../lib/solo-v2/server/dropRunEngine";
 
@@ -311,10 +314,12 @@ async function singleActiveGameRowPlayableOrExpire(supabase, existingSummary, pl
     rs === "ready" ||
     rs === "roll_submitted" ||
     rs === "roll_conflict" ||
-    rs === "guess_submitted" ||
-    rs === "guess_conflict" ||
-    rs === "gate_submitted" ||
-    rs === "gate_conflict"
+      rs === "guess_submitted" ||
+      rs === "guess_conflict" ||
+      rs === "gate_submitted" ||
+      rs === "gate_conflict" ||
+      rs === "action_submitted" ||
+      rs === "action_conflict"
   ) {
     return { ok: true, playable: true };
   }
@@ -515,6 +520,66 @@ async function seedTripleDiceSessionOrWarn(supabase, gameKey, sessionId, playerR
   }
 }
 
+async function seedChallenge21SessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "challenge_21" || !sessionId) return;
+
+  const rowRes = await supabase
+    .from("solo_v2_sessions")
+    .select("entry_amount,session_mode")
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "challenge_21")
+    .maybeSingle();
+
+  let updatePayload;
+  if (!rowRes.error && rowRes.data) {
+    const entryRaw = Math.floor(Number(rowRes.data.entry_amount) || 0);
+    const entryCost = entryRaw >= CHALLENGE_21_MIN_WAGER ? entryRaw : QUICK_FLIP_CONFIG.entryCost;
+    const fundingSource =
+      rowRes.data.session_mode === SOLO_V2_SESSION_MODE.FREEPLAY ? "gift" : "vault";
+    const deal = buildChallenge21DealState(entryCost, fundingSource);
+    if (deal.type === "resolved") {
+      updatePayload = {
+        server_outcome_summary: deal.summary,
+        session_status: SOLO_V2_SESSION_STATUS.RESOLVED,
+        resolved_at: deal.summary.resolvedAt || null,
+      };
+    } else {
+      updatePayload = {
+        server_outcome_summary: deal.summary,
+        session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+        resolved_at: null,
+      };
+    }
+  } else {
+    const deal = buildChallenge21DealState(QUICK_FLIP_CONFIG.entryCost, "vault");
+    updatePayload =
+      deal.type === "resolved"
+        ? {
+            server_outcome_summary: deal.summary,
+            session_status: SOLO_V2_SESSION_STATUS.RESOLVED,
+            resolved_at: deal.summary.resolvedAt || null,
+          }
+        : {
+            server_outcome_summary: deal.summary,
+            session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            resolved_at: null,
+          };
+  }
+
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update(updatePayload)
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "challenge_21")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create challenge_21] seed failed", { sessionId, error });
+  }
+}
+
 async function seedDropRunSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
   if (gameKey !== "drop_run" || !sessionId) return;
   const summary = buildDropRunInitialActiveSummary();
@@ -617,6 +682,7 @@ export default async function handler(req, res) {
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
       gameKey === "triple_dice" ||
+      gameKey === "challenge_21" ||
       gameKey === "drop_run") {
       const minWager = gameKey === "mystery_box" ? MYSTERY_BOX_MIN_WAGER : QUICK_FLIP_MIN_WAGER;
       const buildSnapshot =
@@ -638,9 +704,11 @@ export default async function handler(req, res) {
                         ? buildNumberHuntSessionSnapshot
                         : gameKey === "triple_dice"
                           ? buildTripleDiceSessionSnapshot
-                          : gameKey === "drop_run"
-                            ? buildDropRunSessionSnapshot
-                            : buildQuickFlipSessionSnapshot;
+                          : gameKey === "challenge_21"
+                            ? buildChallenge21SessionSnapshot
+                            : gameKey === "drop_run"
+                              ? buildDropRunSessionSnapshot
+                              : buildQuickFlipSessionSnapshot;
 
       if (!Number.isFinite(entryAmount) || entryAmount < minWager) {
         return res.status(400).json({
@@ -757,6 +825,7 @@ export default async function handler(req, res) {
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
       gameKey === "triple_dice" ||
+      gameKey === "challenge_21" ||
       gameKey === "drop_run") &&
       isGameNotEnabled(error)
     ) {
@@ -804,6 +873,7 @@ export default async function handler(req, res) {
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
       gameKey === "triple_dice" ||
+      gameKey === "challenge_21" ||
       gameKey === "drop_run") &&
         isLegacyDeviceIdNotNullError(error)
       ) {
@@ -833,6 +903,7 @@ export default async function handler(req, res) {
         await seedLimitRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedNumberHuntSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedTripleDiceSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedChallenge21SessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedDropRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         return res.status(201).json({
           ok: true,
@@ -885,6 +956,7 @@ export default async function handler(req, res) {
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
       gameKey === "triple_dice" ||
+      gameKey === "challenge_21" ||
       gameKey === "drop_run") &&
         isUniqueConflict(error)
       ) {
@@ -907,9 +979,11 @@ export default async function handler(req, res) {
                           ? buildNumberHuntSessionSnapshot
                           : gameKey === "triple_dice"
                             ? buildTripleDiceSessionSnapshot
-                            : gameKey === "drop_run"
-                              ? buildDropRunSessionSnapshot
-                              : buildQuickFlipSessionSnapshot;
+                            : gameKey === "challenge_21"
+                              ? buildChallenge21SessionSnapshot
+                              : gameKey === "drop_run"
+                                ? buildDropRunSessionSnapshot
+                                : buildQuickFlipSessionSnapshot;
         const conflictLookup = await healAndReReadActiveSessions(supabase, playerRef, gameKey, "post_unique_conflict");
         if (conflictLookup.ok) {
           const conflictRows = conflictLookup.rows;
@@ -976,6 +1050,7 @@ export default async function handler(req, res) {
               await seedLimitRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedNumberHuntSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedTripleDiceSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedChallenge21SessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedDropRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
@@ -1024,6 +1099,7 @@ export default async function handler(req, res) {
               await seedLimitRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedNumberHuntSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedTripleDiceSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedChallenge21SessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedDropRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
@@ -1087,6 +1163,7 @@ export default async function handler(req, res) {
     await seedLimitRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedNumberHuntSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedTripleDiceSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedChallenge21SessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedDropRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     return res.status(201).json({
       ok: true,

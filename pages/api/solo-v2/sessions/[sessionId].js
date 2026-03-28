@@ -14,6 +14,10 @@ import {
 } from "../../../../lib/solo-v2/server/numberHuntSnapshot";
 import { buildDropRunSessionSnapshot } from "../../../../lib/solo-v2/server/dropRunSnapshot";
 import { buildTripleDiceSessionSnapshot } from "../../../../lib/solo-v2/server/tripleDiceSnapshot";
+import {
+  buildChallenge21SessionSnapshot,
+  stripChallenge21SecretsFromSummary,
+} from "../../../../lib/solo-v2/server/challenge21Snapshot";
 import { SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
 
 function isMissingTable(error) {
@@ -82,6 +86,7 @@ export default async function handler(req, res) {
     let limitRunPayload = null;
     let numberHuntPayload = null;
     let tripleDicePayload = null;
+    let challenge21Payload = null;
     let dropRunPayload = null;
 
     if (row.game_key === "quick_flip") {
@@ -368,6 +373,35 @@ export default async function handler(req, res) {
         canCashOut: tdSnapshot.canCashOut,
         resolvedResult: tdSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "challenge_21") {
+      const c21SnapshotResult = await buildChallenge21SessionSnapshot(supabase, row);
+      if (!c21SnapshotResult.ok) {
+        if (isMissingTable(c21SnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const c21Snapshot = c21SnapshotResult.snapshot;
+      sessionReadState = c21Snapshot.readState;
+      challenge21Payload = {
+        readState: c21Snapshot.readState,
+        playing: c21Snapshot.playing,
+        pendingAction: c21Snapshot.pendingAction,
+        actionConflict: c21Snapshot.actionConflict,
+        canResolveTurn: c21Snapshot.canResolveTurn,
+        canCashOut: c21Snapshot.canCashOut,
+        resolvedResult: c21Snapshot.resolvedResult,
+      };
     } else if (row.game_key === "drop_run") {
       const drSnapshotResult = await buildDropRunSessionSnapshot(supabase, row);
       if (!drSnapshotResult.ok) {
@@ -403,7 +437,9 @@ export default async function handler(req, res) {
     const serverOutcomeSummary =
       row.game_key === "number_hunt" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
         ? stripNumberHuntSecretFromSummary(rawSummary)
-        : rawSummary;
+        : row.game_key === "challenge_21" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
+          ? stripChallenge21SecretsFromSummary(rawSummary)
+          : rawSummary;
 
     return res.status(200).json({
       ok: true,
@@ -434,6 +470,7 @@ export default async function handler(req, res) {
         limitRun: limitRunPayload,
         numberHunt: numberHuntPayload,
         tripleDice: tripleDicePayload,
+        challenge21: challenge21Payload,
         dropRun: dropRunPayload,
       },
       authority: {
