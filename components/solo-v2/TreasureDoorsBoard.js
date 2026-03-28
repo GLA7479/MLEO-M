@@ -235,10 +235,12 @@ export default function TreasureDoorsBoard({
                       className="absolute right-[22%] top-[38%] h-2 w-2 -translate-y-1/2 rounded-full border border-zinc-600 bg-zinc-800"
                       aria-hidden
                     />
-                    <div className="relative z-[1] flex flex-1 flex-col items-center justify-end px-1 pt-8">
+                    <div className="pointer-events-none absolute inset-x-1.5 top-2 bottom-[2.75rem] z-[1] flex items-end justify-center pb-[18%] sm:pb-[20%]">
                       <span className="text-xl font-semibold tabular-nums leading-none text-zinc-200 sm:text-2xl">
                         {door + 1}
                       </span>
+                    </div>
+                    <div className="relative z-[1] flex flex-1 flex-col items-center justify-end px-1">
                       <span className="mt-1 text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-500 sm:text-[10px]">
                         Door
                       </span>
