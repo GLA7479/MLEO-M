@@ -1,0 +1,59 @@
+/* Overlay-only motion — no outer glow / halo (avoids muddy spill on dark UI). */
+@keyframes tdVaultGlowOpacity {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.22;
+  }
+}
+
+@keyframes tdVaultShake {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  20% {
+    transform: translate3d(-2px, 1px, 0) rotate(-0.6deg);
+  }
+  40% {
+    transform: translate3d(3px, -1px, 0) rotate(0.6deg);
+  }
+  60% {
+    transform: translate3d(-2px, -1px, 0) rotate(-0.4deg);
+  }
+  80% {
+    transform: translate3d(2px, 1px, 0) rotate(0.3deg);
+  }
+}
+
+@keyframes tdCrackPulse {
+  0%,
+  100% {
+    opacity: 0.28;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.doorGlow {
+  animation: tdVaultGlowOpacity 0.65s ease-in-out 2;
+}
+
+.doorShake {
+  animation: tdVaultShake 0.42s ease-in-out 3;
+}
+
+.crackPulse {
+  animation: tdCrackPulse 0.5s ease-in-out 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doorGlow,
+  .doorShake,
+  .crackPulse {
+    animation: none;
+  }
+}

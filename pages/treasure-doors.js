@@ -100,10 +100,7 @@ function TreasureDoorsGameplayPanel({
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg">
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="h-12 shrink-0 px-1">
-          <p className="line-clamp-2 text-[11px] leading-snug text-zinc-400">{sessionNotice || "\u00a0"}</p>
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-1">
+        <div className="flex min-h-0 flex-1 flex-col py-0.5">
           <TreasureDoorsBoard
             chamberCount={chamberCount}
             doorCount={doorCount}
@@ -115,9 +112,15 @@ function TreasureDoorsGameplayPanel({
             pulseCell={pulseCell}
             shakeCell={shakeCell}
             onPickDoor={onPickDoor}
+            terminalKind={rr?.terminalKind ?? null}
+            finalChamberIndex={rr?.finalChamberIndex ?? null}
+            lastPickDoor={rr?.lastPickDoor ?? null}
           />
         </div>
-        <div className="h-11 shrink-0 sm:mt-3">
+        <div className="h-10 shrink-0 px-1 pt-0.5">
+          <p className="line-clamp-2 text-[11px] leading-snug text-amber-200/50">{sessionNotice || "\u00a0"}</p>
+        </div>
+        <div className="h-11 shrink-0 sm:mt-1">
           <button
             type="button"
             disabled={!canCashOut || cashOutLoading || busy || isTerminal}
@@ -125,10 +128,10 @@ function TreasureDoorsGameplayPanel({
             className={`w-full rounded-lg border px-3 py-2 text-xs font-extrabold uppercase tracking-wide ${
               !canCashOut || cashOutLoading || busy || isTerminal
                 ? "cursor-not-allowed border-white/15 bg-white/5 text-zinc-500"
-                : "border-teal-400/45 bg-teal-900/35 text-teal-100 hover:bg-teal-800/40"
+                : "border-amber-500/45 bg-amber-950/50 text-amber-100 hover:bg-amber-900/45"
             }`}
           >
-            {cashOutLoading ? "Cashing out…" : "Cash out (secured)"}
+            {cashOutLoading ? "Sealing vault…" : "Bank secured loot"}
           </button>
         </div>
       </div>
@@ -268,7 +271,7 @@ export default function TreasureDoorsPage() {
         settlementSummary: td.resolvedResult.settlementSummary,
       });
       setUiState(UI_STATE.RESOLVED);
-      setSessionNotice(resumed ? "Resumed finished run." : "Run finished.");
+      setSessionNotice(resumed ? "Vault run ended (resumed)." : "The vault has sealed this run.");
       setErrorMessage("");
       return;
     }
@@ -276,13 +279,13 @@ export default function TreasureDoorsPage() {
     if (readState === "pick_conflict") {
       setUiState(UI_STATE.SESSION_ACTIVE);
       setSessionNotice("");
-      setErrorMessage("Session conflict on picks. Refreshing…");
+      setErrorMessage("Conflicting door picks — refreshing chamber state.");
       return;
     }
 
     if (readState === "choice_submitted") {
       setUiState(UI_STATE.SESSION_ACTIVE);
-      setSessionNotice(resumed ? "Pick locked — resolving." : "Resolving your door…");
+      setSessionNotice(resumed ? "Door locked — the vault decides…" : "Opening your door…");
       setErrorMessage("");
       return;
     }
@@ -290,7 +293,17 @@ export default function TreasureDoorsPage() {
     if (readState === "choice_required" || readState === "ready") {
       setResolvedResult(null);
       setUiState(UI_STATE.SESSION_ACTIVE);
-      setSessionNotice(resumed ? "Resumed active run." : "Pick a door in the current chamber.");
+      const ch = Math.floor(Number(td?.playing?.currentChamberIndex ?? 0)) + 1;
+      const cleared = Array.isArray(td?.playing?.clearedChambers) ? td.playing.clearedChambers.length : 0;
+      setSessionNotice(
+        resumed
+          ? cleared > 0
+            ? `Chamber ${ch} — choose your door.`
+            : "Run restored — step into the vault."
+          : cleared > 0
+            ? `Chamber cleared — enter chamber ${ch}.`
+            : `Chamber ${ch} — pick one door.`,
+      );
       setErrorMessage("");
       return;
     }
@@ -726,10 +739,10 @@ export default function TreasureDoorsPage() {
   }
 
   const terminalKind = resolvedResult?.terminalKind;
-  let resultTitle = "Run complete";
-  if (terminalKind === "trap") resultTitle = "Trap — run lost";
-  else if (terminalKind === "full_clear") resultTitle = "All chambers — top win!";
-  else if (terminalKind === "cashout") resultTitle = "Cashed out";
+  let resultTitle = "Vault closed";
+  if (terminalKind === "trap") resultTitle = "Trap triggered — run lost";
+  else if (terminalKind === "full_clear") resultTitle = "Temple cleared — crown payout!";
+  else if (terminalKind === "cashout") resultTitle = "Loot banked — clean exit";
 
   const resolvedIsWin = Boolean(resolvedResult?.isWin);
   const delta = Number(resolvedResult?.settlementSummary?.netDelta ?? 0);
@@ -776,7 +789,7 @@ export default function TreasureDoorsPage() {
   return (
     <SoloV2GameShell
       title="Treasure Doors"
-      subtitle="Arcade Solo"
+      subtitle="Temple run"
       gameplayScrollable={false}
       menuVaultBalance={vaultBalance}
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
@@ -854,9 +867,9 @@ export default function TreasureDoorsPage() {
       }
       helpContent={
         <div className="space-y-2">
-          <p>Five chambers, three doors each — one trap per chamber. Pick one door per chamber.</p>
-          <p>Safe picks advance and raise the secured multiplier; a trap ends the run. Clear all five for the top payout.</p>
-          <p>Cash out is a server action on your current secured payout.</p>
+          <p>You descend five sealed chambers. Each has three heavy doors — two safe passages, one trap.</p>
+          <p>Survive a chamber to deepen the run and raise your secured payout. One wrong door ends the temple run.</p>
+          <p>Bank secured loot any time after a safe chamber; the server seals the vault when you cash out or finish.</p>
         </div>
       }
       resultState={null}

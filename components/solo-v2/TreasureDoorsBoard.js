@@ -1,91 +1,18 @@
+import styles from "./TreasureDoorsBoard.module.css";
+
 function pickDoorForChamber(doorHistory, chamber) {
   const list = Array.isArray(doorHistory) ? doorHistory : [];
   const hit = list.find(h => Math.floor(Number(h.chamberIndex)) === chamber);
   return hit != null ? Math.floor(Number(hit.door)) : null;
 }
 
-function DoorFace({
-  chamber,
-  door,
-  phase,
-  pickedDoor,
-  trapDoor,
-  revealTrap,
-  pulsing,
-  shaking,
-  disabled,
-  onPickDoor,
-}) {
-  const isPickedSafe = pickedDoor === door;
-  const isTrapReveal = revealTrap && trapDoor === door;
-  const isOtherWhenPicked = pickedDoor != null && pickedDoor !== door;
-
-  const base =
-    "flex min-h-[40px] flex-1 items-center justify-center rounded-lg border text-lg font-black transition sm:min-h-[44px]";
-
-  if (phase === "future") {
-    return (
-      <div
-        className={`${base} border-white/10 bg-black/25 text-zinc-600 opacity-45`}
-        aria-hidden
-      >
-        —
-      </div>
-    );
-  }
-
-  if (phase === "past") {
-    if (isTrapReveal) {
-      return (
-        <div
-          className={`${base} border-red-500/40 bg-red-950/80 text-red-200 ${shaking ? "ring-2 ring-red-400/60" : ""}`}
-          aria-label="Trap"
-        >
-          ☠
-        </div>
-      );
-    }
-    if (isPickedSafe) {
-      return (
-        <div className={`${base} border-teal-400/45 bg-teal-900/40 text-teal-100`} aria-label="Safe">
-          ✦
-        </div>
-      );
-    }
-    if (revealTrap && isOtherWhenPicked) {
-      return (
-        <div className={`${base} border-white/15 bg-white/[0.04] text-zinc-500`} aria-hidden>
-          ○
-        </div>
-      );
-    }
-    return (
-      <div className={`${base} border-white/12 bg-zinc-900/50 text-zinc-500`} aria-hidden>
-        ○
-      </div>
-    );
-  }
-
-  const activeCls = pulsing
-    ? "animate-pulse border-teal-300/60 bg-teal-600/35 text-teal-50"
-    : "border-teal-400/40 bg-teal-950/40 text-teal-100 hover:bg-teal-900/50";
-
-  return (
-    <button
-      type="button"
-      disabled={phase !== "current" || disabled}
-      onClick={() => phase === "current" && !disabled && onPickDoor?.(door)}
-      className={`${base} ${phase === "current" ? activeCls : ""} ${
-        disabled && phase === "current" ? "cursor-not-allowed opacity-55" : ""
-      } ${shaking ? "ring-2 ring-teal-300/50" : ""}`}
-    >
-      🚪
-    </button>
-  );
+function stripLabel(i) {
+  return String(i + 1);
 }
 
 /**
- * 5×3 chambers: past locked, current tappable doors, future dimmed.
+ * Chamber-first temple run: progress strip + hero doors (not a dig grid).
+ * Props unchanged vs server contract consumers.
  */
 export default function TreasureDoorsBoard({
   chamberCount = 5,
@@ -98,45 +25,280 @@ export default function TreasureDoorsBoard({
   pulseCell = null,
   shakeCell = null,
   onPickDoor,
+  /** Terminal recap: `trap` | `full_clear` | `cashout` */
+  terminalKind = null,
+  finalChamberIndex = null,
+  lastPickDoor = null,
 }) {
-  const rows = [];
   const chMax = Math.max(1, Math.floor(Number(chamberCount) || 5));
   const dMax = Math.max(1, Math.floor(Number(doorCount) || 3));
+  const cur = Math.min(chMax - 1, Math.max(0, Math.floor(Number(currentChamberIndex) || 0)));
 
-  for (let c = 0; c < chMax; c += 1) {
-    let phase = "future";
-    if (c < currentChamberIndex) phase = "past";
-    if (c === currentChamberIndex) phase = "current";
+  const isTerminalRecap = Boolean(revealTraps);
+  const fk = terminalKind != null ? String(terminalKind) : "";
+  const finalCh =
+    finalChamberIndex != null && Number.isFinite(Number(finalChamberIndex))
+      ? Math.floor(Number(finalChamberIndex))
+      : null;
+  const lastDoor =
+    lastPickDoor != null && Number.isFinite(Number(lastPickDoor)) ? Math.floor(Number(lastPickDoor)) : null;
 
-    const pickedDoor = pickDoorForChamber(doorHistory, c);
-    const trapDoor =
-      Array.isArray(trapDoors) && trapDoors.length > c ? Math.floor(Number(trapDoors[c])) : null;
-
-    rows.push(
-      <div key={c} className="flex w-full gap-1.5 sm:gap-2">
-        <div className="w-5 shrink-0 pt-2 text-center text-[9px] font-bold tabular-nums text-zinc-500 sm:w-6 sm:text-[10px]">
-          {c + 1}
-        </div>
-        <div className="flex min-w-0 flex-1 gap-1.5 sm:gap-2">
-          {Array.from({ length: dMax }).map((_, d) => (
-            <DoorFace
-              key={d}
-              chamber={c}
-              door={d}
-              phase={phase}
-              pickedDoor={pickedDoor}
-              trapDoor={Number.isFinite(trapDoor) ? trapDoor : -1}
-              revealTrap={revealTraps && Number.isFinite(trapDoor)}
-              pulsing={pulseCell?.chamberIndex === c && pulseCell?.door === d}
-              shaking={shakeCell?.chamberIndex === c && shakeCell?.door === d}
-              disabled={disabled}
-              onPickDoor={onPickDoor}
-            />
-          ))}
-        </div>
-      </div>,
-    );
+  /** Chamber shown in hero for terminal recap (trap = fail chamber; full clear = last vault). */
+  let heroCh = cur;
+  if (isTerminalRecap) {
+    if (fk === "trap" && finalCh != null && finalCh >= 0 && finalCh < chMax) {
+      heroCh = finalCh;
+    } else if (fk === "full_clear") {
+      heroCh = chMax - 1;
+    } else if (fk === "cashout") {
+      const hist = Array.isArray(doorHistory) ? doorHistory : [];
+      const maxIdx = hist.reduce((m, h) => {
+        const c = Math.floor(Number(h.chamberIndex));
+        return Number.isFinite(c) ? Math.max(m, c) : m;
+      }, -1);
+      heroCh = maxIdx >= 0 ? Math.min(chMax - 1, maxIdx) : 0;
+    } else {
+      heroCh = chMax - 1;
+    }
   }
 
-  return <div className="flex w-full flex-col gap-1.5 sm:gap-2">{rows}</div>;
+  function stripPhaseForIndex(i) {
+    if (!isTerminalRecap) {
+      if (i < cur) return "cleared";
+      if (i === cur) return "current";
+      return "future";
+    }
+    if (fk === "trap" && finalCh === i) return "trap";
+    if (pickDoorForChamber(doorHistory, i) != null) return "cleared";
+    return "future";
+  }
+
+  const clearedChips = [];
+  if (!isTerminalRecap) {
+    for (let i = 0; i < cur; i += 1) {
+      const d = pickDoorForChamber(doorHistory, i);
+      if (d != null) {
+        clearedChips.push(
+          <span
+            key={`chip-${i}`}
+            className="inline-flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-700 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-zinc-400 sm:text-[10px]"
+          >
+            <span className="text-zinc-500">Ch.{i + 1}</span>
+            <span className="text-zinc-600">·</span>
+            <span className="text-zinc-300">D{d + 1}</span>
+          </span>,
+        );
+      }
+    }
+  }
+
+  return (
+    <div className="flex w-full min-h-0 flex-1 flex-col gap-2 overflow-hidden px-0.5 sm:gap-2.5">
+      {/* Chamber progress — reads as a run, not rows of cells */}
+      <div className="shrink-0">
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 sm:text-[11px]">
+          Chamber run
+        </p>
+        <div className="flex items-end justify-center gap-2 sm:gap-2.5">
+          {Array.from({ length: chMax }).map((_, i) => {
+            const phase = stripPhaseForIndex(i);
+            const base =
+              "relative flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-lg border text-sm font-black tabular-nums sm:h-14 sm:w-12 sm:text-base";
+            let cls = "border-zinc-500/80 bg-zinc-950 text-zinc-500 opacity-65";
+            let inner = stripLabel(i);
+            if (phase === "cleared") {
+              cls =
+                "border-amber-400/85 bg-zinc-900 text-amber-50 opacity-100 ring-2 ring-amber-600/45";
+              inner = "✓";
+            } else if (phase === "current") {
+              cls =
+                "border-amber-300 bg-zinc-900 text-amber-50 opacity-100 ring-[3px] ring-amber-400/70";
+            } else if (phase === "trap") {
+              cls =
+                "border-red-400/80 bg-zinc-950 text-red-100 opacity-100 ring-2 ring-red-700/55";
+              inner = "☠";
+            }
+            return (
+              <div key={i} className="flex shrink-0 flex-col items-center gap-1">
+                <div className={base + " " + cls} aria-label={`Chamber ${i + 1} ${phase}`}>
+                  {inner}
+                </div>
+                <span className="text-[10px] font-semibold tabular-nums text-zinc-500 sm:text-[11px]">{i + 1}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Cleared summary — compact badges, not a second grid */}
+      {clearedChips.length > 0 ? (
+        <div className="flex min-h-[22px] shrink-0 flex-wrap justify-center gap-1">{clearedChips}</div>
+      ) : (
+        <div className="h-[22px] shrink-0" aria-hidden />
+      )}
+
+      {/* Hero: one chamber, three doors — flat card, no halo behind */}
+      <div className="relative flex min-h-0 flex-1 flex-col justify-center">
+        <div className="relative mx-auto w-full max-w-[21rem] rounded-xl border border-zinc-700/90 bg-zinc-950 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:max-w-[22rem] sm:p-3.5">
+          {/* Subtle chamber-cleared flash (opacity only — no box-shadow spill). */}
+          {pulseCell != null &&
+          !isTerminalRecap &&
+          Number.isFinite(Number(pulseCell.chamberIndex)) &&
+          pulseCell.chamberIndex !== cur ? (
+            <div
+              className={`pointer-events-none absolute inset-0 z-[2] rounded-xl bg-amber-400/10 ${styles.doorGlow}`}
+              aria-hidden
+            />
+          ) : null}
+          <div className="mb-3 border-b border-zinc-800 pb-2.5 text-center">
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-200 sm:text-xs">
+              {isTerminalRecap ? "Vault sealed" : `Chamber ${cur + 1} of ${chMax}`}
+            </p>
+            <p className="mt-1 text-[10px] leading-snug text-zinc-500 sm:text-[11px]">
+              {isTerminalRecap
+                ? fk === "trap"
+                  ? "Trap triggered — other doors were safe"
+                  : fk === "cashout"
+                    ? "You banked from the corridor"
+                    : "Every chamber cleared — crown vault"
+                : "Two safe doors · one trap · choose carefully"}
+            </p>
+          </div>
+
+          <div className="relative flex min-h-[118px] w-full justify-center sm:min-h-[136px]">
+            <div className="flex items-stretch justify-center gap-2 sm:gap-2.5">
+            {Array.from({ length: dMax }).map((_, door) => {
+              const pulsing =
+                pulseCell != null &&
+                pulseCell.chamberIndex === cur &&
+                pulseCell.door === door;
+              const shaking = shakeCell?.chamberIndex === cur && shakeCell?.door === door;
+
+              let recapLabel = null;
+              if (isTerminalRecap && Array.isArray(trapDoors) && trapDoors.length > heroCh) {
+                const t = Math.floor(Number(trapDoors[heroCh]));
+                const pickedHere = pickDoorForChamber(doorHistory, heroCh);
+                if (Number.isFinite(t)) {
+                  if (fk === "trap" && heroCh === finalCh) {
+                    if (door === t && lastDoor === door) recapLabel = "trap_opened";
+                    else if (door === t) recapLabel = "trap";
+                    else recapLabel = "safe";
+                  } else if (fk === "full_clear" && pickedHere != null) {
+                    if (door === pickedHere) recapLabel = "picked_safe";
+                    else if (door === t) recapLabel = "trap";
+                    else recapLabel = "safe";
+                  } else if (fk === "cashout" && pickedHere != null) {
+                    if (door === pickedHere) recapLabel = "picked_safe";
+                    else if (door === t) recapLabel = "trap";
+                    else recapLabel = "safe";
+                  } else if (Number.isFinite(t)) {
+                    if (door === t) recapLabel = "trap";
+                    else recapLabel = "safe";
+                  }
+                }
+              }
+
+              const interactive = !isTerminalRecap && !disabled;
+              const doorBase =
+                "relative flex h-full min-h-[110px] w-full flex-col items-stretch justify-between overflow-hidden rounded-lg border px-0 pb-2 pt-2 transition sm:min-h-[128px]";
+
+              const stoneIdle =
+                "border-zinc-600 bg-zinc-900/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]";
+              const stoneActive =
+                interactive
+                  ? "cursor-pointer border-zinc-500 hover:border-zinc-400 hover:bg-zinc-900 active:scale-[0.99]"
+                  : "border-zinc-700 opacity-75";
+
+              const recapTrap = recapLabel === "trap" || recapLabel === "trap_opened";
+              const recapTrapOpened = recapLabel === "trap_opened";
+
+              return (
+                <div key={door} className="relative w-[4.35rem] shrink-0 sm:w-[4.85rem]">
+                  <button
+                    type="button"
+                    disabled={!interactive}
+                    onClick={() => interactive && onPickDoor?.(door)}
+                    className={`${doorBase} ${stoneIdle} ${!isTerminalRecap ? stoneActive : ""} ${
+                      recapTrapOpened ? "border-red-500/80 bg-red-950/40" : ""
+                    } ${recapTrap && !recapTrapOpened ? "border-red-900/50 bg-zinc-950" : ""}`}
+                  >
+                    {/* Door silhouette: frame + inset panel + hinge strip */}
+                    <div
+                      className="absolute inset-x-1.5 top-2 bottom-[2.75rem] rounded border border-zinc-600/90 bg-zinc-950"
+                      aria-hidden
+                    />
+                    <div
+                      className="absolute bottom-[2.75rem] left-2 top-2 w-0.5 rounded-sm bg-zinc-800"
+                      aria-hidden
+                    />
+                    <div
+                      className="absolute right-[22%] top-[38%] h-2 w-2 -translate-y-1/2 rounded-full border border-zinc-600 bg-zinc-800"
+                      aria-hidden
+                    />
+                    <div className="relative z-[1] flex flex-1 flex-col items-center justify-end px-1 pt-8">
+                      <span className="text-xl font-semibold tabular-nums leading-none text-zinc-200 sm:text-2xl">
+                        {door + 1}
+                      </span>
+                      <span className="mt-1 text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-500 sm:text-[10px]">
+                        Door
+                      </span>
+                    </div>
+
+                    {pulsing ? (
+                      <div
+                        className={`pointer-events-none absolute inset-0 rounded-lg bg-amber-400/12 ${styles.doorGlow}`}
+                        aria-hidden
+                      />
+                    ) : null}
+                    {shaking ? (
+                      <>
+                        <div
+                          className={`pointer-events-none absolute inset-0 rounded-lg ${styles.doorShake}`}
+                          aria-hidden
+                        />
+                        <div
+                          className={`pointer-events-none absolute inset-0 rounded-lg bg-red-600/15 ${styles.crackPulse}`}
+                          aria-hidden
+                        />
+                        <div
+                          className="pointer-events-none absolute inset-x-1.5 top-2 bottom-11 opacity-50"
+                          style={{
+                            background:
+                              "repeating-linear-gradient(135deg, transparent, transparent 7px, rgba(127,29,29,0.22) 7px, rgba(127,29,29,0.22) 8px)",
+                          }}
+                          aria-hidden
+                        />
+                      </>
+                    ) : null}
+
+                    {isTerminalRecap && recapTrapOpened ? (
+                      <span className="relative z-[1] mt-1 text-lg" aria-label="Trap triggered">
+                        ☠
+                      </span>
+                    ) : null}
+                    {isTerminalRecap && recapLabel === "trap" && !recapTrapOpened ? (
+                      <span className="relative z-[1] mt-1 text-xs font-bold uppercase tracking-wide text-red-300/70">
+                        Trap
+                      </span>
+                    ) : null}
+                    {isTerminalRecap && (recapLabel === "safe" || recapLabel === "picked_safe") ? (
+                      <span className="relative z-[1] mt-1 text-base text-amber-200/90" aria-label="Safe passage">
+                        ✦
+                      </span>
+                    ) : null}
+                    {isTerminalRecap && recapLabel === "picked_safe" ? (
+                      <span className="relative z-[1] mt-0.5 text-[8px] font-bold uppercase text-amber-300/80">
+                        Your pick
+                      </span>
+                    ) : null}
+                  </button>
+                </div>
+              );
+            })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
