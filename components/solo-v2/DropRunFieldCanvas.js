@@ -7,27 +7,18 @@ import {
 } from "../../lib/solo-v2/dropRunConfig";
 
 /**
- * Peg lattice from mleo-plinko-v2 (pegGapX, row+2 pegs). PEG_ROWS from config = DROP_RUN_PEG_ROWS (15).
- * Fall playback: requestAnimationFrame + continuous integration only (no step/lerp targets).
- * finalBay → targetBoxIndex = finalBay - 1; snap ball center to that bucket center; highlight matches payout.
+ * 9 gates, 15 peg rows — same board geometry as before.
+ * Playback: server path → waypoints → small quadratic Bézier arcs → dense polyline → arc-length motion.
+ * Ease only time (easeOutQuad); last polyline point = target bucket center — no end snap.
  */
 
 const PEG_ROWS = DROP_RUN_PEG_ROWS;
 const REF_PAD_LR = 20;
 const REF_H_INSET = 40;
 
-const GRAVITY = 800;
-const DRAG = 0.995;
-const MAX_SPEED = 1500;
-const PEG_RESTITUTION = 0.6;
-const CENTER_BIAS = 0.05;
-/** Target steering: shallower above 55% board height, stronger at/after 55%. */
-const STEER_SHALLOW = 0.03;
-const STEER_DEEP = 0.14;
-const STEER_SPLIT_Y_FRAC = 0.55;
-
 const LAND_HOLD_MS = 480;
-const MAX_FALL_MS = 9000;
+const DROP_FALL_DURATION_MS = 2800;
+const MAX_FALL_MS = 8500;
 
 function formatMult(m) {
   const x = Number(m);
@@ -36,15 +27,24 @@ function formatMult(m) {
   return String(x);
 }
 
-/** Same peg lattice as mleo-plinko-v2: pegCount = row + 2, pegGapX = (w-40)/(PEG_ROWS+2), centered rows. */
+function xForAuthColumn(col, w, gates) {
+  const c = Math.max(1, Math.min(gates, Math.floor(Number(col)) || 1));
+  const inner = w - REF_H_INSET;
+  return REF_PAD_LR + (c - 0.5) * (inner / gates);
+}
+
+/**
+ * Peg lattice like mleo-plinko-v2: pegCount = row + 2, pegGapX = (w-40)/(PEG_ROWS+2),
+ * pegGapY = (pegFieldBottom - topY) / (PEG_ROWS + 2) — tighter silhouette than (PEG_ROWS-1).
+ */
 function buildReferencePegLayout(w, h, bucketY) {
   const pegGapX = (w - REF_H_INSET) / (PEG_ROWS + 2);
-  const topY = Math.max(6, Math.min(36, Math.round(h * 0.062)));
-  /** End peg field well above payout row so the bottom peg row is not crowded against the boxes. */
-  const gapAboveBuckets = Math.max(18, Math.min(44, Math.round(h * 0.052)));
+  const topY = Math.max(10, Math.min(40, Math.round(h * 0.07)));
+  const gapAboveBuckets = Math.max(16, Math.min(40, Math.round(h * 0.048)));
   const pegFieldBottom = bucketY - gapAboveBuckets;
-  const pegGapY = (pegFieldBottom - topY) / Math.max(1, PEG_ROWS - 1);
-  const pr = Math.max(2.2, Math.min(3.6, pegGapX * 0.052));
+  const pegSpan = Math.max(1, pegFieldBottom - topY);
+  const pegGapY = pegSpan / (PEG_ROWS + 2);
+  const pr = Math.max(2.4, Math.min(3, Math.min(pegGapX * 0.055, 3)));
 
   const pegs = [];
   for (let row = 0; row < PEG_ROWS; row++) {
@@ -56,13 +56,9 @@ function buildReferencePegLayout(w, h, bucketY) {
       pegs.push({ x: startX + col * pegGapX, y: rowY, r: pr });
     }
   }
-  return { pegs, pegGapX, topY, pegGapY, pegFieldBottom };
+  return { pegs, pegGapX, pegGapY, topY, pegFieldBottom };
 }
 
-/**
- * Payout strip — reserve space from canvas bottom so the full row stays visible (desktop + mobile).
- * bucketY + bucketH + bottomPad <= h always.
- */
 function buildReferenceBuckets(w, h, bucketCount) {
   const bottomPad = Math.max(6, Math.min(12, Math.round(h * 0.022)));
   const bucketH = Math.max(20, Math.min(28, Math.round(h * 0.056)));
@@ -81,7 +77,6 @@ function buildReferenceBuckets(w, h, bucketCount) {
   return { buckets, bucketY, bucketH, bucketWidth, bottomPad };
 }
 
-/** Symmetric strip — center emphasis like reference multi-color buckets. */
 function bucketGradStops(i, count) {
   const mid = (count - 1) / 2;
   const d = Math.abs(i - mid);
@@ -92,76 +87,106 @@ function bucketGradStops(i, count) {
   return ["#10b981", "#059669"];
 }
 
-function hashRunKey(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return h;
+function easeOutQuad(t) {
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return 1 - (1 - t) * (1 - t);
+}
+
+function quadBezierPoint(p0, p1, p2, t) {
+  const u = 1 - t;
+  return {
+    x: u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x,
+    y: u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y,
+  };
+}
+
+const SAMPLES_PER_BEZIER_SEGMENT = 8;
+
+/**
+ * Waypoints: one per server path index; last = exact authoritative bucket center.
+ */
+function buildPathWaypoints(pathPositions, w, gates, topY, pegFieldBottom, targetBucket) {
+  const n = pathPositions.length;
+  const yTop = topY - 12;
+  const cx = targetBucket.x + targetBucket.w / 2;
+  const cy = targetBucket.y + targetBucket.h / 2;
+  const waypoints = [];
+  for (let i = 0; i < n; i++) {
+    if (i === n - 1) {
+      waypoints.push({ x: cx, y: cy });
+      continue;
+    }
+    const x = xForAuthColumn(pathPositions[i], w, gates);
+    const y =
+      n <= 2 ? (i === 0 ? yTop : cy) : yTop + ((pegFieldBottom - yTop) * i) / (n - 2);
+    waypoints.push({ x, y });
+  }
+  return waypoints;
 }
 
 /**
- * One physics step — continuous RAF playback (gravity, drag, center bias, target steering, peg bounce).
- * No discrete step/lerp between path waypoints; landing snaps to authoritative targetBoxIndex only.
+ * Quadratic arcs between adjacent waypoints; control.x = midpoint of segment (x stays in-column between endpoints).
+ * 8 samples per segment (t = 0, 1/7, …, 1); skip duplicate joint points.
  */
-function stepPlaybackBall(ball, pegs, buckets, w, h, dt, targetBoxIndex) {
-  ball.vy += GRAVITY * dt;
-  ball.vx *= DRAG;
-  ball.vy *= DRAG;
-
-  let speed = Math.hypot(ball.vx, ball.vy);
-  if (speed > MAX_SPEED) {
-    ball.vx *= MAX_SPEED / speed;
-    ball.vy *= MAX_SPEED / speed;
-  }
-
-  ball.x += ball.vx * dt;
-  ball.y += ball.vy * dt;
-
-  const centerX = w / 2;
-  ball.vx += (centerX - ball.x) * CENTER_BIAS * dt * 60;
-
-  const targetBucket = buckets[targetBoxIndex];
-  if (targetBucket) {
-    const tcx = targetBucket.x + targetBucket.w / 2;
-    const steer = ball.y < h * STEER_SPLIT_Y_FRAC ? STEER_SHALLOW : STEER_DEEP;
-    ball.vx += (tcx - ball.x) * steer * dt * 60;
-  }
-
-  if (ball.x - ball.r < 0) {
-    ball.x = ball.r;
-    ball.vx = Math.abs(ball.vx) * 0.45;
-  } else if (ball.x + ball.r > w) {
-    ball.x = w - ball.r;
-    ball.vx = -Math.abs(ball.vx) * 0.45;
-  }
-
-  for (let p = 0; p < pegs.length; p++) {
-    const peg = pegs[p];
-    const dx = ball.x - peg.x;
-    const dy = ball.y - peg.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < ball.r + peg.r && dist > 1e-6) {
-      const angle = Math.atan2(dy, dx);
-      const overlap = ball.r + peg.r - dist;
-      ball.x += Math.cos(angle) * overlap;
-      ball.y += Math.sin(angle) * overlap;
-      const dvx = ball.vx;
-      const dvy = ball.vy;
-      const dot = dvx * Math.cos(angle) + dvy * Math.sin(angle);
-      ball.vx = (dvx - 2 * dot * Math.cos(angle)) * PEG_RESTITUTION;
-      ball.vy = (dvy - 2 * dot * Math.sin(angle)) * PEG_RESTITUTION;
+function buildArcLengthPolyline(waypoints) {
+  const n = waypoints.length;
+  const pts = [];
+  if (n === 0) return { points: [], cum: [], totalLength: 0 };
+  if (n === 1) {
+    pts.push({ x: waypoints[0].x, y: waypoints[0].y });
+  } else {
+    for (let i = 0; i < n - 1; i++) {
+      const start = waypoints[i];
+      const end = waypoints[i + 1];
+      const control = {
+        x: (start.x + end.x) / 2,
+        y: start.y + (end.y - start.y) * 0.35,
+      };
+      const jStart = i === 0 ? 0 : 1;
+      for (let j = jStart; j < SAMPLES_PER_BEZIER_SEGMENT; j++) {
+        const t = j / (SAMPLES_PER_BEZIER_SEGMENT - 1);
+        pts.push(quadBezierPoint(start, control, end, t));
+      }
     }
   }
 
-  /** Authoritative landing only: when the ball reaches the payout band, snap to server bucket center (no horizontal hit-test). */
-  if (targetBucket && ball.y + ball.r >= targetBucket.y) {
-    ball.x = targetBucket.x + targetBucket.w / 2;
-    ball.y = targetBucket.y + targetBucket.h / 2;
-    ball.vx = 0;
-    ball.vy = 0;
-    return true;
+  const m = pts.length;
+  const cum = new Array(m);
+  cum[0] = 0;
+  let totalLength = 0;
+  for (let k = 1; k < m; k++) {
+    const dx = pts[k].x - pts[k - 1].x;
+    const dy = pts[k].y - pts[k - 1].y;
+    totalLength += Math.hypot(dx, dy);
+    cum[k] = totalLength;
   }
+  return { points: pts, cum, totalLength };
+}
 
-  return false;
+function positionAtArcLength(points, cum, totalLength, d) {
+  const m = points.length;
+  if (m === 0) return { x: 0, y: 0 };
+  if (m === 1 || totalLength <= 0) return { x: points[0].x, y: points[0].y };
+  if (d <= 0) return { x: points[0].x, y: points[0].y };
+  if (d >= totalLength) return { x: points[m - 1].x, y: points[m - 1].y };
+
+  let lo = 0;
+  let hi = m - 1;
+  while (lo < hi - 1) {
+    const mid = (lo + hi) >> 1;
+    if (cum[mid] <= d) lo = mid;
+    else hi = mid;
+  }
+  const segLen = cum[lo + 1] - cum[lo];
+  if (segLen <= 1e-9) return { x: points[lo + 1].x, y: points[lo + 1].y };
+  const f = (d - cum[lo]) / segLen;
+  const a = points[lo];
+  const b = points[lo + 1];
+  return {
+    x: a.x + (b.x - a.x) * f,
+    y: a.y + (b.y - a.y) * f,
+  };
 }
 
 export default function DropRunFieldCanvas({
@@ -183,7 +208,7 @@ export default function DropRunFieldCanvas({
     bucketY: 0,
     bucketH: 0,
   });
-  const ballRef = useRef({ x: 0, y: 0, vx: 0, vy: 0, r: 3 });
+  const ballRef = useRef({ x: 0, y: 0, r: 3 });
   const landRef = useRef(false);
   const completeRef = useRef(onAnimationComplete);
   completeRef.current = onAnimationComplete;
@@ -316,67 +341,62 @@ export default function DropRunFieldCanvas({
       return;
     }
 
-    const { w, h, topY } = layoutRef.current;
+    const { w, h, topY, pegFieldBottom } = layoutRef.current;
     if (!w || !h) return;
 
-    const pegs = pegsRef.current;
     const buckets = bucketsRef.current;
     const targetBoxIndex = Math.max(0, Math.min(DROP_RUN_GATES - 1, Math.floor(Number(finalBay)) - 1));
-    const seed = hashRunKey(runKey);
-    const jx = ((seed % 41) / 41 - 0.5) * 18;
-    const jvx = ((seed >>> 8) % 41) / 41 - 0.5;
+    const targetBucket = buckets[targetBoxIndex];
+    if (!targetBucket) {
+      draw();
+      return;
+    }
+
+    const path = pathRef.current.map(p => Math.floor(Number(p)) || 1);
+    const waypoints = buildPathWaypoints(path, w, DROP_RUN_GATES, topY, pegFieldBottom, targetBucket);
+    const { points: polyPoints, cum, totalLength } = buildArcLengthPolyline(waypoints);
+
     const pegGapX = (w - REF_H_INSET) / (PEG_ROWS + 2);
     const br = Math.max(2.4, Math.min(4, pegGapX * 0.065));
-
-    ballRef.current = {
-      x: w / 2 + jx,
-      y: Math.max(10, topY - 12),
-      vx: jvx * 55,
-      vy: 50,
-      r: br,
-    };
+    const startPos = positionAtArcLength(polyPoints, cum, totalLength, 0);
+    ballRef.current = { x: startPos.x, y: startPos.y, r: br };
 
     const runId = (animRunRef.current += 1);
     let cancelled = false;
     let completed = false;
     let landTime = 0;
-    let last = performance.now();
-    const startTime = last;
-    function snapBallToTargetBucket(timeNow) {
+    const startTime = performance.now();
+
+    const enterLandHold = timeNow => {
       landRef.current = true;
       landTime = timeNow;
-      const bucket = buckets[targetBoxIndex];
-      if (bucket) {
-        ballRef.current.x = bucket.x + bucket.w / 2;
-        ballRef.current.y = bucket.y + bucket.h / 2;
-        ballRef.current.vx = 0;
-        ballRef.current.vy = 0;
-      }
-    }
+    };
 
     const tick = now => {
       if (cancelled || animRunRef.current !== runId) return;
-
       if (completed) return;
 
       if (!landRef.current) {
-        if (now - startTime > MAX_FALL_MS || ballRef.current.y > h + 40) {
-          snapBallToTargetBucket(now);
+        const elapsed = now - startTime;
+        if (elapsed >= MAX_FALL_MS) {
+          const endPos = positionAtArcLength(polyPoints, cum, totalLength, totalLength);
+          ballRef.current.x = endPos.x;
+          ballRef.current.y = endPos.y;
+          enterLandHold(now);
           draw();
           rafRef.current = requestAnimationFrame(tick);
           return;
         }
 
-        let dt = (now - last) / 1000;
-        last = now;
-        if (dt > 0.034) dt = 0.034;
-        if (dt <= 0) dt = 0.016;
-
-        const landed = stepPlaybackBall(ballRef.current, pegs, buckets, w, h, dt, targetBoxIndex);
+        const rawT = Math.min(1, elapsed / DROP_FALL_DURATION_MS);
+        const easedT = easeOutQuad(rawT);
+        const dist = easedT * totalLength;
+        const p = positionAtArcLength(polyPoints, cum, totalLength, dist);
+        ballRef.current.x = p.x;
+        ballRef.current.y = p.y;
         draw();
-        if (landed) {
-          landRef.current = true;
-          landTime = now;
+        if (rawT >= 1) {
+          enterLandHold(now);
         }
       } else {
         draw();
@@ -391,7 +411,6 @@ export default function DropRunFieldCanvas({
     };
 
     draw();
-    last = performance.now();
     rafRef.current = requestAnimationFrame(tick);
 
     return () => {
