@@ -139,7 +139,7 @@ export default function TreasureDoorsBoard({
 
       {/* Hero: one chamber, three doors — flat card, no halo behind */}
       <div className="relative flex min-h-0 flex-1 flex-col justify-center">
-        <div className="relative mx-auto w-full max-w-[21rem] rounded-xl border border-zinc-700/90 bg-zinc-950 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:max-w-[22rem] sm:p-3.5">
+        <div className="relative mx-auto w-full max-w-[21rem] rounded-xl border border-zinc-700/90 bg-zinc-950 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:-mt-2.5 sm:max-w-[22rem] sm:p-3.5">
           {/* Subtle chamber-cleared flash (opacity only — no box-shadow spill). */}
           {pulseCell != null &&
           !isTerminalRecap &&
@@ -166,7 +166,7 @@ export default function TreasureDoorsBoard({
           </div>
 
           <div className="relative flex min-h-[118px] w-full justify-center sm:min-h-[136px]">
-            <div className="flex items-stretch justify-center gap-2 sm:gap-2.5">
+            <div className="flex items-stretch justify-center gap-5 sm:gap-6">
             {Array.from({ length: dMax }).map((_, door) => {
               const pulsing =
                 pulseCell != null &&
