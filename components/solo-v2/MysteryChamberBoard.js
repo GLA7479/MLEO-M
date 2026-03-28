@@ -87,9 +87,9 @@ export default function MysteryChamberBoard({
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border-2 border-amber-900/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-5 sm:min-h-0">
+      <div className="flex h-5 shrink-0 items-center justify-center px-2 sm:h-5">
         <p
-          className={`truncate text-center text-[9px] font-semibold text-amber-200/85 sm:text-[10px] ${
+          className={`line-clamp-1 w-full truncate text-center text-[9px] font-semibold text-amber-200/85 sm:text-[10px] ${
             showSession ? "opacity-100" : "opacity-0"
           }`}
         >
@@ -98,12 +98,16 @@ export default function MysteryChamberBoard({
       </div>
 
       <div className="shrink-0 px-2.5 pb-0 pt-0 text-center sm:px-3 sm:pb-1 sm:pt-1">
-        <p className="min-h-[1.05rem] text-[11px] font-bold leading-tight text-white sm:min-h-[1.2rem] sm:text-[13px]">
-          {statusTop}
-        </p>
-        <p className="mt-0 min-h-[0.8rem] text-[9px] leading-snug text-zinc-400 sm:mt-0.5 sm:min-h-[1rem] sm:text-[10px]">
-          {statusSub}
-        </p>
+        <div className="flex h-[2.55rem] items-start justify-center sm:h-[2.65rem]">
+          <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
+            {statusTop}
+          </p>
+        </div>
+        <div className="flex h-[2.7rem] items-start justify-center sm:h-[2.85rem]">
+          <p className="line-clamp-3 w-full text-center text-[9px] leading-snug text-zinc-400 sm:text-[10px]">
+            {statusSub}
+          </p>
+        </div>
       </div>
 
       <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1.5">
@@ -150,11 +154,9 @@ export default function MysteryChamberBoard({
               {securedReturnLabel}
             </span>
           </div>
-          {securedCaption ? (
-            <p className="border-t border-white/5 px-2.5 pb-1 pt-0.5 text-right text-[8px] font-medium leading-snug text-zinc-500 sm:px-3 sm:pb-1.5 sm:pt-0.5 sm:text-[9px]">
-              {securedCaption}
-            </p>
-          ) : null}
+          <p className="min-h-[1.25rem] border-t border-white/5 px-2.5 pb-1 pt-0.5 text-right text-[8px] font-medium leading-snug text-zinc-500 sm:min-h-[1.35rem] sm:px-3 sm:pb-1.5 sm:pt-0.5 sm:text-[9px]">
+            <span className={securedCaption ? "" : "opacity-0"}>{securedCaption || "\u00a0"}</span>
+          </p>
         </div>
       </div>
 
@@ -178,8 +180,10 @@ export default function MysteryChamberBoard({
         </div>
       </div>
 
-      <div className="flex min-h-[2rem] shrink-0 items-center justify-center px-2 text-center sm:min-h-[2.125rem] sm:px-4">
-        <p className="text-[9px] font-medium leading-snug text-zinc-400 sm:text-[10px]">{hintLine}</p>
+      <div className="flex h-[3rem] shrink-0 items-start justify-center px-2 pt-0.5 text-center sm:h-[2.75rem] sm:items-center sm:px-4 sm:pt-0">
+        <p className="line-clamp-3 w-full text-[9px] font-medium leading-snug text-zinc-400 sm:text-[10px]">
+          {hintLine}
+        </p>
       </div>
 
       {/* Absorb extra desktop height below the hint so the exit band stays bottom-anchored without a void under the sigil row. */}

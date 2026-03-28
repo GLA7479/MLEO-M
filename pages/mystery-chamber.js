@@ -13,6 +13,7 @@ import {
   MYSTERY_CHAMBER_SIGIL_GLYPHS,
   mysteryChamberMaxPotentialReturn,
   mysteryChamberStartingSecured,
+  normalizeMysteryChamberVaultSettlement,
 } from "../lib/solo-v2/mysteryChamberConfig";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
 import { SOLO_V2_GIFT_ROUND_STAKE, soloV2GiftConsumeOne } from "../lib/solo-v2/soloV2GiftStorage";
@@ -119,6 +120,14 @@ function visualsFromPersistedBoard(pb) {
     return ["muted", "muted", "muted", "muted"];
   }
   return v;
+}
+
+function withNormalizedMysterySettlement(resultLike, sessionMode) {
+  if (!resultLike?.settlementSummary) return resultLike;
+  return {
+    ...resultLike,
+    settlementSummary: normalizeMysteryChamberVaultSettlement(resultLike.settlementSummary, sessionMode),
+  };
 }
 
 function visualsFromLocalAnim(anim) {
@@ -307,19 +316,23 @@ export default function MysteryChamberPage() {
     const settlementSummary = resolvedResult?.settlementSummary;
     const sessionId = resolvedResult?.sessionId || session?.id;
     if (!sessionId || !settlementSummary) return;
-    applyMysteryChamberSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
+    const normalized = normalizeMysteryChamberVaultSettlement(
+      settlementSummary,
+      session?.sessionMode ?? sessionRef.current?.sessionMode,
+    );
+    applyMysteryChamberSettlementOnce(sessionId, normalized).then(settlementResult => {
       if (!settlementResult) return;
       if (settlementResult.error) {
         setErrorMessage(settlementResult.error);
         return;
       }
-      const delta = Number(settlementSummary.netDelta || 0);
+      const delta = Number(normalized.netDelta || 0);
       if (settlementResult.applied && delta !== 0) {
         const sign = delta > 0 ? "+" : "";
         setSessionNotice(`Vault ${sign}${formatCompact(delta)}`);
       }
     });
-  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id]);
+  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, session?.sessionMode]);
 
   function openResultPopup() {
     if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
@@ -351,11 +364,16 @@ export default function MysteryChamberPage() {
 
     if (st === "resolved" && mc?.resolvedResult) {
       setInMysteryLoop(false);
-      setResolvedResult({
-        ...mc.resolvedResult,
-        sessionId: sessionPayload.id,
-        settlementSummary: mc.resolvedResult.settlementSummary,
-      });
+      setResolvedResult(
+        withNormalizedMysterySettlement(
+          {
+            ...mc.resolvedResult,
+            sessionId: sessionPayload.id,
+            settlementSummary: mc.resolvedResult.settlementSummary,
+          },
+          sessionPayload.sessionMode,
+        ),
+      );
       setUiState(UI_STATE.RESOLVED);
       setSessionNotice(resumed ? "Run finished (restored)." : "");
       setErrorMessage("");
@@ -469,6 +487,13 @@ export default function MysteryChamberPage() {
       const status = String(payload?.status || "");
 
       if (result === SOLO_V2_API_RESULT.SUCCESS && status === "created" && payload?.session) {
+        const readResult = await readSessionTruth(payload.session.id, activeCycle);
+        if (readResult?.halted) return { ok: false };
+        if (!readResult?.ok) {
+          setUiState(readResult.state);
+          setErrorMessage(readResult.message);
+          return { ok: false };
+        }
         if (isGiftRound) {
           if (!soloV2GiftConsumeOne()) {
             setSession(null);
@@ -477,13 +502,9 @@ export default function MysteryChamberPage() {
             return { ok: false };
           }
           giftRoundMeta?.onGiftConsumed?.();
-        }
-        const readResult = await readSessionTruth(payload.session.id, activeCycle);
-        if (readResult?.halted) return { ok: false };
-        if (!readResult?.ok) {
-          setUiState(readResult.state);
-          setErrorMessage(readResult.message);
-          return { ok: false };
+          if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => giftRoundMeta?.onGiftConsumed?.());
+          }
         }
         setSession(readResult.session);
         applySessionReadState(readResult.session, { resumed: false });
@@ -670,12 +691,17 @@ export default function MysteryChamberPage() {
           chambersCleared: r.chambersCleared ?? readResult?.session?.serverOutcomeSummary?.chambersCleared,
         });
 
-        setResolvedResult({
-          ...r,
-          sessionId: r.sessionId || sessionId,
-          settlementSummary: r.settlementSummary,
-          isWin: Boolean(r.isWin),
-        });
+        setResolvedResult(
+          withNormalizedMysterySettlement(
+            {
+              ...r,
+              sessionId: r.sessionId || sessionId,
+              settlementSummary: r.settlementSummary,
+              isWin: Boolean(r.isWin),
+            },
+            sessionRef.current?.sessionMode,
+          ),
+        );
         setUiState(UI_STATE.RESOLVED);
         setRevealPulse(false);
 
@@ -833,12 +859,17 @@ export default function MysteryChamberPage() {
           safeSigil: null,
           chambersCleared: r.chambersCleared,
         });
-        setResolvedResult({
-          ...r,
-          sessionId: r.sessionId || sid,
-          settlementSummary: r.settlementSummary,
-          isWin: Boolean(r.isWin),
-        });
+        setResolvedResult(
+          withNormalizedMysterySettlement(
+            {
+              ...r,
+              sessionId: r.sessionId || sid,
+              settlementSummary: r.settlementSummary,
+              isWin: Boolean(r.isWin),
+            },
+            sessionRef.current?.sessionMode,
+          ),
+        );
         setUiState(UI_STATE.RESOLVED);
         window.setTimeout(() => openResultPopup(), REVEAL_READABLE_MS);
         return;
@@ -880,6 +911,10 @@ export default function MysteryChamberPage() {
       onGiftConsumed: () => giftRefreshRef.current?.(),
     });
     if (isGiftRound) giftRoundRef.current = false;
+    if (isGiftRound && boot?.ok && typeof window !== "undefined" && window.requestAnimationFrame) {
+      giftRefreshRef.current?.();
+      window.requestAnimationFrame(() => giftRefreshRef.current?.());
+    }
     if (!boot.ok || boot.alreadyTerminal) return;
     setInMysteryLoop(true);
     const mc = boot.session?.mysteryChamber;
