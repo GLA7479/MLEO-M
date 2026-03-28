@@ -8,7 +8,7 @@ function SigilTile({ index, visual, disabled, onPick, revealPulse }) {
   const glyph = MYSTERY_CHAMBER_SIGIL_GLYPHS[index] || "?";
 
   const shell =
-    "group relative flex h-full min-h-[5.65rem] w-full flex-col items-center justify-center rounded-2xl border-2 text-center shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-150 sm:min-h-[6rem] sm:rounded-[1.05rem]";
+    "group relative flex h-full min-h-[5.65rem] w-full flex-col items-center justify-center rounded-2xl border-2 text-center shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-150 sm:min-h-[6.75rem] sm:rounded-[1.05rem] lg:min-h-[7rem]";
 
   let face =
     "border-amber-700/45 bg-gradient-to-b from-zinc-800/95 to-zinc-950 text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ";
@@ -47,7 +47,7 @@ function SigilTile({ index, visual, disabled, onPick, revealPulse }) {
         {index + 1}
       </span>
       <span
-        className={`mt-1 select-none font-serif text-[2.15rem] font-black leading-none tabular-nums tracking-tight sm:text-[2.45rem] ${
+        className={`mt-1 select-none font-serif text-[2.15rem] font-black leading-none tabular-nums tracking-tight sm:text-[2.55rem] lg:text-[2.7rem] ${
           visual === "idle" ? "text-amber-100/95" : ""
         }`}
         aria-hidden
@@ -147,8 +147,13 @@ export default function MysteryChamberBoard({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col justify-center px-2 pb-1 pt-0 sm:px-3 sm:pb-1.5 sm:pt-0">
-        <div className="mx-auto grid w-full max-w-[17.75rem] grid-cols-2 grid-rows-2 gap-2.5 sm:max-w-[19.5rem] sm:gap-3">
+      {/* Mobile: 2×2 centered in flex-1. Desktop (sm+): single horizontal row, full width — uses canvas width, not a shrunk mobile block. */}
+      <div className="flex min-h-0 flex-1 flex-col justify-center px-2 pb-1 pt-0 sm:flex-none sm:justify-start sm:px-4 sm:pb-2 sm:pt-1">
+        <div
+          className="mx-auto grid w-full max-w-[17.75rem] grid-cols-2 grid-rows-2 gap-2.5 sm:mx-0 sm:max-w-none sm:grid-cols-4 sm:grid-rows-1 sm:gap-3 lg:gap-3.5"
+          role="group"
+          aria-label="Sigils"
+        >
           {[0, 1, 2, 3].map(i => (
             <SigilTile
               key={i}
@@ -162,11 +167,14 @@ export default function MysteryChamberBoard({
         </div>
       </div>
 
-      <div className="flex min-h-[2rem] shrink-0 items-center justify-center px-2 text-center sm:min-h-[2.125rem] sm:px-3">
+      <div className="flex min-h-[2rem] shrink-0 items-center justify-center px-2 text-center sm:min-h-[2.125rem] sm:px-4">
         <p className="text-[9px] font-medium leading-snug text-zinc-400 sm:text-[10px]">{hintLine}</p>
       </div>
 
-      <div className="shrink-0 border-t border-amber-900/35 bg-zinc-950/80 px-2 py-1.5 sm:px-3 sm:py-2">
+      {/* Absorb extra desktop height below the hint so the exit band stays bottom-anchored without a void under the sigil row. */}
+      <div className="hidden min-h-0 shrink-0 sm:block sm:flex-1" aria-hidden />
+
+      <div className="shrink-0 border-t border-amber-900/35 bg-zinc-950/80 px-2 py-1.5 sm:px-4 sm:py-2">
         {exitVisible ? (
           <button
             type="button"
