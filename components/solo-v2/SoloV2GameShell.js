@@ -52,6 +52,8 @@ export default function SoloV2GameShell({
    * so flex/min-h-0 layouts are not clipped (desktop only; mobile unchanged).
    */
   gameplayDesktopUnclipVertical = false,
+  /** Optional outer column max-width (Tailwind classes). Default keeps existing Solo V2 width. */
+  layoutMaxWidthClass = "max-w-lg",
 }) {
   const [infoTab, setInfoTab] = useState("help");
   const [isInfoOpen, setIsInfoOpen] = useState(false);
@@ -75,7 +77,9 @@ export default function SoloV2GameShell({
           "radial-gradient(ellipse 85% 60% at 50% 22%, rgba(180, 83, 9, 0.14), transparent 55%), radial-gradient(ellipse 90% 45% at 50% 92%, rgba(0, 0, 0, 0.45), transparent 50%), linear-gradient(180deg, #0a0908 0%, #171717 42%, #0c0a09 100%)",
       }}
     >
-      <div className="mx-auto flex h-full w-full max-w-lg min-h-0 flex-col gap-1.5 px-3 sm:gap-3 sm:px-4">
+      <div
+        className={`mx-auto flex h-full w-full min-h-0 flex-col gap-1.5 px-3 sm:gap-3 sm:px-4 ${layoutMaxWidthClass}`}
+      >
         <SoloV2TopHud
           title={title}
           subtitle={subtitle}

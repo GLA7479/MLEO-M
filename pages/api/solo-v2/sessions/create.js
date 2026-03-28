@@ -19,6 +19,11 @@ import {
   buildInitialActiveSummary as buildTreasureDoorsInitialActiveSummary,
   generateTrapDoors,
 } from "../../../../lib/solo-v2/server/treasureDoorsEngine";
+import { buildSpeedTrackSessionSnapshot } from "../../../../lib/solo-v2/server/speedTrackSnapshot";
+import {
+  buildInitialActiveSummary as buildSpeedTrackInitialActiveSummary,
+  generateBlockedRoutes,
+} from "../../../../lib/solo-v2/server/speedTrackEngine";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -415,6 +420,25 @@ async function seedTreasureDoorsSessionOrWarn(supabase, gameKey, sessionId, play
   }
 }
 
+async function seedSpeedTrackSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "speed_track" || !sessionId) return;
+  const summary = buildSpeedTrackInitialActiveSummary(generateBlockedRoutes());
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "speed_track")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create speed_track] seed failed", { sessionId, error });
+  }
+}
+
 async function createSessionLegacyCompat(supabase, payload) {
   const startedAt = new Date();
   const expiresAt = new Date(startedAt.getTime() + 900 * 1000).toISOString();
@@ -493,7 +517,8 @@ export default async function handler(req, res) {
       gameKey === "mystery_box" ||
       gameKey === "high_low_cards" ||
       gameKey === "gold_rush_digger" ||
-      gameKey === "treasure_doors") {
+      gameKey === "treasure_doors" ||
+      gameKey === "speed_track") {
       const minWager = gameKey === "mystery_box" ? MYSTERY_BOX_MIN_WAGER : QUICK_FLIP_MIN_WAGER;
       const buildSnapshot =
         gameKey === "mystery_box"
@@ -506,7 +531,9 @@ export default async function handler(req, res) {
                 ? buildGoldRushDiggerSessionSnapshot
                 : gameKey === "treasure_doors"
                   ? buildTreasureDoorsSessionSnapshot
-                  : buildQuickFlipSessionSnapshot;
+                  : gameKey === "speed_track"
+                    ? buildSpeedTrackSessionSnapshot
+                    : buildQuickFlipSessionSnapshot;
 
       if (!Number.isFinite(entryAmount) || entryAmount < minWager) {
         return res.status(400).json({
@@ -618,7 +645,8 @@ export default async function handler(req, res) {
       gameKey === "mystery_box" ||
       gameKey === "high_low_cards" ||
       gameKey === "gold_rush_digger" ||
-      gameKey === "treasure_doors") &&
+      gameKey === "treasure_doors" ||
+      gameKey === "speed_track") &&
       isGameNotEnabled(error)
     ) {
       console.warn(`solo-v2 create: ${gameKey} missing/disabled in solo_v2_games, attempting catalog bootstrap`);
@@ -660,7 +688,8 @@ export default async function handler(req, res) {
       gameKey === "mystery_box" ||
       gameKey === "high_low_cards" ||
       gameKey === "gold_rush_digger" ||
-      gameKey === "treasure_doors") &&
+      gameKey === "treasure_doors" ||
+      gameKey === "speed_track") &&
         isLegacyDeviceIdNotNullError(error)
       ) {
         console.warn("solo-v2 create: legacy device_id constraint detected, using compat insert path");
@@ -685,6 +714,7 @@ export default async function handler(req, res) {
         await seedHighLowCardsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedTreasureDoorsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedSpeedTrackSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         return res.status(201).json({
           ok: true,
           category: "success",
@@ -731,7 +761,8 @@ export default async function handler(req, res) {
       gameKey === "mystery_box" ||
       gameKey === "high_low_cards" ||
       gameKey === "gold_rush_digger" ||
-      gameKey === "treasure_doors") &&
+      gameKey === "treasure_doors" ||
+      gameKey === "speed_track") &&
         isUniqueConflict(error)
       ) {
         const buildSnapshot =
@@ -745,7 +776,9 @@ export default async function handler(req, res) {
                   ? buildGoldRushDiggerSessionSnapshot
                   : gameKey === "treasure_doors"
                     ? buildTreasureDoorsSessionSnapshot
-                    : buildQuickFlipSessionSnapshot;
+                    : gameKey === "speed_track"
+                      ? buildSpeedTrackSessionSnapshot
+                      : buildQuickFlipSessionSnapshot;
         const conflictLookup = await healAndReReadActiveSessions(supabase, playerRef, gameKey, "post_unique_conflict");
         if (conflictLookup.ok) {
           const conflictRows = conflictLookup.rows;
@@ -808,6 +841,7 @@ export default async function handler(req, res) {
               await seedHighLowCardsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedTreasureDoorsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedSpeedTrackSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -851,6 +885,7 @@ export default async function handler(req, res) {
               await seedHighLowCardsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedTreasureDoorsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedSpeedTrackSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -909,6 +944,7 @@ export default async function handler(req, res) {
     await seedHighLowCardsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedTreasureDoorsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedSpeedTrackSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     return res.status(201).json({
       ok: true,
       category: "success",

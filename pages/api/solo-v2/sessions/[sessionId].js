@@ -6,6 +6,7 @@ import { buildHighLowCardsSessionSnapshot } from "../../../../lib/solo-v2/server
 import { buildDicePickSessionSnapshot } from "../../../../lib/solo-v2/server/dicePickSnapshot";
 import { buildGoldRushDiggerSessionSnapshot } from "../../../../lib/solo-v2/server/goldRushDiggerSnapshot";
 import { buildTreasureDoorsSessionSnapshot } from "../../../../lib/solo-v2/server/treasureDoorsSnapshot";
+import { buildSpeedTrackSessionSnapshot } from "../../../../lib/solo-v2/server/speedTrackSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -69,6 +70,7 @@ export default async function handler(req, res) {
     let dicePickPayload = null;
     let goldRushDiggerPayload = null;
     let treasureDoorsPayload = null;
+    let speedTrackPayload = null;
 
     if (row.game_key === "quick_flip") {
       const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
@@ -236,6 +238,35 @@ export default async function handler(req, res) {
         canCashOut: tdSnapshot.canCashOut,
         resolvedResult: tdSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "speed_track") {
+      const stSnapshotResult = await buildSpeedTrackSessionSnapshot(supabase, row);
+      if (!stSnapshotResult.ok) {
+        if (isMissingTable(stSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const stSnapshot = stSnapshotResult.snapshot;
+      sessionReadState = stSnapshot.readState;
+      speedTrackPayload = {
+        readState: stSnapshot.readState,
+        playing: stSnapshot.playing,
+        pendingPick: stSnapshot.pendingPick,
+        pickConflict: stSnapshot.pickConflict,
+        canResolveTurn: stSnapshot.canResolveTurn,
+        canCashOut: stSnapshot.canCashOut,
+        resolvedResult: stSnapshot.resolvedResult,
+      };
     }
 
     return res.status(200).json({
@@ -263,6 +294,7 @@ export default async function handler(req, res) {
         dicePick: dicePickPayload,
         goldRushDigger: goldRushDiggerPayload,
         treasureDoors: treasureDoorsPayload,
+        speedTrack: speedTrackPayload,
       },
       authority: {
         sessionTruth: "server",

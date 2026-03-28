@@ -19,6 +19,11 @@ import {
   normalizeTreasureChamberIndex,
   normalizeTreasureDoor,
 } from "../../../../../lib/solo-v2/server/treasureDoorsSnapshot";
+import {
+  buildSpeedTrackSessionSnapshot,
+  normalizeSpeedTrackCheckpointIndex,
+  normalizeSpeedTrackRoute,
+} from "../../../../../lib/solo-v2/server/speedTrackSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -518,6 +523,126 @@ export default async function handler(req, res) {
           category: "conflict",
           status: "pick_conflict",
           message: "A different door is already pending for this chamber.",
+        });
+      }
+    }
+
+    const isSpeedTrackPick =
+      sessionRow.game_key === "speed_track" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "speed_track_pick";
+
+    if (isSpeedTrackPick) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Speed Track pick is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "speed_track") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Speed Track pick requires gameKey speed_track.",
+        });
+      }
+
+      const checkpointIndex = normalizeSpeedTrackCheckpointIndex(eventPayload?.checkpointIndex);
+      const routeIndex = normalizeSpeedTrackRoute(eventPayload?.route);
+      if (checkpointIndex === null || routeIndex === null) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Speed Track pick requires checkpointIndex 0..5 and route inside|center|outside.",
+        });
+      }
+
+      const snapshotResult = await buildSpeedTrackSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Speed Track pick submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.pickConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "Conflicting route picks for this checkpoint. Refresh session state.",
+        });
+      }
+
+      const playing = snapshot.playing;
+      const expectedCp = playing?.currentCheckpointIndex;
+      if (!Number.isFinite(Number(expectedCp)) || checkpointIndex !== expectedCp) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_row",
+          message: "Pick must target the current checkpoint.",
+        });
+      }
+
+      if (snapshot.pendingPick) {
+        const pp = snapshot.pendingPick;
+        const same = pp.checkpointIndex === checkpointIndex && pp.routeIndex === routeIndex;
+        if (same) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pp.pickEventId || null,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "A different route is already pending for this checkpoint.",
         });
       }
     }
