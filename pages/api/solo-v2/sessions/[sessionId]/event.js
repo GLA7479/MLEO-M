@@ -14,6 +14,11 @@ import {
   normalizeGoldRushColumn,
   normalizeGoldRushRowIndex,
 } from "../../../../../lib/solo-v2/server/goldRushDiggerSnapshot";
+import {
+  buildTreasureDoorsSessionSnapshot,
+  normalizeTreasureChamberIndex,
+  normalizeTreasureDoor,
+} from "../../../../../lib/solo-v2/server/treasureDoorsSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -393,6 +398,126 @@ export default async function handler(req, res) {
           category: "conflict",
           status: "pick_conflict",
           message: "A different dig spot is already pending for this row.",
+        });
+      }
+    }
+
+    const isTreasureDoorsPick =
+      sessionRow.game_key === "treasure_doors" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "treasure_doors_pick";
+
+    if (isTreasureDoorsPick) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Treasure Doors pick is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "treasure_doors") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Treasure Doors pick requires gameKey treasure_doors.",
+        });
+      }
+
+      const chamberIndex = normalizeTreasureChamberIndex(eventPayload?.chamberIndex);
+      const door = normalizeTreasureDoor(eventPayload?.door);
+      if (chamberIndex === null || door === null) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Treasure Doors pick requires chamberIndex 0..4 and door 0..2.",
+        });
+      }
+
+      const snapshotResult = await buildTreasureDoorsSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Treasure Doors pick submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.pickConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "Conflicting door picks for this chamber. Refresh session state.",
+        });
+      }
+
+      const playing = snapshot.playing;
+      const expectedChamber = playing?.currentChamberIndex;
+      if (!Number.isFinite(Number(expectedChamber)) || chamberIndex !== expectedChamber) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_row",
+          message: "Pick must target the current chamber.",
+        });
+      }
+
+      if (snapshot.pendingPick) {
+        const pp = snapshot.pendingPick;
+        const same = pp.chamberIndex === chamberIndex && pp.door === door;
+        if (same) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pp.pickEventId || null,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "A different door is already pending for this chamber.",
         });
       }
     }
