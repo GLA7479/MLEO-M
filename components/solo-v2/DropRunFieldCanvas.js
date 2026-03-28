@@ -34,16 +34,14 @@ function xForAuthColumn(col, w, gates) {
 }
 
 /**
- * Peg lattice like mleo-plinko-v2: pegCount = row + 2, pegGapX = (w-40)/(PEG_ROWS+2),
- * pegGapY = (pegFieldBottom - topY) / (PEG_ROWS + 2) — tighter silhouette than (PEG_ROWS-1).
+ * Peg lattice: pegCount = row + 2, pegGapX = (w-40)/(PEG_ROWS+2).
+ * pegGapY = (bucketY - topY) / PEG_ROWS → one row-gap between last peg row and top of payout boxes.
  */
 function buildReferencePegLayout(w, h, bucketY) {
   const pegGapX = (w - REF_H_INSET) / (PEG_ROWS + 2);
   const topY = Math.max(10, Math.min(40, Math.round(h * 0.07)));
-  const gapAboveBuckets = Math.max(16, Math.min(40, Math.round(h * 0.048)));
-  const pegFieldBottom = bucketY - gapAboveBuckets;
-  const pegSpan = Math.max(1, pegFieldBottom - topY);
-  const pegGapY = pegSpan / (PEG_ROWS + 2);
+  const pegGapY = Math.max(1e-6, (bucketY - topY) / PEG_ROWS);
+  const pegFieldBottom = topY + (PEG_ROWS - 1) * pegGapY;
   const pr = Math.max(2.4, Math.min(3, Math.min(pegGapX * 0.055, 3)));
 
   const pegs = [];
