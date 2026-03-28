@@ -27,7 +27,7 @@ import {
 import { buildLimitRunSessionSnapshot } from "../../../../../lib/solo-v2/server/limitRunSnapshot";
 import { normalizeLimitRunTargetMultiplier } from "../../../../../lib/solo-v2/limitRunConfig";
 import { buildTripleDiceSessionSnapshot } from "../../../../../lib/solo-v2/server/tripleDiceSnapshot";
-import { normalizeTripleDiceTargetTotal } from "../../../../../lib/solo-v2/tripleDiceConfig";
+import { normalizeTripleDiceZone } from "../../../../../lib/solo-v2/tripleDiceConfig";
 import { buildNumberHuntSessionSnapshot } from "../../../../../lib/solo-v2/server/numberHuntSnapshot";
 import { normalizeNumberHuntGuess } from "../../../../../lib/solo-v2/numberHuntConfig";
 import { buildDropRunSessionSnapshot } from "../../../../../lib/solo-v2/server/dropRunSnapshot";
@@ -806,13 +806,13 @@ export default async function handler(req, res) {
         });
       }
 
-      const targetTotal = normalizeTripleDiceTargetTotal(eventPayload?.targetTotal);
-      if (targetTotal === null) {
+      const zone = normalizeTripleDiceZone(eventPayload?.zone ?? eventPayload?.tripleDiceZone);
+      if (zone === null) {
         return res.status(400).json({
           ok: false,
           category: "validation_error",
           status: "invalid_request",
-          message: "triple_dice_roll requires targetTotal 3–18.",
+          message: "triple_dice_roll requires zone: low, mid, high, or triple.",
         });
       }
 
@@ -847,8 +847,8 @@ export default async function handler(req, res) {
       if (snapshot.pendingRoll) {
         const pr = snapshot.pendingRoll;
         const pendingId = pr.rollEventId != null ? Number(pr.rollEventId) : null;
-        const sameTarget = Number(pr.targetTotal) === targetTotal;
-        if (sameTarget && Number.isFinite(pendingId) && pendingId > 0) {
+        const sameZone = String(pr.zone) === zone;
+        if (sameZone && Number.isFinite(pendingId) && pendingId > 0) {
           return res.status(200).json({
             ok: true,
             category: "success",

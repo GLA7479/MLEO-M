@@ -14,7 +14,8 @@ import {
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
 import {
   TRIPLE_DICE_MIN_WAGER,
-  normalizeTripleDiceTargetTotal,
+  normalizeTripleDiceZone,
+  tripleDiceFormatFaces,
   tripleDiceProjectedPayout,
   tripleDiceWinChancePercent,
 } from "../lib/solo-v2/tripleDiceConfig";
@@ -62,8 +63,8 @@ function clampDie(n) {
 }
 
 function TripleDiceGameplayPanel({
-  targetTotal,
-  onTargetChange,
+  selectedZone,
+  onZoneChange,
   diceValues,
   diceMuted,
   totalDisplay,
@@ -73,7 +74,7 @@ function TripleDiceGameplayPanel({
   sessionNotice,
   onRoll,
   rollDisabled,
-  targetPickerDisabled,
+  optionPickerDisabled,
   resultPopupOpen,
   resolvedIsWin,
   popupLine2,
@@ -90,12 +91,12 @@ function TripleDiceGameplayPanel({
           diceValues={diceValues}
           diceMuted={diceMuted}
           totalDisplay={totalDisplay}
-          targetTotal={targetTotal}
-          onTargetChange={onTargetChange}
+          selectedZone={selectedZone}
+          onZoneChange={onZoneChange}
           rolling={rollingUi}
           onRoll={onRoll}
           rollDisabled={rollDisabled}
-          targetPickerDisabled={targetPickerDisabled}
+          optionPickerDisabled={optionPickerDisabled}
         />
       </div>
 
@@ -131,7 +132,7 @@ export default function TripleDicePage() {
   const [sessionNotice, setSessionNotice] = useState("");
   const [resolvedResult, setResolvedResult] = useState(null);
   const [resultPopupOpen, setResultPopupOpen] = useState(false);
-  const [targetTotal, setTargetTotal] = useState(10);
+  const [selectedZone, setSelectedZone] = useState("mid");
   const [diceValues, setDiceValues] = useState(() => [...NEUTRAL_DICE]);
   const [rollingUi, setRollingUi] = useState(false);
   const [totalDisplay, setTotalDisplay] = useState("—");
@@ -511,7 +512,6 @@ export default function TripleDicePage() {
   function applyRollOutcomeToUi(r, sid, { animate }) {
     const dice = Array.isArray(r.dice) && r.dice.length === 3 ? r.dice.map(clampDie) : [1, 1, 1];
     const tot = Math.floor(Number(r.rolledTotal));
-    const tgt = Math.floor(Number(r.targetTotal));
     const won = Boolean(r.won ?? r.isWin ?? r.terminalKind === "full_clear");
 
     const finalize = () => {
@@ -595,8 +595,8 @@ export default function TripleDicePage() {
     if (sid == null || String(td?.readState || "") !== "ready") return;
     if (submitInFlightRef.current || resolveInFlightRef.current || rollingUi) return;
 
-    const target = normalizeTripleDiceTargetTotal(targetTotal);
-    if (target === null) return;
+    const zone = normalizeTripleDiceZone(selectedZone);
+    if (zone === null) return;
 
     submitInFlightRef.current = true;
     setUiState(UI_STATE.SUBMITTING_PICK);
@@ -617,7 +617,7 @@ export default function TripleDicePage() {
           eventPayload: {
             action: "triple_dice_roll",
             gameKey: GAME_KEY,
-            targetTotal: target,
+            zone,
           },
         }),
       });
@@ -748,8 +748,8 @@ export default function TripleDicePage() {
       : null;
 
   let summaryPlay = numericWager;
-  const normTarget = normalizeTripleDiceTargetTotal(targetTotal) ?? 10;
-  let summaryWin = tripleDiceProjectedPayout(Math.max(TRIPLE_DICE_MIN_WAGER, numericWager), normTarget);
+  const normZone = normalizeTripleDiceZone(selectedZone) ?? "mid";
+  let summaryWin = tripleDiceProjectedPayout(Math.max(TRIPLE_DICE_MIN_WAGER, numericWager), normZone);
 
   const inActiveRunUi =
     uiState === UI_STATE.SESSION_ACTIVE ||
@@ -762,7 +762,7 @@ export default function TripleDicePage() {
   }
 
   if (playing?.entryAmount != null && (inActiveRunUi || uiState === UI_STATE.RESOLVING)) {
-    summaryWin = tripleDiceProjectedPayout(Math.floor(Number(playing.entryAmount)), normTarget);
+    summaryWin = tripleDiceProjectedPayout(Math.floor(Number(playing.entryAmount)), normZone);
   }
 
   if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
@@ -773,18 +773,19 @@ export default function TripleDicePage() {
 
   const resolvedIsWin = Boolean(resolvedResult?.isWin);
   const rt = Number(resolvedResult?.rolledTotal);
-  const tt = Number(resolvedResult?.targetTotal);
-  const rOk = Number.isFinite(rt);
-  const tOk = Number.isFinite(tt);
-  const popupLine2 = rOk ? `Total ${rt}` : "—";
-  const popupLine3 =
-    rOk && tOk
-      ? resolvedIsWin
-        ? `You matched ${tt}.`
-        : `Target was ${tt}.`
-      : resolvedIsWin
-        ? "EXACT MATCH"
-        : "NO MATCH";
+  const pickZone = normalizeTripleDiceZone(resolvedResult?.selectedZone);
+  const diceArr = Array.isArray(resolvedResult?.dice) ? resolvedResult.dice : null;
+  const facesStr = tripleDiceFormatFaces(diceArr);
+  const rOk = Number.isFinite(rt) && pickZone != null;
+  const pickLabel = pickZone ? pickZone.toUpperCase() : "—";
+  const popupLine2 = rOk ? `Pick ${pickLabel} · ${facesStr} · total ${rt}` : "—";
+  const popupLine3 = resolvedIsWin
+    ? pickZone === "triple"
+      ? "Three of a kind — your pick matched."
+      : "Your pick matched this roll."
+    : pickZone
+      ? "Your pick did not match."
+      : "NO MATCH";
 
   const delta = Number(resolvedResult?.settlementSummary?.netDelta ?? 0);
   const resultVaultLabel =
@@ -829,16 +830,19 @@ export default function TripleDicePage() {
   const rollDisabled =
     busyFooter || uiState !== UI_STATE.SESSION_ACTIVE || readState !== "ready" || rollingUi;
 
-  const targetPickerDisabled =
-    rollingUi || busyFooter || uiState !== UI_STATE.SESSION_ACTIVE || readState !== "ready";
+  const optionPickerDisabled =
+    rollingUi ||
+    (busyFooter && uiState !== UI_STATE.IDLE) ||
+    (uiState === UI_STATE.SESSION_ACTIVE && readState !== "ready") ||
+    uiState === UI_STATE.RESOLVED;
 
-  const winChance = tripleDiceWinChancePercent(normTarget);
+  const winChance = tripleDiceWinChancePercent(normZone);
 
-  let statusTop = "Choose a target total from 3 to 18.";
-  let statusSub = "Press START TRIPLE DICE when ready.";
+  let statusTop = "Choose 1 of 4 options, then roll.";
+  let statusSub = "Pick LOW, MID, HIGH, or TRIPLE — then START TRIPLE DICE.";
   if (inTripleDiceLoop && uiState === UI_STATE.SESSION_ACTIVE && readState === "ready" && !rollingUi) {
-    statusTop = "Set your target, then tap Roll.";
-    statusSub = `Target ${normTarget} · ${winChance.toFixed(2)}% chance`;
+    statusTop = "Tap Roll when ready.";
+    statusSub = `${normZone.toUpperCase()} · ${winChance.toFixed(2)}% hit rate`;
   }
   if (rollingUi) {
     statusTop = "Rolling…";
@@ -846,9 +850,20 @@ export default function TripleDicePage() {
   }
   if (uiState === UI_STATE.RESOLVED && resolvedResult) {
     const t = Math.floor(Number(resolvedResult.rolledTotal));
-    const g = Math.floor(Number(resolvedResult.targetTotal));
-    if (Number.isFinite(t) && Number.isFinite(g)) {
-      statusTop = resolvedIsWin ? `Total ${t}. You matched ${g}.` : `Total ${t}. Target was ${g}.`;
+    const d = Array.isArray(resolvedResult.dice) ? resolvedResult.dice : [];
+    const pz = normalizeTripleDiceZone(resolvedResult.selectedZone);
+    const pickUp = pz ? pz.toUpperCase() : "—";
+    if (Number.isFinite(t) && d.length === 3) {
+      if (resolvedIsWin) {
+        if (pz === "triple") {
+          const face = Math.floor(Number(d[0]));
+          statusTop = Number.isFinite(face) ? `Triple ${face}s. TRIPLE wins.` : "TRIPLE wins.";
+        } else {
+          statusTop = `Total ${t}. ${pickUp} wins.`;
+        }
+      } else {
+        statusTop = `Total ${t}. Your pick was ${pickUp}.`;
+      }
       statusSub = "\u00a0";
     }
   }
@@ -858,7 +873,7 @@ export default function TripleDicePage() {
   return (
     <SoloV2GameShell
       title="Triple Dice"
-      subtitle="Pick a total. Roll all three dice."
+      subtitle="Pick a lane. Roll all three dice."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl"
       gameplayScrollable={false}
       gameplayDesktopUnclipVertical
@@ -921,8 +936,11 @@ export default function TripleDicePage() {
       }}
       gameplaySlot={
         <TripleDiceGameplayPanel
-          targetTotal={targetTotal}
-          onTargetChange={setTargetTotal}
+          selectedZone={selectedZone}
+          onZoneChange={z => {
+            const v = normalizeTripleDiceZone(z);
+            if (v) setSelectedZone(v);
+          }}
           diceValues={diceValues}
           diceMuted={diceMuted}
           totalDisplay={totalDisplay}
@@ -932,7 +950,7 @@ export default function TripleDicePage() {
           sessionNotice={sessionNotice}
           onRoll={handleRoll}
           rollDisabled={rollDisabled}
-          targetPickerDisabled={targetPickerDisabled}
+          optionPickerDisabled={optionPickerDisabled}
           resultPopupOpen={resultPopupOpen}
           resolvedIsWin={resolvedIsWin}
           popupLine2={popupLine2}
@@ -943,12 +961,12 @@ export default function TripleDicePage() {
       helpContent={
         <div className="space-y-2">
           <p>
-            Choose a total from 3 to 18. Your stake is locked when you press START TRIPLE DICE. Win chance and
-            projected win update with the target.
+            Pick one lane — LOW (3–8), MID (9–11), HIGH (12–18), or TRIPLE (three matching faces). Stake locks on
+            START TRIPLE DICE. Win odds and projected win update with your pick.
           </p>
           <p>
-            Tap Roll: the server rolls three dice. If the sum exactly matches your target, you win the shown payout;
-            otherwise the round is a loss.
+            Tap Roll: the server rolls three dice. You win if the result fits your lane. TRIPLE only pays when all
+            three dice show the same number, regardless of the sum.
           </p>
         </div>
       }

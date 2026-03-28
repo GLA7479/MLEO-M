@@ -9,6 +9,7 @@ import { rollThreeDice, sumDice, tripleDiceRollWins } from "../../../../lib/solo
 import {
   buildTripleDiceSettlementSummary,
   TRIPLE_DICE_MIN_WAGER,
+  normalizeTripleDiceZone,
   tripleDiceProjectedPayout,
 } from "../../../../lib/solo-v2/tripleDiceConfig";
 import { QUICK_FLIP_CONFIG } from "../../../../lib/solo-v2/quickFlipConfig";
@@ -54,6 +55,7 @@ function createTerminalResolvedPayload(sessionRow) {
     isWin: terminalKind !== "overload",
     dice: Array.isArray(summary.dice) ? summary.dice : null,
     rolledTotal: summary.rolledTotal != null ? Number(summary.rolledTotal) : null,
+    selectedZone: normalizeTripleDiceZone(summary.selectedZone),
     targetTotal: summary.targetTotal != null ? Number(summary.targetTotal) : null,
     won: summary.won === true || (terminalKind === "full_clear" && payoutReturn > 0),
     overloadReason: summary.overloadReason != null ? String(summary.overloadReason) : null,
@@ -212,9 +214,9 @@ export default async function handler(req, res) {
 
     const pending = snap0.pendingRoll;
     const rollEventId = Number(pending.rollEventId);
-    const targetTotal = Math.floor(Number(pending.targetTotal));
+    const selectedZone = normalizeTripleDiceZone(pending.zone);
 
-    if (!Number.isFinite(rollEventId) || rollEventId <= 0 || !Number.isFinite(targetTotal)) {
+    if (!Number.isFinite(rollEventId) || rollEventId <= 0 || selectedZone == null) {
       return res.status(409).json({
         ok: false,
         category: "conflict",
@@ -225,8 +227,8 @@ export default async function handler(req, res) {
 
     const dice = rollThreeDice();
     const rolledTotal = sumDice(dice);
-    const won = tripleDiceRollWins(rolledTotal, targetTotal);
-    const payoutReturn = won ? tripleDiceProjectedPayout(entryCost, targetTotal) : 0;
+    const won = tripleDiceRollWins(selectedZone, dice, rolledTotal);
+    const payoutReturn = won ? tripleDiceProjectedPayout(entryCost, selectedZone) : 0;
     const terminalKind = won ? "full_clear" : "overload";
     const resolvedAt = new Date().toISOString();
 
@@ -236,7 +238,7 @@ export default async function handler(req, res) {
       payoutReturn,
       dice,
       rolledTotal,
-      targetTotal,
+      selectedZone,
       won,
       overloadReason: won ? null : "triple_dice_miss",
       resolvedAt,
@@ -305,7 +307,7 @@ export default async function handler(req, res) {
         rollEventId,
         dice,
         rolledTotal,
-        targetTotal,
+        selectedZone,
         won,
         payoutReturn,
         settlement: "deferred",
@@ -323,7 +325,7 @@ export default async function handler(req, res) {
         terminalKind,
         dice,
         rolledTotal,
-        targetTotal,
+        selectedZone,
         won,
         isWin: won,
         payoutReturn,
