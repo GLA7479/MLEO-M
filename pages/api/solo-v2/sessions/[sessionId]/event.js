@@ -32,6 +32,10 @@ import { buildNumberHuntSessionSnapshot } from "../../../../../lib/solo-v2/serve
 import { normalizeNumberHuntGuess } from "../../../../../lib/solo-v2/numberHuntConfig";
 import { buildDropRunSessionSnapshot } from "../../../../../lib/solo-v2/server/dropRunSnapshot";
 import {
+  buildMysteryChamberSessionSnapshot,
+  normalizeMysteryChamberSigil,
+} from "../../../../../lib/solo-v2/server/mysteryChamberSnapshot";
+import {
   buildChallenge21SessionSnapshot,
   computeAllowedChallenge21Decisions,
 } from "../../../../../lib/solo-v2/server/challenge21Snapshot";
@@ -541,6 +545,123 @@ export default async function handler(req, res) {
           category: "conflict",
           status: "pick_conflict",
           message: "A different door is already pending for this chamber.",
+        });
+      }
+    }
+
+    const isMysteryChamberPick =
+      sessionRow.game_key === "mystery_chamber" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "mystery_chamber_pick";
+
+    if (isMysteryChamberPick) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Mystery Chamber pick is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "mystery_chamber") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Mystery Chamber pick requires gameKey mystery_chamber.",
+        });
+      }
+
+      const sigilIndex = normalizeMysteryChamberSigil(eventPayload?.sigilIndex);
+      if (sigilIndex === null) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Mystery Chamber pick requires sigilIndex 0..3.",
+        });
+      }
+
+      const snapshotResult = await buildMysteryChamberSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Mystery Chamber pick submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.pickConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "Conflicting sigil picks. Refresh session state.",
+        });
+      }
+
+      if (snapshot.readState !== "choice_required") {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "This chamber is not waiting for a new sigil choice.",
+        });
+      }
+
+      if (snapshot.pendingPick) {
+        const pp = snapshot.pendingPick;
+        const same = pp.sigilIndex === sigilIndex;
+        if (same) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pp.pickEventId || null,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "A different sigil is already pending.",
         });
       }
     }

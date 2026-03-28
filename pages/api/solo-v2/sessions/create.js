@@ -35,6 +35,9 @@ import { buildChallenge21SessionSnapshot } from "../../../../lib/solo-v2/server/
 import { buildChallenge21DealState } from "../../../../lib/solo-v2/server/challenge21Play";
 import { buildDropRunSessionSnapshot } from "../../../../lib/solo-v2/server/dropRunSnapshot";
 import { buildDropRunInitialActiveSummary } from "../../../../lib/solo-v2/server/dropRunEngine";
+import { buildMysteryChamberSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryChamberSnapshot";
+import { MYSTERY_CHAMBER_MIN_WAGER } from "../../../../lib/solo-v2/mysteryChamberConfig";
+import { buildMysteryChamberInitialActiveSummary, generateSafeSigils } from "../../../../lib/solo-v2/server/mysteryChamberEngine";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -599,6 +602,37 @@ async function seedDropRunSessionOrWarn(supabase, gameKey, sessionId, playerRef)
   }
 }
 
+async function seedMysteryChamberSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "mystery_chamber" || !sessionId) return;
+
+  const rowRes = await supabase
+    .from("solo_v2_sessions")
+    .select("entry_amount")
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "mystery_chamber")
+    .maybeSingle();
+
+  const entryRaw = Math.floor(Number(rowRes.data?.entry_amount) || 0);
+  const entryCost = entryRaw >= MYSTERY_CHAMBER_MIN_WAGER ? entryRaw : QUICK_FLIP_CONFIG.entryCost;
+  const summary = buildMysteryChamberInitialActiveSummary(generateSafeSigils(), entryCost);
+
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "mystery_chamber")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create mystery_chamber] seed failed", { sessionId, error });
+  }
+}
+
 async function createSessionLegacyCompat(supabase, payload) {
   const startedAt = new Date();
   const expiresAt = new Date(startedAt.getTime() + 900 * 1000).toISOString();
@@ -683,7 +717,8 @@ export default async function handler(req, res) {
       gameKey === "number_hunt" ||
       gameKey === "triple_dice" ||
       gameKey === "challenge_21" ||
-      gameKey === "drop_run") {
+      gameKey === "drop_run" ||
+      gameKey === "mystery_chamber") {
       const minWager = gameKey === "mystery_box" ? MYSTERY_BOX_MIN_WAGER : QUICK_FLIP_MIN_WAGER;
       const buildSnapshot =
         gameKey === "mystery_box"
@@ -708,7 +743,9 @@ export default async function handler(req, res) {
                             ? buildChallenge21SessionSnapshot
                             : gameKey === "drop_run"
                               ? buildDropRunSessionSnapshot
-                              : buildQuickFlipSessionSnapshot;
+                              : gameKey === "mystery_chamber"
+                                ? buildMysteryChamberSessionSnapshot
+                                : buildQuickFlipSessionSnapshot;
 
       if (!Number.isFinite(entryAmount) || entryAmount < minWager) {
         return res.status(400).json({
@@ -826,7 +863,8 @@ export default async function handler(req, res) {
       gameKey === "number_hunt" ||
       gameKey === "triple_dice" ||
       gameKey === "challenge_21" ||
-      gameKey === "drop_run") &&
+      gameKey === "drop_run" ||
+      gameKey === "mystery_chamber") &&
       isGameNotEnabled(error)
     ) {
       console.warn(`solo-v2 create: ${gameKey} missing/disabled in solo_v2_games, attempting catalog bootstrap`);
@@ -874,7 +912,8 @@ export default async function handler(req, res) {
       gameKey === "number_hunt" ||
       gameKey === "triple_dice" ||
       gameKey === "challenge_21" ||
-      gameKey === "drop_run") &&
+      gameKey === "drop_run" ||
+      gameKey === "mystery_chamber") &&
         isLegacyDeviceIdNotNullError(error)
       ) {
         console.warn("solo-v2 create: legacy device_id constraint detected, using compat insert path");
@@ -905,6 +944,7 @@ export default async function handler(req, res) {
         await seedTripleDiceSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedChallenge21SessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedDropRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedMysteryChamberSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         return res.status(201).json({
           ok: true,
           category: "success",
@@ -957,7 +997,8 @@ export default async function handler(req, res) {
       gameKey === "number_hunt" ||
       gameKey === "triple_dice" ||
       gameKey === "challenge_21" ||
-      gameKey === "drop_run") &&
+      gameKey === "drop_run" ||
+      gameKey === "mystery_chamber") &&
         isUniqueConflict(error)
       ) {
         const buildSnapshot =
@@ -983,7 +1024,9 @@ export default async function handler(req, res) {
                               ? buildChallenge21SessionSnapshot
                               : gameKey === "drop_run"
                                 ? buildDropRunSessionSnapshot
-                                : buildQuickFlipSessionSnapshot;
+                                : gameKey === "mystery_chamber"
+                                  ? buildMysteryChamberSessionSnapshot
+                                  : buildQuickFlipSessionSnapshot;
         const conflictLookup = await healAndReReadActiveSessions(supabase, playerRef, gameKey, "post_unique_conflict");
         if (conflictLookup.ok) {
           const conflictRows = conflictLookup.rows;
@@ -1052,6 +1095,7 @@ export default async function handler(req, res) {
               await seedTripleDiceSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedChallenge21SessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedDropRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedMysteryChamberSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -1101,6 +1145,7 @@ export default async function handler(req, res) {
               await seedTripleDiceSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedChallenge21SessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedDropRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedMysteryChamberSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -1165,6 +1210,7 @@ export default async function handler(req, res) {
     await seedTripleDiceSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedChallenge21SessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedDropRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedMysteryChamberSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     return res.status(201).json({
       ok: true,
       category: "success",
