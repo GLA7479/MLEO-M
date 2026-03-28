@@ -26,6 +26,8 @@ import {
 } from "../../../../../lib/solo-v2/server/speedTrackSnapshot";
 import { buildLimitRunSessionSnapshot } from "../../../../../lib/solo-v2/server/limitRunSnapshot";
 import { normalizeLimitRunTargetMultiplier } from "../../../../../lib/solo-v2/limitRunConfig";
+import { buildNumberHuntSessionSnapshot } from "../../../../../lib/solo-v2/server/numberHuntSnapshot";
+import { normalizeNumberHuntGuess } from "../../../../../lib/solo-v2/numberHuntConfig";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -755,6 +757,138 @@ export default async function handler(req, res) {
           status: "turn_pending",
           message: "Resolve the current roll before submitting a new one.",
         });
+      }
+    }
+
+    const isNumberHuntGuess =
+      sessionRow.game_key === "number_hunt" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "number_hunt_guess";
+
+    if (isNumberHuntGuess) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Number Hunt guess is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "number_hunt") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Number Hunt requires gameKey number_hunt.",
+        });
+      }
+
+      const guess = normalizeNumberHuntGuess(eventPayload?.guess);
+      if (guess === null) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "number_hunt_guess requires an integer 1–20.",
+        });
+      }
+
+      const snapshotResult = await buildNumberHuntSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Number Hunt guess submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.guessConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "guess_conflict",
+          message: "Conflicting guess events. Refresh session state.",
+        });
+      }
+
+      if (snapshot.pendingGuess) {
+        const pg = snapshot.pendingGuess;
+        const pendingId = pg.guessEventId != null ? Number(pg.guessEventId) : null;
+        const same = Number(pg.guess) === guess;
+        if (same && Number.isFinite(pendingId) && pendingId > 0) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pendingId,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "turn_pending",
+          message: "Resolve the current guess before submitting a new one.",
+        });
+      }
+
+      const playing = snapshot.playing;
+      if (playing) {
+        const low = Number(playing.lowBound);
+        const high = Number(playing.highBound);
+        if (Number.isFinite(low) && Number.isFinite(high) && (guess < low || guess > high)) {
+          return res.status(400).json({
+            ok: false,
+            category: "validation_error",
+            status: "invalid_request",
+            message: "Guess is outside the allowed range.",
+          });
+        }
+        const hist = Array.isArray(playing.guessHistory) ? playing.guessHistory : [];
+        if (hist.some(h => Number(h?.guess) === guess)) {
+          return res.status(400).json({
+            ok: false,
+            category: "validation_error",
+            status: "invalid_request",
+            message: "That number was already guessed.",
+          });
+        }
       }
     }
 

@@ -8,6 +8,11 @@ import { buildGoldRushDiggerSessionSnapshot } from "../../../../lib/solo-v2/serv
 import { buildTreasureDoorsSessionSnapshot } from "../../../../lib/solo-v2/server/treasureDoorsSnapshot";
 import { buildSpeedTrackSessionSnapshot } from "../../../../lib/solo-v2/server/speedTrackSnapshot";
 import { buildLimitRunSessionSnapshot } from "../../../../lib/solo-v2/server/limitRunSnapshot";
+import {
+  buildNumberHuntSessionSnapshot,
+  stripNumberHuntSecretFromSummary,
+} from "../../../../lib/solo-v2/server/numberHuntSnapshot";
+import { SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -73,6 +78,7 @@ export default async function handler(req, res) {
     let treasureDoorsPayload = null;
     let speedTrackPayload = null;
     let limitRunPayload = null;
+    let numberHuntPayload = null;
 
     if (row.game_key === "quick_flip") {
       const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
@@ -300,7 +306,42 @@ export default async function handler(req, res) {
         canCashOut: lrSnapshot.canCashOut,
         resolvedResult: lrSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "number_hunt") {
+      const nhSnapshotResult = await buildNumberHuntSessionSnapshot(supabase, row);
+      if (!nhSnapshotResult.ok) {
+        if (isMissingTable(nhSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const nhSnapshot = nhSnapshotResult.snapshot;
+      sessionReadState = nhSnapshot.readState;
+      numberHuntPayload = {
+        readState: nhSnapshot.readState,
+        playing: nhSnapshot.playing,
+        pendingGuess: nhSnapshot.pendingGuess,
+        guessConflict: nhSnapshot.guessConflict,
+        canResolveTurn: nhSnapshot.canResolveTurn,
+        canCashOut: nhSnapshot.canCashOut,
+        resolvedResult: nhSnapshot.resolvedResult,
+      };
     }
+
+    const rawSummary = row.server_outcome_summary || {};
+    const serverOutcomeSummary =
+      row.game_key === "number_hunt" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
+        ? stripNumberHuntSecretFromSummary(rawSummary)
+        : rawSummary;
 
     return res.status(200).json({
       ok: true,
@@ -315,7 +356,7 @@ export default async function handler(req, res) {
         entryAmount: Number(row.entry_amount || 0),
         rewardAmount: Number(row.reward_amount || 0),
         netAmount: Number(row.net_amount || 0),
-        serverOutcomeSummary: row.server_outcome_summary || {},
+        serverOutcomeSummary: serverOutcomeSummary,
         createdAt: row.created_at || null,
         updatedAt: row.updated_at || null,
         expiresAt: row.expires_at || null,
@@ -329,6 +370,7 @@ export default async function handler(req, res) {
         treasureDoors: treasureDoorsPayload,
         speedTrack: speedTrackPayload,
         limitRun: limitRunPayload,
+        numberHunt: numberHuntPayload,
       },
       authority: {
         sessionTruth: "server",
