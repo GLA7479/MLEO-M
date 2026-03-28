@@ -47,6 +47,11 @@ export default function SoloV2GameShell({
   soloV2Footer = null,
   /** When false, gameplay area does not scroll (games that fit entirely in the viewport). */
   gameplayScrollable = true,
+  /**
+   * When true with gameplayScrollable false: on sm+ the gameplay stack can paint past overflow-y-hidden
+   * so flex/min-h-0 layouts are not clipped (desktop only; mobile unchanged).
+   */
+  gameplayDesktopUnclipVertical = false,
 }) {
   const [infoTab, setInfoTab] = useState("help");
   const [isInfoOpen, setIsInfoOpen] = useState(false);
@@ -102,11 +107,21 @@ export default function SoloV2GameShell({
 
         {!hideStatusPanel ? <SoloV2StatusPanel status={shellStatus} details={statusDetails} /> : null}
 
-        <section className="min-h-0 flex-1 overflow-hidden">
+        <section
+          className={
+            gameplayDesktopUnclipVertical
+              ? "min-h-0 flex-1 overflow-hidden sm:overflow-visible"
+              : "min-h-0 flex-1 overflow-hidden"
+          }
+        >
           <div className="flex h-full min-h-0 items-stretch justify-center">
             <div
               className={`h-full w-full min-h-0 overflow-x-hidden ${
-                gameplayScrollable ? "overflow-y-auto" : "overflow-y-hidden"
+                gameplayScrollable
+                  ? "overflow-y-auto"
+                  : gameplayDesktopUnclipVertical
+                    ? "overflow-y-hidden sm:overflow-y-visible"
+                    : "overflow-y-hidden"
               }`}
             >
               {gameplaySlot}

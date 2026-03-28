@@ -93,7 +93,7 @@ export default function TreasureDoorsBoard({
   }
 
   return (
-    <div className="flex w-full min-h-0 flex-1 flex-col gap-2 overflow-hidden px-0.5 sm:gap-2.5">
+    <div className="flex w-full min-h-0 flex-1 flex-col gap-2 overflow-hidden px-0.5 sm:overflow-visible sm:gap-2.5">
       {/* Chamber progress — reads as a run, not rows of cells */}
       <div className="shrink-0">
         <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 sm:text-[11px]">
@@ -138,8 +138,8 @@ export default function TreasureDoorsBoard({
       )}
 
       {/* Hero: one chamber, three doors — flat card, no halo behind */}
-      <div className="relative flex min-h-0 flex-1 flex-col justify-center">
-        <div className="relative mx-auto w-full max-w-[21rem] rounded-xl border border-zinc-700/90 bg-zinc-950 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:-mt-2.5 sm:max-w-[22rem] sm:p-3.5">
+      <div className="relative flex min-h-0 flex-1 flex-col justify-center sm:min-h-auto">
+        <div className="relative mx-auto w-full max-w-[21rem] rounded-xl border border-zinc-700/90 bg-zinc-950 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:max-w-[22rem] sm:p-3.5">
           {/* Subtle chamber-cleared flash (opacity only — no box-shadow spill). */}
           {pulseCell != null &&
           !isTerminalRecap &&

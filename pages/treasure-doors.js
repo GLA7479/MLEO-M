@@ -98,7 +98,7 @@ function TreasureDoorsGameplayPanel({
     : Math.floor(Number(playing?.currentChamberIndex ?? 0));
 
   return (
-    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg">
+    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg sm:overflow-visible">
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col py-0.5">
           <TreasureDoorsBoard
@@ -791,6 +791,7 @@ export default function TreasureDoorsPage() {
       title="Treasure Doors"
       subtitle="Temple run"
       gameplayScrollable={false}
+      gameplayDesktopUnclipVertical
       menuVaultBalance={vaultBalance}
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
