@@ -37,6 +37,18 @@ function fundingSourceFromSessionRow(sessionRow) {
   return sessionRow?.session_mode === SOLO_V2_SESSION_MODE.FREEPLAY ? "gift" : "vault";
 }
 
+function safeSigilSetRevealedFromSummary(summary) {
+  if (Array.isArray(summary?.safeSigilSetRevealed) && summary.safeSigilSetRevealed.length >= 1) {
+    const out = summary.safeSigilSetRevealed.map(x => Math.floor(Number(x)));
+    if (out.every(n => Number.isFinite(n) && n >= 0 && n < MYSTERY_CHAMBER_SIGIL_COUNT)) return out;
+  }
+  if (summary?.safeSigilRevealed != null) {
+    const x = Math.floor(Number(summary.safeSigilRevealed));
+    if (Number.isFinite(x) && x >= 0 && x < MYSTERY_CHAMBER_SIGIL_COUNT) return [x];
+  }
+  return [];
+}
+
 function createTerminalResolvedPayload(sessionRow) {
   const summary = sessionRow?.server_outcome_summary || {};
   const entryCost = entryCostFromSessionRow(sessionRow);
@@ -48,6 +60,7 @@ function createTerminalResolvedPayload(sessionRow) {
         ? "full_clear"
         : "fail";
   const payoutReturn = Math.max(0, Math.floor(Number(summary.payoutReturn) || 0));
+  const safeSigilSet = safeSigilSetRevealedFromSummary(summary);
   return {
     sessionId: sessionRow?.id || null,
     sessionStatus: sessionRow?.session_status || SOLO_V2_SESSION_STATUS.RESOLVED,
@@ -58,8 +71,8 @@ function createTerminalResolvedPayload(sessionRow) {
     finalChamberIndex:
       summary.finalChamberIndex != null ? Math.floor(Number(summary.finalChamberIndex)) : null,
     lastChosenSigil: summary.lastChosenSigil != null ? Math.floor(Number(summary.lastChosenSigil)) : null,
-    safeSigilRevealed:
-      summary.safeSigilRevealed != null ? Math.floor(Number(summary.safeSigilRevealed)) : null,
+    safeSigilSet,
+    safeSigilRevealed: safeSigilSet.length ? safeSigilSet[0] : null,
     safeSigils: Array.isArray(summary.safeSigils) ? summary.safeSigils.map(x => Math.floor(Number(x))) : null,
     resolvedAt: summary.resolvedAt || sessionRow?.resolved_at || null,
     settlementSummary:
@@ -211,8 +224,10 @@ export default async function handler(req, res) {
         chambersCleared: cleared,
         finalChamberIndex: activeCash.currentChamberIndex,
         lastChosenSigil: null,
+        safeSigilSetRevealed: null,
         safeSigilRevealed: null,
-        safeSigils: activeCash.safeSigils,
+        safeSigilSets: activeCash.safeSigilSets,
+        safeSigils: null,
         resolvedAt,
         settlementSummary: buildMysteryChamberSettlementSummary({
           terminalKind: "cashout",
@@ -373,18 +388,18 @@ export default async function handler(req, res) {
       });
     }
 
-    const safeSigil = active.safeSigils[chamberIndex];
+    const safeSet = active.safeSigilSets[chamberIndex];
     const resolvedAt = new Date().toISOString();
-    const isCorrect = sigilIndex === safeSigil;
+    const isCorrect = Array.isArray(safeSet) && safeSet.includes(sigilIndex);
 
     mysteryChamberDebugLog("pick_resolve", {
       sessionId,
       chamberIndex,
       playerPickSigilIndex: sigilIndex,
-      serverSafeSigilIndex: safeSigil,
+      serverSafeSigilSet: safeSet,
       isCorrect,
       pickEventId,
-      safeSigilsLayout: active.safeSigils,
+      safeSigilSetsLayout: active.safeSigilSets,
     });
 
     if (!isCorrect) {
@@ -396,8 +411,10 @@ export default async function handler(req, res) {
         chambersCleared: Math.max(0, Math.floor(Number(active.chambersCleared) || 0)),
         finalChamberIndex: chamberIndex,
         lastChosenSigil: sigilIndex,
-        safeSigilRevealed: safeSigil,
-        safeSigils: active.safeSigils,
+        safeSigilSetRevealed: [...safeSet],
+        safeSigilRevealed: safeSet[0],
+        safeSigilSets: active.safeSigilSets,
+        safeSigils: null,
         resolvedAt,
         settlementSummary: buildMysteryChamberSettlementSummary({
           terminalKind: "fail",
@@ -475,7 +492,8 @@ export default async function handler(req, res) {
           finalChamberIndex: chamberIndex,
           chambersCleared: resolvedSummary.chambersCleared,
           chosenSigil: sigilIndex,
-          safeSigil,
+          safeSigilSet: [...safeSet],
+          safeSigil: safeSet[0],
           payoutReturn,
           settlementSummary: resolvedSummary.settlementSummary,
         },
@@ -512,8 +530,10 @@ export default async function handler(req, res) {
         chambersCleared: nextCleared,
         finalChamberIndex: chamberIndex,
         lastChosenSigil: sigilIndex,
-        safeSigilRevealed: safeSigil,
-        safeSigils: active.safeSigils,
+        safeSigilSetRevealed: [...safeSet],
+        safeSigilRevealed: safeSet[0],
+        safeSigilSets: active.safeSigilSets,
+        safeSigils: null,
         resolvedAt,
         settlementSummary: buildMysteryChamberSettlementSummary({
           terminalKind: "full_clear",
@@ -591,7 +611,8 @@ export default async function handler(req, res) {
           finalChamberIndex: chamberIndex,
           chambersCleared: nextCleared,
           chosenSigil: sigilIndex,
-          safeSigil,
+          safeSigilSet: [...safeSet],
+          safeSigil: safeSet[0],
           payoutReturn,
           settlementSummary: resolvedSummary.settlementSummary,
         },
@@ -604,7 +625,7 @@ export default async function handler(req, res) {
       mysteryChamber: true,
       chamberCount: MYSTERY_CHAMBER_CHAMBER_COUNT,
       sigilCount: 4,
-      safeSigils: active.safeSigils,
+      safeSigilSets: active.safeSigilSets,
       currentChamberIndex: chamberIndex + 1,
       chambersCleared: nextCleared,
       securedReturn: nextSecured,

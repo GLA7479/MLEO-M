@@ -9,6 +9,7 @@ import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompa
 import {
   MYSTERY_CHAMBER_CHAMBER_COUNT,
   MYSTERY_CHAMBER_MIN_WAGER,
+  MYSTERY_CHAMBER_SAFE_COUNT_BY_STEP,
   MYSTERY_CHAMBER_SIGIL_GLYPHS,
   mysteryChamberMaxPotentialReturn,
   mysteryChamberStartingSecured,
@@ -59,14 +60,34 @@ function defaultVisuals() {
   return ["idle", "idle", "idle", "idle"];
 }
 
+function safeSigilSetFromApiResult(r) {
+  if (Array.isArray(r?.safeSigilSet) && r.safeSigilSet.length) {
+    return r.safeSigilSet.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3);
+  }
+  if (Array.isArray(r?.safeSigilSetRevealed) && r.safeSigilSetRevealed.length) {
+    return r.safeSigilSetRevealed.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3);
+  }
+  if (r?.safeSigil != null) {
+    const x = Math.floor(Number(r.safeSigil));
+    return x >= 0 && x <= 3 ? [x] : [];
+  }
+  return [];
+}
+
 function visualsFromPersistedBoard(pb) {
   const v = defaultVisuals();
   if (!pb || !pb.terminalKind) return v;
   if (pb.terminalKind === "fail") {
     const c = Math.floor(Number(pb.chosenSigil));
-    const s = Math.floor(Number(pb.safeSigil));
+    const set = Array.isArray(pb.safeSigilSet)
+      ? pb.safeSigilSet.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3)
+      : pb.safeSigil != null
+        ? [Math.floor(Number(pb.safeSigil))].filter(n => n >= 0 && n <= 3)
+        : [];
     if (c >= 0 && c <= 3) v[c] = "fail";
-    if (s >= 0 && s <= 3) v[s] = "safe";
+    for (const si of set) {
+      if (si >= 0 && si <= 3) v[si] = "safe";
+    }
     for (let i = 0; i < 4; i += 1) {
       if (v[i] === "idle") v[i] = "muted";
     }
@@ -98,8 +119,14 @@ function visualsFromLocalAnim(anim) {
   }
   if (anim.phase === "fail") {
     v[c] = "fail";
-    const s = anim.safe != null ? Math.floor(Number(anim.safe)) : null;
-    if (s != null && s >= 0 && s <= 3) v[s] = "safe";
+    const set = Array.isArray(anim.safeSet)
+      ? anim.safeSet.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3)
+      : anim.safe != null
+        ? [Math.floor(Number(anim.safe))].filter(n => n >= 0 && n <= 3)
+        : [];
+    for (const si of set) {
+      if (si >= 0 && si <= 3) v[si] = "safe";
+    }
     for (let i = 0; i < 4; i += 1) {
       if (v[i] === "idle") v[i] = "muted";
     }
@@ -551,15 +578,17 @@ export default function MysteryChamberPage() {
             sessionId,
             terminalKind: r.terminalKind,
             chosenSigil: r.chosenSigil,
-            safeSigil: r.safeSigil,
+            safeSigilSet: safeSigilSetFromApiResult(r),
             chamberIndex: r.chamberIndex ?? r.finalChamberIndex,
           });
         }
 
+        const revealedSet = safeSigilSetFromApiResult(r);
+
         if (r.terminalKind === "fail") {
           setLocalAnim({
             chosen: r.chosenSigil,
-            safe: r.safeSigil,
+            safeSet: revealedSet,
             phase: "fail",
           });
         } else {
@@ -569,7 +598,7 @@ export default function MysteryChamberPage() {
         setPersistedBoard({
           terminalKind: r.terminalKind,
           chosenSigil: r.chosenSigil,
-          safeSigil: r.safeSigil,
+          safeSigilSet: revealedSet,
           finalChamberIndex: r.finalChamberIndex ?? r.chamberIndex,
           chambersCleared: r.chambersCleared ?? readResult?.session?.serverOutcomeSummary?.chambersCleared,
         });
@@ -854,7 +883,8 @@ export default function MysteryChamberPage() {
   const exitDisabled = busyFooter;
 
   let statusTop = "Press START MYSTERY CHAMBER to begin.";
-  let statusSub = "Four chambers, four sigils each — only one sigil per chamber is safe.";
+  let statusSub =
+    "Chambers 1–3 each have two safe sigils; chamber 4 has one. Four sigils shown every chamber.";
   let hintLine = "\u00a0";
 
   const cleared = playing?.chambersCleared ?? 0;
@@ -865,7 +895,11 @@ export default function MysteryChamberPage() {
     statusSub = "Checking your sigil on the server.";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_required" && !localAnim) {
     statusTop = `Chamber ${curCh + 1} of ${MYSTERY_CHAMBER_CHAMBER_COUNT}. Exit now or continue.`;
-    statusSub = "Secured return updates after each safe path.";
+    const nSafe = MYSTERY_CHAMBER_SAFE_COUNT_BY_STEP[curCh] ?? 1;
+    statusSub =
+      nSafe === 2
+        ? "Two of four sigils are safe — pick one to continue."
+        : "Only one sigil is safe in this chamber — choose carefully.";
     if (cleared >= 1) {
       hintLine = "Exit now keeps your secured return, or choose a sigil to continue the run.";
     }
@@ -878,7 +912,7 @@ export default function MysteryChamberPage() {
   if (localAnim?.phase === "fail") {
     const fc = persistedBoard?.finalChamberIndex ?? 0;
     statusTop = `Wrong sigil. The run ended in Chamber ${fc + 1}.`;
-    statusSub = "Safe sigil revealed.";
+    statusSub = "Safe path(s) revealed.";
   }
   if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "cashout") {
     statusTop = `Exited after ${persistedBoard.chambersCleared || cleared || 0} chamber(s) cleared.`;
@@ -891,16 +925,20 @@ export default function MysteryChamberPage() {
   if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "fail" && !localAnim) {
     const fc = persistedBoard?.finalChamberIndex ?? 0;
     statusTop = `Wrong sigil. The run ended in Chamber ${fc + 1}.`;
-    statusSub = "Safe sigil revealed.";
+    statusSub = "Safe path(s) revealed.";
   }
+  const failRevealSet =
+    Array.isArray(persistedBoard?.safeSigilSet) && persistedBoard.safeSigilSet.length
+      ? persistedBoard.safeSigilSet
+      : localAnim?.phase === "fail" && Array.isArray(localAnim.safeSet) && localAnim.safeSet.length
+        ? localAnim.safeSet
+        : [];
   if (
     (localAnim?.phase === "fail" || (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "fail")) &&
-    persistedBoard?.safeSigil != null
+    failRevealSet.length
   ) {
-    const sg = Math.floor(Number(persistedBoard.safeSigil));
-    if (sg >= 0 && sg <= 3) {
-      hintLine = `Safe path was sigil ${MYSTERY_CHAMBER_SIGIL_GLYPHS[sg]}.`;
-    }
+    const glyphs = failRevealSet.map(i => MYSTERY_CHAMBER_SIGIL_GLYPHS[i]).join(" · ");
+    hintLine = `Safe sigil${failRevealSet.length > 1 ? "s" : ""}: ${glyphs}.`;
   }
 
   const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.settlementSummary?.isWin);
@@ -1084,8 +1122,9 @@ export default function MysteryChamberPage() {
       helpContent={
         <div className="space-y-2">
           <p>
-            Four chambers, four sigils each. Exactly one sigil per chamber is the safe path. Each safe chamber multiplies
-            your secured return on the ladder (×1.2 → ×1½ → ×2 → ×3). A wrong sigil ends the run.
+            Four chambers; each shows four sigils. Chambers 1–3 each have two safe sigils (either is a valid path). Chamber
+            4 has exactly one safe sigil. Each safe chamber multiplies your secured return on the ladder (×1.07 → ×1.08 →
+            ×1.09 → ×1.12). Picking a non-safe sigil ends the run.
           </p>
           <p>
             After any safe chamber you may exit with your secured return or continue. Outcomes are sealed on the server;
