@@ -13,6 +13,7 @@ import {
 } from "../lib/solo-v2/soloV2GiftStorage";
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
 import {
+  LIMIT_RUN_LIMBO_MIN_TARGET,
   LIMIT_RUN_MIN_WAGER,
   limboProjectedPayout,
   limboWinChancePercent,
@@ -125,7 +126,7 @@ export default function LimitRunPage() {
   const [sessionNotice, setSessionNotice] = useState("");
   const [resolvedResult, setResolvedResult] = useState(null);
   const [resultPopupOpen, setResultPopupOpen] = useState(false);
-  const [targetMultiplier, setTargetMultiplier] = useState(2);
+  const [targetMultiplier, setTargetMultiplier] = useState(LIMIT_RUN_LIMBO_MIN_TARGET);
   const [displayMultiplierText, setDisplayMultiplierText] = useState("—");
   const [rollingUi, setRollingUi] = useState(false);
   const [resultLineUi, setResultLineUi] = useState("");

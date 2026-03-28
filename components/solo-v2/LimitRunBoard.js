@@ -1,15 +1,58 @@
+import { useEffect, useState } from "react";
 import {
   LIMIT_RUN_LIMBO_MAX_TARGET,
   LIMIT_RUN_LIMBO_MIN_TARGET,
   LIMIT_RUN_TARGET_PRESETS,
+  normalizeLimitRunTargetMultiplier,
 } from "../../lib/solo-v2/limitRunConfig";
+
+/** Allow typing; max one dot, up to 2 fractional digits (keeps trailing "."). */
+function sanitizeTargetDraftString(raw) {
+  let out = "";
+  let dotSeen = false;
+  let fracLen = 0;
+  for (const ch of String(raw)) {
+    if (ch >= "0" && ch <= "9") {
+      if (dotSeen) {
+        if (fracLen < 2) {
+          out += ch;
+          fracLen += 1;
+        }
+      } else {
+        out += ch;
+      }
+    } else if (ch === "." && !dotSeen) {
+      out += ".";
+      dotSeen = true;
+    }
+  }
+  return out;
+}
+
+function formatTargetInputFromNumber(n) {
+  const v = normalizeLimitRunTargetMultiplier(n);
+  if (v == null) return String(LIMIT_RUN_LIMBO_MIN_TARGET);
+  return parseFloat(v.toFixed(2)).toString();
+}
+
+function commitTargetDraftToNumber(draft) {
+  const t = String(draft).trim();
+  if (t === "" || t === ".") {
+    return normalizeLimitRunTargetMultiplier(LIMIT_RUN_LIMBO_MIN_TARGET) ?? LIMIT_RUN_LIMBO_MIN_TARGET;
+  }
+  const n = parseFloat(t);
+  if (!Number.isFinite(n)) {
+    return normalizeLimitRunTargetMultiplier(LIMIT_RUN_LIMBO_MIN_TARGET) ?? LIMIT_RUN_LIMBO_MIN_TARGET;
+  }
+  return normalizeLimitRunTargetMultiplier(n) ?? LIMIT_RUN_LIMBO_MIN_TARGET;
+}
 
 /**
  * Limit Run — Limbo board only: fixed header (session + helper/result), flex hero, bottom controls.
  * overflow-hidden; no inner scroll. No stage strips or non-limbo chrome.
  */
 export default function LimitRunBoard({
-  targetMultiplier = 2,
+  targetMultiplier = LIMIT_RUN_LIMBO_MIN_TARGET,
   onTargetChange,
   displayMultiplierText = "—",
   rolling = false,
@@ -38,12 +81,32 @@ export default function LimitRunBoard({
   const showHint = showHeroHint && !showResult && !showRollingLine;
   const showSession = Boolean(sessionNotice);
 
+  const [customDraft, setCustomDraft] = useState(() => formatTargetInputFromNumber(targetMultiplier));
+
+  useEffect(() => {
+    setCustomDraft(formatTargetInputFromNumber(targetMultiplier));
+  }, [targetMultiplier]);
+
+  const disabledControls = rolling || rollDisabled;
+
+  const commitCustomTarget = () => {
+    const next = commitTargetDraftToNumber(customDraft);
+    const formatted = formatTargetInputFromNumber(next);
+    setCustomDraft(formatted);
+    if (Math.abs(Number(next) - Number(targetMultiplier)) > 0.0001) {
+      onTargetChange?.(next);
+    }
+  };
+
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border-2 border-violet-600/40 bg-zinc-900">
       <style>{`
         .lr-hero-num { font-size: clamp(1.9rem, 8.5vw, 2.7rem); line-height: 1.02; }
         @media (min-width: 640px) {
           .lr-hero-num { font-size: clamp(2.25rem, 8vmin, 4.5rem); }
+        }
+        .lr-custom-target-input::selection {
+          background-color: rgba(167, 139, 250, 0.38);
         }
       `}</style>
       {/* Fixed header: session line + helper/result (opacity only, fixed height) — tighter on mobile */}
@@ -96,7 +159,7 @@ export default function LimitRunBoard({
         <div className="mx-auto flex w-full flex-col gap-2.5 sm:gap-2">
           <div className="w-full">
             <div className="mb-1 flex items-baseline justify-between gap-2 text-[10px] font-semibold text-zinc-400 sm:mb-0.5 sm:text-[11px]">
-              <span>Target</span>
+              <span id="lr-board-target-heading">Target</span>
               <span className="tabular-nums text-violet-200">×{Number(targetMultiplier).toFixed(2)}</span>
             </div>
             <input
@@ -106,7 +169,7 @@ export default function LimitRunBoard({
               step={0.01}
               value={targetMultiplier}
               onChange={e => onTargetChange?.(Number(e.target.value))}
-              disabled={rolling || rollDisabled}
+              disabled={disabledControls}
               className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 disabled:opacity-50 sm:h-2 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-violet-400 sm:[&::-webkit-slider-thumb]:h-3.5 sm:[&::-webkit-slider-thumb]:w-3.5"
             />
             <div className="mt-1 flex justify-between text-[9px] text-zinc-600 sm:mt-0.5 sm:text-[10px]">
@@ -115,16 +178,16 @@ export default function LimitRunBoard({
             </div>
           </div>
 
-          <div className="flex min-h-12 w-full flex-nowrap items-center justify-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:min-h-11 sm:gap-2 [&::-webkit-scrollbar]:hidden">
+          <div className="flex min-h-12 w-full flex-nowrap items-center justify-center gap-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] sm:min-h-11 sm:gap-2 [&::-webkit-scrollbar]:hidden">
             {LIMIT_RUN_TARGET_PRESETS.map(m => {
               const active = Math.abs(Number(targetMultiplier) - m) < 0.02;
               return (
                 <button
                   key={m}
                   type="button"
-                  disabled={rolling || rollDisabled}
+                  disabled={disabledControls}
                   onClick={() => onTargetChange?.(m)}
-                  className={`flex h-9 shrink-0 items-center justify-center rounded-lg border-2 px-2.5 py-1 text-center text-[10px] font-black tabular-nums transition sm:h-9 sm:px-2.5 sm:text-xs ${
+                  className={`flex h-9 shrink-0 items-center justify-center rounded-lg border-2 px-2 py-1 text-center text-[10px] font-black tabular-nums transition sm:h-9 sm:px-2.5 sm:text-xs ${
                     active
                       ? "border-violet-400 bg-violet-950/60 text-violet-50"
                       : "border-violet-800/60 bg-zinc-800 text-violet-100 hover:border-violet-600"
@@ -134,6 +197,58 @@ export default function LimitRunBoard({
                 </button>
               );
             })}
+            <div
+              className={`flex h-9 w-[4.05rem] shrink-0 items-center gap-px rounded-md border border-violet-950/80 bg-black/60 px-1 shadow-[inset_0_2px_4px_rgba(0,0,0,0.7)] ring-1 ring-inset ring-black/60 transition-[border-color,box-shadow] focus-within:border-violet-400/90 focus-within:shadow-[inset_0_2px_4px_rgba(0,0,0,0.55),0_0_0_1px_rgba(167,139,250,0.4)] focus-within:ring-violet-400/30 sm:w-[4.2rem] sm:px-1.5 ${
+                disabledControls
+                  ? "pointer-events-none cursor-not-allowed opacity-45"
+                  : "cursor-text"
+              }`}
+              onMouseDown={e => {
+                if (disabledControls) return;
+                const el = e.currentTarget.querySelector("input.lr-custom-target-input");
+                if (el && e.target !== el) {
+                  e.preventDefault();
+                  el.focus();
+                }
+              }}
+            >
+              <span
+                className="pointer-events-none shrink-0 select-none text-[10px] font-black tabular-nums leading-none text-violet-200 sm:text-xs"
+                aria-hidden
+              >
+                ×
+              </span>
+              <input
+                type="text"
+                inputMode="decimal"
+                enterKeyHint="done"
+                autoComplete="off"
+                spellCheck={false}
+                aria-labelledby="lr-board-target-heading"
+                disabled={disabledControls}
+                value={customDraft}
+                onChange={e => setCustomDraft(sanitizeTargetDraftString(e.target.value))}
+                onBlur={commitCustomTarget}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="lr-custom-target-input min-w-0 w-0 flex-1 cursor-text border-0 bg-transparent py-0 pl-px pr-0 text-left text-[10px] font-black tabular-nums leading-none text-violet-50 caret-violet-400 outline-none ring-0 focus:outline-none focus:ring-0 disabled:cursor-not-allowed sm:text-xs"
+              />
+              <div
+                className="pointer-events-none flex shrink-0 flex-col items-center justify-center gap-px py-0.5 pr-px text-zinc-500"
+                aria-hidden
+              >
+                <svg className="h-1 w-2" viewBox="0 0 10 5" aria-hidden>
+                  <path fill="currentColor" d="M5 0l5 5H0z" />
+                </svg>
+                <svg className="h-1 w-2" viewBox="0 0 10 5" aria-hidden>
+                  <path fill="currentColor" d="M5 5L0 0h10z" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           <div className="grid min-h-[3.35rem] grid-cols-2 gap-2 rounded-lg border border-violet-900/40 bg-zinc-900/80 px-2.5 py-2 text-center sm:min-h-[3.25rem] sm:gap-1.5 sm:px-2 sm:py-2">
@@ -155,7 +270,7 @@ export default function LimitRunBoard({
 
           <button
             type="button"
-            disabled={rollDisabled || rolling}
+            disabled={disabledControls}
             onClick={() => onRoll?.()}
             className={`flex min-h-[48px] w-full flex-col items-center justify-center rounded-xl border-2 px-2 py-2 text-center transition-colors sm:min-h-[48px] sm:px-1 sm:py-1.5 ${
               rollDisabled || rolling
