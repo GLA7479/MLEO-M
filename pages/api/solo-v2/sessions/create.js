@@ -38,6 +38,7 @@ import { buildDropRunInitialActiveSummary } from "../../../../lib/solo-v2/server
 import { buildMysteryChamberSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryChamberSnapshot";
 import { MYSTERY_CHAMBER_MIN_WAGER } from "../../../../lib/solo-v2/mysteryChamberConfig";
 import { buildMysteryChamberInitialActiveSummary, generateSafeSigils } from "../../../../lib/solo-v2/server/mysteryChamberEngine";
+import { mysteryChamberDebugLog } from "../../../../lib/solo-v2/server/mysteryChamberDebug";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -615,7 +616,16 @@ async function seedMysteryChamberSessionOrWarn(supabase, gameKey, sessionId, pla
 
   const entryRaw = Math.floor(Number(rowRes.data?.entry_amount) || 0);
   const entryCost = entryRaw >= MYSTERY_CHAMBER_MIN_WAGER ? entryRaw : QUICK_FLIP_CONFIG.entryCost;
-  const summary = buildMysteryChamberInitialActiveSummary(generateSafeSigils(), entryCost);
+  const sigils = generateSafeSigils();
+  const summary = buildMysteryChamberInitialActiveSummary(sigils, entryCost);
+
+  mysteryChamberDebugLog("seed_new_run", {
+    sessionId,
+    entryCost,
+    chamberCount: summary.chamberCount,
+    safeSigils: sigils,
+    note: "Independent uniform indices per chamber via crypto.randomInt(0, sigilCount) (upper bound exclusive).",
+  });
 
   const { error } = await supabase
     .from("solo_v2_sessions")

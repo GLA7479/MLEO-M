@@ -10,7 +10,9 @@ import {
   MYSTERY_CHAMBER_CHAMBER_COUNT,
   MYSTERY_CHAMBER_CLEAR_MULTIPLIERS,
   MYSTERY_CHAMBER_MIN_WAGER,
+  MYSTERY_CHAMBER_SIGIL_COUNT,
 } from "../../../../lib/solo-v2/mysteryChamberConfig";
+import { mysteryChamberDebugLog } from "../../../../lib/solo-v2/server/mysteryChamberDebug";
 import { QUICK_FLIP_CONFIG } from "../../../../lib/solo-v2/quickFlipConfig";
 
 function isMissingTable(error) {
@@ -337,7 +339,12 @@ export default async function handler(req, res) {
     const pending = snap0.pendingPick;
     const pickEventId = Number(pending.pickEventId);
     const sigilIndex = Math.floor(Number(pending.sigilIndex));
-    if (!Number.isFinite(pickEventId) || pickEventId <= 0 || sigilIndex < 0 || sigilIndex >= 4) {
+    if (
+      !Number.isFinite(pickEventId) ||
+      pickEventId <= 0 ||
+      sigilIndex < 0 ||
+      sigilIndex >= MYSTERY_CHAMBER_SIGIL_COUNT
+    ) {
       return res.status(409).json({
         ok: false,
         category: "conflict",
@@ -369,6 +376,16 @@ export default async function handler(req, res) {
     const safeSigil = active.safeSigils[chamberIndex];
     const resolvedAt = new Date().toISOString();
     const isCorrect = sigilIndex === safeSigil;
+
+    mysteryChamberDebugLog("pick_resolve", {
+      sessionId,
+      chamberIndex,
+      playerPickSigilIndex: sigilIndex,
+      serverSafeSigilIndex: safeSigil,
+      isCorrect,
+      pickEventId,
+      safeSigilsLayout: active.safeSigils,
+    });
 
     if (!isCorrect) {
       const payoutReturn = 0;

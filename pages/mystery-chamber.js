@@ -545,6 +545,17 @@ export default function MysteryChamberPage() {
           setSession(readResult.session);
         }
 
+        if (process.env.NODE_ENV === "development") {
+          // eslint-disable-next-line no-console -- dev-only fairness trace
+          console.info("[MysteryChamber][dev] resolve_terminal", {
+            sessionId,
+            terminalKind: r.terminalKind,
+            chosenSigil: r.chosenSigil,
+            safeSigil: r.safeSigil,
+            chamberIndex: r.chamberIndex ?? r.finalChamberIndex,
+          });
+        }
+
         if (r.terminalKind === "fail") {
           setLocalAnim({
             chosen: r.chosenSigil,
@@ -597,6 +608,15 @@ export default function MysteryChamberPage() {
     const mc = sessionRef.current?.mysteryChamber;
     if (sid == null || String(mc?.readState || "") !== "choice_required") return;
     if (submitInFlightRef.current || resolveInFlightRef.current) return;
+
+    if (process.env.NODE_ENV === "development") {
+      // eslint-disable-next-line no-console -- dev-only fairness trace (compare to server logs when SOLO_V2_DEBUG_MYSTERY_CHAMBER=1)
+      console.info("[MysteryChamber][dev] client_pick", {
+        sessionId: sid,
+        sigilIndexSent: sigilIndex,
+        currentChamberIndex: mc?.playing?.currentChamberIndex,
+      });
+    }
 
     submitInFlightRef.current = true;
     setUiState(UI_STATE.SUBMITTING_PICK);
