@@ -145,6 +145,11 @@ export default function LimitRunPage() {
   const [rollingUi, setRollingUi] = useState(false);
   const [resultLineUi, setResultLineUi] = useState("");
   const [resultToneUi, setResultToneUi] = useState("neutral");
+  /** After first successful START RUN: stay in run flow — next rounds only need ROLL (session auto-recreated after popup). */
+  const [inLimitRunLoop, setInLimitRunLoop] = useState(false);
+  const inLimitRunLoopRef = useRef(false);
+  const wagerInputRef = useRef(wagerInput);
+  const vaultBalanceRef = useRef(vaultBalance);
 
   const cycleRef = useRef(0);
   const createInFlightRef = useRef(false);
@@ -179,6 +184,18 @@ export default function LimitRunPage() {
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    inLimitRunLoopRef.current = inLimitRunLoop;
+  }, [inLimitRunLoop]);
+
+  useEffect(() => {
+    wagerInputRef.current = wagerInput;
+  }, [wagerInput]);
+
+  useEffect(() => {
+    vaultBalanceRef.current = vaultBalance;
+  }, [vaultBalance]);
 
   useEffect(() => {
     let cancelled = false;
@@ -222,7 +239,11 @@ export default function LimitRunPage() {
     });
   }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id]);
 
-  function resetAfterResultPopup() {
+  /**
+   * After the result popup: clear round UI, then auto-create the next session (same stake as wager field)
+   * so the player can tap ROLL immediately — no second START RUN per round.
+   */
+  async function prepareNextLimitRunRound() {
     if (resultPopupTimerRef.current) {
       clearTimeout(resultPopupTimerRef.current);
       resultPopupTimerRef.current = null;
@@ -231,18 +252,61 @@ export default function LimitRunPage() {
       clearInterval(rollAnimTimerRef.current);
       rollAnimTimerRef.current = null;
     }
-    createInFlightRef.current = false;
     submitInFlightRef.current = false;
     resolveInFlightRef.current = false;
     setResultPopupOpen(false);
-    setSession(null);
     setResolvedResult(null);
-    setUiState(UI_STATE.IDLE);
     setSessionNotice("");
     setDisplayMultiplierText("—");
     setRollingUi(false);
     setResultLineUi("");
     setResultToneUi("neutral");
+
+    if (!inLimitRunLoopRef.current) {
+      createInFlightRef.current = false;
+      setSession(null);
+      setUiState(UI_STATE.IDLE);
+      return;
+    }
+
+    if (!vaultReady) {
+      createInFlightRef.current = false;
+      setSession(null);
+      setUiState(UI_STATE.IDLE);
+      setInLimitRunLoop(false);
+      setErrorMessage("Shared vault unavailable.");
+      return;
+    }
+
+    const wager = parseWagerInput(wagerInputRef.current);
+    if (wager < LIMIT_RUN_MIN_WAGER) {
+      createInFlightRef.current = false;
+      setSession(null);
+      setUiState(UI_STATE.IDLE);
+      setInLimitRunLoop(false);
+      setErrorMessage(`Minimum stake is ${LIMIT_RUN_MIN_WAGER}.`);
+      return;
+    }
+    if (vaultBalanceRef.current < wager) {
+      createInFlightRef.current = false;
+      setSession(null);
+      setUiState(UI_STATE.IDLE);
+      setInLimitRunLoop(false);
+      setErrorMessage(`Insufficient vault balance. Need ${wager} for this round.`);
+      return;
+    }
+
+    cycleRef.current += 1;
+    const activeCycle = cycleRef.current;
+    const boot = await bootstrapSession(wager, activeCycle, SOLO_V2_SESSION_MODE.STANDARD, { isGiftRound: false });
+    if (!boot.ok || boot.alreadyTerminal) {
+      setInLimitRunLoop(false);
+      return;
+    }
+    const lrBoot = boot.session?.limitRun;
+    if (lrBoot?.readState === "roll_submitted" && lrBoot?.canResolveTurn) {
+      void handleResolvePendingRoll(boot.session.id, activeCycle, { animate: false });
+    }
   }
 
   function openResultPopup() {
@@ -250,7 +314,7 @@ export default function LimitRunPage() {
     setResultPopupOpen(true);
     resultPopupTimerRef.current = window.setTimeout(() => {
       resultPopupTimerRef.current = null;
-      resetAfterResultPopup();
+      void prepareNextLimitRunRound();
     }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
   }
 
@@ -260,6 +324,7 @@ export default function LimitRunPage() {
     const st = String(sessionPayload?.sessionStatus || "");
 
     if (st === "resolved" && lrSnap?.resolvedResult) {
+      setInLimitRunLoop(false);
       setResolvedResult({
         ...lrSnap.resolvedResult,
         sessionId: sessionPayload.id,
@@ -272,6 +337,7 @@ export default function LimitRunPage() {
     }
 
     if (readState === "roll_conflict") {
+      setInLimitRunLoop(true);
       setUiState(UI_STATE.SESSION_ACTIVE);
       setSessionNotice("");
       setErrorMessage("Conflicting roll — refresh and try again.");
@@ -279,6 +345,7 @@ export default function LimitRunPage() {
     }
 
     if (readState === "roll_submitted") {
+      setInLimitRunLoop(true);
       setUiState(UI_STATE.SESSION_ACTIVE);
       setSessionNotice(resumed ? "Finishing your roll…" : "Resolving roll…");
       setErrorMessage("");
@@ -286,6 +353,7 @@ export default function LimitRunPage() {
     }
 
     if (readState === "ready") {
+      setInLimitRunLoop(true);
       setResolvedResult(null);
       setUiState(UI_STATE.SESSION_ACTIVE);
       setDisplayMultiplierText("—");
@@ -298,6 +366,7 @@ export default function LimitRunPage() {
     }
 
     if (readState === "invalid" || st === "expired" || st === "cancelled") {
+      setInLimitRunLoop(false);
       setSession(null);
       setResolvedResult(null);
       setUiState(UI_STATE.IDLE);
@@ -308,6 +377,7 @@ export default function LimitRunPage() {
       return;
     }
 
+    setInLimitRunLoop(false);
     setUiState(UI_STATE.UNAVAILABLE);
     setErrorMessage("Session state is not resumable.");
   }
@@ -601,6 +671,7 @@ export default function LimitRunPage() {
         const msg = buildSoloV2ApiErrorMessage(payload, "");
         if (isSoloV2EventRejectedStaleSessionMessage(msg)) {
           setSession(null);
+          setInLimitRunLoop(false);
           setUiState(UI_STATE.IDLE);
           setErrorMessage(msg || "Session expired.");
           return;
@@ -643,6 +714,7 @@ export default function LimitRunPage() {
     });
     if (isGiftRound) giftRoundRef.current = false;
     if (!boot.ok || boot.alreadyTerminal) return;
+    setInLimitRunLoop(true);
     const lrBoot = boot.session?.limitRun;
     if (lrBoot?.readState === "roll_submitted" && lrBoot?.canResolveTurn) {
       void handleResolvePendingRoll(boot.session.id, activeCycle, { animate: false });
@@ -678,6 +750,7 @@ export default function LimitRunPage() {
     : "";
 
   const canStart =
+    !inLimitRunLoop &&
     wagerPlayable &&
     ![UI_STATE.LOADING, UI_STATE.SUBMITTING_PICK, UI_STATE.RESOLVING, UI_STATE.PENDING_MIGRATION].includes(
       uiState,
