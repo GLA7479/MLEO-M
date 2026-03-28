@@ -71,7 +71,8 @@ function LimitRunGameplayPanel({
   rollDisabled,
   resultPopupOpen,
   resolvedIsWin,
-  resultTitle,
+  resultPopupRollLabel,
+  resultPopupCompareLine,
   resultVaultLabel,
 }) {
   const lr = session?.limitRun;
@@ -107,10 +108,23 @@ function LimitRunGameplayPanel({
       <SoloV2ResultPopup
         open={resultPopupOpen}
         isWin={resolvedIsWin}
-        animationKey={String(resultTitle)}
-        vaultSlot={<SoloV2ResultPopupVaultLine isWin={resolvedIsWin} deltaLabel={resultVaultLabel} />}
+        animationKey={`${resultPopupRollLabel}-${resultPopupCompareLine}-${resolvedIsWin ? "w" : "l"}-${resultVaultLabel}`}
+        vaultSlot={
+          resultPopupOpen ? (
+            <SoloV2ResultPopupVaultLine isWin={resolvedIsWin} deltaLabel={resultVaultLabel} />
+          ) : undefined
+        }
       >
-        <p className="text-sm font-extrabold leading-tight">{resultTitle}</p>
+        <div className="text-[13px] font-black uppercase tracking-wide">
+          {resolvedIsWin ? "YOU WIN" : "YOU LOSE"}
+        </div>
+        <div className="mt-1 text-sm font-bold text-white">
+          Rolled:{" "}
+          <span className="text-amber-100 tabular-nums">{resultPopupRollLabel}</span>
+        </div>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">
+          {resultPopupCompareLine}
+        </div>
       </SoloV2ResultPopup>
     </div>
   );
@@ -705,25 +719,20 @@ export default function LimitRunPage() {
     summaryWin = Math.max(0, Math.floor(Number(ss.payoutReturn) || 0));
   }
 
-  const terminalKind = resolvedResult?.terminalKind;
-  let resultTitle = "Round complete";
-  if (terminalKind === "overload") {
-    if (resolvedResult?.overloadReason === "limbo_miss") {
-      const t = Number(resolvedResult?.targetMultiplier);
-      resultTitle = Number.isFinite(t)
-        ? `Landed under ×${t.toFixed(2)}`
-        : "Below your target";
-    } else resultTitle = "No win";
-  } else if (terminalKind === "full_clear") {
-    const r = Number(resolvedResult?.rollMultiplier);
-    const t = Number(resolvedResult?.targetMultiplier);
-    resultTitle =
-      Number.isFinite(r) && Number.isFinite(t)
-        ? `Hit ×${r.toFixed(2)} — beat ×${t.toFixed(2)}`
-        : "Target beaten";
-  }
-
   const resolvedIsWin = Boolean(resolvedResult?.isWin);
+  const rr = Number(resolvedResult?.rollMultiplier);
+  const tt = Number(resolvedResult?.targetMultiplier);
+  const rOk = Number.isFinite(rr);
+  const tOk = Number.isFinite(tt);
+  const resultPopupRollLabel = rOk ? `×${rr.toFixed(2)}` : "—";
+  const resultPopupCompareLine =
+    rOk && tOk
+      ? resolvedIsWin
+        ? `CLEAR — ×${rr.toFixed(2)} ≥ ×${tt.toFixed(2)}`
+        : `MISS — ×${rr.toFixed(2)} < ×${tt.toFixed(2)}`
+      : resolvedIsWin
+        ? "TARGET BEATEN"
+        : "NO WIN";
   const delta = Number(resolvedResult?.settlementSummary?.netDelta ?? 0);
   const resultVaultLabel =
     resolvedResult?.settlementSummary != null
@@ -851,7 +860,8 @@ export default function LimitRunPage() {
           rollDisabled={rollDisabled}
           resultPopupOpen={resultPopupOpen}
           resolvedIsWin={resolvedIsWin}
-          resultTitle={resultTitle}
+          resultPopupRollLabel={resultPopupRollLabel}
+          resultPopupCompareLine={resultPopupCompareLine}
           resultVaultLabel={resultVaultLabel}
         />
       }
