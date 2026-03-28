@@ -7,6 +7,7 @@ import { buildDicePickSessionSnapshot } from "../../../../lib/solo-v2/server/dic
 import { buildGoldRushDiggerSessionSnapshot } from "../../../../lib/solo-v2/server/goldRushDiggerSnapshot";
 import { buildTreasureDoorsSessionSnapshot } from "../../../../lib/solo-v2/server/treasureDoorsSnapshot";
 import { buildSpeedTrackSessionSnapshot } from "../../../../lib/solo-v2/server/speedTrackSnapshot";
+import { buildLimitRunSessionSnapshot } from "../../../../lib/solo-v2/server/limitRunSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -71,6 +72,7 @@ export default async function handler(req, res) {
     let goldRushDiggerPayload = null;
     let treasureDoorsPayload = null;
     let speedTrackPayload = null;
+    let limitRunPayload = null;
 
     if (row.game_key === "quick_flip") {
       const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
@@ -267,6 +269,37 @@ export default async function handler(req, res) {
         canCashOut: stSnapshot.canCashOut,
         resolvedResult: stSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "limit_run") {
+      const lrSnapshotResult = await buildLimitRunSessionSnapshot(supabase, row);
+      if (!lrSnapshotResult.ok) {
+        if (isMissingTable(lrSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const lrSnapshot = lrSnapshotResult.snapshot;
+      sessionReadState = lrSnapshot.readState;
+      limitRunPayload = {
+        readState: lrSnapshot.readState,
+        playing: lrSnapshot.playing,
+        pendingLock: lrSnapshot.pendingLock,
+        pendingRoll: lrSnapshot.pendingRoll,
+        lockConflict: lrSnapshot.lockConflict,
+        rollConflict: lrSnapshot.rollConflict,
+        canResolveTurn: lrSnapshot.canResolveTurn,
+        canCashOut: lrSnapshot.canCashOut,
+        resolvedResult: lrSnapshot.resolvedResult,
+      };
     }
 
     return res.status(200).json({
@@ -295,6 +328,7 @@ export default async function handler(req, res) {
         goldRushDigger: goldRushDiggerPayload,
         treasureDoors: treasureDoorsPayload,
         speedTrack: speedTrackPayload,
+        limitRun: limitRunPayload,
       },
       authority: {
         sessionTruth: "server",

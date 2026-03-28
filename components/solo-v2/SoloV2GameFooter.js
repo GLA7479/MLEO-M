@@ -20,6 +20,12 @@ export default function SoloV2GameFooter({
   primaryActionLoading = false,
   primaryLoadingLabel = "…",
   onPrimaryAction,
+  /** When true, omit the primary CTA row (e.g. in-play action lives in the gameplay panel). */
+  hidePrimaryAction = false,
+  /** When true with hidePrimaryAction, keeps the same vertical band as the primary button (no layout jump). */
+  reservePrimarySlotWhenHidden = false,
+  /** When true, always reserve error row height (opacity/transparent text when empty). */
+  reserveErrorRow = false,
   errorMessage = "",
 }) {
   return (
@@ -75,20 +81,34 @@ export default function SoloV2GameFooter({
         </button>
       </div>
 
-      <button
-        type="button"
-        onClick={onPrimaryAction}
-        disabled={primaryActionDisabled || primaryActionLoading}
-        className={`min-h-[48px] w-full rounded-lg border px-4 py-2.5 text-base font-extrabold tracking-wide ${
-          primaryActionDisabled || primaryActionLoading
-            ? "cursor-not-allowed border-white/20 bg-white/10 text-zinc-400 opacity-70"
-            : "border-emerald-400/40 bg-gradient-to-r from-emerald-600 to-green-600 text-white"
-        }`}
-      >
-        {primaryActionLoading ? primaryLoadingLabel : primaryActionLabel}
-      </button>
+      {hidePrimaryAction ? (
+        reservePrimarySlotWhenHidden ? <div className="min-h-[48px] w-full shrink-0" aria-hidden /> : null
+      ) : (
+        <button
+          type="button"
+          onClick={onPrimaryAction}
+          disabled={primaryActionDisabled || primaryActionLoading}
+          className={`min-h-[48px] w-full rounded-lg border px-4 py-2.5 text-base font-extrabold tracking-wide ${
+            primaryActionDisabled || primaryActionLoading
+              ? "cursor-not-allowed border-white/20 bg-white/10 text-zinc-400 opacity-70"
+              : "border-emerald-400/40 bg-gradient-to-r from-emerald-600 to-green-600 text-white"
+          }`}
+        >
+          {primaryActionLoading ? primaryLoadingLabel : primaryActionLabel}
+        </button>
+      )}
 
-      {errorMessage ? (
+      {reserveErrorRow ? (
+        <div className="flex min-h-[2.75rem] shrink-0 items-start justify-center px-0.5 sm:min-h-[3rem]">
+          <p
+            className={`line-clamp-2 text-center text-[11px] leading-snug transition-opacity duration-150 ${
+              errorMessage ? "text-red-300/95 opacity-100" : "text-transparent opacity-0"
+            }`}
+          >
+            {errorMessage || "\u00a0"}
+          </p>
+        </div>
+      ) : errorMessage ? (
         <p className="text-center text-[11px] leading-snug text-red-300/95">{errorMessage}</p>
       ) : null}
     </div>

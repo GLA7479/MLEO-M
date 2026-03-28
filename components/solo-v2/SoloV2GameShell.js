@@ -45,6 +45,8 @@ export default function SoloV2GameShell({
   gift = null,
   /** When set, renders shared wager + CTA footer above the ad slot (Solo V2 master layout). */
   soloV2Footer = null,
+  /** Optional Tailwind classes on a wrapper around the footer (e.g. dim wager during active play). */
+  soloV2FooterWrapperClassName = "",
   /** When false, gameplay area does not scroll (games that fit entirely in the viewport). */
   gameplayScrollable = true,
   /**
@@ -133,7 +135,11 @@ export default function SoloV2GameShell({
           </div>
         </section>
 
-        {soloV2Footer ? <SoloV2GameFooter {...soloV2Footer} /> : null}
+        {soloV2Footer ? (
+          <div className={soloV2FooterWrapperClassName || undefined}>
+            <SoloV2GameFooter {...soloV2Footer} />
+          </div>
+        ) : null}
 
         {!soloV2Footer && !hideActionBar ? (
           <SoloV2ActionBar

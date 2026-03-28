@@ -24,6 +24,8 @@ import {
   normalizeSpeedTrackCheckpointIndex,
   normalizeSpeedTrackRoute,
 } from "../../../../../lib/solo-v2/server/speedTrackSnapshot";
+import { buildLimitRunSessionSnapshot } from "../../../../../lib/solo-v2/server/limitRunSnapshot";
+import { normalizeLimitRunTargetMultiplier } from "../../../../../lib/solo-v2/limitRunConfig";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -643,6 +645,115 @@ export default async function handler(req, res) {
           category: "conflict",
           status: "pick_conflict",
           message: "A different route is already pending for this checkpoint.",
+        });
+      }
+    }
+
+    const isLimitRunRoll =
+      sessionRow.game_key === "limit_run" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "limit_run_roll";
+
+    if (isLimitRunRoll) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Limit Run roll is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "limit_run") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Limit Run requires gameKey limit_run.",
+        });
+      }
+
+      const targetMultiplier = normalizeLimitRunTargetMultiplier(eventPayload?.targetMultiplier);
+      if (targetMultiplier === null) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "limit_run_roll requires a valid targetMultiplier.",
+        });
+      }
+
+      const snapshotResult = await buildLimitRunSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Limit Run roll submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.rollConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "roll_conflict",
+          message: "Conflicting roll events. Refresh session state.",
+        });
+      }
+
+      if (snapshot.pendingRoll) {
+        const pr = snapshot.pendingRoll;
+        const pendingId = pr.rollEventId != null ? Number(pr.rollEventId) : null;
+        const sameTarget = Number(pr.targetMultiplier) === targetMultiplier;
+        if (sameTarget && Number.isFinite(pendingId) && pendingId > 0) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pendingId,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "turn_pending",
+          message: "Resolve the current roll before submitting a new one.",
         });
       }
     }
