@@ -28,6 +28,12 @@ import { buildLimitRunSessionSnapshot } from "../../../../../lib/solo-v2/server/
 import { normalizeLimitRunTargetMultiplier } from "../../../../../lib/solo-v2/limitRunConfig";
 import { buildNumberHuntSessionSnapshot } from "../../../../../lib/solo-v2/server/numberHuntSnapshot";
 import { normalizeNumberHuntGuess } from "../../../../../lib/solo-v2/numberHuntConfig";
+import { buildDropRunSessionSnapshot } from "../../../../../lib/solo-v2/server/dropRunSnapshot";
+import {
+  DROP_RUN_GATES,
+  DROP_RUN_RELEASE_COLUMN,
+  normalizeDropRunGate,
+} from "../../../../../lib/solo-v2/dropRunConfig";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -1091,6 +1097,121 @@ export default async function handler(req, res) {
           category: "conflict",
           status: "turn_pending",
           message: "Resolve the current guess before submitting a new one.",
+        });
+      }
+    }
+
+    const dropRunAction = String(eventPayload?.action || "");
+    const isDropRunClientAction =
+      sessionRow.game_key === "drop_run" &&
+      eventType === "client_action" &&
+      (dropRunAction === "drop_run_play" || dropRunAction === "drop_run_select_gate");
+
+    if (isDropRunClientAction) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Drop Run actions are only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "drop_run") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Drop Run requires gameKey drop_run.",
+        });
+      }
+
+      let gate = null;
+      if (dropRunAction === "drop_run_play") {
+        gate = DROP_RUN_RELEASE_COLUMN;
+      } else {
+        gate = normalizeDropRunGate(eventPayload?.gate);
+        if (gate === null) {
+          return res.status(400).json({
+            ok: false,
+            category: "validation_error",
+            status: "invalid_request",
+            message: `drop_run_select_gate requires gate 1–${DROP_RUN_GATES}.`,
+          });
+        }
+      }
+
+      const snapshotResult = await buildDropRunSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Drop Run event submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.gateConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "gate_conflict",
+          message: "Conflicting drop events. Refresh session state.",
+        });
+      }
+
+      if (snapshot.pendingGate) {
+        const pg = snapshot.pendingGate;
+        const pendingId = pg.gateEventId != null ? Number(pg.gateEventId) : null;
+        const same = Number(pg.gate) === gate;
+        if (same && Number.isFinite(pendingId) && pendingId > 0) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pendingId,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "turn_pending",
+          message: "Finish the current drop before starting another.",
         });
       }
     }

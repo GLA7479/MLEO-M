@@ -28,6 +28,8 @@ import { buildLimitRunSessionSnapshot } from "../../../../lib/solo-v2/server/lim
 import { buildLimitRunInitialActiveSummary } from "../../../../lib/solo-v2/server/limitRunEngine";
 import { buildNumberHuntSessionSnapshot } from "../../../../lib/solo-v2/server/numberHuntSnapshot";
 import { buildNumberHuntInitialActiveSummary } from "../../../../lib/solo-v2/server/numberHuntEngine";
+import { buildDropRunSessionSnapshot } from "../../../../lib/solo-v2/server/dropRunSnapshot";
+import { buildDropRunInitialActiveSummary } from "../../../../lib/solo-v2/server/dropRunEngine";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -308,7 +310,9 @@ async function singleActiveGameRowPlayableOrExpire(supabase, existingSummary, pl
     rs === "roll_submitted" ||
     rs === "roll_conflict" ||
     rs === "guess_submitted" ||
-    rs === "guess_conflict"
+    rs === "guess_conflict" ||
+    rs === "gate_submitted" ||
+    rs === "gate_conflict"
   ) {
     return { ok: true, playable: true };
   }
@@ -490,6 +494,25 @@ async function seedNumberHuntSessionOrWarn(supabase, gameKey, sessionId, playerR
   }
 }
 
+async function seedDropRunSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "drop_run" || !sessionId) return;
+  const summary = buildDropRunInitialActiveSummary();
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "drop_run")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create drop_run] seed failed", { sessionId, error });
+  }
+}
+
 async function createSessionLegacyCompat(supabase, payload) {
   const startedAt = new Date();
   const expiresAt = new Date(startedAt.getTime() + 900 * 1000).toISOString();
@@ -571,7 +594,8 @@ export default async function handler(req, res) {
       gameKey === "treasure_doors" ||
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
-      gameKey === "number_hunt") {
+      gameKey === "number_hunt" ||
+      gameKey === "drop_run") {
       const minWager = gameKey === "mystery_box" ? MYSTERY_BOX_MIN_WAGER : QUICK_FLIP_MIN_WAGER;
       const buildSnapshot =
         gameKey === "mystery_box"
@@ -590,7 +614,9 @@ export default async function handler(req, res) {
                       ? buildLimitRunSessionSnapshot
                       : gameKey === "number_hunt"
                         ? buildNumberHuntSessionSnapshot
-                        : buildQuickFlipSessionSnapshot;
+                        : gameKey === "drop_run"
+                          ? buildDropRunSessionSnapshot
+                          : buildQuickFlipSessionSnapshot;
 
       if (!Number.isFinite(entryAmount) || entryAmount < minWager) {
         return res.status(400).json({
@@ -705,7 +731,8 @@ export default async function handler(req, res) {
       gameKey === "treasure_doors" ||
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
-      gameKey === "number_hunt") &&
+      gameKey === "number_hunt" ||
+      gameKey === "drop_run") &&
       isGameNotEnabled(error)
     ) {
       console.warn(`solo-v2 create: ${gameKey} missing/disabled in solo_v2_games, attempting catalog bootstrap`);
@@ -750,7 +777,8 @@ export default async function handler(req, res) {
       gameKey === "treasure_doors" ||
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
-      gameKey === "number_hunt") &&
+      gameKey === "number_hunt" ||
+      gameKey === "drop_run") &&
         isLegacyDeviceIdNotNullError(error)
       ) {
         console.warn("solo-v2 create: legacy device_id constraint detected, using compat insert path");
@@ -778,6 +806,7 @@ export default async function handler(req, res) {
         await seedSpeedTrackSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedLimitRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedNumberHuntSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedDropRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         return res.status(201).json({
           ok: true,
           category: "success",
@@ -827,7 +856,8 @@ export default async function handler(req, res) {
       gameKey === "treasure_doors" ||
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
-      gameKey === "number_hunt") &&
+      gameKey === "number_hunt" ||
+      gameKey === "drop_run") &&
         isUniqueConflict(error)
       ) {
         const buildSnapshot =
@@ -847,7 +877,9 @@ export default async function handler(req, res) {
                         ? buildLimitRunSessionSnapshot
                         : gameKey === "number_hunt"
                           ? buildNumberHuntSessionSnapshot
-                          : buildQuickFlipSessionSnapshot;
+                          : gameKey === "drop_run"
+                            ? buildDropRunSessionSnapshot
+                            : buildQuickFlipSessionSnapshot;
         const conflictLookup = await healAndReReadActiveSessions(supabase, playerRef, gameKey, "post_unique_conflict");
         if (conflictLookup.ok) {
           const conflictRows = conflictLookup.rows;
@@ -913,6 +945,7 @@ export default async function handler(req, res) {
               await seedSpeedTrackSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedLimitRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedNumberHuntSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedDropRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -959,6 +992,7 @@ export default async function handler(req, res) {
               await seedSpeedTrackSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedLimitRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedNumberHuntSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedDropRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -1020,6 +1054,7 @@ export default async function handler(req, res) {
     await seedSpeedTrackSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedLimitRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedNumberHuntSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedDropRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     return res.status(201).json({
       ok: true,
       category: "success",
