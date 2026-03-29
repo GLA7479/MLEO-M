@@ -229,7 +229,7 @@ export default function TwentyOneChallengeBoard({
   const showSessionBanner = Boolean(sessionNotice) && !hideSessionBanner;
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-0 text-center sm:gap-0.5">
+    <div className="flex h-full min-h-0 w-full flex-col gap-0 pt-0 text-center sm:gap-0.5">
       {!suppressShellStatus ? (
         <div className="min-h-[2rem] shrink-0 px-0.5 sm:min-h-[2.15rem] sm:px-1">
           {showSessionBanner ? (
@@ -250,139 +250,198 @@ export default function TwentyOneChallengeBoard({
         <div className="min-h-[0.85rem] shrink-0" aria-hidden />
       )}
 
-      {suppressShellStatus && hands.length <= 1 ? <div className="min-h-[0.85rem] shrink-0" aria-hidden /> : null}
-
-      {splitLayout ? (
-        <div
-          className="flex min-h-[1.25rem] shrink-0 items-center justify-center gap-1.5 sm:hidden"
-          role="tablist"
-          aria-label="Choose hand to view"
-        >
-          {hands.map((_, hi) => {
-            const playingHere = hi === ai;
-            const selected = hi === mobileViewHandIndex;
-            return (
-              <button
-                key={`mhand-tab-${hi}`}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                onClick={() => setMobileViewHandIndex(hi)}
-                className={`rounded-lg border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide transition ${
-                  selected
-                    ? "border-amber-400/60 bg-amber-500/15 text-amber-100"
-                    : "border-white/15 bg-white/[0.06] text-white/70"
-                } ${playingHere ? "ring-1 ring-amber-400/70 ring-offset-1 ring-offset-zinc-950" : ""}`}
-              >
-                Hand {hi + 1}
-                {playingHere ? <span className="ml-1 text-[9px] font-extrabold text-amber-200">Play</span> : null}
-              </button>
-            );
-          })}
-        </div>
+      {suppressShellStatus && hands.length <= 1 ? (
+        <div className="h-0 min-h-0 shrink-0 sm:min-h-[0.85rem]" aria-hidden />
       ) : null}
 
       <div
         className={`flex min-h-0 flex-1 flex-col justify-start gap-1 sm:gap-2 ${splitLayout ? "sm:gap-3" : ""}`}
       >
-        <div className="shrink-0">
-          <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:text-[9px]">
-            Opponent
-          </div>
-          <div className="flex h-[5.75rem] min-h-0 flex-wrap items-center justify-center gap-1 py-0.5 sm:h-[4.65rem] sm:gap-1.5">
-            {opponentRow.length === 0 ? (
-              <div className="text-xs text-white/35">—</div>
-            ) : (
-              opponentRow.map(({ key, code, hidden, pulse }) => (
-                <MiniCard
-                  key={key}
-                  code={code}
-                  hidden={hidden}
-                  variant="dealer"
-                  dealAnimate={pulse}
-                  compact={false}
-                />
-              ))
-            )}
-          </div>
-          <div className="mt-0 min-h-[1.05rem] text-[11px] font-bold tabular-nums leading-tight text-white/85 sm:text-xs">
-            {opponentTotalLine}
-          </div>
-        </div>
-
-        <div
-          className={
-            splitLayout ? "flex shrink-0 flex-col sm:min-h-0 sm:flex-1 sm:justify-start" : "shrink-0"
-          }
-        >
-          <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-amber-200/50 sm:text-[9px]">
-            You
-          </div>
-          {!splitLayout ? (
-            <div className="flex flex-col gap-0 sm:gap-0.5">
-              {hands.length === 0 ? (
-                <div className="flex h-[7.35rem] items-center justify-center text-xs text-white/35 sm:h-[5.6rem]">
-                  —
-                </div>
-              ) : (
-                hands.map((h, hi) => (
-                  <ChallengePlayerHandBlock
-                    key={`ph-${hi}`}
-                    handIndex={hi}
-                    hand={h}
-                    activeHandIndex={ai}
-                    pulses={pulses}
-                    showHandLabel={false}
-                    compactCards={false}
-                    cardRowClassName="flex h-[7.2rem] min-h-0 flex-wrap items-center justify-center gap-1 sm:h-[5.45rem] sm:gap-1.5"
-                  />
-                ))
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col gap-1 sm:hidden">
-                {hands.length === 0 ? (
-                  <div className="flex h-[7.35rem] items-center justify-center text-xs text-white/35">—</div>
+        {!splitLayout ? (
+          <>
+            <div className="shrink-0 max-sm:pt-1">
+              <div className="mb-0.5 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:mb-0 sm:text-[9px]">
+                Opponent
+              </div>
+              <div className="flex h-[5.75rem] min-h-0 flex-wrap items-center justify-center gap-1 py-0.5 sm:h-[4.65rem] sm:gap-1.5">
+                {opponentRow.length === 0 ? (
+                  <div className="text-xs text-white/35">—</div>
                 ) : (
-                  <ChallengePlayerHandBlock
-                    handIndex={mobileViewHandIndex}
-                    hand={hands[mobileViewHandIndex]}
-                    activeHandIndex={ai}
-                    pulses={pulses}
-                    showHandLabel={false}
-                    compactCards={false}
-                    cardRowClassName="flex h-[7.2rem] min-h-0 flex-wrap items-center justify-center gap-1"
-                  />
+                  opponentRow.map(({ key, code, hidden, pulse }) => (
+                    <MiniCard
+                      key={key}
+                      code={code}
+                      hidden={hidden}
+                      variant="dealer"
+                      dealAnimate={pulse}
+                      compact={false}
+                    />
+                  ))
                 )}
               </div>
-              <div className="hidden min-h-0 flex-1 flex-col gap-2 sm:flex sm:gap-3">
+              <div className="mt-0 min-h-[1.05rem] text-[11px] font-bold tabular-nums leading-tight text-white/85 sm:text-xs">
+                {opponentTotalLine}
+              </div>
+            </div>
+
+            <div className="shrink-0">
+              <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-amber-200/50 sm:text-[9px]">
+                You
+              </div>
+              <div className="flex flex-col gap-0 sm:gap-0.5">
+                {hands.length === 0 ? (
+                  <div className="flex h-[7.35rem] items-center justify-center text-xs text-white/35 sm:h-[5.6rem]">
+                    —
+                  </div>
+                ) : (
+                  hands.map((h, hi) => (
+                    <ChallengePlayerHandBlock
+                      key={`ph-${hi}`}
+                      handIndex={hi}
+                      hand={h}
+                      activeHandIndex={ai}
+                      pulses={pulses}
+                      showHandLabel={false}
+                      compactCards={false}
+                      cardRowClassName="flex h-[7.2rem] min-h-0 flex-wrap items-center justify-center gap-1 sm:h-[5.45rem] sm:gap-1.5"
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex min-h-0 flex-1 flex-row items-stretch gap-2 sm:hidden">
+              <div
+                className="flex w-[3.65rem] shrink-0 flex-col items-stretch justify-start gap-1.5 self-start pt-0"
+                role="tablist"
+                aria-label="Choose hand to view"
+              >
+                {hands.map((_, hi) => {
+                  const playingHere = hi === ai;
+                  const selected = hi === mobileViewHandIndex;
+                  return (
+                    <button
+                      key={`mhand-tab-${hi}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setMobileViewHandIndex(hi)}
+                      className={`w-full rounded-lg border px-1 py-2 text-[9px] font-bold uppercase leading-tight transition ${
+                        selected
+                          ? "border-amber-400/60 bg-amber-500/15 text-amber-100"
+                          : "border-white/15 bg-white/[0.06] text-white/70"
+                      } ${playingHere ? "ring-1 ring-amber-400/70 ring-offset-1 ring-offset-zinc-950" : ""}`}
+                    >
+                      <span className="block">Hand {hi + 1}</span>
+                      {playingHere ? (
+                        <span className="mt-0.5 block text-[8px] font-extrabold text-amber-200">Play</span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1 pt-0">
+                <div className="shrink-0 max-sm:pt-1">
+                  <div className="mb-0.5 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:mb-0 sm:text-[9px]">
+                    Opponent
+                  </div>
+                  <div className="flex h-[5.75rem] min-h-0 flex-wrap items-center justify-center gap-1 py-0.5 sm:h-[4.65rem] sm:gap-1.5">
+                    {opponentRow.length === 0 ? (
+                      <div className="text-xs text-white/35">—</div>
+                    ) : (
+                      opponentRow.map(({ key, code, hidden, pulse }) => (
+                        <MiniCard
+                          key={key}
+                          code={code}
+                          hidden={hidden}
+                          variant="dealer"
+                          dealAnimate={pulse}
+                          compact={false}
+                        />
+                      ))
+                    )}
+                  </div>
+                  <div className="mt-0 min-h-[1.05rem] text-[11px] font-bold tabular-nums leading-tight text-white/85 sm:text-xs">
+                    {opponentTotalLine}
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-amber-200/50 sm:text-[9px]">
+                    You
+                  </div>
+                  {hands.length === 0 ? (
+                    <div className="flex h-[7.35rem] items-center justify-center text-xs text-white/35">—</div>
+                  ) : (
+                    <ChallengePlayerHandBlock
+                      handIndex={mobileViewHandIndex}
+                      hand={hands[mobileViewHandIndex]}
+                      activeHandIndex={ai}
+                      pulses={pulses}
+                      showHandLabel={false}
+                      compactCards={false}
+                      cardRowClassName="flex h-[7.2rem] min-h-0 flex-wrap items-center justify-center gap-1"
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="hidden min-h-0 flex-1 flex-col gap-2 sm:flex sm:gap-3">
+              <div className="shrink-0">
+                <div className="mb-0.5 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:mb-0 sm:text-[9px]">
+                  Opponent
+                </div>
+                <div className="flex h-[5.75rem] min-h-0 flex-wrap items-center justify-center gap-1 py-0.5 sm:h-[4.65rem] sm:gap-1.5">
+                  {opponentRow.length === 0 ? (
+                    <div className="text-xs text-white/35">—</div>
+                  ) : (
+                    opponentRow.map(({ key, code, hidden, pulse }) => (
+                      <MiniCard
+                        key={key}
+                        code={code}
+                        hidden={hidden}
+                        variant="dealer"
+                        dealAnimate={pulse}
+                        compact={false}
+                      />
+                    ))
+                  )}
+                </div>
+                <div className="mt-0 min-h-[1.05rem] text-[11px] font-bold tabular-nums leading-tight text-white/85 sm:text-xs">
+                  {opponentTotalLine}
+                </div>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-amber-200/50 sm:mb-0.5 sm:text-[9px]">
+                  You
+                </div>
                 {hands.length === 0 ? (
                   <div className="flex min-h-[8rem] flex-1 items-center justify-center text-xs text-white/35 sm:min-h-[9rem]">
                     —
                   </div>
                 ) : (
-                  hands.map((h, hi) => (
-                    <div
-                      key={`ph-dk-${hi}`}
-                      className="flex min-h-0 flex-1 flex-col justify-center sm:basis-0"
-                    >
-                      <ChallengePlayerHandBlock
-                        handIndex={hi}
-                        hand={h}
-                        activeHandIndex={ai}
-                        pulses={pulses}
-                        showHandLabel
-                        compactCards={false}
-                        cardRowClassName="flex min-h-[6.5rem] flex-1 flex-wrap items-center justify-center gap-1 sm:min-h-[7.25rem] sm:gap-1.5 lg:min-h-[8rem]"
-                      />
-                    </div>
-                  ))
+                  <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-x-4 sm:gap-y-2 lg:gap-x-6">
+                    {hands.map((h, hi) => (
+                      <div key={`ph-dk-${hi}`} className="flex min-h-0 min-w-0 flex-col justify-start">
+                        <ChallengePlayerHandBlock
+                          handIndex={hi}
+                          hand={h}
+                          activeHandIndex={ai}
+                          pulses={pulses}
+                          showHandLabel
+                          compactCards={false}
+                          cardRowClassName="flex min-h-[6.5rem] flex-1 flex-wrap items-center justify-center gap-1.5 sm:min-h-[7rem] sm:gap-2 lg:min-h-[7.5rem]"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className={`${ACTION_MIN_H} mt-auto shrink-0 border-t border-zinc-700/40 pb-0.5 pt-2`}>

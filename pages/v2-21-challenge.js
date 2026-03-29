@@ -246,7 +246,7 @@ function Challenge21GameplayPanel({
             aria-label="21 Challenge table"
           >
             <div
-              className={`flex min-h-0 flex-1 flex-col px-0.5 py-1 sm:px-1 sm:py-1.5 lg:min-h-0 lg:px-1 lg:py-0.5 ${
+              className={`flex min-h-0 flex-1 flex-col px-0.5 pb-1 pt-0 sm:px-1 sm:py-1.5 lg:min-h-0 lg:px-1 lg:py-0.5 ${
                 splitPlayerHands ? "min-h-[11rem] sm:min-h-[20rem]" : "min-h-[11rem] sm:min-h-[12rem]"
               }`}
             >
