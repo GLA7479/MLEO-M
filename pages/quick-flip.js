@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import QuickFlipBoard from "../components/solo-v2/QuickFlipBoard";
 import QuickFlipCoinDisplay from "../components/solo-v2/QuickFlipCoinDisplay";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -50,6 +51,8 @@ function qfStartDebug(label, data) {
 const STATS_KEY = "solo_v2_quick_flip_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
+/** Brief beat after resolve so the coin can read as “landed” before the result overlay (mirror-game timing). */
+const REVEAL_READABLE_MS = 520;
 
 /** Parsed numeric wager from the amount field (0 if empty/invalid). No minimum — playability is gated separately. */
 function parseWagerInput(raw) {
@@ -117,34 +120,90 @@ function normalizeQuickFlipServerOutcome(outcome) {
   return null;
 }
 
-function ChoiceButton({ label, value, selectedChoice, disabled, onSelect }) {
+/** Heads / Tails — tile rhythm matches Mystery Chamber sigil buttons (rounded-2xl, premium weight). */
+function FlipChoiceTile({ label, value, selectedChoice, disabled, onSelect }) {
   const isSelected = selectedChoice === value;
+  const isHeads = value === "heads";
+  const shell =
+    "group relative flex h-full min-h-[5.25rem] w-full flex-col items-center justify-center rounded-2xl border-2 text-center shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-150 sm:min-h-[6.1rem] sm:rounded-[1.05rem] lg:min-h-[6.35rem]";
+
+  let face =
+    "border-amber-700/45 bg-gradient-to-b from-zinc-800/95 to-zinc-950 text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ";
+  if (isSelected && isHeads) {
+    face =
+      "border-emerald-400/65 bg-gradient-to-b from-emerald-900/55 to-emerald-950/90 text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(16,185,129,0.12)] ring-2 ring-inset ring-emerald-400/20 ";
+  } else if (isSelected && !isHeads) {
+    face =
+      "border-violet-400/65 bg-gradient-to-b from-violet-900/55 to-violet-950/90 text-violet-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(139,92,246,0.15)] ring-2 ring-inset ring-violet-400/20 ";
+  } else {
+    face +=
+      "enabled:hover:border-amber-500/55 enabled:hover:from-zinc-800 enabled:hover:to-zinc-950 enabled:active:scale-[0.98] ";
+  }
 
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={() => onSelect(value)}
-      className={`min-h-[42px] rounded-lg border px-3 py-2 text-sm font-bold transition ${
-        isSelected
-          ? "border-amber-400/50 bg-amber-500/25 text-amber-50"
-          : "border-white/25 bg-white/[0.06] text-zinc-100 hover:bg-white/12"
-      } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+      className={`${shell} ${face}${
+        disabled ? "cursor-not-allowed opacity-[0.42] " : ""
+      }focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/35`}
     >
-      {label}
+      <span
+        className={`mt-0.5 select-none text-[2rem] font-black leading-none tabular-nums sm:text-[2.35rem] lg:text-[2.5rem] ${
+          isSelected ? "" : "text-amber-100/95"
+        }`}
+        aria-hidden
+      >
+        {isHeads ? "H" : "T"}
+      </span>
+      <span className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/38 sm:text-[10px]">
+        {label}
+      </span>
     </button>
   );
 }
 
-/** Center gameplay only — shell owns header stats, wager row, CTA, ad slot. */
+function quickFlipRoundStripModel(uiState) {
+  const stepTotal = 2;
+  if (uiState === UI_STATE.RESOLVED) {
+    return { stepTotal, stepsComplete: 2, currentStepIndex: 1 };
+  }
+  if (
+    uiState === UI_STATE.SUBMITTING_CHOICE ||
+    uiState === UI_STATE.CHOICE_SUBMITTED ||
+    uiState === UI_STATE.RESOLVING
+  ) {
+    return { stepTotal, stepsComplete: 1, currentStepIndex: 1 };
+  }
+  return { stepTotal, stepsComplete: 0, currentStepIndex: 0 };
+}
+
+/**
+ * Gameplay column — mirrors MysteryChamberGameplayPanel: outer padding, flex-1 board, result popup overlay.
+ */
 function QuickFlipGameplayPanel({
   uiState,
   selectedChoice,
   isFlipping,
-  resultToast,
+  resultPopupOpen,
+  resolvedIsWin,
+  resultVaultLabel,
+  popupTitle,
+  popupLine2,
+  popupLine3,
+  sessionNotice,
+  statusTop,
+  statusSub,
+  hintLine,
+  stepTotal,
+  stepsComplete,
+  currentStepIndex,
+  payoutBandLabel,
+  payoutBandValue,
+  payoutCaption,
   onSelectChoice,
   coinResolvedFace,
-  pickedSide,
 }) {
   const isChoiceLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
   const canChoose =
@@ -153,52 +212,61 @@ function QuickFlipGameplayPanel({
   const coinPhase = isFlipping ? "flipping" : coinResolvedFace ? "resolved" : "idle";
 
   return (
-    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1">
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-3 sm:py-5">
-          <QuickFlipCoinDisplay phase={coinPhase} resolvedFace={coinResolvedFace} />
-        </div>
-
-        <div className="w-full shrink-0 space-y-2.5 pb-2 sm:space-y-3 sm:pb-3">
-          <div className="grid w-full grid-cols-2 gap-2">
-            <ChoiceButton
-              label="Heads"
-              value="heads"
-              selectedChoice={selectedChoice}
-              disabled={!canChoose}
-              onSelect={onSelectChoice}
-            />
-            <ChoiceButton
-              label="Tails"
-              value="tails"
-              selectedChoice={selectedChoice}
-              disabled={!canChoose}
-              onSelect={onSelectChoice}
-            />
-          </div>
-        </div>
+        <QuickFlipBoard
+          sessionNotice={sessionNotice}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          stepTotal={stepTotal}
+          currentStepIndex={currentStepIndex}
+          stepsComplete={stepsComplete}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
+          hintLine={hintLine}
+          coinSlot={<QuickFlipCoinDisplay phase={coinPhase} resolvedFace={coinResolvedFace} />}
+          choiceSlot={
+            <div className="grid w-full grid-cols-2 gap-2 sm:gap-3" role="group" aria-label="Choose side">
+              <FlipChoiceTile
+                label="Heads"
+                value="heads"
+                selectedChoice={selectedChoice}
+                disabled={!canChoose}
+                onSelect={onSelectChoice}
+              />
+              <FlipChoiceTile
+                label="Tails"
+                value="tails"
+                selectedChoice={selectedChoice}
+                disabled={!canChoose}
+                onSelect={onSelectChoice}
+              />
+            </div>
+          }
+        />
       </div>
 
       <SoloV2ResultPopup
-        open={Boolean(resultToast)}
-        isWin={Boolean(resultToast?.isWin)}
-        animationKey={`${resultToast?.outcome ?? ""}-${resultToast?.deltaLabel ?? ""}-${pickedSide ?? ""}`}
+        open={resultPopupOpen}
+        isWin={resolvedIsWin}
+        resultTone={resolvedIsWin ? "win" : "lose"}
+        animationKey={`${popupLine2}-${popupLine3}-${resultVaultLabel}`}
         vaultSlot={
-          resultToast ? (
-            <SoloV2ResultPopupVaultLine isWin={resultToast.isWin} deltaLabel={resultToast.deltaLabel} />
+          resultPopupOpen ? (
+            <SoloV2ResultPopupVaultLine
+              isWin={resolvedIsWin}
+              tone={resolvedIsWin ? "win" : "lose"}
+              deltaLabel={resultVaultLabel}
+            />
           ) : undefined
         }
       >
-        <div className="text-[13px] font-black uppercase tracking-wide">
-          {resultToast?.isWin ? "YOU WIN" : "YOU LOSE"}
-        </div>
+        <div className="text-[13px] font-black uppercase tracking-wide">{popupTitle}</div>
         <div className="mt-1 text-sm font-bold text-white">
-          Your pick:{" "}
-          <span className="text-amber-100">{String(pickedSide || "—").toUpperCase()}</span>
+          <span className="text-amber-100 tabular-nums">{popupLine2}</span>
         </div>
-        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">
-          Coin: {String(resultToast?.outcome || "—").toUpperCase()}
-        </div>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">{popupLine3}</div>
       </SoloV2ResultPopup>
     </div>
   );
@@ -214,14 +282,16 @@ export default function QuickFlipPage() {
   const [eventInfo, setEventInfo] = useState(null);
   const [resolvedResult, setResolvedResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [, setSessionNotice] = useState("");
+  const [sessionNotice, setSessionNotice] = useState("");
   const [vaultBalance, setVaultBalance] = useState(0);
   const [vaultReady, setVaultReady] = useState(false);
   const [wagerInput, setWagerInput] = useState(String(QUICK_FLIP_MIN_WAGER));
   const lastPresetAmountRef = useRef(null);
   const [stats, setStats] = useState(readQuickFlipStats);
-  const [resultToast, setResultToast] = useState(null);
-  const toastTimerRef = useRef(null);
+  const [resultPopupOpen, setResultPopupOpen] = useState(false);
+  const resultPopupTimerRef = useRef(null);
+  /** True only after a fresh client resolve — avoids auto-opening the terminal popup on resumed resolved sessions. */
+  const terminalPopupEligibleRef = useRef(false);
   const createInFlightRef = useRef(false);
   const submitInFlightRef = useRef(false);
   const resolveInFlightRef = useRef(false);
@@ -266,13 +336,32 @@ export default function QuickFlipPage() {
 
   useEffect(() => {
     return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
+      if (resultPopupTimerRef.current) {
+        clearTimeout(resultPopupTimerRef.current);
       }
     };
   }, []);
 
-  /** After the result popup closes: clear terminal session, keep side + wager — one FLIP COIN starts the next round. */
+  const dismissResultPopupAfterTerminalRun = useCallback(() => {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setResultPopupOpen(false);
+  }, []);
+
+  const openResultPopup = useCallback(() => {
+    if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+    setResultPopupOpen(true);
+    resultPopupTimerRef.current = window.setTimeout(() => {
+      resultPopupTimerRef.current = null;
+      dismissResultPopupAfterTerminalRun();
+    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+  }, [dismissResultPopupAfterTerminalRun]);
+
+  /** Hard reset when vault settlement fails or stale recovery — not used on normal popup dismiss. */
   function resetRoundAfterResultPopup() {
     createInFlightRef.current = false;
     submitInFlightRef.current = false;
@@ -280,7 +369,7 @@ export default function QuickFlipPage() {
     setSession(null);
     setEventInfo(null);
     setResolvedResult(null);
-    setResultToast(null);
+    setResultPopupOpen(false);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
   }
@@ -294,7 +383,7 @@ export default function QuickFlipPage() {
     setSelectedChoice("");
     setEventInfo(null);
     setResolvedResult(null);
-    setResultToast(null);
+    setResultPopupOpen(false);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
     setErrorMessage(String(message || "").trim() || "This round is no longer valid. Choose side and press FLIP COIN.");
@@ -312,8 +401,9 @@ export default function QuickFlipPage() {
       if (settlementResult.error) {
         setErrorMessage(settlementResult.error);
         setSessionNotice("Result resolved, but vault update failed.");
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = setTimeout(() => {
+        terminalPopupEligibleRef.current = false;
+        if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+        resultPopupTimerRef.current = setTimeout(() => {
           resetRoundAfterResultPopup();
         }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
         return;
@@ -347,20 +437,15 @@ export default function QuickFlipPage() {
         setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
       }
 
-      const toastDelta = Number(settlementSummary.netDelta || 0);
-      const toastDeltaLabel = toastDelta >= 0 ? `+${toastDelta}` : `${toastDelta}`;
-      setResultToast({
-        isWin: Boolean(resolvedResult?.isWin),
-        deltaLabel: toastDeltaLabel,
-        outcome: resolvedResult?.outcome || null,
-      });
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => {
-        setResultToast(null);
-        resetRoundAfterResultPopup();
-      }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+      const shouldOpenTerminalPopup = terminalPopupEligibleRef.current;
+      terminalPopupEligibleRef.current = false;
+      if (shouldOpenTerminalPopup) {
+        window.setTimeout(() => {
+          openResultPopup();
+        }, REVEAL_READABLE_MS);
+      }
     });
-  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
+  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState, openResultPopup]);
 
   function hydrateResolvedFromSession(sessionPayload) {
     const summary = sessionPayload?.quickFlip?.resolvedResult || sessionPayload?.serverOutcomeSummary || {};
@@ -490,6 +575,11 @@ export default function QuickFlipPage() {
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     setSession(null);
     setEventInfo(null);
     setResolvedResult(null);
@@ -530,6 +620,9 @@ export default function QuickFlipPage() {
             return { ok: false };
           }
           giftRoundMeta?.onGiftConsumed?.();
+          if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => giftRoundMeta?.onGiftConsumed?.());
+          }
         }
         setSession(payload.session);
         setSessionNotice("");
@@ -786,6 +879,10 @@ export default function QuickFlipPage() {
           onGiftConsumed: () => giftRefreshRef.current?.(),
         });
         if (!boot.ok || activeCycle !== cycleRef.current) return;
+        if (isGiftRound && typeof window !== "undefined" && window.requestAnimationFrame) {
+          giftRefreshRef.current?.();
+          window.requestAnimationFrame(() => giftRefreshRef.current?.());
+        }
         if (boot.alreadyTerminal) return;
         sessionId = boot.session?.id;
         readStateKnown = String(boot.session?.readState || "");
@@ -853,6 +950,7 @@ export default function QuickFlipPage() {
       const result = classifySoloV2ApiResult(response, payload);
 
       if (result === SOLO_V2_API_RESULT.SUCCESS && status === "resolved" && payload?.result) {
+        terminalPopupEligibleRef.current = true;
         setResolvedResult(payload.result);
         setEventInfo(null);
         setSession(previous =>
@@ -895,6 +993,120 @@ export default function QuickFlipPage() {
   const wagerPlayable =
     vaultReady && numericWager >= QUICK_FLIP_MIN_WAGER && vaultBalance >= numericWager;
 
+  const inActiveRunUi = [
+    UI_STATE.SESSION_CREATED,
+    UI_STATE.CHOICE_SELECTED,
+    UI_STATE.CHOICE_SUBMITTED,
+    UI_STATE.SUBMITTING_CHOICE,
+    UI_STATE.RESOLVING,
+    UI_STATE.LOADING,
+  ].includes(uiState);
+
+  const runEntryFromSession =
+    session != null &&
+    Number(session.entryAmount) >= QUICK_FLIP_MIN_WAGER &&
+    Number.isFinite(Number(session.entryAmount))
+      ? Math.floor(Number(session.entryAmount))
+      : null;
+
+  const sessionLocksSummary = runEntryFromSession != null && inActiveRunUi;
+
+  const potentialWin = Math.floor(numericWager * QUICK_FLIP_WIN_MULTIPLIER);
+  const summaryPlay = sessionLocksSummary ? runEntryFromSession : numericWager;
+  const summaryWin = sessionLocksSummary
+    ? Math.floor(Number(summaryPlay) * QUICK_FLIP_WIN_MULTIPLIER)
+    : potentialWin;
+
+  const idleLike =
+    uiState === UI_STATE.IDLE ||
+    uiState === UI_STATE.UNAVAILABLE ||
+    uiState === UI_STATE.PENDING_MIGRATION ||
+    uiState === UI_STATE.RESOLVED;
+  const stakeExceedsVault =
+    vaultReady &&
+    idleLike &&
+    numericWager >= QUICK_FLIP_MIN_WAGER &&
+    vaultBalance < numericWager;
+  const stakeHint = stakeExceedsVault
+    ? `Stake exceeds available vault (${formatCompact(vaultBalance)}). Lower amount to play.`
+    : "";
+
+  const isFlipping = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
+  const strip = quickFlipRoundStripModel(uiState);
+
+  let statusTop = "Press FLIP COIN when you are set.";
+  let statusSub =
+    "Choose Heads or Tails, set your play in the bar below, then flip. The server seals the coin before you see it.";
+  let hintLine = "Fair ×1.92 payout on a winning match — one flip per round.";
+
+  if (uiState === UI_STATE.UNAVAILABLE) {
+    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
+    statusSub = !vaultReady
+      ? "Shared vault could not be opened. Return to the arcade and try again."
+      : String(errorMessage || "").trim() || "Check your balance and connection, then try FLIP COIN again.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.LOADING) {
+    statusTop = "Starting round…";
+    statusSub = "Opening or resuming a session with the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.SUBMITTING_CHOICE) {
+    statusTop = "Locking your pick…";
+    statusSub = "Sending Heads or Tails to the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.CHOICE_SUBMITTED || isFlipping) {
+    statusTop = "Flipping…";
+    statusSub = "Outcome is resolved on the server; the coin follows the fair result.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    statusTop = resolvedResult.isWin ? "You matched the coin." : "No match this time.";
+    statusSub =
+      "Round is complete. Change side or stake, then press FLIP COIN for another round.";
+    hintLine = resolvedResult.isWin
+      ? "Vault credit applied after settlement."
+      : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
+  } else if (uiState === UI_STATE.SESSION_CREATED || uiState === UI_STATE.CHOICE_SELECTED) {
+    statusTop = hasValidSide ? "Ready to flip." : "Choose your side.";
+    statusSub = hasValidSide
+      ? "Press FLIP COIN to lock your pick and resolve this round."
+      : "Tap Heads or Tails, then flip from the footer.";
+  } else if (uiState === UI_STATE.RESOLVE_FAILED) {
+    statusTop = "Could not resolve.";
+    statusSub = "Check your connection and try FLIP COIN again.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
+    statusTop = "Migration pending.";
+    statusSub = "This environment is updating. Try again shortly.";
+    hintLine = "\u00a0";
+  }
+
+  let payoutBandLabel = "Payout if win";
+  let payoutBandValue = formatCompact(summaryWin);
+  let payoutCaption = `×${QUICK_FLIP_WIN_MULTIPLIER} multiplier · play ${formatCompact(summaryPlay)}`;
+
+  if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary?.payoutReturn ?? 0)));
+    payoutBandLabel = resolvedResult.isWin ? "Return paid" : "Return this round";
+    payoutBandValue = formatCompact(pr);
+    const oc = normalizeQuickFlipServerOutcome(resolvedResult.outcome);
+    payoutCaption = `Coin ${String(oc || "—").toUpperCase()} · pick ${String(resolvedResult.choice || "—").toUpperCase()}`;
+  }
+
+  const resolvedIsWin = Boolean(resolvedResult?.isWin);
+  const deltaVault = Number(resolvedResult?.settlementSummary?.netDelta ?? 0);
+  const resultVaultLabel =
+    resolvedResult?.settlementSummary != null ? `${deltaVault > 0 ? "+" : ""}${formatCompact(deltaVault)}` : "";
+
+  let popupTitle = "—";
+  let popupLine2 = "—";
+  let popupLine3 = "—";
+  if (resolvedResult) {
+    const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary?.payoutReturn ?? 0)));
+    const oc = normalizeQuickFlipServerOutcome(resolvedResult.outcome);
+    popupTitle = resolvedIsWin ? "YOU WIN" : "YOU LOSE";
+    popupLine2 = `Return ${formatCompact(pr)}`;
+    popupLine3 = `Pick ${String(resolvedResult.choice || "—").toUpperCase()} · coin ${String(oc || "—").toUpperCase()}`;
+  }
+
   useEffect(() => {
     if (!wagerPlayable) return;
     setErrorMessage(prev => {
@@ -920,6 +1132,12 @@ export default function QuickFlipPage() {
       UI_STATE.RESOLVING,
       UI_STATE.PENDING_MIGRATION,
     ].includes(uiState);
+
+  const busyFooter =
+    uiState === UI_STATE.LOADING ||
+    uiState === UI_STATE.SUBMITTING_CHOICE ||
+    uiState === UI_STATE.CHOICE_SUBMITTED ||
+    uiState === UI_STATE.RESOLVING;
 
   const isPrimaryLoading =
     uiState === UI_STATE.LOADING || uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
@@ -951,9 +1169,6 @@ export default function QuickFlipPage() {
     }
   }
 
-  const isFlipping = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
-  const potentialWin = Math.floor(numericWager * QUICK_FLIP_WIN_MULTIPLIER);
-
   const handleGiftPlay = useCallback(() => {
     if (!vaultReady) {
       setErrorMessage("Shared vault unavailable.");
@@ -983,8 +1198,12 @@ export default function QuickFlipPage() {
   return (
     <SoloV2GameShell
       title="Quick Flip"
-      subtitle="Arcade Solo"
+      subtitle="One honest flip — sealed on the server before you see it."
+      layoutMaxWidthClass="max-w-full sm:max-w-2xl"
+      mobileHeaderBreathingRoom
+      stableTripleTopSummary
       gameplayScrollable={false}
+      gameplayDesktopUnclipVertical
       menuVaultBalance={vaultBalance}
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
@@ -994,14 +1213,16 @@ export default function QuickFlipPage() {
       }}
       topGameStatsSlot={
         <>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Play <span className="font-semibold tabular-nums text-amber-200/90">{formatCompact(numericWager)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Play</span>
+            <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
           </span>
           <span className="shrink-0 text-zinc-600" aria-hidden>
             ·
           </span>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Win <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(potentialWin)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Win</span>
+            <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
           </span>
         </>
       }
@@ -1009,7 +1230,9 @@ export default function QuickFlipPage() {
         betPresets: BET_PRESETS,
         wagerInput,
         wagerNumeric: numericWager,
-        canEditPlay: !isFlipping,
+        canEditPlay: !busyFooter,
+        compactAmountDisplayWhenBlurred: true,
+        formatPresetLabel: v => formatCompact(v),
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
@@ -1039,41 +1262,67 @@ export default function QuickFlipPage() {
         primaryActionLoading: isPrimaryLoading,
         primaryLoadingLabel: "FLIPPING...",
         onPrimaryAction: handlePrimaryCta,
-        errorMessage,
+        errorMessage: errorMessage || stakeHint,
       }}
+      soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
         <QuickFlipGameplayPanel
           uiState={uiState}
           selectedChoice={selectedChoice}
           isFlipping={isFlipping}
-          resultToast={resultToast}
+          resultPopupOpen={resultPopupOpen}
+          resolvedIsWin={resolvedIsWin}
+          resultVaultLabel={resultVaultLabel}
+          popupTitle={popupTitle}
+          popupLine2={popupLine2}
+          popupLine3={popupLine3}
+          sessionNotice={sessionNotice}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          hintLine={hintLine}
+          stepTotal={strip.stepTotal}
+          stepsComplete={strip.stepsComplete}
+          currentStepIndex={strip.currentStepIndex}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           onSelectChoice={handleSelectChoice}
           coinResolvedFace={
             uiState === UI_STATE.RESOLVED
               ? normalizeQuickFlipServerOutcome(resolvedResult?.outcome)
               : null
           }
-          pickedSide={resolvedResult?.choice || selectedChoice || ""}
         />
       }
       helpContent={
         <div className="space-y-2">
-          <p>1. Choose Heads or Tails.</p>
-          <p>2. Set your play amount and press FLIP COIN.</p>
-          <p>3. If your side matches the result, you win.</p>
-          <p>Win ratio is x1.92 per round in this release.</p>
-          <p>Result is server-resolved before vault settlement is applied.</p>
+          <p>
+            Quick Flip is a single coin round: pick Heads or Tails, set your play amount, then press FLIP COIN. The
+            server resolves the outcome before the coin animation finishes, then your shared vault is updated from that
+            result.
+          </p>
+          <p>
+            A winning match pays ×{QUICK_FLIP_WIN_MULTIPLIER} on your stake for this release (96% RTP design). Gift rounds
+            use freeplay mode: a loss does not debit your vault; a win credits the full payout.
+          </p>
+          <p>
+            After a round ends, the board stays on the final coin face until you start again — adjust side or stake and
+            press FLIP COIN explicitly; there is no auto-start.
+          </p>
         </div>
       }
       statsContent={
         <div className="space-y-2">
           <p>Total games: {stats.totalGames}</p>
+          <p>Wins: {stats.wins}</p>
+          <p>Losses: {stats.losses}</p>
           <p>Win rate: {stats.totalGames ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : "0.0"}%</p>
-          <p>Total play: {formatCompact(stats.totalPlay)}</p>
-          <p>Total won: {formatCompact(stats.totalWon)}</p>
+          <p>Total played: {formatCompact(stats.totalPlay)}</p>
+          <p>Total returned: {formatCompact(stats.totalWon)}</p>
           <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
-          <p>Net profit: {formatCompact(stats.totalWon - stats.totalPlay)}</p>
-          <p>Heads wins: {stats.headsWins} | Tails wins: {stats.tailsWins}</p>
+          <p>Net flow (returned − played): {formatCompact(stats.totalWon - stats.totalPlay)}</p>
+          <p>Heads wins: {stats.headsWins}</p>
+          <p>Tails wins: {stats.tailsWins}</p>
         </div>
       }
       resultState={null}
