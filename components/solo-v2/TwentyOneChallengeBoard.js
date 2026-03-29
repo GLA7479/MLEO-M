@@ -69,33 +69,11 @@ function opponentLabelFromSlots(slots) {
   return `Total ${handTotal(faceUpCodes)}`;
 }
 
-function ChallengePlayerHandBlock({
-  handIndex,
-  hand,
-  activeHandIndex,
-  pulses,
-  cardRowClassName,
-  showHandLabel,
-  compactCards,
-}) {
+function ChallengePlayerHandBlock({ handIndex, hand, pulses, cardRowClassName, compactCards }) {
   const arr = Array.isArray(hand) ? hand : [];
-  const active = handIndex === activeHandIndex;
   const t = arr.length ? handTotal(arr) : null;
   return (
-    <div
-      className={`rounded-lg px-0.5 py-0 sm:px-1 sm:py-0.5 ${
-        showHandLabel && active
-          ? "ring-1 ring-amber-400/50 ring-offset-1 ring-offset-transparent"
-          : showHandLabel && !active
-            ? "opacity-80"
-            : ""
-      }`}
-    >
-      {showHandLabel ? (
-        <div className="mb-0 text-[8px] font-semibold uppercase tracking-wide text-white/45">
-          Hand {handIndex + 1}
-        </div>
-      ) : null}
+    <div className="rounded-lg px-0.5 py-0 sm:px-1 sm:py-0.5">
       <div className={cardRowClassName}>
         {arr.length === 0 ? (
           <span className="text-xs text-white/35">—</span>
@@ -242,11 +220,7 @@ export default function TwentyOneChallengeBoard({
         </div>
       ) : null}
 
-      {hands.length > 1 ? (
-        <div className="hidden min-h-[0.85rem] shrink-0 text-[9px] font-semibold tabular-nums text-white/60 sm:block sm:text-[10px]">
-          Hand {ai + 1} of {hands.length}
-        </div>
-      ) : suppressShellStatus ? null : (
+      {hands.length > 1 ? null : suppressShellStatus ? null : (
         <div className="min-h-[0.85rem] shrink-0" aria-hidden />
       )}
 
@@ -255,7 +229,7 @@ export default function TwentyOneChallengeBoard({
       ) : null}
 
       <div
-        className={`flex min-h-0 flex-1 flex-col justify-start gap-1 sm:gap-2 ${splitLayout ? "sm:gap-3" : ""}`}
+        className="flex min-h-0 flex-1 flex-col justify-start gap-1 sm:gap-2"
       >
         {!splitLayout ? (
           <>
@@ -299,9 +273,7 @@ export default function TwentyOneChallengeBoard({
                       key={`ph-${hi}`}
                       handIndex={hi}
                       hand={h}
-                      activeHandIndex={ai}
                       pulses={pulses}
-                      showHandLabel={false}
                       compactCards={false}
                       cardRowClassName="flex h-[7.2rem] min-h-0 flex-wrap items-center justify-center gap-1 sm:h-[5.45rem] sm:gap-1.5"
                     />
@@ -312,7 +284,7 @@ export default function TwentyOneChallengeBoard({
           </>
         ) : (
           <>
-            <div className="flex min-h-0 flex-1 flex-row items-stretch gap-2 sm:hidden">
+            <div className="flex min-h-0 flex-1 flex-row items-stretch gap-2">
               <div
                 className="flex w-[3.65rem] shrink-0 flex-col items-stretch justify-start gap-1.5 self-start pt-0"
                 role="tablist"
@@ -377,67 +349,12 @@ export default function TwentyOneChallengeBoard({
                     <ChallengePlayerHandBlock
                       handIndex={mobileViewHandIndex}
                       hand={hands[mobileViewHandIndex]}
-                      activeHandIndex={ai}
                       pulses={pulses}
-                      showHandLabel={false}
                       compactCards={false}
-                      cardRowClassName="flex h-[7.2rem] min-h-0 flex-wrap items-center justify-center gap-1"
+                      cardRowClassName="flex h-[7.2rem] min-h-0 flex-wrap items-center justify-center gap-1 sm:h-[5.45rem] sm:gap-1.5"
                     />
                   )}
                 </div>
-              </div>
-            </div>
-
-            <div className="hidden min-h-0 flex-1 flex-col gap-2 sm:flex sm:gap-3">
-              <div className="shrink-0">
-                <div className="mb-0.5 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:mb-0 sm:text-[9px]">
-                  Opponent
-                </div>
-                <div className="flex h-[5.75rem] min-h-0 flex-wrap items-center justify-center gap-1 py-0.5 sm:h-[4.65rem] sm:gap-1.5">
-                  {opponentRow.length === 0 ? (
-                    <div className="text-xs text-white/35">—</div>
-                  ) : (
-                    opponentRow.map(({ key, code, hidden, pulse }) => (
-                      <MiniCard
-                        key={key}
-                        code={code}
-                        hidden={hidden}
-                        variant="dealer"
-                        dealAnimate={pulse}
-                        compact={false}
-                      />
-                    ))
-                  )}
-                </div>
-                <div className="mt-0 min-h-[1.05rem] text-[11px] font-bold tabular-nums leading-tight text-white/85 sm:text-xs">
-                  {opponentTotalLine}
-                </div>
-              </div>
-              <div className="flex min-h-0 flex-1 flex-col">
-                <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-amber-200/50 sm:mb-0.5 sm:text-[9px]">
-                  You
-                </div>
-                {hands.length === 0 ? (
-                  <div className="flex min-h-[8rem] flex-1 items-center justify-center text-xs text-white/35 sm:min-h-[9rem]">
-                    —
-                  </div>
-                ) : (
-                  <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-x-4 sm:gap-y-2 lg:gap-x-6">
-                    {hands.map((h, hi) => (
-                      <div key={`ph-dk-${hi}`} className="flex min-h-0 min-w-0 flex-col justify-start">
-                        <ChallengePlayerHandBlock
-                          handIndex={hi}
-                          hand={h}
-                          activeHandIndex={ai}
-                          pulses={pulses}
-                          showHandLabel
-                          compactCards={false}
-                          cardRowClassName="flex min-h-[6.5rem] flex-1 flex-wrap items-center justify-center gap-1.5 sm:min-h-[7rem] sm:gap-2 lg:min-h-[7.5rem]"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           </>
