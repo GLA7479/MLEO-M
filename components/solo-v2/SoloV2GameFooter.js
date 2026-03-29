@@ -23,6 +23,12 @@ export default function SoloV2GameFooter({
   primaryActionLoading = false,
   primaryLoadingLabel = "…",
   onPrimaryAction,
+  /** Optional second full-width row (e.g. pit stop / cash out) below the primary CTA. Omit when label is null/empty. */
+  secondaryActionLabel = null,
+  secondaryActionDisabled = true,
+  secondaryActionLoading = false,
+  secondaryLoadingLabel = "…",
+  onSecondaryAction,
   /** When true, omit the primary CTA row (e.g. in-play action lives in the gameplay panel). */
   hidePrimaryAction = false,
   /** When true with hidePrimaryAction, keeps the same vertical band as the primary button (no layout jump). */
@@ -143,6 +149,21 @@ export default function SoloV2GameFooter({
           {primaryActionLoading ? primaryLoadingLabel : primaryActionLabel}
         </button>
       )}
+
+      {secondaryActionLabel ? (
+        <button
+          type="button"
+          onClick={onSecondaryAction}
+          disabled={secondaryActionDisabled || secondaryActionLoading}
+          className={`min-h-[44px] w-full rounded-lg border px-4 py-2 text-xs font-extrabold uppercase tracking-wide sm:text-sm ${
+            secondaryActionDisabled || secondaryActionLoading
+              ? "cursor-not-allowed border-white/15 bg-white/5 text-zinc-500"
+              : "border-amber-400/45 bg-amber-950/40 text-amber-100 hover:bg-amber-900/45"
+          }`}
+        >
+          {secondaryActionLoading ? secondaryLoadingLabel : secondaryActionLabel}
+        </button>
+      ) : null}
 
       {reserveErrorRow ? (
         <div className="flex min-h-[2.75rem] shrink-0 items-start justify-center px-0.5 sm:min-h-[3rem]">
