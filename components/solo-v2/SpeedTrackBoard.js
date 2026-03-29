@@ -28,6 +28,7 @@ export default function SpeedTrackBoard({
   terminalKind = null,
   failCheckpointIndex = null,
   lockedRouteIndex = null,
+  hideCheckpointRibbon = false,
 }) {
   const [hoverLane, setHoverLane] = useState(null);
   const [pulseFlash, setPulseFlash] = useState(false);
@@ -111,7 +112,7 @@ export default function SpeedTrackBoard({
   }
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col gap-1.5">
+    <div className={`flex min-h-0 w-full flex-1 flex-col ${hideCheckpointRibbon ? "gap-0" : "gap-1.5"}`}>
       <style>{`
         @keyframes st-shake-lane {
           0%, 100% { transform: translateX(0); }
@@ -121,38 +122,40 @@ export default function SpeedTrackBoard({
         .st-lane-shake { animation: st-shake-lane 0.6s ease-in-out both; }
       `}</style>
 
-      <div className="flex shrink-0 items-stretch gap-0.5 px-0.5">
-        {Array.from({ length: checkpointCount }, (_, i) => {
-          const done =
-            terminalKind === "full_clear" ||
-            clearedSet.has(i) ||
-            (failIx != null && terminalKind === "blocked" && i < failIx);
-          const active = inPlay && i === safeCp;
-          const lost = terminalKind === "blocked" && failIx === i;
-          return (
-            <div key={i} className="flex min-w-0 flex-1 flex-col items-center gap-0.5" title={`CP ${i + 1}`}>
-              <div
-                className={`h-2 w-full rounded-sm ${
-                  done
-                    ? "bg-emerald-500"
-                    : active
-                      ? "bg-amber-400"
-                      : lost
-                        ? "bg-rose-500"
-                        : "bg-zinc-600"
-                }`}
-              />
-              <span
-                className={`text-[8px] font-bold leading-none sm:text-[9px] ${
-                  active ? "text-amber-200" : done ? "text-emerald-400" : "text-zinc-500"
-                }`}
-              >
-                {i + 1}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      {!hideCheckpointRibbon ? (
+        <div className="flex shrink-0 items-stretch gap-0.5 px-0.5">
+          {Array.from({ length: checkpointCount }, (_, i) => {
+            const done =
+              terminalKind === "full_clear" ||
+              clearedSet.has(i) ||
+              (failIx != null && terminalKind === "blocked" && i < failIx);
+            const active = inPlay && i === safeCp;
+            const lost = terminalKind === "blocked" && failIx === i;
+            return (
+              <div key={i} className="flex min-w-0 flex-1 flex-col items-center gap-0.5" title={`CP ${i + 1}`}>
+                <div
+                  className={`h-2 w-full rounded-sm ${
+                    done
+                      ? "bg-emerald-500"
+                      : active
+                        ? "bg-amber-400"
+                        : lost
+                          ? "bg-rose-500"
+                          : "bg-zinc-600"
+                  }`}
+                />
+                <span
+                  className={`text-[8px] font-bold leading-none sm:text-[9px] ${
+                    active ? "text-amber-200" : done ? "text-emerald-400" : "text-zinc-500"
+                  }`}
+                >
+                  {i + 1}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       {/* Card: column flex; only middle row grows — route row never clipped */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-2 border-cyan-600/40 bg-zinc-900">

@@ -31,6 +31,7 @@ export default function TreasureDoorsBoard({
   terminalKind = null,
   finalChamberIndex = null,
   lastPickDoor = null,
+  hideChamberRunStrip = false,
 }) {
   const chMax = Math.max(1, Math.floor(Number(chamberCount) || 5));
   const dMax = Math.max(1, Math.floor(Number(doorCount) || 3));
@@ -101,42 +102,46 @@ export default function TreasureDoorsBoard({
   }
 
   return (
-    <div className="flex w-full min-h-0 flex-1 flex-col gap-2 overflow-hidden px-0.5 sm:overflow-visible sm:gap-2.5">
+    <div
+      className={`flex w-full min-h-0 flex-1 flex-col overflow-hidden px-0.5 sm:overflow-visible ${hideChamberRunStrip ? "gap-1 sm:gap-1.5" : "gap-2 sm:gap-2.5"}`}
+    >
       {/* Chamber progress — reads as a run, not rows of cells */}
-      <div className="shrink-0">
-        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 sm:text-[11px]">
-          Chamber run
-        </p>
-        <div className="flex items-end justify-center gap-2 sm:gap-2.5">
-          {Array.from({ length: chMax }).map((_, i) => {
-            const phase = stripPhaseForIndex(i);
-            const base =
-              "relative flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-lg border text-sm font-black tabular-nums sm:h-14 sm:w-12 sm:text-base";
-            let cls = "border-zinc-500/80 bg-zinc-950 text-zinc-500 opacity-65";
-            let inner = stripLabel(i);
-            if (phase === "cleared") {
-              cls =
-                "border-amber-400/85 bg-zinc-900 text-amber-50 opacity-100 ring-2 ring-amber-600/45";
-              inner = "✓";
-            } else if (phase === "current") {
-              cls =
-                "border-amber-300 bg-zinc-900 text-amber-50 opacity-100 ring-[3px] ring-amber-400/70";
-            } else if (phase === "trap") {
-              cls =
-                "border-red-400/80 bg-zinc-950 text-red-100 opacity-100 ring-2 ring-red-700/55";
-              inner = "☠";
-            }
-            return (
-              <div key={i} className="flex shrink-0 flex-col items-center gap-1">
-                <div className={base + " " + cls} aria-label={`Chamber ${i + 1} ${phase}`}>
-                  {inner}
+      {!hideChamberRunStrip ? (
+        <div className="shrink-0">
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 sm:text-[11px]">
+            Chamber run
+          </p>
+          <div className="flex items-end justify-center gap-2 sm:gap-2.5">
+            {Array.from({ length: chMax }).map((_, i) => {
+              const phase = stripPhaseForIndex(i);
+              const base =
+                "relative flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-lg border text-sm font-black tabular-nums sm:h-14 sm:w-12 sm:text-base";
+              let cls = "border-zinc-500/80 bg-zinc-950 text-zinc-500 opacity-65";
+              let inner = stripLabel(i);
+              if (phase === "cleared") {
+                cls =
+                  "border-amber-400/85 bg-zinc-900 text-amber-50 opacity-100 ring-2 ring-amber-600/45";
+                inner = "✓";
+              } else if (phase === "current") {
+                cls =
+                  "border-amber-300 bg-zinc-900 text-amber-50 opacity-100 ring-[3px] ring-amber-400/70";
+              } else if (phase === "trap") {
+                cls =
+                  "border-red-400/80 bg-zinc-950 text-red-100 opacity-100 ring-2 ring-red-700/55";
+                inner = "☠";
+              }
+              return (
+                <div key={i} className="flex shrink-0 flex-col items-center gap-1">
+                  <div className={base + " " + cls} aria-label={`Chamber ${i + 1} ${phase}`}>
+                    {inner}
+                  </div>
+                  <span className="text-[10px] font-semibold tabular-nums text-zinc-500 sm:text-[11px]">{i + 1}</span>
                 </div>
-                <span className="text-[10px] font-semibold tabular-nums text-zinc-500 sm:text-[11px]">{i + 1}</span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Cleared summary — compact badges, not a second grid */}
       {clearedChips.length > 0 ? (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import TripleDiceBoard from "../components/solo-v2/TripleDiceBoard";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -19,6 +19,7 @@ import {
   tripleDiceProjectedPayout,
   tripleDiceWinChancePercent,
 } from "../lib/solo-v2/tripleDiceConfig";
+import { QUICK_FLIP_CONFIG } from "../lib/solo-v2/quickFlipConfig";
 import {
   applyTripleDiceSettlementOnce,
   readQuickFlipSharedVaultBalance,
@@ -45,8 +46,10 @@ const UI_STATE = {
   RESOLVED: "resolved",
 };
 
+const STATS_KEY = "solo_v2_triple_dice_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
+const REVEAL_READABLE_MS = 520;
 
 const NEUTRAL_DICE = [2, 3, 4];
 
@@ -86,6 +89,73 @@ function clampDie(n) {
   return Math.min(6, Math.max(1, Math.floor(Number(n)) || 1));
 }
 
+function readTripleDiceStats() {
+  if (typeof window === "undefined") {
+    return {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+    };
+  }
+  try {
+    const raw = window.localStorage.getItem(STATS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") throw new Error("invalid");
+    return {
+      totalGames: Number(parsed.totalGames || 0),
+      wins: Number(parsed.wins || 0),
+      losses: Number(parsed.losses || 0),
+      totalPlay: Number(parsed.totalPlay || 0),
+      totalWon: Number(parsed.totalWon || 0),
+      biggestWin: Number(parsed.biggestWin || 0),
+    };
+  } catch {
+    return {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+    };
+  }
+}
+
+function writeTripleDiceStats(next) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STATS_KEY, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+function tripleDiceStripModel(uiState, readState, rollingUi) {
+  const stepTotal = 2;
+  const rs = String(readState || "");
+  if (uiState === UI_STATE.RESOLVED) {
+    return { stepTotal, stepsComplete: 2, currentStepIndex: 1 };
+  }
+  if (
+    rollingUi ||
+    uiState === UI_STATE.SUBMITTING_PICK ||
+    uiState === UI_STATE.RESOLVING ||
+    (uiState === UI_STATE.SESSION_ACTIVE && rs === "roll_submitted")
+  ) {
+    return { stepTotal, stepsComplete: 1, currentStepIndex: 1 };
+  }
+  if (uiState === UI_STATE.SESSION_ACTIVE && rs === "ready") {
+    return { stepTotal, stepsComplete: 1, currentStepIndex: 1 };
+  }
+  if (uiState === UI_STATE.LOADING) {
+    return { stepTotal, stepsComplete: 0, currentStepIndex: 0 };
+  }
+  return { stepTotal, stepsComplete: 0, currentStepIndex: 0 };
+}
+
 function TripleDiceGameplayPanel({
   selectedZone,
   onZoneChange,
@@ -96,6 +166,14 @@ function TripleDiceGameplayPanel({
   statusTop,
   statusSub,
   sessionNotice,
+  stepTotal,
+  stepsComplete,
+  currentStepIndex,
+  stepLabels,
+  payoutBandLabel,
+  payoutBandValue,
+  payoutCaption,
+  hintLine,
   onRoll,
   rollDisabled,
   optionPickerDisabled,
@@ -105,32 +183,115 @@ function TripleDiceGameplayPanel({
   popupLine3,
   resultVaultLabel,
 }) {
+  const showSession = Boolean(sessionNotice);
+  const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
+  const stripCleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
+  const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
+  const hintVisible = String(hintLine || "").trim().length > 0 && hintLine !== "\u00a0";
+
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-1 text-center sm:px-2">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <TripleDiceBoard
-          sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
-          diceValues={diceValues}
-          diceMuted={diceMuted}
-          totalDisplay={totalDisplay}
-          selectedZone={selectedZone}
-          onZoneChange={onZoneChange}
-          rolling={rollingUi}
-          onRoll={onRoll}
-          rollDisabled={rollDisabled}
-          optionPickerDisabled={optionPickerDisabled}
-        />
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-2 border-violet-700/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-8">
+          <p
+            className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-violet-200/85 sm:text-[10px] ${
+              showSession ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            {showSession ? sessionNotice : "\u00a0"}
+          </p>
+        </div>
+
+        <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-8">
+          <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
+            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-violet-200/40 sm:text-[9px]">Round</span>
+            <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
+              {Math.min(stripCleared + 1, total)} / {total}
+            </span>
+          </div>
+          <div
+            className="flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
+            aria-label="Round progress"
+          >
+            {Array.from({ length: total }, (_, i) => {
+              const done = i < stripCleared;
+              const active = i === cur && !done;
+              const label = stepLabels[i] ?? String(i + 1);
+              return (
+                <div
+                  key={`td3-step-${i}`}
+                  className={`flex min-w-0 flex-1 flex-col items-center justify-center rounded-[5px] py-1 sm:rounded-md sm:py-1.5 ${
+                    done
+                      ? "bg-emerald-600/35 text-emerald-100"
+                      : active
+                        ? "bg-violet-500/25 text-violet-100 ring-1 ring-inset ring-violet-400/35"
+                        : "bg-zinc-900/90 text-zinc-500"
+                  }`}
+                >
+                  <span className="px-0.5 text-center text-[9px] font-extrabold uppercase tracking-wide sm:text-[10px]">
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="shrink-0 px-2.5 pb-1 pt-0.5 sm:px-3 sm:pb-1.5 sm:pt-1 lg:px-8">
+          <div className="flex flex-col items-center gap-0.5 rounded-xl border border-zinc-700/55 bg-zinc-950/70 px-2 py-1.5 sm:flex-row sm:items-baseline sm:justify-center sm:gap-2 sm:px-3 sm:py-2">
+            <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-500 sm:text-[9px]">{payoutBandLabel}</span>
+            <span className="text-sm font-black tabular-nums text-amber-100 sm:text-base">{payoutBandValue}</span>
+          </div>
+          <p
+            className={`mt-1 line-clamp-2 min-h-[2.25rem] text-center text-[9px] font-semibold leading-snug text-zinc-400 sm:min-h-[2.5rem] sm:text-[10px] ${
+              payoutCaption ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            {payoutCaption || "\u00a0"}
+          </p>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 pt-0 sm:px-2 lg:px-4 lg:pb-2">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <TripleDiceBoard
+              sessionNotice=""
+              hideSessionBanner
+              statusTop={statusTop}
+              statusSub={statusSub}
+              diceValues={diceValues}
+              diceMuted={diceMuted}
+              totalDisplay={totalDisplay}
+              selectedZone={selectedZone}
+              onZoneChange={onZoneChange}
+              rolling={rollingUi}
+              onRoll={onRoll}
+              rollDisabled={rollDisabled}
+              optionPickerDisabled={optionPickerDisabled}
+            />
+          </div>
+
+          {hintVisible ? (
+            <p className="mt-1 line-clamp-2 shrink-0 px-1 text-center text-[9px] font-semibold leading-snug text-zinc-400 sm:px-2 sm:text-[10px] lg:px-0">
+              {hintLine}
+            </p>
+          ) : (
+            <div className="mt-1 h-[2.25rem] shrink-0 sm:h-[2.5rem]" aria-hidden />
+          )}
+        </div>
       </div>
 
       <SoloV2ResultPopup
         open={resultPopupOpen}
         isWin={resolvedIsWin}
+        resultTone={resolvedIsWin ? "win" : "lose"}
         animationKey={`${popupLine2}-${popupLine3}-${resolvedIsWin ? "w" : "l"}-${resultVaultLabel}`}
         vaultSlot={
           resultPopupOpen ? (
-            <SoloV2ResultPopupVaultLine isWin={resolvedIsWin} deltaLabel={resultVaultLabel} />
+            <SoloV2ResultPopupVaultLine
+              isWin={resolvedIsWin}
+              tone={resolvedIsWin ? "win" : "lose"}
+              deltaLabel={resultVaultLabel}
+            />
           ) : undefined
         }
       >
@@ -162,10 +323,7 @@ export default function TripleDicePage() {
   const [totalDisplay, setTotalDisplay] = useState("—");
   const [inTripleDiceLoop, setInTripleDiceLoop] = useState(false);
   const [persistedLastRound, setPersistedLastRound] = useState(null);
-  const inTripleDiceLoopRef = useRef(false);
-  const preserveBoardAfterRoundRef = useRef(false);
-  const wagerInputRef = useRef(wagerInput);
-  const vaultBalanceRef = useRef(vaultBalance);
+  const [stats, setStats] = useState(readTripleDiceStats);
 
   const cycleRef = useRef(0);
   const createInFlightRef = useRef(false);
@@ -177,6 +335,7 @@ export default function TripleDicePage() {
   const lastPresetAmountRef = useRef(null);
   const resultPopupTimerRef = useRef(null);
   const rollAnimTimerRef = useRef(null);
+  const terminalPopupEligibleRef = useRef(false);
 
   const giftShell = useSoloV2GiftShellState();
 
@@ -202,16 +361,8 @@ export default function TripleDicePage() {
   }, [session]);
 
   useEffect(() => {
-    inTripleDiceLoopRef.current = inTripleDiceLoop;
-  }, [inTripleDiceLoop]);
-
-  useEffect(() => {
-    wagerInputRef.current = wagerInput;
-  }, [wagerInput]);
-
-  useEffect(() => {
-    vaultBalanceRef.current = vaultBalance;
-  }, [vaultBalance]);
+    writeTripleDiceStats(stats);
+  }, [stats]);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,115 +385,105 @@ export default function TripleDicePage() {
     };
   }, []);
 
+  const dismissResultPopupAfterTerminalRun = useCallback(() => {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setResultPopupOpen(false);
+  }, []);
+
+  const openResultPopup = useCallback(() => {
+    if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+    setResultPopupOpen(true);
+    resultPopupTimerRef.current = window.setTimeout(() => {
+      resultPopupTimerRef.current = null;
+      dismissResultPopupAfterTerminalRun();
+    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+  }, [dismissResultPopupAfterTerminalRun]);
+
+  function resetRoundAfterResultPopup() {
+    createInFlightRef.current = false;
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setSession(null);
+    setResolvedResult(null);
+    setResultPopupOpen(false);
+    setUiState(UI_STATE.IDLE);
+    setSessionNotice("");
+    setInTripleDiceLoop(false);
+    setPersistedLastRound(null);
+    setDiceValues([...NEUTRAL_DICE]);
+    setTotalDisplay("—");
+    setRollingUi(false);
+    if (rollAnimTimerRef.current) {
+      clearInterval(rollAnimTimerRef.current);
+      rollAnimTimerRef.current = null;
+    }
+  }
+
   useEffect(() => {
+    if (uiState !== UI_STATE.RESOLVED) return;
     const settlementSummary = resolvedResult?.settlementSummary;
     const sessionId = resolvedResult?.sessionId || session?.id;
     if (!sessionId || !settlementSummary) return;
     applyTripleDiceSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
       if (!settlementResult) return;
+      const authoritativeBalance = Math.max(0, Number(settlementResult.nextBalance || 0));
+      setVaultBalance(authoritativeBalance);
       if (settlementResult.error) {
         setErrorMessage(settlementResult.error);
+        setSessionNotice("Result resolved, but vault update failed.");
+        terminalPopupEligibleRef.current = false;
+        if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+        resultPopupTimerRef.current = window.setTimeout(() => {
+          resetRoundAfterResultPopup();
+        }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
         return;
       }
+
       const delta = Number(settlementSummary.netDelta || 0);
+      const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
+      const won = Boolean(resolvedResult?.isWin ?? resolvedResult?.won);
       if (settlementResult.applied) {
-        setVaultBalance(Math.max(0, Number(settlementResult.nextBalance || 0)));
+        setSessionNotice(`Settled (${deltaLabel}). Vault: ${authoritativeBalance}.`);
+        setStats(prev => {
+          const entryCost = Number(settlementSummary.entryCost || QUICK_FLIP_CONFIG.entryCost);
+          const payoutReturn = Number(settlementSummary.payoutReturn || 0);
+          return {
+            ...prev,
+            totalGames: Number(prev.totalGames || 0) + 1,
+            wins: Number(prev.wins || 0) + (won ? 1 : 0),
+            losses: Number(prev.losses || 0) + (won ? 0 : 1),
+            totalPlay:
+              Number(prev.totalPlay || 0) + (settlementSummary.fundingSource === "gift" ? 0 : entryCost),
+            totalWon: Number(prev.totalWon || 0) + payoutReturn,
+            biggestWin: Math.max(Number(prev.biggestWin || 0), won ? payoutReturn : 0),
+          };
+        });
+      } else {
+        setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
       }
-      if (settlementResult.applied && delta !== 0) {
-        const sign = delta > 0 ? "+" : "";
-        setSessionNotice(`Vault ${sign}${formatCompact(delta)}`);
+
+      const shouldOpenTerminalPopup = terminalPopupEligibleRef.current;
+      terminalPopupEligibleRef.current = false;
+      if (shouldOpenTerminalPopup) {
+        window.setTimeout(() => {
+          openResultPopup();
+        }, REVEAL_READABLE_MS);
       }
     });
-  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id]);
-
-  async function prepareNextTripleDiceRound() {
-    if (resultPopupTimerRef.current) {
-      clearTimeout(resultPopupTimerRef.current);
-      resultPopupTimerRef.current = null;
-    }
-    if (rollAnimTimerRef.current) {
-      clearInterval(rollAnimTimerRef.current);
-      rollAnimTimerRef.current = null;
-    }
-    submitInFlightRef.current = false;
-    resolveInFlightRef.current = false;
-    setResultPopupOpen(false);
-    setResolvedResult(null);
-    setSessionNotice("");
-    setRollingUi(false);
-
-    if (!inTripleDiceLoopRef.current) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setPersistedLastRound(null);
-      setDiceValues([...NEUTRAL_DICE]);
-      setTotalDisplay("—");
-      return;
-    }
-
-    if (!vaultReady) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInTripleDiceLoop(false);
-      setErrorMessage("Shared vault unavailable.");
-      setPersistedLastRound(null);
-      setDiceValues([...NEUTRAL_DICE]);
-      setTotalDisplay("—");
-      return;
-    }
-
-    const wager = parseWagerInput(wagerInputRef.current);
-    if (wager < TRIPLE_DICE_MIN_WAGER) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInTripleDiceLoop(false);
-      setErrorMessage(`Minimum stake is ${TRIPLE_DICE_MIN_WAGER}.`);
-      setPersistedLastRound(null);
-      setDiceValues([...NEUTRAL_DICE]);
-      setTotalDisplay("—");
-      return;
-    }
-    if (vaultBalanceRef.current < wager) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInTripleDiceLoop(false);
-      setErrorMessage(`Insufficient vault balance. Need ${wager} for this round.`);
-      setPersistedLastRound(null);
-      setDiceValues([...NEUTRAL_DICE]);
-      setTotalDisplay("—");
-      return;
-    }
-
-    cycleRef.current += 1;
-    const activeCycle = cycleRef.current;
-    preserveBoardAfterRoundRef.current = true;
-    const boot = await bootstrapSession(wager, activeCycle, SOLO_V2_SESSION_MODE.STANDARD, {
-      isGiftRound: false,
-      preserveBoardAfterRound: true,
-    });
-    if (!boot.ok || boot.alreadyTerminal) {
-      setInTripleDiceLoop(false);
-      preserveBoardAfterRoundRef.current = false;
-      return;
-    }
-    const tdBoot = boot.session?.tripleDice;
-    if (tdBoot?.readState === "roll_submitted" && tdBoot?.canResolveTurn) {
-      void handleResolvePendingRoll(boot.session.id, activeCycle, { animate: false });
-    }
-  }
-
-  function openResultPopup() {
-    if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
-    setResultPopupOpen(true);
-    resultPopupTimerRef.current = window.setTimeout(() => {
-      resultPopupTimerRef.current = null;
-      void prepareNextTripleDiceRound();
-    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
-  }
+  }, [
+    resolvedResult?.sessionId,
+    resolvedResult?.settlementSummary,
+    resolvedResult?.isWin,
+    resolvedResult?.won,
+    session?.id,
+    uiState,
+    openResultPopup,
+  ]);
 
   function applySessionReadState(sessionPayload, { resumed = false } = {}) {
     const tdSnap = sessionPayload?.tripleDice;
@@ -383,12 +524,6 @@ export default function TripleDicePage() {
       setResolvedResult(null);
       setUiState(UI_STATE.SESSION_ACTIVE);
       setRollingUi(false);
-      if (preserveBoardAfterRoundRef.current) {
-        preserveBoardAfterRoundRef.current = false;
-        setSessionNotice("");
-        setErrorMessage("");
-        return;
-      }
       setDiceValues([...NEUTRAL_DICE]);
       setTotalDisplay("—");
       setPersistedLastRound(null);
@@ -451,17 +586,19 @@ export default function TripleDicePage() {
 
   async function bootstrapSession(wager, activeCycle, createSessionMode, giftRoundMeta) {
     const isGiftRound = Boolean(giftRoundMeta?.isGiftRound);
-    const preserveBoard = Boolean(giftRoundMeta?.preserveBoardAfterRound);
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     setSession(null);
     setResolvedResult(null);
-    if (!preserveBoard) {
-      setDiceValues([...NEUTRAL_DICE]);
-      setTotalDisplay("—");
-      setPersistedLastRound(null);
-    }
+    setDiceValues([...NEUTRAL_DICE]);
+    setTotalDisplay("—");
+    setPersistedLastRound(null);
 
     try {
       const response = await fetch("/api/solo-v2/sessions/create", {
@@ -490,6 +627,9 @@ export default function TripleDicePage() {
             return { ok: false };
           }
           giftRoundMeta?.onGiftConsumed?.();
+          if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => giftRoundMeta?.onGiftConsumed?.());
+          }
         }
         const readResult = await readSessionTruth(payload.session.id, activeCycle);
         if (readResult?.halted) return { ok: false };
@@ -587,8 +727,9 @@ export default function TripleDicePage() {
         isWin: won,
         rolledTotal: tot,
       });
+      setInTripleDiceLoop(false);
       setUiState(UI_STATE.RESOLVED);
-      openResultPopup();
+      terminalPopupEligibleRef.current = true;
     };
 
     if (!animate) {
@@ -658,6 +799,11 @@ export default function TripleDicePage() {
     const td = sessionRef.current?.tripleDice;
     if (sid == null || String(td?.readState || "") !== "ready") return;
     if (submitInFlightRef.current || resolveInFlightRef.current || rollingUi) return;
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
 
     const zone = normalizeTripleDiceZone(selectedZone);
     if (zone === null) return;
@@ -757,6 +903,10 @@ export default function TripleDicePage() {
     });
     if (isGiftRound) giftRoundRef.current = false;
     if (!boot.ok || boot.alreadyTerminal) return;
+    if (isGiftRound && typeof window !== "undefined" && window.requestAnimationFrame) {
+      giftRefreshRef.current?.();
+      window.requestAnimationFrame(() => giftRefreshRef.current?.());
+    }
     setInTripleDiceLoop(true);
     const tdBoot = boot.session?.tripleDice;
     if (tdBoot?.readState === "roll_submitted" && tdBoot?.canResolveTurn) {
@@ -782,7 +932,8 @@ export default function TripleDicePage() {
   const idleLike =
     uiState === UI_STATE.IDLE ||
     uiState === UI_STATE.UNAVAILABLE ||
-    uiState === UI_STATE.PENDING_MIGRATION;
+    uiState === UI_STATE.PENDING_MIGRATION ||
+    uiState === UI_STATE.RESOLVED;
   const stakeExceedsVault =
     vaultReady &&
     idleLike &&
@@ -798,12 +949,28 @@ export default function TripleDicePage() {
     ![UI_STATE.LOADING, UI_STATE.SUBMITTING_PICK, UI_STATE.RESOLVING, UI_STATE.PENDING_MIGRATION].includes(
       uiState,
     ) &&
-    (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE);
+    (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE || uiState === UI_STATE.RESOLVED);
 
   const isPrimaryLoading = uiState === UI_STATE.LOADING;
 
+  useEffect(() => {
+    if (!wagerPlayable) return;
+    setErrorMessage(prev => {
+      const s = String(prev || "");
+      if (
+        /Session expired\. Press START TRIPLE DICE|Session ended\. Press START TRIPLE DICE|no longer valid\. Press START TRIPLE DICE/i.test(
+          s,
+        )
+      ) {
+        return "";
+      }
+      return s;
+    });
+  }, [wagerPlayable]);
+
   const tdSnap = session?.tripleDice;
   const playing = tdSnap?.playing;
+  const readState = String(tdSnap?.readState || "");
 
   const runEntryFromSession =
     session != null &&
@@ -836,7 +1003,7 @@ export default function TripleDicePage() {
     summaryWin = Math.max(0, Math.floor(Number(ss.payoutReturn) || 0));
   }
 
-  const resolvedIsWin = Boolean(resolvedResult?.isWin);
+  const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.won);
   const rt = Number(resolvedResult?.rolledTotal);
   const pickZone = normalizeTripleDiceZone(resolvedResult?.selectedZone);
   const diceArr = Array.isArray(resolvedResult?.dice) ? resolvedResult.dice : null;
@@ -856,16 +1023,31 @@ export default function TripleDicePage() {
   const resultVaultLabel =
     resolvedResult?.settlementSummary != null ? `${delta > 0 ? "+" : ""}${formatCompact(delta)}` : "";
 
-  function handleGiftPlay() {
+  const handleZoneSelect = useCallback(z => {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
+    const v = normalizeTripleDiceZone(z);
+    if (v) setSelectedZone(v);
+  }, []);
+
+  const handleGiftPlay = useCallback(() => {
     if (!vaultReady) {
       setErrorMessage("Shared vault unavailable.");
       return;
     }
     if (giftShell.giftCount < 1) return;
     if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
+    if (
+      [UI_STATE.LOADING, UI_STATE.SUBMITTING_PICK, UI_STATE.RESOLVING, UI_STATE.PENDING_MIGRATION].includes(uiState)
+    ) {
+      return;
+    }
     giftRoundRef.current = true;
     void runStartTripleDice();
-  }
+  }, [vaultReady, giftShell.giftCount, uiState]);
 
   function handlePresetClick(presetValue) {
     const v = Number(presetValue);
@@ -891,7 +1073,6 @@ export default function TripleDicePage() {
     uiState === UI_STATE.RESOLVING ||
     uiState === UI_STATE.LOADING;
 
-  const readState = String(tdSnap?.readState || "");
   const rollDisabled =
     busyFooter || uiState !== UI_STATE.SESSION_ACTIVE || readState !== "ready" || rollingUi;
 
@@ -902,6 +1083,34 @@ export default function TripleDicePage() {
     uiState === UI_STATE.RESOLVED;
 
   const winChance = tripleDiceWinChancePercent(normZone);
+
+  const strip = tripleDiceStripModel(uiState, readState, rollingUi);
+  const stepLabels = ["Session", "Roll"];
+
+  let payoutBandLabel = "Win if hit";
+  let payoutBandValue = formatCompact(summaryWin);
+  let payoutCaption = `${normZone.toUpperCase()} · ~${winChance.toFixed(2)}% hit`;
+
+  if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
+    const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
+    const won = Boolean(resolvedResult.isWin ?? resolvedResult.won);
+    payoutBandLabel = won ? "Return paid" : "Return this round";
+    payoutBandValue = formatCompact(pr);
+    const pz = normalizeTripleDiceZone(resolvedResult.selectedZone);
+    const pzLabel = pz ? pz.toUpperCase() : "—";
+    payoutCaption = pzLabel && pzLabel !== "—" ? `Played ${pzLabel} on this round` : "Round settled";
+  }
+
+  let hintLine =
+    "TRIPLE pays only when all three dice show the same number — the sum does not decide that lane.";
+  if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    hintLine =
+      "Press START TRIPLE DICE for another round — there is no auto-start after the popup; the dice stay on the final roll.";
+  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready" && !rollingUi) {
+    hintLine = `Lane ${normZone.toUpperCase()} · ~${winChance.toFixed(2)}% — switch before you roll if you want different odds.`;
+  } else if (uiState === UI_STATE.UNAVAILABLE || uiState === UI_STATE.LOADING) {
+    hintLine = "\u00a0";
+  }
 
   let statusTop = "Choose 1 of 4 options, then roll.";
   let statusSub = "Pick LOW, MID, HIGH, or TRIPLE — then START TRIPLE DICE.";
@@ -944,8 +1153,10 @@ export default function TripleDicePage() {
   return (
     <SoloV2GameShell
       title="Triple Dice"
-      subtitle="Pick a lane. Roll all three dice."
-      layoutMaxWidthClass="max-w-full sm:max-w-2xl"
+      subtitle="Pick LOW, MID, HIGH, or TRIPLE — three server dice, one roll per session; odds and projected win follow your lane."
+      layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
+      mobileHeaderBreathingRoom
+      stableTripleTopSummary
       gameplayScrollable={false}
       gameplayDesktopUnclipVertical
       menuVaultBalance={vaultBalance}
@@ -957,14 +1168,16 @@ export default function TripleDicePage() {
       }}
       topGameStatsSlot={
         <>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Play <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Play</span>
+            <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
           </span>
           <span className="shrink-0 text-zinc-600" aria-hidden>
             ·
           </span>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Win <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Win</span>
+            <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
           </span>
         </>
       }
@@ -973,6 +1186,8 @@ export default function TripleDicePage() {
         wagerInput,
         wagerNumeric: numericWager,
         canEditPlay: !busyFooter,
+        compactAmountDisplayWhenBlurred: true,
+        formatPresetLabel: v => formatCompact(v),
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
@@ -1005,13 +1220,11 @@ export default function TripleDicePage() {
         },
         errorMessage: errorMessage || stakeHint,
       }}
+      soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
         <TripleDiceGameplayPanel
           selectedZone={selectedZone}
-          onZoneChange={z => {
-            const v = normalizeTripleDiceZone(z);
-            if (v) setSelectedZone(v);
-          }}
+          onZoneChange={handleZoneSelect}
           diceValues={diceValues}
           diceMuted={diceMuted}
           totalDisplay={totalDisplay}
@@ -1019,6 +1232,14 @@ export default function TripleDicePage() {
           statusTop={statusTop}
           statusSub={statusSub}
           sessionNotice={sessionNotice}
+          stepTotal={strip.stepTotal}
+          stepsComplete={strip.stepsComplete}
+          currentStepIndex={strip.currentStepIndex}
+          stepLabels={stepLabels}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
+          hintLine={hintLine}
           onRoll={handleRoll}
           rollDisabled={rollDisabled}
           optionPickerDisabled={optionPickerDisabled}
@@ -1033,12 +1254,29 @@ export default function TripleDicePage() {
         <div className="space-y-2">
           <p>
             Pick one lane — LOW (3–8), MID (9–11), HIGH (12–18), or TRIPLE (three matching faces). Stake locks on
-            START TRIPLE DICE. Win odds and projected win update with your pick.
+            START TRIPLE DICE. Win odds and projected payout update with your pick before you roll.
           </p>
           <p>
-            Tap Roll: the server rolls three dice. You win if the result fits your lane. TRIPLE only pays when all
-            three dice show the same number, regardless of the sum.
+            Tap Roll: the server rolls three fair dice. You win if the outcome fits your lane. TRIPLE only wins when
+            all three dice show the same face; the sum does not decide that lane.
           </p>
+          <p>
+            Gift rounds use freeplay — a loss does not debit your vault; a win credits the full payout. After the result
+            popup closes, the final dice stay visible — press START TRIPLE DICE explicitly for the next round; there is no
+            auto-start or auto-chain.
+          </p>
+        </div>
+      }
+      statsContent={
+        <div className="space-y-2">
+          <p>Total games: {stats.totalGames}</p>
+          <p>Wins: {stats.wins}</p>
+          <p>Losses: {stats.losses}</p>
+          <p>Win rate: {stats.totalGames ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : "0.0"}%</p>
+          <p>Total played: {formatCompact(stats.totalPlay)}</p>
+          <p>Total returned: {formatCompact(stats.totalWon)}</p>
+          <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
+          <p>Net flow (returned − played): {formatCompact(stats.totalWon - stats.totalPlay)}</p>
         </div>
       }
       resultState={null}

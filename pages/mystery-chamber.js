@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import MysteryChamberBoard from "../components/solo-v2/MysteryChamberBoard";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -60,7 +60,7 @@ const UI_STATE = {
 
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
-const REVEAL_READABLE_MS = 620;
+const REVEAL_READABLE_MS = 520;
 const SUCCESS_ANIM_CLEAR_MS = 400;
 /** After a safe chamber, hold the chosen sigil highlighted and block new picks until the next chamber is obvious. */
 const CHAMBER_INTERSTITIAL_MS = 720;
@@ -265,7 +265,7 @@ function MysteryChamberGameplayPanel({
   const sec = playing?.securedReturn != null ? Math.floor(Number(playing.securedReturn)) : 0;
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
       <div className="flex min-h-0 flex-1 flex-col">
         <MysteryChamberBoard
           sessionNotice={sessionNotice}
@@ -325,9 +325,7 @@ export default function MysteryChamberPage() {
   const [revealPulse, setRevealPulse] = useState(false);
   const [mcLocalStats, setMcLocalStats] = useState(() => readMysteryChamberStats());
 
-  const inMysteryLoopRef = useRef(false);
-  const wagerInputRef = useRef(wagerInput);
-  const vaultBalanceRef = useRef(vaultBalance);
+  const terminalPopupEligibleRef = useRef(false);
   const cycleRef = useRef(0);
   const createInFlightRef = useRef(false);
   const submitInFlightRef = useRef(false);
@@ -369,18 +367,6 @@ export default function MysteryChamberPage() {
   }, [session]);
 
   useEffect(() => {
-    inMysteryLoopRef.current = inMysteryLoop;
-  }, [inMysteryLoop]);
-
-  useEffect(() => {
-    wagerInputRef.current = wagerInput;
-  }, [wagerInput]);
-
-  useEffect(() => {
-    vaultBalanceRef.current = vaultBalance;
-  }, [vaultBalance]);
-
-  useEffect(() => {
     writeMysteryChamberStats(mcLocalStats);
   }, [mcLocalStats]);
 
@@ -405,7 +391,59 @@ export default function MysteryChamberPage() {
     };
   }, []);
 
+  const dismissResultPopupAfterTerminalRun = useCallback(() => {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setResultPopupOpen(false);
+    setLocalAnim(null);
+    setRevealPulse(false);
+  }, []);
+
+  const openResultPopup = useCallback(() => {
+    if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+    setResultPopupOpen(true);
+    resultPopupTimerRef.current = window.setTimeout(() => {
+      resultPopupTimerRef.current = null;
+      dismissResultPopupAfterTerminalRun();
+    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+  }, [dismissResultPopupAfterTerminalRun]);
+
+  function resetRoundAfterResultPopup() {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    createInFlightRef.current = false;
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setSession(null);
+    setResolvedResult(null);
+    setPersistedBoard(null);
+    setLocalAnim(null);
+    setRevealPulse(false);
+    interstitialSafeSigilRef.current = null;
+    setInterstitialSafeSigil(null);
+    setResultPopupOpen(false);
+    setSessionNotice("");
+    setUiState(UI_STATE.IDLE);
+    setInMysteryLoop(false);
+    terminalPopupEligibleRef.current = false;
+    if (localAnimTimerRef.current) {
+      clearTimeout(localAnimTimerRef.current);
+      localAnimTimerRef.current = null;
+    }
+    if (postSuccessInterstitialTimerRef.current) {
+      clearTimeout(postSuccessInterstitialTimerRef.current);
+      postSuccessInterstitialTimerRef.current = null;
+    }
+  }
+
   useEffect(() => {
+    if (uiState !== UI_STATE.RESOLVED) return;
     const settlementSummary = resolvedResult?.settlementSummary;
     const sessionId = resolvedResult?.sessionId || session?.id;
     if (!sessionId || !settlementSummary) return;
@@ -415,40 +453,43 @@ export default function MysteryChamberPage() {
     );
     applyMysteryChamberSettlementOnce(sessionId, normalized).then(settlementResult => {
       if (!settlementResult) return;
+      const authoritativeBalance = Math.max(0, Number(settlementResult.nextBalance || 0));
+      setVaultBalance(authoritativeBalance);
       if (settlementResult.error) {
         setErrorMessage(settlementResult.error);
+        setSessionNotice("Result resolved, but vault update failed.");
+        terminalPopupEligibleRef.current = false;
+        if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+        resultPopupTimerRef.current = window.setTimeout(() => {
+          resetRoundAfterResultPopup();
+        }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
         return;
       }
+
       const delta = Number(normalized.netDelta || 0);
-      if (settlementResult.applied && delta !== 0) {
-        const sign = delta > 0 ? "+" : "";
-        setSessionNotice(`Vault ${sign}${formatCompact(delta)}`);
+      const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
+      if (settlementResult.applied) {
+        setSessionNotice(`Settled (${deltaLabel}). Vault: ${authoritativeBalance}.`);
+      } else {
+        setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
+      }
+
+      const shouldOpenTerminalPopup = terminalPopupEligibleRef.current;
+      terminalPopupEligibleRef.current = false;
+      if (shouldOpenTerminalPopup) {
+        window.setTimeout(() => {
+          openResultPopup();
+        }, REVEAL_READABLE_MS);
       }
     });
-  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, session?.sessionMode]);
-
-  function openResultPopup() {
-    if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
-    setResultPopupOpen(true);
-    resultPopupTimerRef.current = window.setTimeout(() => {
-      resultPopupTimerRef.current = null;
-      dismissResultPopupAfterTerminalRun();
-    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
-  }
-
-  /** After a terminal run, close popup only — keep resolved board; next run starts only on START. */
-  function dismissResultPopupAfterTerminalRun() {
-    if (resultPopupTimerRef.current) {
-      clearTimeout(resultPopupTimerRef.current);
-      resultPopupTimerRef.current = null;
-    }
-    submitInFlightRef.current = false;
-    resolveInFlightRef.current = false;
-    setResultPopupOpen(false);
-    setInMysteryLoop(false);
-    setLocalAnim(null);
-    setRevealPulse(false);
-  }
+  }, [
+    resolvedResult?.sessionId,
+    resolvedResult?.settlementSummary,
+    session?.id,
+    session?.sessionMode,
+    uiState,
+    openResultPopup,
+  ]);
 
   function applySessionReadState(sessionPayload, { resumed = false } = {}) {
     const mc = sessionPayload?.mysteryChamber;
@@ -550,16 +591,19 @@ export default function MysteryChamberPage() {
 
   async function bootstrapSession(wager, activeCycle, createSessionMode, giftRoundMeta) {
     const isGiftRound = Boolean(giftRoundMeta?.isGiftRound);
-    const preserveBoard = Boolean(giftRoundMeta?.preserveBoardAfterRound);
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
+    terminalPopupEligibleRef.current = false;
     setSession(null);
     setResolvedResult(null);
-    if (!preserveBoard) {
-      setPersistedBoard(null);
-      setLocalAnim(null);
-    }
+    setPersistedBoard(null);
+    setLocalAnim(null);
 
     try {
       const response = await fetch("/api/solo-v2/sessions/create", {
@@ -815,12 +859,10 @@ export default function MysteryChamberPage() {
             sessionRef.current?.sessionMode,
           ),
         );
+        setInMysteryLoop(false);
         setUiState(UI_STATE.RESOLVED);
         setRevealPulse(false);
-
-        window.setTimeout(() => {
-          openResultPopup();
-        }, REVEAL_READABLE_MS);
+        terminalPopupEligibleRef.current = true;
         return;
       }
 
@@ -854,6 +896,12 @@ export default function MysteryChamberPage() {
     const mc = sessionRef.current?.mysteryChamber;
     if (sid == null || String(mc?.readState || "") !== "choice_required") return;
     if (submitInFlightRef.current || resolveInFlightRef.current) return;
+
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
 
     if (process.env.NODE_ENV === "development") {
       // eslint-disable-next-line no-console -- dev-only fairness trace (compare to server logs when SOLO_V2_DEBUG_MYSTERY_CHAMBER=1)
@@ -931,6 +979,11 @@ export default function MysteryChamberPage() {
     const sid = sessionRef.current?.id;
     if (sid == null) return;
     if (submitInFlightRef.current || resolveInFlightRef.current) return;
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     resolveInFlightRef.current = true;
     setUiState(UI_STATE.RESOLVING);
     setErrorMessage("");
@@ -994,8 +1047,9 @@ export default function MysteryChamberPage() {
             sessionRef.current?.sessionMode,
           ),
         );
+        setInMysteryLoop(false);
         setUiState(UI_STATE.RESOLVED);
-        window.setTimeout(() => openResultPopup(), REVEAL_READABLE_MS);
+        terminalPopupEligibleRef.current = true;
         return;
       }
 
@@ -1047,6 +1101,22 @@ export default function MysteryChamberPage() {
     }
   }
 
+  const handleGiftPlay = useCallback(() => {
+    if (!vaultReady) {
+      setErrorMessage("Shared vault unavailable.");
+      return;
+    }
+    if (giftShell.giftCount < 1) return;
+    if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
+    if (
+      [UI_STATE.LOADING, UI_STATE.SUBMITTING_PICK, UI_STATE.RESOLVING, UI_STATE.PENDING_MIGRATION].includes(uiState)
+    ) {
+      return;
+    }
+    giftRoundRef.current = true;
+    void runStartMysteryChamber();
+  }, [vaultReady, giftShell.giftCount, uiState]);
+
   useEffect(() => {
     const sid = session?.id;
     const mc = session?.mysteryChamber;
@@ -1086,6 +1156,20 @@ export default function MysteryChamberPage() {
 
   const isPrimaryLoading = uiState === UI_STATE.LOADING;
 
+  useEffect(() => {
+    if (!wagerPlayable) return;
+    setErrorMessage(prev => {
+      const s = String(prev || "");
+      if (
+        /^Session expired\.|^Session ended\./i.test(s) ||
+        /Press START MYSTERY CHAMBER/i.test(s)
+      ) {
+        return "";
+      }
+      return s;
+    });
+  }, [wagerPlayable]);
+
   const mcSnap = session?.mysteryChamber;
   const playing = mcSnap?.playing;
   const readState = String(mcSnap?.readState || "");
@@ -1115,7 +1199,14 @@ export default function MysteryChamberPage() {
       ? Math.floor(Number(playing.securedReturn))
       : mysteryChamberStartingSecured(runEntryFromSession)
     : previewMaxClear;
-  const summarySecondStatLabel = sessionLocksSummary ? "Secured" : "Max clear";
+  let summarySecondStatLabel = sessionLocksSummary ? "Secured" : "Max clear";
+
+  if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
+    const ss = resolvedResult.settlementSummary;
+    summaryPlay = Math.max(0, Math.floor(Number(ss.entryCost) || summaryPlay));
+    summaryWin = Math.max(0, Math.floor(Number(ss.payoutReturn) || 0));
+    summarySecondStatLabel = "Return";
+  }
 
   const busyFooter =
     uiState === UI_STATE.SUBMITTING_PICK || uiState === UI_STATE.RESOLVING || uiState === UI_STATE.LOADING;
@@ -1203,6 +1294,11 @@ export default function MysteryChamberPage() {
     statusSub = "The run is over.";
   }
 
+  if (uiState === UI_STATE.RESOLVED && persistedBoard) {
+    hintLine =
+      "After the popup closes, the final board stays visible — press START MYSTERY CHAMBER for a new run; there is no auto-start or auto-chain.";
+  }
+
   const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.settlementSummary?.isWin);
   const tk = String(resolvedResult?.terminalKind || "");
   const delta = Number(resolvedResult?.settlementSummary?.netDelta ?? 0);
@@ -1226,17 +1322,6 @@ export default function MysteryChamberPage() {
       popupTitle = "FULL CLEAR";
       popupLine3 = "All four chambers · maximum return";
     }
-  }
-
-  function handleGiftPlay() {
-    if (!vaultReady) {
-      setErrorMessage("Shared vault unavailable.");
-      return;
-    }
-    if (giftShell.giftCount < 1) return;
-    if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
-    giftRoundRef.current = true;
-    void runStartMysteryChamber();
   }
 
   function handlePresetClick(presetValue) {
@@ -1302,7 +1387,7 @@ export default function MysteryChamberPage() {
     <SoloV2GameShell
       title="Mystery Chamber"
       subtitle="Advance through the chamber run."
-      layoutMaxWidthClass="max-w-full sm:max-w-2xl"
+      layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
       gameplayScrollable={false}
@@ -1402,6 +1487,11 @@ export default function MysteryChamberPage() {
           <p>
             After any safe chamber you may exit with your secured return or continue. Outcomes are sealed on the server;
             picks are validated and resolved there.
+          </p>
+          <p>
+            Gift rounds use freeplay — a loss does not debit your vault; a win credits the full payout. After the result
+            popup closes, the board stays on the final run — press START MYSTERY CHAMBER explicitly for the next run; there
+            is no auto-start or auto-chain.
           </p>
         </div>
       }

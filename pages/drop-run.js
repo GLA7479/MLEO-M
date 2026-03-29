@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import DropRunBoard from "../components/solo-v2/DropRunBoard";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -13,6 +13,7 @@ import {
 } from "../lib/solo-v2/soloV2GiftStorage";
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
 import { DROP_RUN_MIN_WAGER, dropRunMaxPayout, dropRunMultiplierForBay } from "../lib/solo-v2/dropRunConfig";
+import { QUICK_FLIP_CONFIG } from "../lib/solo-v2/quickFlipConfig";
 import {
   applyDropRunSettlementOnce,
   readQuickFlipSharedVaultBalance,
@@ -39,8 +40,10 @@ const UI_STATE = {
   RESOLVED: "resolved",
 };
 
+const STATS_KEY = "solo_v2_drop_run_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
+const REVEAL_READABLE_MS = 520;
 
 function parseWagerInput(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
@@ -57,12 +60,84 @@ function formatMultiplierLabel(m) {
   return String(x);
 }
 
+function readDropRunStats() {
+  if (typeof window === "undefined") {
+    return {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+    };
+  }
+  try {
+    const raw = window.localStorage.getItem(STATS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") throw new Error("invalid");
+    return {
+      totalGames: Number(parsed.totalGames || 0),
+      wins: Number(parsed.wins || 0),
+      losses: Number(parsed.losses || 0),
+      totalPlay: Number(parsed.totalPlay || 0),
+      totalWon: Number(parsed.totalWon || 0),
+      biggestWin: Number(parsed.biggestWin || 0),
+    };
+  } catch {
+    return {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+    };
+  }
+}
+
+function writeDropRunStats(next) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STATS_KEY, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+function dropRunRoundStripModel(uiState, readState, hasDropPlayback) {
+  const stepTotal = 2;
+  const rs = String(readState || "");
+  if (uiState === UI_STATE.RESOLVED) {
+    return { stepTotal, stepsComplete: 2, currentStepIndex: 1 };
+  }
+  if (
+    hasDropPlayback ||
+    uiState === UI_STATE.SUBMITTING_PICK ||
+    uiState === UI_STATE.RESOLVING ||
+    rs === "gate_submitted"
+  ) {
+    return { stepTotal, stepsComplete: 1, currentStepIndex: 1 };
+  }
+  if (uiState === UI_STATE.SESSION_ACTIVE && rs === "ready") {
+    return { stepTotal, stepsComplete: 1, currentStepIndex: 1 };
+  }
+  return { stepTotal, stepsComplete: 0, currentStepIndex: 0 };
+}
+
 function DropRunGameplayPanel({
-  session,
   uiState,
   pickingUi,
   resolvingUi,
   sessionNotice,
+  statusTop,
+  statusSub,
+  hintLine,
+  stepTotal,
+  stepsComplete,
+  currentStepIndex,
+  payoutBandLabel,
+  payoutBandValue,
+  payoutCaption,
   resultPopupOpen,
   resolvedIsWin,
   popupLine2,
@@ -71,15 +146,23 @@ function DropRunGameplayPanel({
   dropPlayback,
   onDropAnimationComplete,
 }) {
-  const dr = session?.dropRun;
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-1 text-center sm:px-2">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
       <div className="flex min-h-0 flex-1 flex-col">
         <DropRunBoard
           sessionNotice={sessionNotice}
-          readState={String(dr?.readState || "")}
           pickingUi={pickingUi}
           resolvingUi={resolvingUi}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          hintLine={hintLine}
+          stepTotal={stepTotal}
+          currentStepIndex={currentStepIndex}
+          stepsComplete={stepsComplete}
+          stepLabels={["Session", "Drop"]}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           dropPlayback={dropPlayback}
           onDropAnimationComplete={onDropAnimationComplete}
         />
@@ -88,10 +171,15 @@ function DropRunGameplayPanel({
       <SoloV2ResultPopup
         open={resultPopupOpen}
         isWin={resolvedIsWin}
+        resultTone={resolvedIsWin ? "win" : "lose"}
         animationKey={`${popupLine2}-${popupLine3}-${resolvedIsWin ? "w" : "l"}-${resultVaultLabel}`}
         vaultSlot={
           resultPopupOpen ? (
-            <SoloV2ResultPopupVaultLine isWin={resolvedIsWin} deltaLabel={resultVaultLabel} />
+            <SoloV2ResultPopupVaultLine
+              isWin={resolvedIsWin}
+              tone={resolvedIsWin ? "win" : "lose"}
+              deltaLabel={resultVaultLabel}
+            />
           ) : undefined
         }
       >
@@ -99,7 +187,7 @@ function DropRunGameplayPanel({
           {resolvedIsWin ? "YOU WIN" : "YOU LOSE"}
         </div>
         <div className="mt-1 text-sm font-bold text-white">
-          <span className="text-amber-100">{popupLine2}</span>
+          <span className="text-amber-100 tabular-nums">{popupLine2}</span>
         </div>
         <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">{popupLine3}</div>
       </SoloV2ResultPopup>
@@ -120,9 +208,7 @@ export default function DropRunPage() {
   const [pickingUi, setPickingUi] = useState(false);
   const [dropPlayback, setDropPlayback] = useState(null);
   const [inDropLoop, setInDropLoop] = useState(false);
-  const inDropLoopRef = useRef(false);
-  const wagerInputRef = useRef(wagerInput);
-  const vaultBalanceRef = useRef(vaultBalance);
+  const [stats, setStats] = useState(readDropRunStats);
   const pendingTerminalRef = useRef(null);
   const animCompleteFiredRef = useRef(false);
   const dropAnimEpochRef = useRef(0);
@@ -136,6 +222,7 @@ export default function DropRunPage() {
   const giftRefreshRef = useRef(() => {});
   const lastPresetAmountRef = useRef(null);
   const resultPopupTimerRef = useRef(null);
+  const terminalPopupEligibleRef = useRef(false);
 
   const giftShell = useSoloV2GiftShellState();
 
@@ -157,16 +244,8 @@ export default function DropRunPage() {
   }, [session]);
 
   useEffect(() => {
-    inDropLoopRef.current = inDropLoop;
-  }, [inDropLoop]);
-
-  useEffect(() => {
-    wagerInputRef.current = wagerInput;
-  }, [wagerInput]);
-
-  useEffect(() => {
-    vaultBalanceRef.current = vaultBalance;
-  }, [vaultBalance]);
+    writeDropRunStats(stats);
+  }, [stats]);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,28 +268,7 @@ export default function DropRunPage() {
     };
   }, []);
 
-  useEffect(() => {
-    const settlementSummary = resolvedResult?.settlementSummary;
-    const sessionId = resolvedResult?.sessionId || session?.id;
-    if (!sessionId || !settlementSummary) return;
-    applyDropRunSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
-      if (!settlementResult) return;
-      if (settlementResult.error) {
-        setErrorMessage(settlementResult.error);
-        return;
-      }
-      const delta = Number(settlementSummary.netDelta || 0);
-      if (settlementResult.applied) {
-        setVaultBalance(Math.max(0, Number(settlementResult.nextBalance || 0)));
-      }
-      if (settlementResult.applied && delta !== 0) {
-        const sign = delta > 0 ? "+" : "";
-        setSessionNotice(`Vault ${sign}${formatCompact(delta)}`);
-      }
-    });
-  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id]);
-
-  async function prepareNextDropRound() {
+  const dismissResultPopupAfterTerminalRun = useCallback(() => {
     if (resultPopupTimerRef.current) {
       clearTimeout(resultPopupTimerRef.current);
       resultPopupTimerRef.current = null;
@@ -218,68 +276,93 @@ export default function DropRunPage() {
     submitInFlightRef.current = false;
     resolveInFlightRef.current = false;
     setResultPopupOpen(false);
-    setResolvedResult(null);
-    setDropPlayback(null);
-    setSessionNotice("");
-    setPickingUi(false);
-    pendingTerminalRef.current = null;
-    animCompleteFiredRef.current = false;
+  }, []);
 
-    if (!inDropLoopRef.current) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      return;
-    }
-
-    if (!vaultReady) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInDropLoop(false);
-      setErrorMessage("Shared vault unavailable.");
-      return;
-    }
-
-    const wager = parseWagerInput(wagerInputRef.current);
-    if (wager < DROP_RUN_MIN_WAGER) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInDropLoop(false);
-      setErrorMessage(`Minimum stake is ${DROP_RUN_MIN_WAGER}.`);
-      return;
-    }
-    if (vaultBalanceRef.current < wager) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInDropLoop(false);
-      setErrorMessage(`Insufficient vault balance. Need ${wager} for this round.`);
-      return;
-    }
-
-    cycleRef.current += 1;
-    const activeCycle = cycleRef.current;
-    const boot = await bootstrapSession(wager, activeCycle, SOLO_V2_SESSION_MODE.STANDARD, { isGiftRound: false });
-    if (!boot.ok || boot.alreadyTerminal) {
-      setInDropLoop(false);
-      return;
-    }
-    const drBoot = boot.session?.dropRun;
-    if (drBoot?.readState === "gate_submitted" && drBoot?.canResolveTurn) {
-      void handleResolvePendingDrop(boot.session.id, activeCycle);
-    }
-  }
-
-  function openResultPopup() {
+  const openResultPopup = useCallback(() => {
     if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
     setResultPopupOpen(true);
     resultPopupTimerRef.current = window.setTimeout(() => {
       resultPopupTimerRef.current = null;
-      void prepareNextDropRound();
+      dismissResultPopupAfterTerminalRun();
     }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+  }, [dismissResultPopupAfterTerminalRun]);
+
+  function resetRoundAfterResultPopup() {
+    createInFlightRef.current = false;
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setSession(null);
+    setResolvedResult(null);
+    setResultPopupOpen(false);
+    setInDropLoop(false);
+    setPickingUi(false);
+    setDropPlayback(null);
+    setSessionNotice("");
+    pendingTerminalRef.current = null;
+    animCompleteFiredRef.current = false;
+    setUiState(UI_STATE.IDLE);
   }
+
+  useEffect(() => {
+    if (uiState !== UI_STATE.RESOLVED) return;
+    const settlementSummary = resolvedResult?.settlementSummary;
+    const sessionId = resolvedResult?.sessionId || session?.id;
+    if (!sessionId || !settlementSummary) return;
+    applyDropRunSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
+      if (!settlementResult) return;
+      const authoritativeBalance = Math.max(0, Number(settlementResult.nextBalance || 0));
+      setVaultBalance(authoritativeBalance);
+      if (settlementResult.error) {
+        setErrorMessage(settlementResult.error);
+        setSessionNotice("Result resolved, but vault update failed.");
+        terminalPopupEligibleRef.current = false;
+        if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+        resultPopupTimerRef.current = window.setTimeout(() => {
+          resetRoundAfterResultPopup();
+        }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+        return;
+      }
+
+      const delta = Number(settlementSummary.netDelta || 0);
+      const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
+      if (settlementResult.applied) {
+        setSessionNotice(`Settled (${deltaLabel}). Vault: ${authoritativeBalance}.`);
+        setStats(prev => {
+          const entryCost = Number(settlementSummary.entryCost || QUICK_FLIP_CONFIG.entryCost);
+          const payoutReturn = Number(settlementSummary.payoutReturn || 0);
+          const won = Boolean(resolvedResult?.isWin ?? resolvedResult?.won);
+          return {
+            ...prev,
+            totalGames: Number(prev.totalGames || 0) + 1,
+            wins: Number(prev.wins || 0) + (won ? 1 : 0),
+            losses: Number(prev.losses || 0) + (won ? 0 : 1),
+            totalPlay:
+              Number(prev.totalPlay || 0) + (settlementSummary.fundingSource === "gift" ? 0 : entryCost),
+            totalWon: Number(prev.totalWon || 0) + payoutReturn,
+            biggestWin: Math.max(Number(prev.biggestWin || 0), won ? payoutReturn : 0),
+          };
+        });
+      } else {
+        setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
+      }
+
+      const shouldOpenTerminalPopup = terminalPopupEligibleRef.current;
+      terminalPopupEligibleRef.current = false;
+      if (shouldOpenTerminalPopup) {
+        window.setTimeout(() => {
+          openResultPopup();
+        }, REVEAL_READABLE_MS);
+      }
+    });
+  }, [
+    resolvedResult?.sessionId,
+    resolvedResult?.settlementSummary,
+    resolvedResult?.isWin,
+    resolvedResult?.won,
+    session?.id,
+    uiState,
+    openResultPopup,
+  ]);
 
   function applySessionReadState(sessionPayload, { resumed = false } = {}) {
     const drSnap = sessionPayload?.dropRun;
@@ -380,6 +463,11 @@ export default function DropRunPage() {
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     setSession(null);
     setResolvedResult(null);
     setDropPlayback(null);
@@ -411,6 +499,9 @@ export default function DropRunPage() {
             return { ok: false };
           }
           giftRoundMeta?.onGiftConsumed?.();
+          if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => giftRoundMeta?.onGiftConsumed?.());
+          }
         }
         const readResult = await readSessionTruth(payload.session.id, activeCycle);
         if (readResult?.halted) return { ok: false };
@@ -487,7 +578,8 @@ export default function DropRunPage() {
 
   function applyTerminalOutcomeToUi(r, sid, nextSession) {
     setPickingUi(false);
-    setDropPlayback(null);
+    setInDropLoop(false);
+    terminalPopupEligibleRef.current = true;
     if (nextSession) setSession(nextSession);
     setResolvedResult({
       ...r,
@@ -495,7 +587,6 @@ export default function DropRunPage() {
       settlementSummary: r.settlementSummary,
     });
     setUiState(UI_STATE.RESOLVED);
-    openResultPopup();
   }
 
   async function handleResolvePendingDrop(sessionId, activeCycle) {
@@ -554,6 +645,12 @@ export default function DropRunPage() {
     const dr = sessionRef.current?.dropRun;
     if (sid == null || String(dr?.readState || "") !== "ready") return;
     if (submitInFlightRef.current || resolveInFlightRef.current || pickingUi || dropPlayback) return;
+
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
 
     submitInFlightRef.current = true;
     setUiState(UI_STATE.SUBMITTING_PICK);
@@ -646,6 +743,10 @@ export default function DropRunPage() {
     });
     if (isGiftRound) giftRoundRef.current = false;
     if (!boot.ok || boot.alreadyTerminal) return;
+    if (isGiftRound && typeof window !== "undefined" && window.requestAnimationFrame) {
+      giftRefreshRef.current?.();
+      window.requestAnimationFrame(() => giftRefreshRef.current?.());
+    }
     setInDropLoop(true);
     const drBoot = boot.session?.dropRun;
     if (drBoot?.readState === "gate_submitted" && drBoot?.canResolveTurn) {
@@ -671,7 +772,8 @@ export default function DropRunPage() {
   const idleLike =
     uiState === UI_STATE.IDLE ||
     uiState === UI_STATE.UNAVAILABLE ||
-    uiState === UI_STATE.PENDING_MIGRATION;
+    uiState === UI_STATE.PENDING_MIGRATION ||
+    uiState === UI_STATE.RESOLVED;
   const stakeExceedsVault =
     vaultReady &&
     idleLike &&
@@ -682,17 +784,28 @@ export default function DropRunPage() {
     : "";
 
   const canStart =
-    !inDropLoop &&
     wagerPlayable &&
     ![UI_STATE.LOADING, UI_STATE.SUBMITTING_PICK, UI_STATE.RESOLVING, UI_STATE.PENDING_MIGRATION].includes(
       uiState,
     ) &&
-    (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE);
+    (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE || uiState === UI_STATE.RESOLVED);
 
   const isPrimaryLoading = uiState === UI_STATE.LOADING;
 
+  useEffect(() => {
+    if (!wagerPlayable) return;
+    setErrorMessage(prev => {
+      const s = String(prev || "");
+      if (/Session expired\. Press START DROP|Session ended\. Press START DROP|no longer valid\. Press START DROP/i.test(s)) {
+        return "";
+      }
+      return s;
+    });
+  }, [wagerPlayable]);
+
   const drSnap = session?.dropRun;
   const playing = drSnap?.playing;
+  const readState = String(drSnap?.readState || "");
 
   const runEntryFromSession =
     session != null &&
@@ -724,7 +837,74 @@ export default function DropRunPage() {
     summaryWin = Math.max(0, Math.floor(Number(ss.payoutReturn) || 0));
   }
 
-  const resolvedIsWin = Boolean(resolvedResult?.isWin);
+  const strip = dropRunRoundStripModel(uiState, readState, Boolean(dropPlayback));
+
+  let statusTop = "Press START DROP when you are set.";
+  let statusSub =
+    "Set your play in the bar below, then start. The server seals the path; DROP BALL releases the run.";
+  let hintLine = "Outer boxes pay ×0; multipliers rise toward the center (up to ×4.75 on your play).";
+
+  if (uiState === UI_STATE.UNAVAILABLE) {
+    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
+    statusSub = !vaultReady
+      ? "Shared vault could not be opened. Return to the arcade and try again."
+      : String(errorMessage || "").trim() || "Check your balance and connection, then try START DROP again.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.LOADING) {
+    statusTop = "Starting run…";
+    statusSub = "Opening or resuming a session with the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.SUBMITTING_PICK) {
+    statusTop = "Locking drop…";
+    statusSub = "Sending your play to the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.RESOLVING && !dropPlayback) {
+    statusTop = "Drawing path…";
+    statusSub = "Server is sealing the bounce path for this drop.";
+    hintLine = "\u00a0";
+  } else if (dropPlayback) {
+    statusTop = "Dropping…";
+    statusSub = "Follow the ball — it lands in the box that sets this round’s multiplier.";
+    hintLine = "\u00a0";
+  } else if (readState === "gate_submitted") {
+    statusTop = "Starting drop…";
+    statusSub = "Resolving gate with the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    statusTop = resolvedResult.isWin || resolvedResult.won ? "Payout box hit." : "No payout this time.";
+    statusSub =
+      "Round is complete. The board keeps the last drop until you press START DROP again — there is no auto-start.";
+    hintLine =
+      resolvedResult.isWin || resolvedResult.won
+        ? "Vault credit applied after settlement."
+        : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
+  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready") {
+    statusTop = "Ready to drop.";
+    statusSub = "Press DROP BALL in the footer to release the ball through the field.";
+    hintLine = "One drop per round — path and landing are server-resolved.";
+  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
+    statusTop = "Migration pending.";
+    statusSub = "This environment is updating. Try again shortly.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.IDLE) {
+    statusTop = "Drop Run";
+    statusSub = "Plinko-style field — bottom box sets your multiplier on this play.";
+    hintLine = "START DROP opens a session; DROP BALL runs the sealed path.";
+  }
+
+  let payoutBandLabel = "Max win";
+  let payoutBandValue = formatCompact(summaryWin);
+  let payoutCaption = "Best box ×4.75 on stake · outer columns ×0";
+
+  if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
+    const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
+    payoutBandLabel = resolvedResult.isWin || resolvedResult.won ? "Return paid" : "Return this round";
+    payoutBandValue = formatCompact(pr);
+    const fb = Number(resolvedResult.finalBay);
+    payoutCaption = Number.isFinite(fb) ? `Landed box ${Math.floor(fb)}` : "Round settled";
+  }
+
+  const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.won);
   const finalBay = Number(resolvedResult?.finalBay);
   const bayOk = Number.isFinite(finalBay);
   const multResolved = resolvedResult?.resolvedMultiplier;
@@ -741,16 +921,21 @@ export default function DropRunPage() {
   const resultVaultLabel =
     resolvedResult?.settlementSummary != null ? `${delta > 0 ? "+" : ""}${formatCompact(delta)}` : "";
 
-  function handleGiftPlay() {
+  const handleGiftPlay = useCallback(() => {
     if (!vaultReady) {
       setErrorMessage("Shared vault unavailable.");
       return;
     }
     if (giftShell.giftCount < 1) return;
     if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
+    if (
+      [UI_STATE.LOADING, UI_STATE.SUBMITTING_PICK, UI_STATE.RESOLVING, UI_STATE.PENDING_MIGRATION].includes(uiState)
+    ) {
+      return;
+    }
     giftRoundRef.current = true;
     void runStartDrop();
-  }
+  }, [vaultReady, giftShell.giftCount, uiState]);
 
   function handlePresetClick(presetValue) {
     const v = Number(presetValue);
@@ -776,7 +961,6 @@ export default function DropRunPage() {
     uiState === UI_STATE.RESOLVING ||
     uiState === UI_STATE.LOADING;
 
-  const readState = String(drSnap?.readState || "");
   const dropRoundFoot =
     inDropLoop &&
     uiState !== UI_STATE.RESOLVED &&
@@ -811,8 +995,10 @@ export default function DropRunPage() {
   return (
     <SoloV2GameShell
       title="Drop Run"
-      subtitle="Drop through the field · Landing box sets payout"
-      layoutMaxWidthClass="max-w-full sm:max-w-2xl"
+      subtitle="Server-sealed path through the peg field — landing box sets your multiplier."
+      layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
+      mobileHeaderBreathingRoom
+      stableTripleTopSummary
       gameplayScrollable={false}
       gameplayDesktopUnclipVertical
       menuVaultBalance={vaultBalance}
@@ -824,14 +1010,15 @@ export default function DropRunPage() {
       }}
       topGameStatsSlot={
         <>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Play <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Play</span>
+            <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
           </span>
           <span className="shrink-0 text-zinc-600" aria-hidden>
             ·
           </span>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Max win{" "}
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Max win</span>
             <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
           </span>
         </>
@@ -841,6 +1028,8 @@ export default function DropRunPage() {
         wagerInput,
         wagerNumeric: numericWager,
         canEditPlay: !busyFooter,
+        compactAmountDisplayWhenBlurred: true,
+        formatPresetLabel: v => formatCompact(v),
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
@@ -874,13 +1063,22 @@ export default function DropRunPage() {
         },
         errorMessage: errorMessage || stakeHint,
       }}
+      soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
         <DropRunGameplayPanel
-          session={session}
           uiState={uiState}
           pickingUi={pickingUi}
           resolvingUi={uiState === UI_STATE.RESOLVING}
           sessionNotice={sessionNotice}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          hintLine={hintLine}
+          stepTotal={strip.stepTotal}
+          stepsComplete={strip.stepsComplete}
+          currentStepIndex={strip.currentStepIndex}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           resultPopupOpen={resultPopupOpen}
           resolvedIsWin={resolvedIsWin}
           popupLine2={popupLine2}
@@ -893,14 +1091,30 @@ export default function DropRunPage() {
       helpContent={
         <div className="space-y-2">
           <p>
-            The ball releases from the center and falls through a server-sealed path across the peg field. It lands in
-            one of nine bottom boxes — that box sets your multiplier on the current play. The two outer columns pay
-            nothing; values rise toward the middle, with the highest multiplier on the center box (×4.75 on your play).
+            Drop Run is one round per session: the ball follows a server-sealed path through the peg field and lands in
+            one of nine bottom boxes. That box sets your multiplier on your play (outer columns ×0, highest at center ×4.75
+            for this release). The canvas keeps the final landing until you start again.
           </p>
           <p>
-            Use START DROP for your first entry, then DROP BALL for each repeat round in the same session. Outcome is
-            resolved on the server when the drop animation completes.
+            Press START DROP to open a session, then DROP BALL to run the drop. Outcome is resolved on the server before
+            the animation finishes; gift rounds use freeplay — a loss does not debit your vault; a win credits the full
+            payout.
           </p>
+          <p>
+            After the result popup closes, there is no auto-start — press START DROP explicitly for the next round.
+          </p>
+        </div>
+      }
+      statsContent={
+        <div className="space-y-2">
+          <p>Total games: {stats.totalGames}</p>
+          <p>Wins: {stats.wins}</p>
+          <p>Losses: {stats.losses}</p>
+          <p>Win rate: {stats.totalGames ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : "0.0"}%</p>
+          <p>Total played: {formatCompact(stats.totalPlay)}</p>
+          <p>Total returned: {formatCompact(stats.totalWon)}</p>
+          <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
+          <p>Net flow (returned − played): {formatCompact(stats.totalWon - stats.totalPlay)}</p>
         </div>
       }
       resultState={null}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import NumberHuntBoard from "../components/solo-v2/NumberHuntBoard";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -13,11 +13,13 @@ import {
 } from "../lib/solo-v2/soloV2GiftStorage";
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
 import {
+  NUMBER_HUNT_MAX_GUESSES,
   NUMBER_HUNT_MAX_NUM,
   NUMBER_HUNT_MIN_NUM,
   NUMBER_HUNT_MIN_WAGER,
   numberHuntMaxPayout,
 } from "../lib/solo-v2/numberHuntConfig";
+import { QUICK_FLIP_CONFIG } from "../lib/solo-v2/quickFlipConfig";
 import {
   applyNumberHuntSettlementOnce,
   readQuickFlipSharedVaultBalance,
@@ -44,8 +46,10 @@ const UI_STATE = {
   RESOLVED: "resolved",
 };
 
+const STATS_KEY = "solo_v2_number_hunt_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
+const REVEAL_READABLE_MS = 520;
 
 function parseWagerInput(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
@@ -61,11 +65,84 @@ function formatGuessPath(history) {
   return nums.length ? nums.join(", ") : "—";
 }
 
+function readNumberHuntStats() {
+  if (typeof window === "undefined") {
+    return {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+    };
+  }
+  try {
+    const raw = window.localStorage.getItem(STATS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") throw new Error("invalid");
+    return {
+      totalGames: Number(parsed.totalGames || 0),
+      wins: Number(parsed.wins || 0),
+      losses: Number(parsed.losses || 0),
+      totalPlay: Number(parsed.totalPlay || 0),
+      totalWon: Number(parsed.totalWon || 0),
+      biggestWin: Number(parsed.biggestWin || 0),
+    };
+  } catch {
+    return {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+    };
+  }
+}
+
+function writeNumberHuntStats(next) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STATS_KEY, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+function numberHuntRoundStripModel(uiState, readState, guessCount) {
+  const stepTotal = NUMBER_HUNT_MAX_GUESSES;
+  const gc = Math.max(0, Math.min(stepTotal, Math.floor(Number(guessCount) || 0)));
+  const rs = String(readState || "");
+  if (uiState === UI_STATE.RESOLVED) {
+    return { stepTotal, stepsComplete: stepTotal, currentStepIndex: stepTotal - 1 };
+  }
+  if (
+    uiState === UI_STATE.SUBMITTING_PICK ||
+    uiState === UI_STATE.RESOLVING ||
+    (uiState === UI_STATE.SESSION_ACTIVE && rs === "guess_submitted")
+  ) {
+    return { stepTotal, stepsComplete: gc, currentStepIndex: Math.min(gc, stepTotal - 1) };
+  }
+  if (uiState === UI_STATE.SESSION_ACTIVE && rs === "ready") {
+    return { stepTotal, stepsComplete: gc, currentStepIndex: Math.min(gc, stepTotal - 1) };
+  }
+  return { stepTotal, stepsComplete: 0, currentStepIndex: 0 };
+}
+
 function NumberHuntGameplayPanel({
   session,
   uiState,
   pickingUi,
   sessionNotice,
+  statusTop,
+  statusSub,
+  hintLine,
+  stepTotal,
+  stepsComplete,
+  currentStepIndex,
+  payoutBandLabel,
+  payoutBandValue,
+  payoutCaption,
   onPickNumber,
   pickDisabled,
   resultPopupOpen,
@@ -93,12 +170,22 @@ function NumberHuntGameplayPanel({
   const revealWin = Boolean(resolvedResult?.isWin);
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-1 text-center sm:px-2">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
       <div className="flex min-h-0 flex-1 flex-col">
         <NumberHuntBoard
           playing={playing}
           pickingUi={pickingUi}
           sessionNotice={sessionNotice}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          hintLine={hintLine}
+          stepTotal={stepTotal}
+          currentStepIndex={currentStepIndex}
+          stepsComplete={stepsComplete}
+          stepLabels={["1st", "2nd", "3rd"]}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           onPickNumber={onPickNumber}
           pickDisabled={pickDisabled}
           revealTarget={revealTarget}
@@ -115,10 +202,15 @@ function NumberHuntGameplayPanel({
       <SoloV2ResultPopup
         open={resultPopupOpen}
         isWin={resolvedIsWin}
+        resultTone={resolvedIsWin ? "win" : "lose"}
         animationKey={`${popupLine2}-${popupLine3}-${resolvedIsWin ? "w" : "l"}-${resultVaultLabel}`}
         vaultSlot={
           resultPopupOpen ? (
-            <SoloV2ResultPopupVaultLine isWin={resolvedIsWin} deltaLabel={resultVaultLabel} />
+            <SoloV2ResultPopupVaultLine
+              isWin={resolvedIsWin}
+              tone={resolvedIsWin ? "win" : "lose"}
+              deltaLabel={resultVaultLabel}
+            />
           ) : undefined
         }
       >
@@ -126,7 +218,7 @@ function NumberHuntGameplayPanel({
           {resolvedIsWin ? "YOU WIN" : "YOU LOSE"}
         </div>
         <div className="mt-1 text-sm font-bold text-white">
-          <span className="text-amber-100">{popupLine2}</span>
+          <span className="text-amber-100 tabular-nums">{popupLine2}</span>
         </div>
         <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">{popupLine3}</div>
       </SoloV2ResultPopup>
@@ -146,9 +238,7 @@ export default function NumberHuntPage() {
   const [resultPopupOpen, setResultPopupOpen] = useState(false);
   const [pickingUi, setPickingUi] = useState(false);
   const [inHuntLoop, setInHuntLoop] = useState(false);
-  const inHuntLoopRef = useRef(false);
-  const wagerInputRef = useRef(wagerInput);
-  const vaultBalanceRef = useRef(vaultBalance);
+  const [stats, setStats] = useState(readNumberHuntStats);
 
   const cycleRef = useRef(0);
   const createInFlightRef = useRef(false);
@@ -159,6 +249,7 @@ export default function NumberHuntPage() {
   const giftRefreshRef = useRef(() => {});
   const lastPresetAmountRef = useRef(null);
   const resultPopupTimerRef = useRef(null);
+  const terminalPopupEligibleRef = useRef(false);
 
   const giftShell = useSoloV2GiftShellState();
 
@@ -180,16 +271,8 @@ export default function NumberHuntPage() {
   }, [session]);
 
   useEffect(() => {
-    inHuntLoopRef.current = inHuntLoop;
-  }, [inHuntLoop]);
-
-  useEffect(() => {
-    wagerInputRef.current = wagerInput;
-  }, [wagerInput]);
-
-  useEffect(() => {
-    vaultBalanceRef.current = vaultBalance;
-  }, [vaultBalance]);
+    writeNumberHuntStats(stats);
+  }, [stats]);
 
   useEffect(() => {
     let cancelled = false;
@@ -212,28 +295,7 @@ export default function NumberHuntPage() {
     };
   }, []);
 
-  useEffect(() => {
-    const settlementSummary = resolvedResult?.settlementSummary;
-    const sessionId = resolvedResult?.sessionId || session?.id;
-    if (!sessionId || !settlementSummary) return;
-    applyNumberHuntSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
-      if (!settlementResult) return;
-      if (settlementResult.error) {
-        setErrorMessage(settlementResult.error);
-        return;
-      }
-      const delta = Number(settlementSummary.netDelta || 0);
-      if (settlementResult.applied) {
-        setVaultBalance(Math.max(0, Number(settlementResult.nextBalance || 0)));
-      }
-      if (settlementResult.applied && delta !== 0) {
-        const sign = delta > 0 ? "+" : "";
-        setSessionNotice(`Vault ${sign}${formatCompact(delta)}`);
-      }
-    });
-  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id]);
-
-  async function prepareNextHuntRound() {
+  const dismissResultPopupAfterTerminalRun = useCallback(() => {
     if (resultPopupTimerRef.current) {
       clearTimeout(resultPopupTimerRef.current);
       resultPopupTimerRef.current = null;
@@ -241,65 +303,89 @@ export default function NumberHuntPage() {
     submitInFlightRef.current = false;
     resolveInFlightRef.current = false;
     setResultPopupOpen(false);
-    setResolvedResult(null);
-    setSessionNotice("");
-    setPickingUi(false);
+  }, []);
 
-    if (!inHuntLoopRef.current) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      return;
-    }
-
-    if (!vaultReady) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInHuntLoop(false);
-      setErrorMessage("Shared vault unavailable.");
-      return;
-    }
-
-    const wager = parseWagerInput(wagerInputRef.current);
-    if (wager < NUMBER_HUNT_MIN_WAGER) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInHuntLoop(false);
-      setErrorMessage(`Minimum stake is ${NUMBER_HUNT_MIN_WAGER}.`);
-      return;
-    }
-    if (vaultBalanceRef.current < wager) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInHuntLoop(false);
-      setErrorMessage(`Insufficient vault balance. Need ${wager} for this round.`);
-      return;
-    }
-
-    cycleRef.current += 1;
-    const activeCycle = cycleRef.current;
-    const boot = await bootstrapSession(wager, activeCycle, SOLO_V2_SESSION_MODE.STANDARD, { isGiftRound: false });
-    if (!boot.ok || boot.alreadyTerminal) {
-      setInHuntLoop(false);
-      return;
-    }
-    const nhBoot = boot.session?.numberHunt;
-    if (nhBoot?.readState === "guess_submitted" && nhBoot?.canResolveTurn) {
-      void handleResolvePendingGuess(boot.session.id, activeCycle);
-    }
-  }
-
-  function openResultPopup() {
+  const openResultPopup = useCallback(() => {
     if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
     setResultPopupOpen(true);
     resultPopupTimerRef.current = window.setTimeout(() => {
       resultPopupTimerRef.current = null;
-      void prepareNextHuntRound();
+      dismissResultPopupAfterTerminalRun();
     }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+  }, [dismissResultPopupAfterTerminalRun]);
+
+  function resetRoundAfterResultPopup() {
+    createInFlightRef.current = false;
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setSession(null);
+    setResolvedResult(null);
+    setResultPopupOpen(false);
+    setInHuntLoop(false);
+    setPickingUi(false);
+    setSessionNotice("");
+    setUiState(UI_STATE.IDLE);
   }
+
+  useEffect(() => {
+    if (uiState !== UI_STATE.RESOLVED) return;
+    const settlementSummary = resolvedResult?.settlementSummary;
+    const sessionId = resolvedResult?.sessionId || session?.id;
+    if (!sessionId || !settlementSummary) return;
+    applyNumberHuntSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
+      if (!settlementResult) return;
+      const authoritativeBalance = Math.max(0, Number(settlementResult.nextBalance || 0));
+      setVaultBalance(authoritativeBalance);
+      if (settlementResult.error) {
+        setErrorMessage(settlementResult.error);
+        setSessionNotice("Result resolved, but vault update failed.");
+        terminalPopupEligibleRef.current = false;
+        if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+        resultPopupTimerRef.current = window.setTimeout(() => {
+          resetRoundAfterResultPopup();
+        }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+        return;
+      }
+
+      const delta = Number(settlementSummary.netDelta || 0);
+      const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
+      if (settlementResult.applied) {
+        setSessionNotice(`Settled (${deltaLabel}). Vault: ${authoritativeBalance}.`);
+        setStats(prev => {
+          const entryCost = Number(settlementSummary.entryCost || QUICK_FLIP_CONFIG.entryCost);
+          const payoutReturn = Number(settlementSummary.payoutReturn || 0);
+          const won = Boolean(resolvedResult?.isWin);
+          return {
+            ...prev,
+            totalGames: Number(prev.totalGames || 0) + 1,
+            wins: Number(prev.wins || 0) + (won ? 1 : 0),
+            losses: Number(prev.losses || 0) + (won ? 0 : 1),
+            totalPlay:
+              Number(prev.totalPlay || 0) + (settlementSummary.fundingSource === "gift" ? 0 : entryCost),
+            totalWon: Number(prev.totalWon || 0) + payoutReturn,
+            biggestWin: Math.max(Number(prev.biggestWin || 0), won ? payoutReturn : 0),
+          };
+        });
+      } else {
+        setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
+      }
+
+      const shouldOpenTerminalPopup = terminalPopupEligibleRef.current;
+      terminalPopupEligibleRef.current = false;
+      if (shouldOpenTerminalPopup) {
+        window.setTimeout(() => {
+          openResultPopup();
+        }, REVEAL_READABLE_MS);
+      }
+    });
+  }, [
+    resolvedResult?.sessionId,
+    resolvedResult?.settlementSummary,
+    resolvedResult?.isWin,
+    session?.id,
+    uiState,
+    openResultPopup,
+  ]);
 
   function applySessionReadState(sessionPayload, { resumed = false } = {}) {
     const nhSnap = sessionPayload?.numberHunt;
@@ -399,6 +485,11 @@ export default function NumberHuntPage() {
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     setSession(null);
     setResolvedResult(null);
 
@@ -429,6 +520,9 @@ export default function NumberHuntPage() {
             return { ok: false };
           }
           giftRoundMeta?.onGiftConsumed?.();
+          if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => giftRoundMeta?.onGiftConsumed?.());
+          }
         }
         const readResult = await readSessionTruth(payload.session.id, activeCycle);
         if (readResult?.halted) return { ok: false };
@@ -505,13 +599,14 @@ export default function NumberHuntPage() {
 
   function applyTerminalOutcomeToUi(r, sid) {
     setPickingUi(false);
+    setInHuntLoop(false);
+    terminalPopupEligibleRef.current = true;
     setResolvedResult({
       ...r,
       sessionId: r.sessionId || sid,
       settlementSummary: r.settlementSummary,
     });
     setUiState(UI_STATE.RESOLVED);
-    openResultPopup();
   }
 
   async function handleResolvePendingGuess(sessionId, activeCycle) {
@@ -566,6 +661,12 @@ export default function NumberHuntPage() {
     const nh = sessionRef.current?.numberHunt;
     if (sid == null || String(nh?.readState || "") !== "ready") return;
     if (submitInFlightRef.current || resolveInFlightRef.current || pickingUi) return;
+
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
 
     submitInFlightRef.current = true;
     setUiState(UI_STATE.SUBMITTING_PICK);
@@ -658,6 +759,10 @@ export default function NumberHuntPage() {
     });
     if (isGiftRound) giftRoundRef.current = false;
     if (!boot.ok || boot.alreadyTerminal) return;
+    if (isGiftRound && typeof window !== "undefined" && window.requestAnimationFrame) {
+      giftRefreshRef.current?.();
+      window.requestAnimationFrame(() => giftRefreshRef.current?.());
+    }
     setInHuntLoop(true);
     const nhBoot = boot.session?.numberHunt;
     if (nhBoot?.readState === "guess_submitted" && nhBoot?.canResolveTurn) {
@@ -683,7 +788,8 @@ export default function NumberHuntPage() {
   const idleLike =
     uiState === UI_STATE.IDLE ||
     uiState === UI_STATE.UNAVAILABLE ||
-    uiState === UI_STATE.PENDING_MIGRATION;
+    uiState === UI_STATE.PENDING_MIGRATION ||
+    uiState === UI_STATE.RESOLVED;
   const stakeExceedsVault =
     vaultReady &&
     idleLike &&
@@ -694,17 +800,28 @@ export default function NumberHuntPage() {
     : "";
 
   const canStart =
-    !inHuntLoop &&
     wagerPlayable &&
     ![UI_STATE.LOADING, UI_STATE.SUBMITTING_PICK, UI_STATE.RESOLVING, UI_STATE.PENDING_MIGRATION].includes(
       uiState,
     ) &&
-    (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE);
+    (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE || uiState === UI_STATE.RESOLVED);
 
   const isPrimaryLoading = uiState === UI_STATE.LOADING;
 
+  useEffect(() => {
+    if (!wagerPlayable) return;
+    setErrorMessage(prev => {
+      const s = String(prev || "");
+      if (/Session expired\. Press START HUNT|Session ended\. Press START HUNT|no longer valid\. Press START HUNT/i.test(s)) {
+        return "";
+      }
+      return s;
+    });
+  }, [wagerPlayable]);
+
   const nhSnap = session?.numberHunt;
   const playing = nhSnap?.playing;
+  const readState = String(nhSnap?.readState || "");
 
   const runEntryFromSession =
     session != null &&
@@ -736,6 +853,87 @@ export default function NumberHuntPage() {
     summaryWin = Math.max(0, Math.floor(Number(ss.payoutReturn) || 0));
   }
 
+  const guessCountForStrip = Array.isArray(playing?.guessHistory) ? playing.guessHistory.length : 0;
+  const strip = numberHuntRoundStripModel(uiState, readState, guessCountForStrip);
+
+  const lastClue =
+    Array.isArray(playing?.guessHistory) && playing.guessHistory.length > 0
+      ? String(playing.guessHistory[playing.guessHistory.length - 1]?.clue || "").trim()
+      : "";
+
+  let statusTop = "Press START HUNT when you are set.";
+  let statusSub =
+    "Set your play in the bar below, then start. The server holds a secret 1–20; you get up to three guesses with clues.";
+  let hintLine = "Hit on 1st / 2nd / 3rd guess pays ×4.5 / ×2.5 / ×1.5 on your stake (this release).";
+
+  if (uiState === UI_STATE.UNAVAILABLE) {
+    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
+    statusSub = !vaultReady
+      ? "Shared vault could not be opened. Return to the arcade and try again."
+      : String(errorMessage || "").trim() || "Check your balance and connection, then try START HUNT again.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.LOADING) {
+    statusTop = "Starting hunt…";
+    statusSub = "Opening or resuming a session with the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.SUBMITTING_PICK) {
+    statusTop = "Submitting guess…";
+    statusSub = "Sending your pick to the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.RESOLVING) {
+    statusTop = "Resolving…";
+    statusSub = "Checking your guess against the sealed target.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    statusTop = resolvedResult.isWin ? "You found the target." : "Out of guesses.";
+    statusSub =
+      "Round is complete. Adjust stake if you like, then press START HUNT for another round — there is no auto-start.";
+    hintLine = resolvedResult.isWin
+      ? "Vault credit applied after settlement."
+      : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
+  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready") {
+    if (pickingUi) {
+      statusTop = "Checking…";
+      statusSub = "\u00a0";
+      hintLine = "\u00a0";
+    } else if (guessCountForStrip === 0) {
+      statusTop = "Pick your first guess.";
+      statusSub = "Hidden number is 1–20 · You have three tries.";
+      hintLine = "Tap a number in range; wrong picks are ruled out with higher / lower clues.";
+    } else if (lastClue) {
+      statusTop = lastClue;
+      statusSub = `Guess ${guessCountForStrip + 1} of ${NUMBER_HUNT_MAX_GUESSES} · use the clues to narrow the range.`;
+      hintLine = "Numbers outside the live range can’t be selected.";
+    } else {
+      statusTop = "Pick your next guess.";
+      statusSub = `Guess ${guessCountForStrip + 1} of ${NUMBER_HUNT_MAX_GUESSES}.`;
+      hintLine = "Use the range row and grid — eliminated numbers stay struck out.";
+    }
+  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "guess_submitted") {
+    statusTop = "Finishing your guess…";
+    statusSub = "Resolving with the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
+    statusTop = "Migration pending.";
+    statusSub = "This environment is updating. Try again shortly.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.IDLE) {
+    statusTop = "Number Hunt";
+    statusSub = "Three guesses, higher-or-lower clues, range narrows after each miss.";
+    hintLine = "START HUNT locks your stake; picks happen on the board only.";
+  }
+
+  let payoutBandLabel = "Max win";
+  let payoutBandValue = formatCompact(summaryWin);
+  let payoutCaption = `Full hit on 1st guess · up to ${formatCompact(summaryWin)}`;
+
+  if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
+    const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
+    payoutBandLabel = resolvedResult.isWin ? "Return paid" : "Return this round";
+    payoutBandValue = formatCompact(pr);
+    payoutCaption = resolvedResult.isWin ? "Target found within three guesses" : "No payout — target not found";
+  }
+
   const resolvedIsWin = Boolean(resolvedResult?.isWin);
   const secret = Number(resolvedResult?.secretTarget);
   const secretOk = Number.isFinite(secret);
@@ -760,16 +958,21 @@ export default function NumberHuntPage() {
   const resultVaultLabel =
     resolvedResult?.settlementSummary != null ? `${delta > 0 ? "+" : ""}${formatCompact(delta)}` : "";
 
-  function handleGiftPlay() {
+  const handleGiftPlay = useCallback(() => {
     if (!vaultReady) {
       setErrorMessage("Shared vault unavailable.");
       return;
     }
     if (giftShell.giftCount < 1) return;
     if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
+    if (
+      [UI_STATE.LOADING, UI_STATE.SUBMITTING_PICK, UI_STATE.RESOLVING, UI_STATE.PENDING_MIGRATION].includes(uiState)
+    ) {
+      return;
+    }
     giftRoundRef.current = true;
     void runStartHunt();
-  }
+  }, [vaultReady, giftShell.giftCount, uiState]);
 
   function handlePresetClick(presetValue) {
     const v = Number(presetValue);
@@ -795,15 +998,16 @@ export default function NumberHuntPage() {
     uiState === UI_STATE.RESOLVING ||
     uiState === UI_STATE.LOADING;
 
-  const readState = String(nhSnap?.readState || "");
   const pickDisabled =
     busyFooter || uiState !== UI_STATE.SESSION_ACTIVE || readState !== "ready" || pickingUi;
 
   return (
     <SoloV2GameShell
       title="Number Hunt"
-      subtitle="Hidden number 1–20 · Three guesses · Higher / lower clues"
-      layoutMaxWidthClass="max-w-full sm:max-w-2xl"
+      subtitle="Three guesses to find a server-sealed number from 1–20."
+      layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
+      mobileHeaderBreathingRoom
+      stableTripleTopSummary
       gameplayScrollable={false}
       gameplayDesktopUnclipVertical
       menuVaultBalance={vaultBalance}
@@ -815,14 +1019,15 @@ export default function NumberHuntPage() {
       }}
       topGameStatsSlot={
         <>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Play <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Play</span>
+            <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
           </span>
           <span className="shrink-0 text-zinc-600" aria-hidden>
             ·
           </span>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Max win{" "}
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Max win</span>
             <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
           </span>
         </>
@@ -832,6 +1037,8 @@ export default function NumberHuntPage() {
         wagerInput,
         wagerNumeric: numericWager,
         canEditPlay: !busyFooter,
+        compactAmountDisplayWhenBlurred: true,
+        formatPresetLabel: v => formatCompact(v),
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
@@ -864,12 +1071,22 @@ export default function NumberHuntPage() {
         },
         errorMessage: errorMessage || stakeHint,
       }}
+      soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
         <NumberHuntGameplayPanel
           session={session}
           uiState={uiState}
           pickingUi={pickingUi}
           sessionNotice={sessionNotice}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          hintLine={hintLine}
+          stepTotal={strip.stepTotal}
+          stepsComplete={strip.stepsComplete}
+          currentStepIndex={strip.currentStepIndex}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           onPickNumber={handlePickNumber}
           pickDisabled={pickDisabled}
           resultPopupOpen={resultPopupOpen}
@@ -883,13 +1100,29 @@ export default function NumberHuntPage() {
       helpContent={
         <div className="space-y-2">
           <p>
-            The server picks a secret integer from 1 to 20. You have three guesses; after each wrong guess you get a
-            higher-or-lower style clue and impossible numbers are ruled out.
+            Number Hunt is a single hunt per session: the server picks a secret integer from 1 to 20. You have three
+            guesses; after each wrong guess you get a higher-or-lower style clue and numbers outside the live range are
+            disabled. The board stays on your final clues and reveal until you press START HUNT again.
           </p>
           <p>
-            Hit on guess 1 pays ×4.5, guess 2 pays ×2.5, guess 3 pays ×1.5 (on your stake). Use START HUNT once, then
-            play repeated hunts with number picks only.
+            Hit on guess 1 pays ×4.5, guess 2 pays ×2.5, guess 3 pays ×1.5 on your stake for this release. Gift rounds use
+            freeplay mode: a loss does not debit your vault; a win credits the full payout.
           </p>
+          <p>
+            After the result popup closes, there is no auto-start — explicitly press START HUNT for the next hunt.
+          </p>
+        </div>
+      }
+      statsContent={
+        <div className="space-y-2">
+          <p>Total games: {stats.totalGames}</p>
+          <p>Wins: {stats.wins}</p>
+          <p>Losses: {stats.losses}</p>
+          <p>Win rate: {stats.totalGames ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : "0.0"}%</p>
+          <p>Total played: {formatCompact(stats.totalPlay)}</p>
+          <p>Total returned: {formatCompact(stats.totalWon)}</p>
+          <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
+          <p>Net flow (returned − played): {formatCompact(stats.totalWon - stats.totalPlay)}</p>
         </div>
       }
       resultState={null}

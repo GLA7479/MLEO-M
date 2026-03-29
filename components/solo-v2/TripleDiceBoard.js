@@ -68,30 +68,33 @@ export default function TripleDiceBoard({
   onRoll,
   rollDisabled = false,
   optionPickerDisabled = false,
+  hideSessionBanner = false,
 }) {
-  const showSession = Boolean(sessionNotice);
+  const showSession = Boolean(sessionNotice) && !hideSessionBanner;
   const d0 = diceValues[0] ?? 1;
   const d1 = diceValues[1] ?? 1;
   const d2 = diceValues[2] ?? 1;
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border-2 border-violet-600/40 bg-zinc-900">
-      <div className="flex h-5 shrink-0 items-center justify-center px-2 sm:h-6">
-        <p
-          className={`truncate text-center text-[10px] text-emerald-200/75 sm:text-[11px] ${
-            showSession ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          {showSession ? sessionNotice : "\u00a0"}
-        </p>
-      </div>
+      {!hideSessionBanner ? (
+        <div className="flex h-5 shrink-0 items-center justify-center px-2 sm:h-6">
+          <p
+            className={`truncate text-center text-[10px] text-emerald-200/75 sm:text-[11px] ${
+              showSession ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            {showSession ? sessionNotice : "\u00a0"}
+          </p>
+        </div>
+      ) : null}
 
-      <div className="shrink-0 px-3 pb-0.5 pt-0.5 text-center sm:px-4 sm:pb-1">
+      <div className="shrink-0 px-3 pb-0.5 pt-0.5 text-center sm:px-4 sm:pb-1 lg:px-6">
         <p className="min-h-[1.2rem] text-[12px] font-bold leading-tight text-white sm:text-sm">{statusTop}</p>
         <p className="mt-0.5 min-h-[1rem] text-[10px] leading-snug text-zinc-400 sm:text-xs">{statusSub}</p>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-0 px-2 py-0 sm:gap-0.5 sm:px-3 sm:py-0.5">
+      <div className="flex min-h-0 flex-1 flex-col justify-center gap-0 px-2 py-0 sm:gap-0.5 sm:px-3 sm:py-0.5 lg:px-5">
         <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-2.5">
           <PipDie value={d0} rolling={rolling} muted={diceMuted} />
           <PipDie value={d1} rolling={rolling} muted={diceMuted} />
@@ -105,7 +108,7 @@ export default function TripleDiceBoard({
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-violet-600/30 bg-zinc-950 px-2 pb-2 pt-1.5 sm:px-3 sm:pb-2 sm:pt-2">
+      <div className="shrink-0 border-t border-violet-600/30 bg-zinc-950 px-2 pb-2 pt-1.5 sm:px-3 sm:pb-2 sm:pt-2 lg:px-6">
         <div className="mx-auto grid w-full max-w-[17.5rem] grid-cols-2 gap-2 sm:max-w-[17.75rem] sm:gap-2">
           {ZONE_TILES.map(t => {
             const active = zoneTileMatches(t, selectedZone);

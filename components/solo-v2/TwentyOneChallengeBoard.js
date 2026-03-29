@@ -83,6 +83,7 @@ function slotsToOpponentRow(slots, pulses) {
 
 export default function TwentyOneChallengeBoard({
   sessionNotice,
+  hideSessionBanner = false,
   statusTop,
   statusSub,
   playerHands,
@@ -166,10 +167,12 @@ export default function TwentyOneChallengeBoard({
     );
   }
 
+  const showSessionBanner = Boolean(sessionNotice) && !hideSessionBanner;
+
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-0 text-center sm:gap-0.5">
       <div className="min-h-[2rem] shrink-0 px-0.5 sm:min-h-[2.15rem] sm:px-1">
-        {sessionNotice ? (
+        {showSessionBanner ? (
           <div className="text-[10px] font-semibold text-amber-200/90 sm:text-[11px]">{sessionNotice}</div>
         ) : null}
         <div className="text-[11px] font-semibold leading-snug text-white/90 sm:text-[13px]">{statusTop}</div>
