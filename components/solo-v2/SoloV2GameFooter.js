@@ -36,15 +36,30 @@ export default function SoloV2GameFooter({
    */
   compactAmountDisplayWhenBlurred = false,
   formatAmountCompact = formatCompactNumber,
+  /**
+   * Desktop (lg+) only: one-line payout chip to the right of the wager row (`h-9`/`sm:h-10`, same as controls).
+   * `caption` is ignored here (mobile board band still uses it below lg).
+   */
+  desktopPayout = null,
 }) {
   const [amountFieldFocused, setAmountFieldFocused] = useState(false);
   const showCompactAmount = compactAmountDisplayWhenBlurred && !amountFieldFocused;
 
   const amountInputValue = showCompactAmount ? formatAmountCompact(wagerNumeric) : wagerInput;
 
+  const payout = desktopPayout && typeof desktopPayout === "object" ? desktopPayout : null;
+  const showDesktopPayout = Boolean(payout && (payout.label != null || payout.value != null));
+
   return (
     <div className="flex w-full shrink-0 flex-col gap-2.5 pb-1 sm:gap-3 sm:pb-2">
-      <div className="flex h-9 w-full min-w-0 flex-nowrap items-stretch gap-1 sm:h-10 sm:gap-1.5">
+      <div
+        className={`flex min-w-0 flex-col gap-2 ${showDesktopPayout ? "lg:flex-row lg:items-center lg:gap-3" : ""}`}
+      >
+        <div
+          className={`flex h-9 w-full min-w-0 flex-nowrap items-stretch gap-1 sm:h-10 sm:gap-1.5 ${
+            showDesktopPayout ? "lg:min-w-0 lg:flex-1" : ""
+          }`}
+        >
         {betPresets.map(value => (
           <button
             key={value}
@@ -95,6 +110,21 @@ export default function SoloV2GameFooter({
         >
           +
         </button>
+        </div>
+
+        {showDesktopPayout ? (
+          <aside
+            className="hidden h-9 w-[10.25rem] max-w-[40vw] shrink-0 flex-row items-center justify-between gap-1.5 rounded-md border border-amber-900/50 bg-zinc-800/55 px-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:h-10 lg:flex"
+            aria-label="Payout summary"
+          >
+            <span className="min-w-0 max-w-[46%] truncate text-left text-[7px] font-bold uppercase leading-none tracking-[0.12em] text-amber-200/45 sm:text-[8px]">
+              {payout.label}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-right text-sm font-black tabular-nums leading-none text-amber-100 sm:text-base">
+              {payout.value}
+            </span>
+          </aside>
+        ) : null}
       </div>
 
       {hidePrimaryAction ? (

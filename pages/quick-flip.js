@@ -1251,6 +1251,10 @@ export default function QuickFlipPage() {
         primaryLoadingLabel: "FLIPPING...",
         onPrimaryAction: handlePrimaryCta,
         errorMessage: errorMessage || stakeHint,
+        desktopPayout: {
+          label: payoutBandLabel,
+          value: payoutBandValue,
+        },
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={

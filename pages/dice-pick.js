@@ -1267,6 +1267,10 @@ export default function DicePickPage() {
         primaryLoadingLabel: "ROLLING...",
         onPrimaryAction: handlePrimaryCta,
         errorMessage: errorMessage || stakeHint,
+        desktopPayout: {
+          label: payoutBandLabel,
+          value: payoutBandValue,
+        },
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
