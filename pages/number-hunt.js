@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import NumberHuntBoard from "../components/solo-v2/NumberHuntBoard";
+import DicePickBoard from "../components/solo-v2/DicePickBoard";
+import { NumberHuntGuessSlots, NumberHuntPickGrid } from "../components/solo-v2/NumberHuntBoard";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
   SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
@@ -146,6 +147,7 @@ function NumberHuntGameplayPanel({
   pickDisabled,
   resultPopupOpen,
   resolvedIsWin,
+  popupTitle,
   popupLine2,
   popupLine3,
   resultVaultLabel,
@@ -168,33 +170,36 @@ function NumberHuntGameplayPanel({
   const revealWin = Boolean(resolvedResult?.isWin);
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <NumberHuntBoard
-          playing={playing}
-          pickingUi={pickingUi}
-          sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
-          stepTotal={stepTotal}
-          currentStepIndex={currentStepIndex}
-          stepsComplete={stepsComplete}
-          stepLabels={["1st", "2nd", "3rd"]}
-          payoutBandLabel={payoutBandLabel}
-          payoutBandValue={payoutBandValue}
-          payoutCaption={payoutCaption}
-          onPickNumber={onPickNumber}
-          pickDisabled={pickDisabled}
-          revealTarget={revealTarget}
-          revealWin={revealWin}
-        />
-      </div>
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
+      <DicePickBoard
+        sessionNotice={sessionNotice}
+        statusTop={statusTop}
+        statusSub={statusSub}
+        stepTotal={stepTotal}
+        currentStepIndex={currentStepIndex}
+        stepsComplete={stepsComplete}
+        stepLabels={["1st", "2nd", "3rd"]}
+        payoutBandLabel={payoutBandLabel}
+        payoutBandValue={payoutBandValue}
+        payoutCaption={payoutCaption}
+        diceSlot={<NumberHuntGuessSlots playing={playing} />}
+        choiceSlot={
+          <NumberHuntPickGrid
+            playing={playing}
+            pickingUi={pickingUi}
+            onPickNumber={onPickNumber}
+            pickDisabled={pickDisabled}
+            revealTarget={revealTarget}
+            revealWin={revealWin}
+          />
+        }
+      />
 
       <SoloV2ResultPopup
         open={resultPopupOpen}
         isWin={resolvedIsWin}
         resultTone={resolvedIsWin ? "win" : "lose"}
-        animationKey={`${popupLine2}-${popupLine3}-${resolvedIsWin ? "w" : "l"}-${resultVaultLabel}`}
+        animationKey={`${popupLine2}-${popupLine3}-${resultVaultLabel}`}
         vaultSlot={
           resultPopupOpen ? (
             <SoloV2ResultPopupVaultLine
@@ -205,9 +210,7 @@ function NumberHuntGameplayPanel({
           ) : undefined
         }
       >
-        <div className="text-[13px] font-black uppercase tracking-wide">
-          {resolvedIsWin ? "YOU WIN" : "YOU LOSE"}
-        </div>
+        <div className="text-[13px] font-black uppercase tracking-wide">{popupTitle}</div>
         <div className="mt-1 text-sm font-bold text-white">
           <span className="text-amber-100 tabular-nums">{popupLine2}</span>
         </div>
@@ -930,6 +933,8 @@ export default function NumberHuntPage() {
       ? `TARGET ${secret} · GUESSES: ${guessPath}`
       : `GUESSES: ${guessPath}`;
 
+  const popupTitle = resolvedIsWin ? "YOU WIN" : "YOU LOSE";
+
   const delta = Number(resolvedResult?.settlementSummary?.netDelta ?? 0);
   const resultVaultLabel =
     resolvedResult?.settlementSummary != null ? `${delta > 0 ? "+" : ""}${formatCompact(delta)}` : "";
@@ -1046,6 +1051,10 @@ export default function NumberHuntPage() {
           void runStartHunt();
         },
         errorMessage: errorMessage || stakeHint,
+        desktopPayout: {
+          label: payoutBandLabel,
+          value: payoutBandValue,
+        },
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
@@ -1066,6 +1075,7 @@ export default function NumberHuntPage() {
           pickDisabled={pickDisabled}
           resultPopupOpen={resultPopupOpen}
           resolvedIsWin={resolvedIsWin}
+          popupTitle={popupTitle}
           popupLine2={popupLine2}
           popupLine3={popupLine3}
           resultVaultLabel={resultVaultLabel}
