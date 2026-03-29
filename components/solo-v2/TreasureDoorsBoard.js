@@ -82,23 +82,6 @@ export default function TreasureDoorsBoard({
     return "future";
   }
 
-  const clearedChips = [];
-  if (!isTerminalRecap) {
-    for (let i = 0; i < cur; i += 1) {
-      const d = pickDoorForChamber(doorHistory, i);
-      if (d != null) {
-        clearedChips.push(
-          <span
-            key={`chip-${i}`}
-            className="inline-flex shrink-0 items-center rounded-md border border-zinc-700 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-zinc-300 sm:text-[10px]"
-          >
-            D{d + 1}
-          </span>,
-        );
-      }
-    }
-  }
-
   return (
     <div
       className={`flex w-full min-h-0 flex-1 flex-col overflow-hidden px-0.5 sm:overflow-visible ${hideChamberRunStrip ? "gap-1 sm:gap-1.5" : "gap-2 sm:gap-2.5"}`}
@@ -140,13 +123,6 @@ export default function TreasureDoorsBoard({
           </div>
         </div>
       ) : null}
-
-      {/* Cleared summary — compact badges, not a second grid */}
-      {clearedChips.length > 0 ? (
-        <div className="flex min-h-[22px] shrink-0 flex-wrap justify-center gap-1">{clearedChips}</div>
-      ) : (
-        <div className="h-[22px] shrink-0" aria-hidden />
-      )}
 
       {/* Hero: one chamber, three doors — flat card, no halo behind */}
       <div className="relative flex min-h-0 flex-1 flex-col justify-center sm:min-h-auto">
