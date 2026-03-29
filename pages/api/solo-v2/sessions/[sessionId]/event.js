@@ -626,11 +626,21 @@ export default async function handler(req, res) {
       }
 
       if (snapshot.readState !== "choice_required") {
+        const rs = String(snapshot.readState || "");
+        let detail = "This step is not accepting a new sigil pick right now.";
+        if (rs === "choice_submitted") {
+          detail =
+            "Your last sigil is still resolving — wait for the result before choosing again (avoid double-tapping).";
+        } else if (rs === "resolved") {
+          detail = "This Mystery Chamber run has already finished — start a new run to play again.";
+        } else if (rs === "invalid") {
+          detail = "Session is not in a valid state for Mystery Chamber picks.";
+        }
         return res.status(409).json({
           ok: false,
           category: "conflict",
           status: "invalid_session_state",
-          message: "This chamber is not waiting for a new sigil choice.",
+          message: detail,
         });
       }
 
@@ -661,7 +671,8 @@ export default async function handler(req, res) {
           ok: false,
           category: "conflict",
           status: "pick_conflict",
-          message: "A different sigil is already pending.",
+          message:
+            "A different sigil is already locked in for this chamber — refresh if the screen looks out of sync.",
         });
       }
     }

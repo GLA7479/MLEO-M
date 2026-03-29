@@ -62,6 +62,8 @@ const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
 const REVEAL_READABLE_MS = 620;
 const SUCCESS_ANIM_CLEAR_MS = 400;
+/** After a safe chamber, hold the chosen sigil highlighted and block new picks until the next chamber is obvious. */
+const CHAMBER_INTERSTITIAL_MS = 720;
 
 function parseWagerInput(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
@@ -319,6 +321,7 @@ export default function MysteryChamberPage() {
   const [inMysteryLoop, setInMysteryLoop] = useState(false);
   const [persistedBoard, setPersistedBoard] = useState(null);
   const [localAnim, setLocalAnim] = useState(null);
+  const [interstitialSafeSigil, setInterstitialSafeSigil] = useState(null);
   const [revealPulse, setRevealPulse] = useState(false);
   const [mcLocalStats, setMcLocalStats] = useState(() => readMysteryChamberStats());
 
@@ -335,6 +338,8 @@ export default function MysteryChamberPage() {
   const lastPresetAmountRef = useRef(null);
   const resultPopupTimerRef = useRef(null);
   const localAnimTimerRef = useRef(null);
+  const postSuccessInterstitialTimerRef = useRef(null);
+  const interstitialSafeSigilRef = useRef(null);
 
   const giftShell = useSoloV2GiftShellState();
 
@@ -346,8 +351,18 @@ export default function MysteryChamberPage() {
     return () => {
       if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
       if (localAnimTimerRef.current) clearTimeout(localAnimTimerRef.current);
+      if (postSuccessInterstitialTimerRef.current) clearTimeout(postSuccessInterstitialTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    interstitialSafeSigilRef.current = null;
+    setInterstitialSafeSigil(null);
+    if (postSuccessInterstitialTimerRef.current) {
+      clearTimeout(postSuccessInterstitialTimerRef.current);
+      postSuccessInterstitialTimerRef.current = null;
+    }
+  }, [session?.id]);
 
   useEffect(() => {
     sessionRef.current = session;
@@ -650,12 +665,27 @@ export default function MysteryChamberPage() {
     return { response, payload };
   }
 
-  function scheduleClearSuccessAnim() {
+  function schedulePostSuccessChamberSequence(chosenSigilRaw) {
+    const c = Math.floor(Number(chosenSigilRaw));
+    const chosenOk = Number.isFinite(c) && c >= 0 && c <= 3;
+
     if (localAnimTimerRef.current) clearTimeout(localAnimTimerRef.current);
+    if (postSuccessInterstitialTimerRef.current) clearTimeout(postSuccessInterstitialTimerRef.current);
+
     localAnimTimerRef.current = window.setTimeout(() => {
       localAnimTimerRef.current = null;
       setLocalAnim(null);
       setRevealPulse(false);
+      if (!chosenOk) {
+        return;
+      }
+      interstitialSafeSigilRef.current = c;
+      setInterstitialSafeSigil(c);
+      postSuccessInterstitialTimerRef.current = window.setTimeout(() => {
+        postSuccessInterstitialTimerRef.current = null;
+        interstitialSafeSigilRef.current = null;
+        setInterstitialSafeSigil(null);
+      }, CHAMBER_INTERSTITIAL_MS);
     }, SUCCESS_ANIM_CLEAR_MS);
   }
 
@@ -695,7 +725,7 @@ export default function MysteryChamberPage() {
           applySessionReadState(readResult.session, { resumed: true });
         }
         setUiState(UI_STATE.SESSION_ACTIVE);
-        scheduleClearSuccessAnim();
+        schedulePostSuccessChamberSequence(r.sigilIndex);
         return;
       }
 
@@ -797,6 +827,16 @@ export default function MysteryChamberPage() {
       setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Resolve failed."));
       setRevealPulse(false);
       setLocalAnim(null);
+      interstitialSafeSigilRef.current = null;
+      setInterstitialSafeSigil(null);
+      if (localAnimTimerRef.current) {
+        clearTimeout(localAnimTimerRef.current);
+        localAnimTimerRef.current = null;
+      }
+      if (postSuccessInterstitialTimerRef.current) {
+        clearTimeout(postSuccessInterstitialTimerRef.current);
+        postSuccessInterstitialTimerRef.current = null;
+      }
       const readResult = await readSessionTruth(sessionId, activeCycle);
       if (readResult?.ok && readResult.session) {
         setSession(readResult.session);
@@ -809,6 +849,7 @@ export default function MysteryChamberPage() {
   }
 
   async function handleSigilPick(sigilIndex) {
+    if (interstitialSafeSigilRef.current != null) return;
     const sid = sessionRef.current?.id;
     const mc = sessionRef.current?.mysteryChamber;
     if (sid == null || String(mc?.readState || "") !== "choice_required") return;
@@ -1080,11 +1121,24 @@ export default function MysteryChamberPage() {
     uiState === UI_STATE.SUBMITTING_PICK || uiState === UI_STATE.RESOLVING || uiState === UI_STATE.LOADING;
 
   const sigilPickDisabled =
-    busyFooter || uiState !== UI_STATE.SESSION_ACTIVE || readState !== "choice_required" || Boolean(localAnim);
+    busyFooter ||
+    uiState !== UI_STATE.SESSION_ACTIVE ||
+    readState !== "choice_required" ||
+    Boolean(localAnim) ||
+    interstitialSafeSigil != null;
 
   let sigilVisuals = defaultVisuals();
   if (localAnim) {
     sigilVisuals = visualsFromLocalAnim(localAnim);
+  } else if (interstitialSafeSigil != null) {
+    const c = Math.floor(Number(interstitialSafeSigil));
+    if (Number.isFinite(c) && c >= 0 && c <= 3) {
+      sigilVisuals = defaultVisuals();
+      sigilVisuals[c] = "safe";
+      for (let i = 0; i < 4; i += 1) {
+        if (i !== c) sigilVisuals[i] = "muted";
+      }
+    }
   } else if (uiState === UI_STATE.RESOLVED && persistedBoard) {
     sigilVisuals = visualsFromPersistedBoard(persistedBoard);
   }
@@ -1093,7 +1147,8 @@ export default function MysteryChamberPage() {
     uiState === UI_STATE.SESSION_ACTIVE &&
     readState === "choice_required" &&
     Boolean(mcSnap?.canCashOut) &&
-    !localAnim;
+    !localAnim &&
+    interstitialSafeSigil == null;
   const exitDisabled = busyFooter;
 
   let statusTop = "Press START MYSTERY CHAMBER to begin.";
@@ -1107,6 +1162,13 @@ export default function MysteryChamberPage() {
   if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_submitted") {
     statusTop = "Resolving…";
     statusSub = "Checking your sigil on the server.";
+  } else if (interstitialSafeSigil != null) {
+    const nextHuman = Math.min(
+      MYSTERY_CHAMBER_CHAMBER_COUNT,
+      Math.max(1, Math.floor(Number(curCh) || 0) + 1),
+    );
+    statusTop = "Chamber cleared — safe path.";
+    statusSub = `Next: Chamber ${nextHuman} of ${MYSTERY_CHAMBER_CHAMBER_COUNT}. Sigils unlock in a moment — then choose again; the same glyph is a new pick for this chamber.`;
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_required" && !localAnim) {
     statusTop = `Chamber ${curCh + 1} of ${MYSTERY_CHAMBER_CHAMBER_COUNT}. Exit now or continue.`;
     const nSafe = MYSTERY_CHAMBER_SAFE_COUNT_BY_STEP[curCh] ?? 1;
@@ -1272,6 +1334,8 @@ export default function MysteryChamberPage() {
         wagerInput,
         wagerNumeric: numericWager,
         canEditPlay: !busyFooter,
+        compactAmountDisplayWhenBlurred: true,
+        formatPresetLabel: v => formatCompact(v),
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();

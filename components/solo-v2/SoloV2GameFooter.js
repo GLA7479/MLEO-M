@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { formatCompactNumber } from "../../lib/solo-v2/formatCompactNumber";
+
 /**
  * Shared Solo V2 bottom shell: wager controls + primary CTA + inline error.
  * Game supplies presets/steps and handlers; layout stays fixed for all games.
@@ -27,7 +30,18 @@ export default function SoloV2GameFooter({
   /** When true, always reserve error row height (opacity/transparent text when empty). */
   reserveErrorRow = false,
   errorMessage = "",
+  /**
+   * When true: amount field shows compact K/M/B while blurred; raw digits while focused.
+   * Underlying `wagerNumeric` / `onAmountInput` stay unchanged (display-only toggle).
+   */
+  compactAmountDisplayWhenBlurred = false,
+  formatAmountCompact = formatCompactNumber,
 }) {
+  const [amountFieldFocused, setAmountFieldFocused] = useState(false);
+  const showCompactAmount = compactAmountDisplayWhenBlurred && !amountFieldFocused;
+
+  const amountInputValue = showCompactAmount ? formatAmountCompact(wagerNumeric) : wagerInput;
+
   return (
     <div className="flex w-full shrink-0 flex-col gap-2.5 pb-1 sm:gap-3 sm:pb-2">
       <div className="flex h-9 w-full min-w-0 flex-nowrap items-stretch gap-1 sm:h-10 sm:gap-1.5">
@@ -57,8 +71,10 @@ export default function SoloV2GameFooter({
         <input
           type="text"
           inputMode="numeric"
-          value={wagerInput}
+          value={amountInputValue}
           onChange={e => onAmountInput?.(e.target.value)}
+          onFocus={() => setAmountFieldFocused(true)}
+          onBlur={() => setAmountFieldFocused(false)}
           disabled={!canEditPlay}
           className="h-full min-w-0 flex-[1.15] rounded-md border border-white/20 bg-black/40 px-1.5 text-center text-[11px] font-bold text-white disabled:opacity-50 sm:min-w-[4.5rem] sm:text-sm"
         />
