@@ -254,3 +254,12 @@ body {
   animation: c21-card-reveal 0.38s cubic-bezier(0.2, 0.85, 0.25, 1) both;
 }
 
+/* Solo V2 — desktop-only compact shell padding (lg+). Not mobile; not zoom/transform. */
+@media (min-width: 1024px) {
+  .solo-v2-game-shell,
+  .solo-v2-arcade-lobby-main {
+    padding-top: max(4px, env(safe-area-inset-top)) !important;
+    padding-bottom: max(4px, env(safe-area-inset-bottom)) !important;
+  }
+}
+

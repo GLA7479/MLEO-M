@@ -59,12 +59,12 @@ export default function SoloV2GameFooter({
   const showDesktopPayout = Boolean(payout && (payout.label != null || payout.value != null));
 
   return (
-    <div className="flex w-full shrink-0 flex-col gap-2.5 pb-1 sm:gap-3 sm:pb-2">
+    <div className="flex w-full shrink-0 flex-col gap-2.5 pb-1 sm:gap-3 sm:pb-2 lg:gap-2 lg:pb-1">
       <div
-        className={`flex min-w-0 flex-col gap-2 ${showDesktopPayout ? "lg:flex-row lg:items-center lg:gap-3" : ""}`}
+        className={`flex min-w-0 flex-col gap-2 lg:gap-1.5 ${showDesktopPayout ? "lg:flex-row lg:items-center lg:gap-2.5" : ""}`}
       >
         <div
-          className={`flex h-9 w-full min-w-0 flex-nowrap items-stretch gap-1 sm:h-10 sm:gap-1.5 ${
+          className={`flex h-9 w-full min-w-0 flex-nowrap items-stretch gap-1 sm:h-10 sm:gap-1.5 lg:h-9 lg:gap-1 ${
             showDesktopPayout ? "lg:min-w-0 lg:flex-1" : ""
           }`}
         >
@@ -87,7 +87,7 @@ export default function SoloV2GameFooter({
           type="button"
           onClick={onDecreaseAmount}
           disabled={!canEditPlay}
-          className="h-full w-9 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:w-10"
+          className="h-full w-9 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:w-10 lg:w-9"
         >
           −
         </button>
@@ -105,7 +105,7 @@ export default function SoloV2GameFooter({
           type="button"
           onClick={onResetAmount}
           disabled={!canEditPlay}
-          className="h-full w-9 shrink-0 rounded-md border border-red-400/35 bg-red-500/15 text-[11px] font-bold text-red-100 disabled:opacity-50 sm:w-10"
+          className="h-full w-9 shrink-0 rounded-md border border-red-400/35 bg-red-500/15 text-[11px] font-bold text-red-100 disabled:opacity-50 sm:w-10 lg:w-9"
           title="Reset"
         >
           ↺
@@ -114,7 +114,7 @@ export default function SoloV2GameFooter({
           type="button"
           onClick={onIncreaseAmount}
           disabled={!canEditPlay}
-          className="h-full w-9 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:w-10"
+          className="h-full w-9 shrink-0 rounded-md border border-white/20 bg-white/10 text-sm font-bold leading-none text-white disabled:opacity-50 sm:w-10 lg:w-9"
         >
           +
         </button>
@@ -122,7 +122,7 @@ export default function SoloV2GameFooter({
 
         {showDesktopPayout ? (
           <aside
-            className="hidden h-9 w-[10.25rem] max-w-[40vw] shrink-0 flex-row items-center justify-between gap-1.5 rounded-md border border-amber-900/50 bg-zinc-800/55 px-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:h-10 lg:flex"
+            className="hidden h-9 w-[10.25rem] max-w-[40vw] shrink-0 flex-row items-center justify-between gap-1.5 rounded-md border border-amber-900/50 bg-zinc-800/55 px-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:h-10 lg:flex lg:h-9"
             aria-label="Payout summary"
           >
             <span className="min-w-0 max-w-[46%] truncate text-left text-[7px] font-bold uppercase leading-none tracking-[0.12em] text-amber-200/45 sm:text-[8px]">
@@ -136,13 +136,15 @@ export default function SoloV2GameFooter({
       </div>
 
       {hidePrimaryAction ? (
-        reservePrimarySlotWhenHidden ? <div className="min-h-[48px] w-full shrink-0" aria-hidden /> : null
+        reservePrimarySlotWhenHidden ? (
+          <div className="min-h-[48px] w-full shrink-0 lg:min-h-[44px]" aria-hidden />
+        ) : null
       ) : (
         <button
           type="button"
           onClick={onPrimaryAction}
           disabled={primaryActionDisabled || primaryActionLoading}
-          className={`min-h-[48px] w-full rounded-lg border px-4 py-2.5 text-base font-extrabold tracking-wide ${
+          className={`min-h-[48px] w-full rounded-lg border px-4 py-2.5 text-base font-extrabold tracking-wide lg:min-h-[44px] lg:py-2 lg:text-sm ${
             primaryActionDisabled || primaryActionLoading
               ? "cursor-not-allowed border-white/20 bg-white/10 text-zinc-400 opacity-70"
               : "border-emerald-400/40 bg-gradient-to-r from-emerald-600 to-green-600 text-white"
@@ -157,7 +159,7 @@ export default function SoloV2GameFooter({
           type="button"
           onClick={onSecondaryAction}
           disabled={secondaryActionDisabled || secondaryActionLoading}
-          className={`min-h-[44px] w-full rounded-lg border px-4 py-2 text-xs font-extrabold uppercase tracking-wide sm:text-sm ${
+          className={`min-h-[44px] w-full rounded-lg border px-4 py-2 text-xs font-extrabold uppercase tracking-wide sm:text-sm lg:min-h-[42px] lg:py-1.5 lg:text-xs ${
             secondaryActionLgHidden ? "lg:hidden" : ""
           } ${
             secondaryActionDisabled || secondaryActionLoading
@@ -170,7 +172,7 @@ export default function SoloV2GameFooter({
       ) : null}
 
       {reserveErrorRow ? (
-        <div className="flex min-h-[2.75rem] shrink-0 items-start justify-center px-0.5 sm:min-h-[3rem]">
+        <div className="flex min-h-[2.75rem] shrink-0 items-start justify-center px-0.5 sm:min-h-[3rem] lg:min-h-[2.5rem]">
           <p
             className={`line-clamp-2 text-center text-[11px] leading-snug transition-opacity duration-150 ${
               errorMessage ? "text-red-300/95 opacity-100" : "text-transparent opacity-0"

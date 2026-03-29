@@ -31,14 +31,14 @@ export default function SoloV2ArcadeLobby() {
   return (
     <Layout title="Arcade Solo V2">
       <main
-        className="h-[100dvh] max-h-[100dvh] overflow-hidden bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white"
+        className="solo-v2-arcade-lobby-main h-[100dvh] max-h-[100dvh] overflow-hidden bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white"
         style={{
           paddingTop: "max(8px, env(safe-area-inset-top))",
           paddingBottom: "max(8px, env(safe-area-inset-bottom))",
         }}
       >
-        <div className="mx-auto flex h-full max-w-2xl min-h-0 flex-col gap-2 px-2">
-          <header className="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-white/15 bg-black/30 px-2 py-2">
+        <div className="mx-auto flex h-full max-w-2xl min-h-0 flex-col gap-2 px-2 lg:gap-1.5 lg:px-3">
+          <header className="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-white/15 bg-black/30 px-2 py-2 lg:gap-1.5 lg:px-2 lg:py-1.5">
             <Link
               href="/mining"
               className="rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-xs font-semibold text-white"
@@ -46,8 +46,8 @@ export default function SoloV2ArcadeLobby() {
               Back
             </Link>
             <div className="min-w-0 flex-1 text-center">
-              <h1 className="truncate text-sm font-extrabold sm:text-base">Arcade Solo V2</h1>
-              <p className="truncate text-[11px] text-zinc-300">Mobile-first lobby foundation</p>
+              <h1 className="truncate text-sm font-extrabold sm:text-base lg:text-sm">Arcade Solo V2</h1>
+              <p className="truncate text-[11px] text-zinc-300 lg:text-[10px]">Mobile-first lobby foundation</p>
             </div>
             <div className="rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-[11px] text-zinc-200">
               {SOLO_V2_LOBBY_GAMES.length} games
@@ -66,7 +66,7 @@ export default function SoloV2ArcadeLobby() {
             />
           )}
 
-          <section className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-black/20 p-2">
+          <section className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-black/20 p-2 lg:p-1.5">
             {v2Enabled ? (
               <SoloV2LobbyGrid games={pageGames} />
             ) : (

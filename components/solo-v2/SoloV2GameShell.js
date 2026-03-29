@@ -81,7 +81,7 @@ export default function SoloV2GameShell({
 
   return (
     <main
-      className="relative h-[100dvh] max-h-[100dvh] overflow-hidden text-white"
+      className="solo-v2-game-shell relative h-[100dvh] max-h-[100dvh] overflow-hidden text-white"
       style={{
         paddingTop: "max(8px, env(safe-area-inset-top))",
         paddingBottom: "max(8px, env(safe-area-inset-bottom))",
@@ -90,8 +90,8 @@ export default function SoloV2GameShell({
       }}
     >
       <div
-        className={`mx-auto flex h-full w-full min-h-0 flex-col px-3 sm:px-4 ${layoutMaxWidthClass} ${
-          mobileHeaderBreathingRoom ? "gap-2.5 sm:gap-3" : "gap-1.5 sm:gap-3"
+        className={`mx-auto flex h-full w-full min-h-0 flex-col px-3 sm:px-4 lg:px-3.5 ${layoutMaxWidthClass} ${
+          mobileHeaderBreathingRoom ? "gap-2.5 sm:gap-3 lg:gap-2" : "gap-1.5 sm:gap-3 lg:gap-2"
         }`}
       >
         <SoloV2TopHud
@@ -117,7 +117,7 @@ export default function SoloV2GameShell({
               <button
                 type="button"
                 onClick={() => setIsResultOpen(true)}
-                className="inline-flex h-8 touch-manipulation select-none items-center justify-center rounded-full border border-violet-400/25 bg-violet-500/25 px-3 text-[11px] font-medium text-violet-50 shadow-sm shadow-black/20 transition-colors hover:bg-violet-500/35 active:bg-violet-500/40 sm:text-xs"
+                className="inline-flex h-8 touch-manipulation select-none items-center justify-center rounded-full border border-violet-400/25 bg-violet-500/25 px-3 text-[11px] font-medium text-violet-50 shadow-sm shadow-black/20 transition-colors hover:bg-violet-500/35 active:bg-violet-500/40 sm:text-xs lg:h-7 lg:px-2.5 lg:text-[10px]"
                 aria-label="View result"
               >
                 Result
@@ -137,7 +137,7 @@ export default function SoloV2GameShell({
         >
           <div
             className={`flex h-full min-h-0 items-stretch justify-center ${
-              mobileHeaderBreathingRoom ? "max-sm:pt-1.5" : ""
+              mobileHeaderBreathingRoom ? "max-sm:pt-1.5 lg:pt-0" : "lg:pt-0"
             }`}
           >
             <div
@@ -177,11 +177,11 @@ export default function SoloV2GameShell({
       </div>
 
       <SoloV2Modal open={isInfoOpen} title="Info" onClose={() => setIsInfoOpen(false)} maxWidthClass="max-w-lg">
-        <div className="mb-5 flex gap-1.5 rounded-2xl border border-white/10 bg-black/35 p-1 sm:gap-2 sm:p-1.5">
+        <div className="mb-5 flex gap-1.5 rounded-2xl border border-white/10 bg-black/35 p-1 sm:gap-2 sm:p-1.5 lg:mb-4 lg:gap-1.5 lg:p-1">
           <button
             type="button"
             onClick={() => setInfoTab("help")}
-            className={`min-h-[44px] flex-1 rounded-xl px-3 py-2.5 text-sm font-semibold transition sm:py-3 ${
+            className={`min-h-[44px] flex-1 rounded-xl px-3 py-2.5 text-sm font-semibold transition sm:py-3 lg:min-h-[40px] lg:py-2 ${
               infoTab === "help"
                 ? "border border-amber-400/45 bg-amber-500/25 text-amber-50 shadow-sm shadow-amber-900/20"
                 : "border border-transparent text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
@@ -192,7 +192,7 @@ export default function SoloV2GameShell({
           <button
             type="button"
             onClick={() => setInfoTab("stats")}
-            className={`min-h-[44px] flex-1 rounded-xl px-3 py-2.5 text-sm font-semibold transition sm:py-3 ${
+            className={`min-h-[44px] flex-1 rounded-xl px-3 py-2.5 text-sm font-semibold transition sm:py-3 lg:min-h-[40px] lg:py-2 ${
               infoTab === "stats"
                 ? "border border-amber-400/45 bg-amber-500/25 text-amber-50 shadow-sm shadow-amber-900/20"
                 : "border border-transparent text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
@@ -201,7 +201,7 @@ export default function SoloV2GameShell({
             Stats
           </button>
         </div>
-        <div className="text-[15px] leading-[1.65] text-zinc-200/95 [&_p]:mb-3 [&_p:last-child]:mb-0">
+        <div className="text-[15px] leading-[1.65] text-zinc-200/95 lg:text-sm lg:leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0">
           {infoTab === "help"
             ? helpContent || (
                 <p>

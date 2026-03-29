@@ -1,6 +1,6 @@
 export default function SoloV2LobbyPager({ pageCount, pageIndex, onChange }) {
   return (
-    <nav className="flex shrink-0 items-center justify-center gap-1" aria-label="Lobby pages">
+    <nav className="flex shrink-0 items-center justify-center gap-1 lg:gap-0.5" aria-label="Lobby pages">
       {Array.from({ length: pageCount }).map((_, idx) => {
         const active = idx === pageIndex;
         return (
@@ -8,7 +8,7 @@ export default function SoloV2LobbyPager({ pageCount, pageIndex, onChange }) {
             key={`page-${idx}`}
             type="button"
             onClick={() => onChange(idx)}
-            className={`min-h-[34px] min-w-[34px] rounded-lg border text-xs font-extrabold ${
+            className={`min-h-[34px] min-w-[34px] rounded-lg border text-xs font-extrabold lg:min-h-[30px] lg:min-w-[30px] lg:text-[11px] ${
               active
                 ? "border-violet-300/60 bg-violet-500/40 text-white"
                 : "border-white/20 bg-white/5 text-zinc-200"
