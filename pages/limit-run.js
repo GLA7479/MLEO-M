@@ -123,7 +123,10 @@ function limitRunRoundStripModel(uiState, readState) {
   return { stepTotal, stepsComplete: 0, currentStepIndex: 0 };
 }
 
-/** Ladder-family shell — mirrors Gold Rush Digger; inner board keeps limbo / target-roll identity. */
+/**
+ * Ladder-family shell — mirrors Gold Rush Digger; inner board keeps limbo / target-roll identity.
+ * Approved exception: inner playfield wrappers use shrink-0 flex (not the dig-style flex-1 / min-h chain) for limbo UI — keep unless a design pass explicitly retargets vertical fill.
+ */
 function LimitRunGameplayPanel({
   session,
   targetMultiplier,
@@ -213,6 +216,7 @@ function LimitRunGameplayPanel({
           </div>
         </div>
 
+        {/* Approved inner flex variation (see LimitRunGameplayPanel JSDoc) — do not “normalize” to Gold Rush dig-grid flex. */}
         <div className="flex shrink-0 flex-col px-1 pb-1 sm:px-2 lg:px-4 lg:pb-1.5">
           <div
             className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"

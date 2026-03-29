@@ -19,6 +19,8 @@ export default function DicePickBoard({
   choiceSlot,
   /** When set, replaces the dice/choice two-column playfield (Hi-Lo Cards layout fix). Other games omit. */
   mergedPlayfieldSlot = null,
+  /** React keys for `SoloV2ProgressStrip` steps; must be unique per route when this board is reused. */
+  progressStripKeyPrefix = "dp",
 }) {
   const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
   const cleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
@@ -51,7 +53,7 @@ export default function DicePickBoard({
       </div>
 
       <SoloV2ProgressStrip
-        keyPrefix="dp"
+        keyPrefix={progressStripKeyPrefix}
         rowLabel="Round"
         ariaLabel="Round progress"
         stepTotal={total}

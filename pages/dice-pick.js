@@ -209,6 +209,7 @@ function DicePickGameplayPanel({
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
       <DicePickBoard
+        progressStripKeyPrefix="dice-pick"
         sessionNotice={sessionNotice}
         statusTop={statusTop}
         statusSub={statusSub}

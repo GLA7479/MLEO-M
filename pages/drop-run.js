@@ -183,6 +183,7 @@ function DropRunGameplayPanel({
           stepLabels={stepLabels}
         />
 
+        {/* Ladder payout subgroup B (footer-driven desktop payout) — see gold-rush-digger gameplay panel comment for subgroup A vs B. */}
         <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
           <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
             <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">

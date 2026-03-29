@@ -149,6 +149,7 @@ function extraStakeForChallenge21Action(decision, playing, baseWager) {
   return 0;
 }
 
+/** Solo V2 ladder chrome (strip + mobile payout band) + bespoke blackjack table (`TwentyOneChallengeBoard`) — intentional; do not fold into a generic ladder board in normalization passes. */
 function Challenge21GameplayPanel({
   sessionNotice,
   statusTop,

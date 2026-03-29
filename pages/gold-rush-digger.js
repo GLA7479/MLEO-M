@@ -218,6 +218,11 @@ function GoldRushGameplayPanel({
           </div>
         </div>
 
+        {/*
+         * Ladder desktop payout — two approved patterns (do not unify without design sign-off):
+         * Subgroup A — in-board desktop band: this page (and Speed Track, Treasure Doors, Mystery Chamber) shows payout/cash-out again under the playfield on lg+ (`lg:flex` block below).
+         * Subgroup B — footer-driven on lg+: mobile payout strip stays `lg:hidden`; desktop uses SoloV2GameFooter.desktopPayout only — e.g. Drop Run, Limit Run, 21 Challenge, DicePickBoard routes.
+         */}
         <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
           <div
             className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(14rem,30vh)]"
