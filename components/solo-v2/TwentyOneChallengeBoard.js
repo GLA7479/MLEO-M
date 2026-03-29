@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { formatCardShort, handTotal, upCardShowValue } from "../../lib/solo-v2/challenge21HandMath";
 
 /** Mobile-first: large default; `sm:` desktop; `compact` when split (slightly smaller). */
@@ -68,6 +69,56 @@ function opponentLabelFromSlots(slots) {
   return `Total ${handTotal(faceUpCodes)}`;
 }
 
+function ChallengePlayerHandBlock({
+  handIndex,
+  hand,
+  activeHandIndex,
+  pulses,
+  cardRowClassName,
+  showHandLabel,
+  compactCards,
+}) {
+  const arr = Array.isArray(hand) ? hand : [];
+  const active = handIndex === activeHandIndex;
+  const t = arr.length ? handTotal(arr) : null;
+  return (
+    <div
+      className={`rounded-lg px-0.5 py-0 sm:px-1 sm:py-0.5 ${
+        showHandLabel && active
+          ? "ring-1 ring-amber-400/50 ring-offset-1 ring-offset-transparent"
+          : showHandLabel && !active
+            ? "opacity-80"
+            : ""
+      }`}
+    >
+      {showHandLabel ? (
+        <div className="mb-0 text-[8px] font-semibold uppercase tracking-wide text-white/45">
+          Hand {handIndex + 1}
+        </div>
+      ) : null}
+      <div className={cardRowClassName}>
+        {arr.length === 0 ? (
+          <span className="text-xs text-white/35">—</span>
+        ) : (
+          arr.map((c, i) => (
+            <MiniCard
+              key={`p-${handIndex}-${i}-${c}`}
+              code={c}
+              hidden={false}
+              variant="player"
+              dealAnimate={pulses.has(`p-${handIndex}-${i}`)}
+              compact={compactCards}
+            />
+          ))
+        )}
+      </div>
+      <div className="mt-0 min-h-[1.05rem] text-[11px] font-bold tabular-nums leading-tight text-amber-100/90 sm:text-xs">
+        {t != null ? `Total ${t}` : "—"}
+      </div>
+    </div>
+  );
+}
+
 /**
  * @param {Array<{ code: string | null; hidden: boolean }>} slots
  */
@@ -117,6 +168,12 @@ export default function TwentyOneChallengeBoard({
       ? Math.max(0, Math.min(hands.length - 1, Math.floor(Number(presentation.activeHandIndex) || 0)))
       : Math.max(0, Math.min(hands.length - 1, Math.floor(Number(activeHandIndex) || 0)));
   const splitLayout = hands.length > 1;
+
+  const [mobileViewHandIndex, setMobileViewHandIndex] = useState(0);
+  useEffect(() => {
+    if (!splitLayout) return;
+    setMobileViewHandIndex(ai);
+  }, [ai, splitLayout]);
   const ov = Array.isArray(opponentVisibleHand) ? opponentVisibleHand : [];
   const oppResolved = Array.isArray(opponentHandResolved) ? opponentHandResolved : null;
 
@@ -186,7 +243,7 @@ export default function TwentyOneChallengeBoard({
       ) : null}
 
       {hands.length > 1 ? (
-        <div className="min-h-[0.85rem] shrink-0 text-[9px] font-semibold tabular-nums text-white/60 sm:text-[10px]">
+        <div className="hidden min-h-[0.85rem] shrink-0 text-[9px] font-semibold tabular-nums text-white/60 sm:block sm:text-[10px]">
           Hand {ai + 1} of {hands.length}
         </div>
       ) : suppressShellStatus ? null : (
@@ -195,14 +252,44 @@ export default function TwentyOneChallengeBoard({
 
       {suppressShellStatus && hands.length <= 1 ? <div className="min-h-[0.85rem] shrink-0" aria-hidden /> : null}
 
-      <div className="flex min-h-0 flex-1 flex-col justify-start gap-1 sm:gap-2">
+      {splitLayout ? (
+        <div
+          className="flex min-h-[1.25rem] shrink-0 items-center justify-center gap-1.5 sm:hidden"
+          role="tablist"
+          aria-label="Choose hand to view"
+        >
+          {hands.map((_, hi) => {
+            const playingHere = hi === ai;
+            const selected = hi === mobileViewHandIndex;
+            return (
+              <button
+                key={`mhand-tab-${hi}`}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setMobileViewHandIndex(hi)}
+                className={`rounded-lg border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide transition ${
+                  selected
+                    ? "border-amber-400/60 bg-amber-500/15 text-amber-100"
+                    : "border-white/15 bg-white/[0.06] text-white/70"
+                } ${playingHere ? "ring-1 ring-amber-400/70 ring-offset-1 ring-offset-zinc-950" : ""}`}
+              >
+                Hand {hi + 1}
+                {playingHere ? <span className="ml-1 text-[9px] font-extrabold text-amber-200">Play</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <div
+        className={`flex min-h-0 flex-1 flex-col justify-start gap-1 sm:gap-2 ${splitLayout ? "sm:gap-3" : ""}`}
+      >
         <div className="shrink-0">
           <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:text-[9px]">
             Opponent
           </div>
-          <div
-            className={`flex min-h-0 flex-wrap items-center justify-center gap-1 sm:gap-1.5 ${splitLayout ? "h-[4.85rem] py-0.5 sm:h-[4.1rem]" : "h-[5.75rem] py-0.5 sm:h-[4.65rem]"}`}
-          >
+          <div className="flex h-[5.75rem] min-h-0 flex-wrap items-center justify-center gap-1 py-0.5 sm:h-[4.65rem] sm:gap-1.5">
             {opponentRow.length === 0 ? (
               <div className="text-xs text-white/35">—</div>
             ) : (
@@ -213,7 +300,7 @@ export default function TwentyOneChallengeBoard({
                   hidden={hidden}
                   variant="dealer"
                   dealAnimate={pulse}
-                  compact={splitLayout}
+                  compact={false}
                 />
               ))
             )}
@@ -223,64 +310,78 @@ export default function TwentyOneChallengeBoard({
           </div>
         </div>
 
-        <div className="shrink-0">
+        <div
+          className={
+            splitLayout ? "flex shrink-0 flex-col sm:min-h-0 sm:flex-1 sm:justify-start" : "shrink-0"
+          }
+        >
           <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-amber-200/50 sm:text-[9px]">
             You
           </div>
-          <div className={`flex flex-col ${splitLayout ? "gap-0.5 sm:gap-1" : "gap-0 sm:gap-0.5"}`}>
-            {hands.length === 0 ? (
-              <div
-                className={`flex items-center justify-center text-xs text-white/35 ${splitLayout ? "h-[6.1rem] sm:h-[5.1rem]" : "h-[7.35rem] sm:h-[5.6rem]"}`}
-              >
-                —
-              </div>
-            ) : (
-              hands.map((h, hi) => {
-                const arr = Array.isArray(h) ? h : [];
-                const active = hi === ai;
-                const t = arr.length ? handTotal(arr) : null;
-                return (
-                  <div
+          {!splitLayout ? (
+            <div className="flex flex-col gap-0 sm:gap-0.5">
+              {hands.length === 0 ? (
+                <div className="flex h-[7.35rem] items-center justify-center text-xs text-white/35 sm:h-[5.6rem]">
+                  —
+                </div>
+              ) : (
+                hands.map((h, hi) => (
+                  <ChallengePlayerHandBlock
                     key={`ph-${hi}`}
-                    className={`rounded-lg px-0.5 py-0 sm:px-1 sm:py-0.5 ${
-                      hands.length > 1 && active
-                        ? "ring-1 ring-amber-400/50 ring-offset-1 ring-offset-transparent"
-                        : hands.length > 1
-                          ? "opacity-80"
-                          : ""
-                    }`}
-                  >
-                    {hands.length > 1 ? (
-                      <div className="mb-0 text-[8px] font-semibold uppercase tracking-wide text-white/45">
-                        Hand {hi + 1}
-                      </div>
-                    ) : null}
-                    <div
-                      className={`flex min-h-0 flex-wrap items-center justify-center gap-1 sm:gap-1.5 ${splitLayout ? "h-[6rem] sm:h-[5.1rem]" : "h-[7.2rem] sm:h-[5.45rem]"}`}
-                    >
-                      {arr.length === 0 ? (
-                        <span className="text-xs text-white/35">—</span>
-                      ) : (
-                        arr.map((c, i) => (
-                          <MiniCard
-                            key={`p-${hi}-${i}-${c}`}
-                            code={c}
-                            hidden={false}
-                            variant="player"
-                            dealAnimate={pulses.has(`p-${hi}-${i}`)}
-                            compact={splitLayout}
-                          />
-                        ))
-                      )}
-                    </div>
-                    <div className="mt-0 min-h-[1.05rem] text-[11px] font-bold tabular-nums leading-tight text-amber-100/90 sm:text-xs">
-                      {t != null ? `Total ${t}` : "—"}
-                    </div>
+                    handIndex={hi}
+                    hand={h}
+                    activeHandIndex={ai}
+                    pulses={pulses}
+                    showHandLabel={false}
+                    compactCards={false}
+                    cardRowClassName="flex h-[7.2rem] min-h-0 flex-wrap items-center justify-center gap-1 sm:h-[5.45rem] sm:gap-1.5"
+                  />
+                ))
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1 sm:hidden">
+                {hands.length === 0 ? (
+                  <div className="flex h-[7.35rem] items-center justify-center text-xs text-white/35">—</div>
+                ) : (
+                  <ChallengePlayerHandBlock
+                    handIndex={mobileViewHandIndex}
+                    hand={hands[mobileViewHandIndex]}
+                    activeHandIndex={ai}
+                    pulses={pulses}
+                    showHandLabel={false}
+                    compactCards={false}
+                    cardRowClassName="flex h-[7.2rem] min-h-0 flex-wrap items-center justify-center gap-1"
+                  />
+                )}
+              </div>
+              <div className="hidden min-h-0 flex-1 flex-col gap-2 sm:flex sm:gap-3">
+                {hands.length === 0 ? (
+                  <div className="flex min-h-[8rem] flex-1 items-center justify-center text-xs text-white/35 sm:min-h-[9rem]">
+                    —
                   </div>
-                );
-              })
-            )}
-          </div>
+                ) : (
+                  hands.map((h, hi) => (
+                    <div
+                      key={`ph-dk-${hi}`}
+                      className="flex min-h-0 flex-1 flex-col justify-center sm:basis-0"
+                    >
+                      <ChallengePlayerHandBlock
+                        handIndex={hi}
+                        hand={h}
+                        activeHandIndex={ai}
+                        pulses={pulses}
+                        showHandLabel
+                        compactCards={false}
+                        cardRowClassName="flex min-h-[6.5rem] flex-1 flex-wrap items-center justify-center gap-1 sm:min-h-[7.25rem] sm:gap-1.5 lg:min-h-[8rem]"
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

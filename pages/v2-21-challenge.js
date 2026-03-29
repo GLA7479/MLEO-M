@@ -184,6 +184,7 @@ function Challenge21GameplayPanel({
   const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
   const stripCleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
   const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
+  const splitPlayerHands = Array.isArray(playerHands) && playerHands.length > 1;
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
@@ -239,10 +240,16 @@ function Challenge21GameplayPanel({
 
         <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
           <div
-            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(14rem,30vh)]"
+            className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] ${
+              splitPlayerHands ? "lg:min-h-[min(26rem,58vh)]" : "lg:min-h-[min(14rem,30vh)]"
+            }`}
             aria-label="21 Challenge table"
           >
-            <div className="flex min-h-0 min-h-[11rem] flex-1 flex-col px-0.5 py-1 sm:min-h-[12rem] sm:px-1 sm:py-1.5 lg:min-h-0 lg:px-1 lg:py-0.5">
+            <div
+              className={`flex min-h-0 flex-1 flex-col px-0.5 py-1 sm:px-1 sm:py-1.5 lg:min-h-0 lg:px-1 lg:py-0.5 ${
+                splitPlayerHands ? "min-h-[11rem] sm:min-h-[20rem]" : "min-h-[11rem] sm:min-h-[12rem]"
+              }`}
+            >
               <TwentyOneChallengeBoard
                 sessionNotice=""
                 hideSessionBanner
