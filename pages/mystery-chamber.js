@@ -75,13 +75,44 @@ function defaultVisuals() {
   return ["idle", "idle", "idle", "idle"];
 }
 
+function mergeMysteryChamberSafeIndices(...lists) {
+  const s = new Set();
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const x of list) {
+      const n = Math.floor(Number(x));
+      if (n >= 0 && n <= 3) s.add(n);
+    }
+  }
+  return [...s].sort((a, b) => a - b);
+}
+
+function safeSigilRowFromResultGrid(r) {
+  const fi = r.finalChamberIndex ?? r.chamberIndex;
+  if (!Array.isArray(r?.safeSigilSets) || r.safeSigilSets.length !== MYSTERY_CHAMBER_CHAMBER_COUNT) {
+    return [];
+  }
+  if (fi == null) return [];
+  const idx = Math.floor(Number(fi));
+  if (!Number.isFinite(idx) || idx < 0 || idx >= MYSTERY_CHAMBER_CHAMBER_COUNT) return [];
+  const row = r.safeSigilSets[idx];
+  if (!Array.isArray(row)) return [];
+  return row.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3);
+}
+
+/** Full safe set for the failing step: union server reveal + grid row (authoritative for all greens). */
 function safeSigilSetFromApiResult(r) {
-  if (Array.isArray(r?.safeSigilSet) && r.safeSigilSet.length) {
-    return r.safeSigilSet.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3);
-  }
-  if (Array.isArray(r?.safeSigilSetRevealed) && r.safeSigilSetRevealed.length) {
-    return r.safeSigilSetRevealed.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3);
-  }
+  const a =
+    Array.isArray(r?.safeSigilSet) && r.safeSigilSet.length
+      ? r.safeSigilSet.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3)
+      : [];
+  const b =
+    Array.isArray(r?.safeSigilSetRevealed) && r.safeSigilSetRevealed.length
+      ? r.safeSigilSetRevealed.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3)
+      : [];
+  const c = safeSigilRowFromResultGrid(r);
+  const merged = mergeMysteryChamberSafeIndices(a, b, c);
+  if (merged.length) return merged;
   if (r?.safeSigil != null) {
     const x = Math.floor(Number(r.safeSigil));
     return x >= 0 && x <= 3 ? [x] : [];
@@ -89,20 +120,24 @@ function safeSigilSetFromApiResult(r) {
   return [];
 }
 
+function mysteryChamberChosenSigilFromResult(r) {
+  const raw = r.chosenSigil ?? r.lastChosenSigil;
+  if (raw == null) return null;
+  const c = Math.floor(Number(raw));
+  return c >= 0 && c <= 3 ? c : null;
+}
+
 function visualsFromPersistedBoard(pb) {
   const v = defaultVisuals();
   if (!pb || !pb.terminalKind) return v;
   if (pb.terminalKind === "fail") {
-    const c = Math.floor(Number(pb.chosenSigil));
-    const set = Array.isArray(pb.safeSigilSet)
-      ? pb.safeSigilSet.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3)
-      : pb.safeSigil != null
-        ? [Math.floor(Number(pb.safeSigil))].filter(n => n >= 0 && n <= 3)
-        : [];
-    if (c >= 0 && c <= 3) v[c] = "fail";
+    const set = safeSigilSetFromApiResult(pb);
     for (const si of set) {
       if (si >= 0 && si <= 3) v[si] = "safe";
     }
+    const cRaw = pb.chosenSigil ?? pb.lastChosenSigil;
+    const c = Math.floor(Number(cRaw));
+    if (c >= 0 && c <= 3) v[c] = "fail";
     for (let i = 0; i < 4; i += 1) {
       if (v[i] === "idle") v[i] = "muted";
     }
@@ -133,15 +168,14 @@ function withNormalizedMysterySettlement(resultLike, sessionMode) {
 function visualsFromLocalAnim(anim) {
   const v = defaultVisuals();
   if (!anim) return v;
-  const c = Math.floor(Number(anim.chosen));
-  if (c < 0 || c > 3) return v;
   if (anim.phase === "success") {
+    const c = Math.floor(Number(anim.chosen));
+    if (!Number.isFinite(c) || c < 0 || c > 3) return v;
     v[c] = "pending";
     for (let i = 0; i < 4; i += 1) if (i !== c) v[i] = "muted";
     return v;
   }
   if (anim.phase === "fail") {
-    v[c] = "fail";
     const set = Array.isArray(anim.safeSet)
       ? anim.safeSet.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3)
       : anim.safe != null
@@ -149,6 +183,11 @@ function visualsFromLocalAnim(anim) {
         : [];
     for (const si of set) {
       if (si >= 0 && si <= 3) v[si] = "safe";
+    }
+    const chosenRaw = anim.chosen;
+    if (chosenRaw != null && chosenRaw !== "") {
+      const c = Math.floor(Number(chosenRaw));
+      if (Number.isFinite(c) && c >= 0 && c <= 3) v[c] = "fail";
     }
     for (let i = 0; i < 4; i += 1) {
       if (v[i] === "idle") v[i] = "muted";
@@ -673,9 +712,11 @@ export default function MysteryChamberPage() {
           );
         }
 
+        const chosenForBoard = mysteryChamberChosenSigilFromResult(r);
+
         if (r.terminalKind === "fail") {
           setLocalAnim({
-            chosen: r.chosenSigil,
+            chosen: chosenForBoard != null ? chosenForBoard : undefined,
             safeSet: revealedSet,
             phase: "fail",
           });
@@ -685,8 +726,10 @@ export default function MysteryChamberPage() {
 
         setPersistedBoard({
           terminalKind: r.terminalKind,
-          chosenSigil: r.chosenSigil,
+          chosenSigil: chosenForBoard != null ? chosenForBoard : r.chosenSigil,
+          lastChosenSigil: r.lastChosenSigil ?? chosenForBoard,
           safeSigilSet: revealedSet,
+          safeSigilSets: r.safeSigilSets,
           finalChamberIndex: r.finalChamberIndex ?? r.chamberIndex,
           chambersCleared: r.chambersCleared ?? readResult?.session?.serverOutcomeSummary?.chambersCleared,
         });

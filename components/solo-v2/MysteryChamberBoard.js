@@ -11,7 +11,7 @@ function SigilTile({ index, visual, disabled, onPick, revealPulse }) {
   const glyph = MYSTERY_CHAMBER_SIGIL_GLYPHS[index] || "?";
 
   const shell =
-    "group relative flex h-full min-h-[5.65rem] w-full flex-col items-center justify-center rounded-2xl border-2 text-center shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-150 sm:min-h-[6.75rem] sm:rounded-[1.05rem] lg:min-h-[7rem]";
+    "group relative flex h-full min-h-[5.65rem] w-full flex-col items-center justify-center rounded-2xl border-2 text-center shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-150 sm:min-h-[6.45rem] sm:rounded-[1.05rem] lg:min-h-[6.75rem]";
 
   let face =
     "border-amber-700/45 bg-gradient-to-b from-zinc-800/95 to-zinc-950 text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ";
@@ -110,7 +110,7 @@ export default function MysteryChamberBoard({
         </div>
       </div>
 
-      <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1.5">
+      <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1">
         <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
           <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">
             Chambers
@@ -144,7 +144,7 @@ export default function MysteryChamberBoard({
         </div>
       </div>
 
-      <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-2">
+      <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1">
         <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
           <div className="flex items-center justify-between gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5">
             <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
@@ -163,7 +163,7 @@ export default function MysteryChamberBoard({
       </div>
 
       {/* Mobile: 2×2 centered in flex-1. Desktop: row is flex-none so EXIT NOW stays in view (no flex-1 spacer below). */}
-      <div className="flex min-h-0 flex-1 flex-col justify-center px-2 pb-0.5 pt-0 sm:flex-none sm:justify-start sm:px-4 sm:pb-1 sm:pt-0.5">
+      <div className="flex min-h-0 flex-1 flex-col justify-center px-2 pb-0.5 pt-0 sm:flex-none sm:justify-start sm:px-4 sm:pb-0.5 sm:pt-0">
         <div
           className="mx-auto grid w-full max-w-[17.75rem] grid-cols-2 grid-rows-2 gap-2 sm:mx-0 sm:max-w-none sm:grid-cols-4 sm:grid-rows-1 sm:gap-3 lg:gap-3.5"
           role="group"
@@ -188,18 +188,18 @@ export default function MysteryChamberBoard({
         </p>
       </div>
 
-      <div className="shrink-0 border-t border-amber-900/35 bg-zinc-950/80 px-2 py-1.5 sm:px-4 sm:py-2">
+      <div className="shrink-0 border-t border-amber-900/35 bg-zinc-950/80 px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1">
         {exitVisible ? (
           <button
             type="button"
             disabled={exitDisabled}
             onClick={() => onExitNow?.()}
-            className="w-full rounded-xl border-2 border-white/12 bg-white/[0.08] py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white transition enabled:hover:border-white/18 enabled:hover:bg-white/[0.11] enabled:active:scale-[0.99] enabled:active:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-35 sm:py-2.5 sm:text-[11px]"
+            className="w-full rounded-xl border-2 border-white/12 bg-white/[0.08] py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white transition enabled:hover:border-white/18 enabled:hover:bg-white/[0.11] enabled:active:scale-[0.99] enabled:active:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-35 sm:py-2 sm:text-[11px]"
           >
             Exit now
           </button>
         ) : (
-          <div className="h-10 w-full sm:h-[2.65rem]" aria-hidden />
+          <div className="h-10 w-full sm:h-[2.4rem]" aria-hidden />
         )}
       </div>
     </div>
