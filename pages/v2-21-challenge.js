@@ -5,6 +5,7 @@ import SoloV2ResultPopup, {
   SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
 } from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
+import SoloV2ProgressStrip from "../components/solo-v2/SoloV2ProgressStrip";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { handTotal, upCardShowValue } from "../lib/solo-v2/challenge21HandMath";
 import { CHALLENGE_21_MIN_WAGER } from "../lib/solo-v2/challenge21Config";
@@ -185,9 +186,9 @@ function Challenge21GameplayPanel({
   const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-2 border-amber-700/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-8">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-2 border-amber-900/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-5">
           <p
             className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-amber-200/85 sm:text-[10px] ${
               showSession ? "opacity-100" : "opacity-0"
@@ -197,75 +198,71 @@ function Challenge21GameplayPanel({
           </p>
         </div>
 
-        <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-8">
-          <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
-            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">Round</span>
-            <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
-              {Math.min(stripCleared + 1, total)} / {total}
-            </span>
+        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
+          <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
+            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
+              {statusTop}
+            </p>
           </div>
+          <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
+            <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">{statusSub}</p>
+          </div>
+        </div>
+
+        <SoloV2ProgressStrip
+          keyPrefix="c21"
+          rowLabel="Round"
+          ariaLabel="21 Challenge round"
+          stepTotal={total}
+          stepsComplete={stripCleared}
+          currentStepIndex={cur}
+          stepLabels={stepLabels}
+        />
+
+        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
+          <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
+            <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">
+              <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
+                {payoutBandLabel}
+              </span>
+              <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
+                {payoutBandValue}
+              </span>
+            </div>
+            <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
+              <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
+                {payoutCaption || "\u00a0"}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
           <div
-            className="flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
-            aria-label="Round progress"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(14rem,30vh)]"
+            aria-label="21 Challenge table"
           >
-            {Array.from({ length: total }, (_, i) => {
-              const done = i < stripCleared;
-              const active = i === cur && !done;
-              const label = stepLabels[i] ?? String(i + 1);
-              return (
-                <div
-                  key={`c21-step-${i}`}
-                  className={`flex min-w-0 flex-1 flex-col items-center justify-center rounded-[5px] py-1 sm:rounded-md sm:py-1.5 ${
-                    done
-                      ? "bg-emerald-600/35 text-emerald-100"
-                      : active
-                        ? "bg-amber-500/25 text-amber-100 ring-1 ring-inset ring-amber-400/35"
-                        : "bg-zinc-900/90 text-zinc-500"
-                  }`}
-                >
-                  <span className="px-0.5 text-center text-[9px] font-extrabold uppercase tracking-wide sm:text-[10px]">
-                    {label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="shrink-0 px-2.5 pb-1 pt-0.5 sm:px-3 sm:pb-1.5 sm:pt-1 lg:px-8">
-          <div className="flex flex-col items-center gap-0.5 rounded-xl border border-zinc-700/55 bg-zinc-950/70 px-2 py-1.5 sm:flex-row sm:items-baseline sm:justify-center sm:gap-2 sm:px-3 sm:py-2">
-            <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-500 sm:text-[9px]">{payoutBandLabel}</span>
-            <span className="text-sm font-black tabular-nums text-amber-100 sm:text-base">{payoutBandValue}</span>
-          </div>
-          <p
-            className={`mt-1 line-clamp-2 min-h-[2.25rem] text-center text-[9px] font-semibold leading-snug text-zinc-400 sm:min-h-[2.5rem] sm:text-[10px] ${
-              payoutCaption ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            {payoutCaption || "\u00a0"}
-          </p>
-        </div>
-
-        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 pt-0 sm:px-2 lg:px-4 lg:pb-2">
-          <div className="flex min-h-0 flex-1 flex-col">
-            <TwentyOneChallengeBoard
-              sessionNotice=""
-              hideSessionBanner
-              statusTop={statusTop}
-              statusSub={statusSub}
-              playerHands={playerHands}
-              activeHandIndex={activeHandIndex}
-              playerHand={playerHand}
-              opponentVisibleHand={opponentVisibleHand}
-              opponentHandResolved={opponentHandResolved}
-              holeHidden={holeHidden}
-              presentation={presentation}
-              allowedDecisions={allowedDecisions}
-              insurancePending={insurancePending}
-              entryAmount={entryAmount}
-              onAction={onBoardAction}
-              actionsHidden={actionsHidden}
-            />
+            <div className="flex min-h-0 min-h-[11rem] flex-1 flex-col px-0.5 py-1 sm:min-h-[12rem] sm:px-1 sm:py-1.5 lg:min-h-0 lg:px-1 lg:py-0.5">
+              <TwentyOneChallengeBoard
+                sessionNotice=""
+                hideSessionBanner
+                suppressShellStatus
+                statusTop={statusTop}
+                statusSub={statusSub}
+                playerHands={playerHands}
+                activeHandIndex={activeHandIndex}
+                playerHand={playerHand}
+                opponentVisibleHand={opponentVisibleHand}
+                opponentHandResolved={opponentHandResolved}
+                holeHidden={holeHidden}
+                presentation={presentation}
+                allowedDecisions={allowedDecisions}
+                insurancePending={insurancePending}
+                entryAmount={entryAmount}
+                onAction={onBoardAction}
+                actionsHidden={actionsHidden}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -1629,6 +1626,10 @@ export default function Challenge21Page() {
           else void runStartChallenge();
         },
         errorMessage: errorMessage || stakeHint,
+        desktopPayout: {
+          label: payoutBandLabel,
+          value: payoutBandValue,
+        },
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={

@@ -84,6 +84,8 @@ function slotsToOpponentRow(slots, pulses) {
 export default function TwentyOneChallengeBoard({
   sessionNotice,
   hideSessionBanner = false,
+  /** When true, status lines are omitted (shown by ladder shell above the inner table). */
+  suppressShellStatus = false,
   statusTop,
   statusSub,
   playerHands,
@@ -171,31 +173,35 @@ export default function TwentyOneChallengeBoard({
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-0 text-center sm:gap-0.5">
-      <div className="min-h-[2rem] shrink-0 px-0.5 sm:min-h-[2.15rem] sm:px-1">
-        {showSessionBanner ? (
-          <div className="text-[10px] font-semibold text-amber-200/90 sm:text-[11px]">{sessionNotice}</div>
-        ) : null}
-        <div className="text-[11px] font-semibold leading-snug text-white/90 sm:text-[13px]">{statusTop}</div>
-        <div className="mt-0.5 min-h-[0.9rem] text-[9px] font-medium text-white/55 sm:min-h-[1rem] sm:text-[10px]">
-          {statusSub}
+      {!suppressShellStatus ? (
+        <div className="min-h-[2rem] shrink-0 px-0.5 sm:min-h-[2.15rem] sm:px-1">
+          {showSessionBanner ? (
+            <div className="text-[10px] font-semibold text-amber-200/90 sm:text-[11px]">{sessionNotice}</div>
+          ) : null}
+          <div className="text-[11px] font-semibold leading-snug text-white/90 sm:text-[13px]">{statusTop}</div>
+          <div className="mt-0.5 min-h-[0.9rem] text-[9px] font-medium text-white/55 sm:min-h-[1rem] sm:text-[10px]">
+            {statusSub}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {hands.length > 1 ? (
         <div className="min-h-[0.85rem] shrink-0 text-[9px] font-semibold tabular-nums text-white/60 sm:text-[10px]">
           Hand {ai + 1} of {hands.length}
         </div>
-      ) : (
+      ) : suppressShellStatus ? null : (
         <div className="min-h-[0.85rem] shrink-0" aria-hidden />
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-0 sm:gap-0.5">
-        <div>
+      {suppressShellStatus && hands.length <= 1 ? <div className="min-h-[0.85rem] shrink-0" aria-hidden /> : null}
+
+      <div className="flex min-h-0 flex-1 flex-col justify-start gap-1 sm:gap-2">
+        <div className="shrink-0">
           <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:text-[9px]">
             Opponent
           </div>
           <div
-            className={`flex min-h-0 flex-wrap items-center justify-center gap-1 sm:gap-1.5 ${splitLayout ? "min-h-[4.75rem] py-0.5 sm:min-h-[4rem]" : "min-h-[5.6rem] py-0.5 sm:min-h-[4.5rem]"}`}
+            className={`flex min-h-0 flex-wrap items-center justify-center gap-1 sm:gap-1.5 ${splitLayout ? "h-[4.85rem] py-0.5 sm:h-[4.1rem]" : "h-[5.75rem] py-0.5 sm:h-[4.65rem]"}`}
           >
             {opponentRow.length === 0 ? (
               <div className="text-xs text-white/35">—</div>
@@ -217,14 +223,14 @@ export default function TwentyOneChallengeBoard({
           </div>
         </div>
 
-        <div>
+        <div className="shrink-0">
           <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-amber-200/50 sm:text-[9px]">
             You
           </div>
           <div className={`flex flex-col ${splitLayout ? "gap-0.5 sm:gap-1" : "gap-0 sm:gap-0.5"}`}>
             {hands.length === 0 ? (
               <div
-                className={`flex items-center justify-center text-xs text-white/35 ${splitLayout ? "min-h-[6rem] sm:min-h-[5rem]" : "min-h-[7.25rem] sm:min-h-[5.5rem]"}`}
+                className={`flex items-center justify-center text-xs text-white/35 ${splitLayout ? "h-[6.1rem] sm:h-[5.1rem]" : "h-[7.35rem] sm:h-[5.6rem]"}`}
               >
                 —
               </div>
@@ -250,7 +256,7 @@ export default function TwentyOneChallengeBoard({
                       </div>
                     ) : null}
                     <div
-                      className={`flex min-h-0 flex-wrap items-center justify-center gap-1 sm:gap-1.5 ${splitLayout ? "min-h-[5.9rem] sm:min-h-[5rem]" : "min-h-[7.1rem] sm:min-h-[5.35rem]"}`}
+                      className={`flex min-h-0 flex-wrap items-center justify-center gap-1 sm:gap-1.5 ${splitLayout ? "h-[6rem] sm:h-[5.1rem]" : "h-[7.2rem] sm:h-[5.45rem]"}`}
                     >
                       {arr.length === 0 ? (
                         <span className="text-xs text-white/35">—</span>
@@ -278,7 +284,7 @@ export default function TwentyOneChallengeBoard({
         </div>
       </div>
 
-      <div className={`${ACTION_MIN_H} shrink-0 pb-0.5 pt-0.5`}>
+      <div className={`${ACTION_MIN_H} mt-auto shrink-0 border-t border-zinc-700/40 pb-0.5 pt-2`}>
         {actionsHidden ? (
           <div className={ACTION_MIN_H} aria-hidden />
         ) : (
