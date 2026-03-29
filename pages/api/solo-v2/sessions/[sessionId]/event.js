@@ -30,6 +30,8 @@ import { buildTripleDiceSessionSnapshot } from "../../../../../lib/solo-v2/serve
 import { normalizeTripleDiceZone } from "../../../../../lib/solo-v2/tripleDiceConfig";
 import { buildNumberHuntSessionSnapshot } from "../../../../../lib/solo-v2/server/numberHuntSnapshot";
 import { normalizeNumberHuntGuess } from "../../../../../lib/solo-v2/numberHuntConfig";
+import { buildCoreBreakerSessionSnapshot } from "../../../../../lib/solo-v2/server/coreBreakerSnapshot";
+import { normalizeCoreBreakerColumn } from "../../../../../lib/solo-v2/coreBreakerConfig";
 import { buildDropRunSessionSnapshot } from "../../../../../lib/solo-v2/server/dropRunSnapshot";
 import {
   buildMysteryChamberSessionSnapshot,
@@ -1144,6 +1146,124 @@ export default async function handler(req, res) {
             message: "That number was already guessed.",
           });
         }
+      }
+    }
+
+    const isCoreBreakerStrike =
+      sessionRow.game_key === "core_breaker" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "core_breaker_strike";
+
+    if (isCoreBreakerStrike) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Core Breaker strike is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "core_breaker") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Core Breaker requires gameKey core_breaker.",
+        });
+      }
+
+      const column = normalizeCoreBreakerColumn(eventPayload?.column);
+      if (column === null) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "core_breaker_strike requires column 0, 1, or 2.",
+        });
+      }
+
+      const snapshotResult = await buildCoreBreakerSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Core Breaker strike submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.pickConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "strike_conflict",
+          message: "Conflicting strike events. Refresh session state.",
+        });
+      }
+
+      if (snapshot.pendingPick) {
+        const pp = snapshot.pendingPick;
+        const pendingId = pp.pickEventId != null ? Number(pp.pickEventId) : null;
+        const same = Number(pp.column) === column;
+        if (same && Number.isFinite(pendingId) && pendingId > 0) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pendingId,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "turn_pending",
+          message: "Resolve the current strike before submitting a new one.",
+        });
+      }
+
+      if (String(snapshot.readState || "") !== "ready") {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Core Breaker is not accepting strikes right now.",
+        });
       }
     }
 

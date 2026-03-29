@@ -12,6 +12,10 @@ import {
   buildNumberHuntSessionSnapshot,
   stripNumberHuntSecretFromSummary,
 } from "../../../../lib/solo-v2/server/numberHuntSnapshot";
+import {
+  buildCoreBreakerSessionSnapshot,
+  stripCoreBreakerSecretsFromSummary,
+} from "../../../../lib/solo-v2/server/coreBreakerSnapshot";
 import { buildDropRunSessionSnapshot } from "../../../../lib/solo-v2/server/dropRunSnapshot";
 import {
   buildMysteryChamberSessionSnapshot,
@@ -89,6 +93,7 @@ export default async function handler(req, res) {
     let speedTrackPayload = null;
     let limitRunPayload = null;
     let numberHuntPayload = null;
+    let coreBreakerPayload = null;
     let tripleDicePayload = null;
     let challenge21Payload = null;
     let dropRunPayload = null;
@@ -349,6 +354,35 @@ export default async function handler(req, res) {
         canCashOut: nhSnapshot.canCashOut,
         resolvedResult: nhSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "core_breaker") {
+      const cbSnapshotResult = await buildCoreBreakerSessionSnapshot(supabase, row);
+      if (!cbSnapshotResult.ok) {
+        if (isMissingTable(cbSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const cbSnapshot = cbSnapshotResult.snapshot;
+      sessionReadState = cbSnapshot.readState;
+      coreBreakerPayload = {
+        readState: cbSnapshot.readState,
+        playing: cbSnapshot.playing,
+        pendingPick: cbSnapshot.pendingPick,
+        pickConflict: cbSnapshot.pickConflict,
+        canResolveTurn: cbSnapshot.canResolveTurn,
+        canCashOut: cbSnapshot.canCashOut,
+        resolvedResult: cbSnapshot.resolvedResult,
+      };
     } else if (row.game_key === "triple_dice") {
       const tdSnapshotResult = await buildTripleDiceSessionSnapshot(supabase, row);
       if (!tdSnapshotResult.ok) {
@@ -471,6 +505,8 @@ export default async function handler(req, res) {
     const serverOutcomeSummary =
       row.game_key === "number_hunt" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
         ? stripNumberHuntSecretFromSummary(rawSummary)
+        : row.game_key === "core_breaker" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
+          ? stripCoreBreakerSecretsFromSummary(rawSummary)
         : row.game_key === "challenge_21" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
           ? stripChallenge21SecretsFromSummary(rawSummary)
           : row.game_key === "mystery_chamber" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
@@ -505,6 +541,7 @@ export default async function handler(req, res) {
         speedTrack: speedTrackPayload,
         limitRun: limitRunPayload,
         numberHunt: numberHuntPayload,
+        coreBreaker: coreBreakerPayload,
         tripleDice: tripleDicePayload,
         challenge21: challenge21Payload,
         dropRun: dropRunPayload,
