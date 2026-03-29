@@ -1,20 +1,29 @@
 /**
  * Flash Vein — coin-family DicePickBoard `diceSlot` + `choiceSlot`.
  * Reveal lives in a fixed-size grid; lane picks mirror dice-pick / core-breaker strike layout.
+ * Flash uses symbols only (no role words) so play is memory-shaped, not read-and-click.
  */
 
-function roleShortLabel(role) {
-  if (role === "unstable") return "Unstable";
-  if (role === "gem") return "Gem";
-  if (role === "safe") return "Safe";
+/** Visible glyph during flash only — no SAFE / GEM / UNSTABLE text. */
+function roleRevealSymbol(role) {
+  if (role === "unstable") return "\u2715";
+  if (role === "gem") return "\u25C6";
+  if (role === "safe") return "\u25CB";
   return "";
 }
 
 function roleToneClass(role) {
-  if (role === "unstable") return "text-red-300/95";
-  if (role === "gem") return "text-cyan-300/95";
-  if (role === "safe") return "text-amber-200/95";
+  if (role === "unstable") return "text-red-200/68";
+  if (role === "gem") return "text-cyan-200/62";
+  if (role === "safe") return "text-amber-100/65";
   return "text-zinc-500";
+}
+
+function roleCellTintClass(role) {
+  if (role === "unstable") return "bg-red-950/15";
+  if (role === "gem") return "bg-cyan-950/12";
+  if (role === "safe") return "bg-amber-950/10";
+  return "";
 }
 
 /**
@@ -43,28 +52,34 @@ export function FlashVeinDiceSlot({ lanes, revealPhase }) {
         <div className="relative z-[1] grid h-full w-full grid-cols-3 gap-0 px-1 py-2 sm:px-1.5 sm:py-2.5">
           {[0, 1, 2].map(i => {
             const role = safeLanes ? String(safeLanes[i] || "") : "";
-            const label = showFaces ? roleShortLabel(role) : "";
+            const sym = showFaces ? roleRevealSymbol(role) : "";
             const muted = revealPhase === "masked" || revealPhase === "idle";
+            const tint = showFaces && role ? roleCellTintClass(role) : "";
             return (
               <div
                 key={`fv-cell-${i}`}
-                className="flex min-h-0 flex-col items-center justify-center border-r border-white/[0.06] px-0.5 last:border-r-0"
+                className={[
+                  "flex min-h-0 flex-col items-center justify-center border-r border-white/[0.06] px-0.5 transition-colors duration-100 last:border-r-0",
+                  tint,
+                ].join(" ")}
               >
                 <span
                   className={[
-                    "select-none text-center text-[0.65rem] font-black uppercase leading-tight tracking-wide sm:text-[0.72rem] lg:text-[0.8rem]",
+                    "select-none text-center font-black leading-none tabular-nums",
+                    "text-[1.35rem] sm:text-[1.55rem] lg:text-[1.7rem]",
                     showFaces ? roleToneClass(role) : "text-zinc-600",
                     muted && !showFaces ? "opacity-95" : "",
                   ].join(" ")}
                   style={{
                     opacity: showFaces ? 1 : revealPhase === "masked" ? 0.55 : 0.35,
-                    transition: "opacity 160ms ease-out",
+                    transition: "opacity 120ms ease-out",
                   }}
+                  aria-hidden
                 >
-                  {showFaces ? label : "?"}
+                  {showFaces ? sym : "?"}
                 </span>
                 <span className="mt-1 text-[7px] font-bold uppercase tracking-[0.14em] text-zinc-600 sm:text-[8px]">
-                  {i === 0 ? "Left" : i === 1 ? "Ctr" : "Right"}
+                  {i === 0 ? "L" : i === 1 ? "C" : "R"}
                 </span>
               </div>
             );
@@ -90,9 +105,9 @@ const LANE_FACE_BASE =
   "border-amber-700/45 bg-gradient-to-b from-zinc-800/95 to-zinc-950 text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] enabled:hover:border-amber-500/55 enabled:hover:from-zinc-800 enabled:hover:to-zinc-950 enabled:active:scale-[0.98] ";
 
 function outcomeFlashLabel(outcome) {
-  if (outcome === "unstable") return "Unstable — vein lost";
-  if (outcome === "gem") return "Gem lane — multiplier up";
-  if (outcome === "safe") return "Safe lane — carry on";
+  if (outcome === "unstable") return "That lane collapsed.";
+  if (outcome === "gem") return "Strong hit — multiplier up.";
+  if (outcome === "safe") return "Solid carry.";
   return "";
 }
 
@@ -102,8 +117,8 @@ export function FlashVeinChoiceSlot({ pickDisabled, pickingUi, lastFlash, onPick
 
   return (
     <div className="grid w-full grid-cols-1 gap-2.5 sm:gap-3 lg:gap-4">
-      <p className="text-center text-[10px] font-semibold leading-snug text-zinc-300 sm:text-[11px] sm:leading-relaxed lg:text-left lg:text-[12px] lg:leading-normal">
-        Memorize the flash. Pick the safe lane. Gem boosts payout. Unstable ends the run.
+      <p className="text-center text-[10px] font-semibold leading-snug text-zinc-400 sm:text-[11px] sm:leading-relaxed lg:text-left lg:text-[12px] lg:leading-normal">
+        Watch the flash once, then pick a lane from memory.
       </p>
 
       <div
@@ -112,53 +127,34 @@ export function FlashVeinChoiceSlot({ pickDisabled, pickingUi, lastFlash, onPick
         aria-label="Vein lanes"
         aria-busy={Boolean(pickingUi)}
       >
-        {[0, 1, 2].map(col => {
-          const fl = lastFlash?.column === col ? lastFlash.outcome : null;
-          const ring =
-            fl === "unstable"
-              ? "ring-2 ring-red-600/75 ring-offset-2 ring-offset-zinc-950"
-              : fl === "gem"
-                ? "ring-2 ring-cyan-500/60 ring-offset-2 ring-offset-zinc-950"
-                : fl === "safe"
-                  ? "ring-2 ring-amber-500/55 ring-offset-2 ring-offset-zinc-950"
-                  : "";
-          return (
-            <button
-              key={`fv-lane-${col}`}
-              type="button"
-              disabled={pickDisabled}
-              onClick={() => onPickLane(col)}
-              className={`${LANE_SHELL} ${LANE_FACE_BASE}${ring} ${
-                pickDisabled ? "cursor-not-allowed opacity-[0.42] " : ""
-              }focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/35`}
+        {[0, 1, 2].map(col => (
+          <button
+            key={`fv-lane-${col}`}
+            type="button"
+            disabled={pickDisabled}
+            onClick={() => onPickLane(col)}
+            className={`${LANE_SHELL} ${LANE_FACE_BASE}${
+              pickDisabled ? "cursor-not-allowed opacity-[0.42] " : ""
+            }focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/35`}
+          >
+            <span
+              className="mt-0.5 select-none text-[1.65rem] font-black leading-none tabular-nums text-amber-100/95 sm:text-[2rem] lg:text-[2.35rem]"
+              aria-hidden
             >
-              <span
-                className="mt-0.5 select-none text-[1.65rem] font-black leading-none tabular-nums text-amber-100/95 sm:text-[2rem] lg:text-[2.35rem]"
-                aria-hidden
-              >
-                ⛏
-              </span>
-              <span className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/38 sm:text-[10px] lg:text-[11px]">
-                {labels[col]}
-              </span>
-              <span className="mt-0.5 text-[8px] font-semibold text-zinc-500 sm:text-[9px]">Strike</span>
-            </button>
-          );
-        })}
+              ⛏
+            </span>
+            <span className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/38 sm:text-[10px] lg:text-[11px]">
+              {labels[col]}
+            </span>
+            <span className="mt-0.5 text-[8px] font-semibold text-zinc-500 sm:text-[9px]">Strike</span>
+          </button>
+        ))}
       </div>
 
       <div className="flex min-h-[2.625rem] items-start sm:min-h-[2.75rem]">
         <p
           className={`line-clamp-2 w-full text-center text-[10px] leading-tight sm:text-[11px] lg:text-left ${
-            flashText
-              ? `font-bold ${
-                  lastFlash?.outcome === "unstable"
-                    ? "text-red-300/95"
-                    : lastFlash?.outcome === "gem"
-                      ? "text-cyan-300/95"
-                      : "text-amber-200/95"
-                }`
-              : "select-none font-bold text-transparent"
+            flashText ? "font-semibold text-zinc-400" : "select-none font-bold text-transparent"
           }`}
           role="status"
           aria-live="polite"

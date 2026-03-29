@@ -16,8 +16,10 @@ import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState"
 import { QUICK_FLIP_CONFIG } from "../lib/solo-v2/quickFlipConfig";
 import {
   FLASH_VEIN_MIN_WAGER,
+  FLASH_VEIN_POST_REVEAL_BLACKOUT_MS,
   FLASH_VEIN_ROUNDS,
   flashVeinMaxPayout,
+  flashVeinRevealMsForRound,
 } from "../lib/solo-v2/flashVeinConfig";
 import {
   applyFlashVeinSettlementOnce,
@@ -49,7 +51,6 @@ const STATS_KEY = "solo_v2_flash_vein_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
 const REVEAL_READABLE_MS = 520;
-const FLASH_SHOW_MS = 880;
 
 function parseWagerInput(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
@@ -223,6 +224,7 @@ export default function FlashVeinPage() {
   const [stats, setStats] = useState(readFlashVeinStats);
   const [revealPhase, setRevealPhase] = useState("idle");
   const [flashLanes, setFlashLanes] = useState(null);
+  const [memoryPickUnlocked, setMemoryPickUnlocked] = useState(false);
 
   const cycleRef = useRef(0);
   const createInFlightRef = useRef(false);
@@ -237,6 +239,7 @@ export default function FlashVeinPage() {
   const flashTimerRef = useRef(null);
   const revealBusyRef = useRef(false);
   const revealHideTimerRef = useRef(null);
+  const flashBlackoutTimerRef = useRef(null);
   const lastRoundIdxRef = useRef(null);
 
   const giftShell = useSoloV2GiftShellState();
@@ -259,6 +262,10 @@ export default function FlashVeinPage() {
         clearTimeout(revealHideTimerRef.current);
         revealHideTimerRef.current = null;
       }
+      if (flashBlackoutTimerRef.current) {
+        clearTimeout(flashBlackoutTimerRef.current);
+        flashBlackoutTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -278,9 +285,15 @@ export default function FlashVeinPage() {
     lastRoundIdxRef.current = n;
     setRevealPhase("idle");
     setFlashLanes(null);
+    setMemoryPickUnlocked(false);
+    setLastFlash(null);
     if (revealHideTimerRef.current) {
       clearTimeout(revealHideTimerRef.current);
       revealHideTimerRef.current = null;
+    }
+    if (flashBlackoutTimerRef.current) {
+      clearTimeout(flashBlackoutTimerRef.current);
+      flashBlackoutTimerRef.current = null;
     }
   }, [session?.flashVein?.playing?.currentRoundIndex, session?.id]);
 
@@ -340,6 +353,7 @@ export default function FlashVeinPage() {
     setLastFlash(null);
     setRevealPhase("idle");
     setFlashLanes(null);
+    setMemoryPickUnlocked(false);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
   }
@@ -691,6 +705,7 @@ export default function FlashVeinPage() {
     const fv = sessionRef.current?.flashVein;
     if (sid == null || String(fv?.readState || "") !== "pick_pending") return;
     if (revealPhase !== "masked") return;
+    if (!memoryPickUnlocked) return;
     if (submitInFlightRef.current || resolveInFlightRef.current || pickingUi) return;
 
     if (resultPopupTimerRef.current) {
@@ -849,6 +864,12 @@ export default function FlashVeinPage() {
           return;
         }
         const lanes = payload.reveal.lanes;
+        const roundIndex = Math.max(
+          0,
+          Math.min(FLASH_VEIN_ROUNDS - 1, Math.floor(Number(payload.reveal.roundIndex) || 0)),
+        );
+        const revealMs = flashVeinRevealMsForRound(roundIndex);
+        setMemoryPickUnlocked(false);
         setFlashLanes(Array.isArray(lanes) ? [...lanes] : null);
         setRevealPhase("showing");
         const readResult = await readSessionTruth(sid, activeCycle);
@@ -857,10 +878,15 @@ export default function FlashVeinPage() {
           applySessionReadState(readResult.session, { resumed: true });
         }
         if (revealHideTimerRef.current) clearTimeout(revealHideTimerRef.current);
+        if (flashBlackoutTimerRef.current) clearTimeout(flashBlackoutTimerRef.current);
         revealHideTimerRef.current = window.setTimeout(() => {
           revealHideTimerRef.current = null;
           setRevealPhase("masked");
-        }, FLASH_SHOW_MS);
+          flashBlackoutTimerRef.current = window.setTimeout(() => {
+            flashBlackoutTimerRef.current = null;
+            setMemoryPickUnlocked(true);
+          }, FLASH_VEIN_POST_REVEAL_BLACKOUT_MS);
+        }, revealMs);
       } catch (_e) {
         setErrorMessage("Network error during flash.");
       } finally {
@@ -959,7 +985,8 @@ export default function FlashVeinPage() {
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "awaiting_reveal") {
     statusTop = "Opening flash…";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "pick_pending") {
-    if (revealPhase === "showing") statusTop = "Memorize the lanes.";
+    if (revealPhase === "showing") statusTop = "Watch the flash.";
+    else if (revealPhase === "masked" && !memoryPickUnlocked) statusTop = "Lock in…";
     else if (revealPhase === "masked")
       statusTop = `Round ${roundsDone + 1} of ${FLASH_VEIN_ROUNDS} — pick your lane.`;
     else statusTop = "Preparing flash…";
@@ -1052,6 +1079,7 @@ export default function FlashVeinPage() {
     uiState !== UI_STATE.SESSION_ACTIVE ||
     readState !== "pick_pending" ||
     revealPhase !== "masked" ||
+    !memoryPickUnlocked ||
     pickingUi;
 
   return (
