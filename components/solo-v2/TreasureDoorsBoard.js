@@ -137,11 +137,11 @@ export default function TreasureDoorsBoard({
               aria-hidden
             />
           ) : null}
-          <div className="mb-3 border-b border-zinc-800 pb-2.5 text-center">
-            <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-200 sm:text-xs">
+          <div className="mb-2 border-b border-zinc-800 pb-2 text-center">
+            <p className="min-h-[1.125rem] text-[11px] font-bold uppercase leading-tight tracking-[0.12em] text-zinc-200 sm:min-h-[1.25rem] sm:text-xs">
               {isTerminalRecap ? "Vault sealed" : `Chamber ${cur + 1} of ${chMax}`}
             </p>
-            <p className="mt-1 text-[10px] leading-snug text-zinc-500 sm:text-[11px]">
+            <p className="mt-0.5 min-h-[1.5625rem] text-[10px] leading-tight text-zinc-500 line-clamp-2 sm:min-h-[1.75rem] sm:text-[11px]">
               {isTerminalRecap
                 ? fk === "trap"
                   ? "Trap triggered — other doors were safe"

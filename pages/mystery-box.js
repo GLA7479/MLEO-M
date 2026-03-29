@@ -136,24 +136,29 @@ function MysteryBoxAccent({ winningBoxIndex }) {
   const showWin = winningBoxIndex === 0 || winningBoxIndex === 1 || winningBoxIndex === 2;
   return (
     <div
-      className="flex h-[7.5rem] w-[7.5rem] shrink-0 flex-col items-center justify-center rounded-2xl border-[3px] border-dashed border-amber-400/45 bg-gradient-to-br from-zinc-600/90 via-zinc-800 to-zinc-950 shadow-[inset_0_2px_12px_rgba(0,0,0,0.45)] sm:h-[9rem] sm:w-[9rem] lg:h-[11rem] lg:w-[11rem]"
+      className="flex h-[7.5rem] w-[7.5rem] shrink-0 flex-col rounded-2xl border-[3px] border-dashed border-amber-400/45 bg-gradient-to-br from-zinc-600/90 via-zinc-800 to-zinc-950 py-1.5 shadow-[inset_0_2px_12px_rgba(0,0,0,0.45)] sm:h-[9rem] sm:w-[9rem] sm:py-2 lg:h-[11rem] lg:w-[11rem]"
       aria-hidden
     >
-      {showWin ? (
-        <>
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+        {showWin ? (
           <span className="text-[3.25rem] font-black leading-none text-amber-100 drop-shadow sm:text-6xl lg:text-7xl">
             {letters[winningBoxIndex]}
           </span>
-          <span className="mt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-emerald-200/90 sm:text-xs">
-            Prize
-          </span>
-        </>
-      ) : (
-        <>
+        ) : (
           <span className="text-[2.75rem] font-black leading-none text-zinc-400/95 sm:text-[3.25rem] lg:text-[4rem]">?</span>
-          <span className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 sm:text-[11px]">Box</span>
-        </>
-      )}
+        )}
+      </div>
+      <div className="flex h-[1.125rem] shrink-0 items-center justify-center sm:h-[1.25rem]">
+        <span
+          className={
+            showWin
+              ? "text-[11px] font-extrabold uppercase tracking-wide text-emerald-200/90 sm:text-xs"
+              : "text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 sm:text-[11px]"
+          }
+        >
+          {showWin ? "Prize" : "Box"}
+        </span>
+      </div>
     </div>
   );
 }

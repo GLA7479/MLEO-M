@@ -189,14 +189,14 @@ function SpeedTrackGameplayPanel({
           </p>
         </div>
 
-        <div className="shrink-0 px-2.5 pb-0 pt-0.5 text-center sm:px-3 sm:pb-0.5 sm:pt-0.5 lg:px-8">
-          <div className="flex min-h-[1.875rem] items-start justify-center sm:min-h-[2rem]">
-            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-snug text-white sm:text-[13px] sm:leading-snug">
+        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-8">
+          <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
+            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
               {statusTop}
             </p>
           </div>
-          <div className="flex min-h-[1.625rem] items-start justify-center sm:min-h-[1.75rem]">
-            <p className="line-clamp-2 w-full text-center text-[9px] leading-snug text-zinc-400 sm:text-[10px]">{statusSub}</p>
+          <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
+            <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">{statusSub}</p>
           </div>
         </div>
 
@@ -237,7 +237,7 @@ function SpeedTrackGameplayPanel({
 
         <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-8 lg:hidden">
           <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
-            <div className="flex items-center justify-between gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5">
+            <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">
               <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
                 {payoutBandLabel}
               </span>
