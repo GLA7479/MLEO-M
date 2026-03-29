@@ -975,42 +975,6 @@ export default function HighLowCardsPage() {
     Boolean(pendingGuess) || uiState === UI_STATE.RESOLVING || revealAnimating;
   const showGuessActionRow = (uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING) && playing;
 
-  let statusTop = "Press PLAY to deal your first card.";
-  let statusSub = "Ace is high · each correct call grows the multiplier ladder (+0.206 per win).";
-
-  if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can't start right now.";
-    statusSub = String(errorMessage || "").trim() || "Check your balance, then try PLAY again.";
-  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
-    statusTop = "Migration pending.";
-    statusSub = "This environment is updating. Try again shortly.";
-  } else if (uiState === UI_STATE.LOADING) {
-    statusTop = "Starting run…";
-    statusSub = "Opening a session with the server.";
-  } else if (uiState === UI_STATE.TERMINAL && terminalResult) {
-    const tk = String(terminalResult.terminalKind || "");
-    if (tk === "cashout") {
-      statusTop = `Cashed out · streak ${terminalResult.streak ?? 0}.`;
-      statusSub = "Press PLAY when you are ready for another run.";
-    } else if (tk === "loss" || terminalResult.isWin === false) {
-      statusTop = terminalResult.lastNextCard?.rank
-        ? `Miss — next was ${terminalResult.lastNextCard.rank}${terminalResult.lastNextCard.suit || "♠"}.`
-        : "Run ended on a miss.";
-      statusSub = "Press PLAY to try again.";
-    } else {
-      statusTop = "Run complete.";
-      statusSub = "Press PLAY for another deal.";
-    }
-  } else if (isRunActive && playing) {
-    statusTop = currentCard?.rank
-      ? `Table: ${currentCard.rank}${currentCard.suit || "♠"} — call higher or lower.`
-      : "Run active.";
-    statusSub =
-      uiState === UI_STATE.RESOLVING
-        ? "Drawing the next card on the server…"
-        : `Streak ${streak} · bank ×${mult.toFixed(3)}`;
-  }
-
   let payoutBandLabel = "Potential return";
   let payoutBandValue = formatCompact(payoutFromEntryAndStreak(Math.max(HIGH_LOW_CARDS_MIN_WAGER, numericWager), 0));
   let payoutCaption = "Each correct call adds +0.206 to the multiplier · Ace is high";
@@ -1120,8 +1084,9 @@ export default function HighLowCardsPage() {
           <DicePickBoard
             progressStripKeyPrefix="high-low-cards"
             sessionNotice={sessionNotice}
-            statusTop={statusTop}
-            statusSub={statusSub}
+            statusTop=""
+            statusSub=""
+            hideBoardStatusStack
             stepTotal={strip.stepTotal}
             currentStepIndex={strip.currentStepIndex}
             stepsComplete={strip.stepsComplete}

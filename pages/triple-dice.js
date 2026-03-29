@@ -54,30 +54,6 @@ const REVEAL_READABLE_MS = 520;
 
 const NEUTRAL_DICE = [2, 3, 4];
 
-function buildOutcomeStatusLines(rolledTotal, dice, selectedZoneNorm, resolvedIsWin, showNextRoundHint) {
-  const t = Math.floor(Number(rolledTotal));
-  const d = Array.isArray(dice) ? dice : [];
-  const pz = normalizeTripleDiceZone(selectedZoneNorm);
-  const pickUp = pz ? pz.toUpperCase() : "—";
-  if (!Number.isFinite(t) || d.length !== 3) {
-    return { statusTop: "Round finished.", statusSub: "\u00a0" };
-  }
-  let statusTop = "";
-  if (resolvedIsWin) {
-    if (pz === "triple") {
-      const face = Math.floor(Number(d[0]));
-      statusTop = Number.isFinite(face) ? `Triple ${face}s. TRIPLE wins.` : "TRIPLE wins.";
-    } else {
-      statusTop = `Total ${t}. ${pickUp} wins.`;
-    }
-  } else {
-    statusTop = `Total ${t}. Your pick was ${pickUp}.`;
-  }
-  const statusSub =
-    showNextRoundHint && pz ? `Played ${pickUp} · tap Roll for next round` : "\u00a0";
-  return { statusTop, statusSub };
-}
-
 function parseWagerInput(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
   if (!digits) return 0;
@@ -164,8 +140,6 @@ function TripleDiceGameplayPanel({
   diceMuted,
   totalDisplay,
   rollingUi,
-  statusTop,
-  statusSub,
   sessionNotice,
   stepTotal,
   stepsComplete,
@@ -189,8 +163,9 @@ function TripleDiceGameplayPanel({
       <DicePickBoard
         progressStripKeyPrefix="triple-dice"
         sessionNotice={sessionNotice}
-        statusTop={statusTop}
-        statusSub={statusSub}
+        statusTop=""
+        statusSub=""
+        hideBoardStatusStack
         stepTotal={stepTotal}
         currentStepIndex={currentStepIndex}
         stepsComplete={stepsComplete}
@@ -1043,42 +1018,6 @@ export default function TripleDicePage() {
     payoutCaption = pzLabel && pzLabel !== "—" ? `Played ${pzLabel} on this round` : "Round settled";
   }
 
-  let statusTop = "Choose 1 of 4 options, then roll.";
-  let statusSub = "Pick LOW, MID, HIGH, or TRIPLE — then START TRIPLE DICE.";
-  if (rollingUi) {
-    statusTop = "Rolling…";
-    statusSub = "\u00a0";
-  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    const lines = buildOutcomeStatusLines(
-      resolvedResult.rolledTotal,
-      resolvedResult.dice,
-      resolvedResult.selectedZone,
-      resolvedIsWin,
-      false,
-    );
-    statusTop = lines.statusTop;
-    statusSub = lines.statusSub;
-  } else if (
-    persistedLastRound &&
-    inTripleDiceLoop &&
-    uiState === UI_STATE.SESSION_ACTIVE &&
-    readState === "ready" &&
-    !rollingUi
-  ) {
-    const pl = buildOutcomeStatusLines(
-      persistedLastRound.rolledTotal,
-      persistedLastRound.dice,
-      persistedLastRound.playedZone,
-      persistedLastRound.isWin,
-      true,
-    );
-    statusTop = pl.statusTop;
-    statusSub = pl.statusSub;
-  } else if (inTripleDiceLoop && uiState === UI_STATE.SESSION_ACTIVE && readState === "ready" && !rollingUi) {
-    statusTop = "Tap Roll when ready.";
-    statusSub = `${normZone.toUpperCase()} · ${winChance.toFixed(2)}% hit rate`;
-  }
-
   const diceMuted = !inTripleDiceLoop && idleLike;
 
   return (
@@ -1164,8 +1103,6 @@ export default function TripleDicePage() {
           diceMuted={diceMuted}
           totalDisplay={totalDisplay}
           rollingUi={rollingUi}
-          statusTop={statusTop}
-          statusSub={statusSub}
           sessionNotice={sessionNotice}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}

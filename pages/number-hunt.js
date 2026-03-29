@@ -135,8 +135,6 @@ function NumberHuntGameplayPanel({
   uiState,
   pickingUi,
   sessionNotice,
-  statusTop,
-  statusSub,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -175,8 +173,9 @@ function NumberHuntGameplayPanel({
         progressStripKeyPrefix="number-hunt"
         hideMobilePayoutBand
         sessionNotice={sessionNotice}
-        statusTop={statusTop}
-        statusSub={statusSub}
+        statusTop=""
+        statusSub=""
+        hideBoardStatusStack
         stepTotal={stepTotal}
         currentStepIndex={currentStepIndex}
         stepsComplete={stepsComplete}
@@ -852,58 +851,6 @@ export default function NumberHuntPage() {
   const guessCountForStrip = Array.isArray(playing?.guessHistory) ? playing.guessHistory.length : 0;
   const strip = numberHuntRoundStripModel(uiState, readState, guessCountForStrip);
 
-  const lastClue =
-    Array.isArray(playing?.guessHistory) && playing.guessHistory.length > 0
-      ? String(playing.guessHistory[playing.guessHistory.length - 1]?.clue || "").trim()
-      : "";
-
-  let statusTop = "Press START HUNT when you are set.";
-  let statusSub =
-    "Set your play in the bar below, then start. The server holds a secret 1–20; you get up to three guesses with clues.";
-
-  if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
-    statusSub = !vaultReady
-      ? "Shared vault could not be opened. Return to the arcade and try again."
-      : String(errorMessage || "").trim() || "Check your balance and connection, then try START HUNT again.";
-  } else if (uiState === UI_STATE.LOADING) {
-    statusTop = "Starting hunt…";
-    statusSub = "Opening or resuming a session with the server.";
-  } else if (uiState === UI_STATE.SUBMITTING_PICK) {
-    statusTop = "Submitting guess…";
-    statusSub = "Sending your pick to the server.";
-  } else if (uiState === UI_STATE.RESOLVING) {
-    statusTop = "Resolving…";
-    statusSub = "Checking your guess against the sealed target.";
-  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    statusTop = resolvedResult.isWin ? "You found the target." : "Out of guesses.";
-    statusSub =
-      "Round is complete. Adjust stake if you like, then press START HUNT for another round — there is no auto-start.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready") {
-    if (pickingUi) {
-      statusTop = "Checking…";
-      statusSub = "\u00a0";
-    } else if (guessCountForStrip === 0) {
-      statusTop = "Pick your first guess.";
-      statusSub = "Hidden number is 1–20 · You have three tries.";
-    } else if (lastClue) {
-      statusTop = lastClue;
-      statusSub = `Guess ${guessCountForStrip + 1} of ${NUMBER_HUNT_MAX_GUESSES} · use the clues to narrow the range.`;
-    } else {
-      statusTop = "Pick your next guess.";
-      statusSub = `Guess ${guessCountForStrip + 1} of ${NUMBER_HUNT_MAX_GUESSES}.`;
-    }
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "guess_submitted") {
-    statusTop = "Finishing your guess…";
-    statusSub = "Resolving with the server.";
-  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
-    statusTop = "Migration pending.";
-    statusSub = "This environment is updating. Try again shortly.";
-  } else if (uiState === UI_STATE.IDLE) {
-    statusTop = "Number Hunt";
-    statusSub = "Three guesses, higher-or-lower clues, range narrows after each miss.";
-  }
-
   let payoutBandLabel = "Max win";
   let payoutBandValue = formatCompact(summaryWin);
   let payoutCaption = `Full hit on 1st guess · up to ${formatCompact(summaryWin)}`;
@@ -1065,8 +1012,6 @@ export default function NumberHuntPage() {
           uiState={uiState}
           pickingUi={pickingUi}
           sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

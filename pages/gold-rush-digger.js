@@ -119,8 +119,6 @@ function GoldRushGameplayPanel({
   shakeCell,
   onDigColumn,
   sessionNotice,
-  statusTop,
-  statusSub,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -174,17 +172,6 @@ function GoldRushGameplayPanel({
           >
             {showSession ? sessionNotice : "\u00a0"}
           </p>
-        </div>
-
-        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
-          <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
-            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
-              {statusTop}
-            </p>
-          </div>
-          <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
-            <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">{statusSub}</p>
-          </div>
         </div>
 
         <SoloV2ProgressStrip
@@ -969,46 +956,6 @@ export default function GoldRushDiggerPage() {
   const strip = goldRushStripModel(rowTotal, uiState, nCleared, stripTerminalKind);
   const stepLabels = Array.from({ length: strip.stepTotal }, (_, i) => `R${i + 1}`);
 
-  let statusTop = "Press START RUN when you are set.";
-  let statusSub =
-    "Set play in the bar below, then open a run. Each row has three spots — one bomb per row is sealed server-side before you dig.";
-
-  if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can't start this run.";
-    statusSub = !vaultReady
-      ? "Shared vault could not be opened. Return to the arcade and try again."
-      : String(errorMessage || "").trim() || "Check your balance and connection, then try START RUN again.";
-  } else if (uiState === UI_STATE.LOADING) {
-    statusTop = "Starting run…";
-    statusSub = "Opening or resuming a session with the server.";
-  } else if (uiState === UI_STATE.SUBMITTING_PICK) {
-    statusTop = "Submitting dig…";
-    statusSub = "Locking your spot with the server.";
-  } else if (uiState === UI_STATE.RESOLVING || cashOutLoading) {
-    statusTop = cashOutLoading ? "Cashing out…" : "Resolving this row…";
-    statusSub = "Outcome is resolved on the server before the grid updates.";
-  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    const won = Boolean(resolvedResult.isWin ?? resolvedResult.won);
-    statusTop = won ? "Run closed in your favor." : "Run closed.";
-    statusSub =
-      "Adjust stake if needed, then press START RUN for another run — there is no auto-start after the popup.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "pick_conflict") {
-    statusTop = "State conflict.";
-    statusSub = "Refreshing row state from the server.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_submitted") {
-    statusTop = "Pick locked — resolving…";
-    statusSub = "The server reveals gold or bomb for this row.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && (readState === "choice_required" || readState === "ready")) {
-    statusTop = "Pick a spot on the current row.";
-    statusSub = "Three columns — one bomb per row. Your pick is committed when you tap.";
-  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
-    statusTop = "Migration pending.";
-    statusSub = "This environment is updating. Try again shortly.";
-  } else if (uiState === UI_STATE.IDLE) {
-    statusTop = "Gold rush dig.";
-    statusSub = "Six rows, three spots each — survive the ladder or cash out between safe digs.";
-  }
-
   let payoutBandLabel = "Secured payout";
   let payoutBandValue = formatCompact(summaryWin);
 
@@ -1170,8 +1117,6 @@ export default function GoldRushDiggerPage() {
           shakeCell={shakeCell}
           onDigColumn={handleDigColumn}
           sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

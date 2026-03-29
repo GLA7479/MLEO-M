@@ -131,8 +131,6 @@ function CoreBreakerGameplayPanel({
   strikingUi,
   lastFlash,
   sessionNotice,
-  statusTop,
-  statusSub,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -156,8 +154,9 @@ function CoreBreakerGameplayPanel({
       <DicePickBoard
         progressStripKeyPrefix="core-breaker"
         sessionNotice={sessionNotice}
-        statusTop={statusTop}
-        statusSub={statusSub}
+        statusTop=""
+        statusSub=""
+        hideBoardStatusStack
         stepTotal={stepTotal}
         currentStepIndex={currentStepIndex}
         stepsComplete={stepsComplete}
@@ -852,28 +851,6 @@ export default function CoreBreakerPage() {
   const strikesForStrip = Array.isArray(playing?.strikeHistory) ? playing.strikeHistory.length : 0;
   const strip = coreBreakerStripModel(uiState, readState, strikesForStrip);
 
-  let statusTop = "Press START RUN.";
-
-  if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can't start.";
-  } else if (uiState === UI_STATE.LOADING) {
-    statusTop = "Starting run…";
-  } else if (uiState === UI_STATE.SUBMITTING_PICK || uiState === UI_STATE.RESOLVING) {
-    statusTop = "Working…";
-  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    statusTop = resolvedResult.isWin ? "You won." : "Run lost.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready") {
-    statusTop = strikingUi ? "Working…" : `Strike ${strikesForStrip + 1} of ${CORE_BREAKER_STRIKE_STEPS}.`;
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "strike_submitted") {
-    statusTop = "Working…";
-  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
-    statusTop = "Migration pending.";
-  } else if (uiState === UI_STATE.IDLE) {
-    statusTop = "Press START RUN.";
-  }
-
-  const statusSub = "\u00a0";
-
   let payoutBandLabel = "Max win";
   let payoutBandValue = formatCompact(summaryWin);
   let payoutCaption = `Full clear · up to ${formatCompact(summaryWin)} (all gem path)`;
@@ -1033,8 +1010,6 @@ export default function CoreBreakerPage() {
           strikingUi={strikingUi}
           lastFlash={lastFlash}
           sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

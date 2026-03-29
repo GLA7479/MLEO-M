@@ -192,8 +192,6 @@ function DicePickGameplayPanel({
   popupLine2,
   popupLine3,
   sessionNotice,
-  statusTop,
-  statusSub,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -211,8 +209,9 @@ function DicePickGameplayPanel({
       <DicePickBoard
         progressStripKeyPrefix="dice-pick"
         sessionNotice={sessionNotice}
-        statusTop={statusTop}
-        statusSub={statusSub}
+        statusTop=""
+        statusSub=""
+        hideBoardStatusStack
         stepTotal={stepTotal}
         currentStepIndex={currentStepIndex}
         stepsComplete={stepsComplete}
@@ -1042,41 +1041,6 @@ export default function DicePickPage() {
   const isFlipping = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
   const strip = dicePickRoundStripModel(uiState);
 
-  let statusTop = "Press ROLL DICE when you are set.";
-  let statusSub =
-    "Choose LOW or HIGH, set your play in the bar below, then roll. The server seals the die before you see it.";
-
-  if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
-    statusSub = !vaultReady
-      ? "Shared vault could not be opened. Return to the arcade and try again."
-      : String(errorMessage || "").trim() || "Check your balance and connection, then try ROLL DICE again.";
-  } else if (uiState === UI_STATE.LOADING) {
-    statusTop = "Starting round…";
-    statusSub = "Opening or resuming a session with the server.";
-  } else if (uiState === UI_STATE.SUBMITTING_CHOICE) {
-    statusTop = "Locking your zone…";
-    statusSub = "Sending LOW or HIGH to the server.";
-  } else if (uiState === UI_STATE.CHOICE_SUBMITTED || isFlipping) {
-    statusTop = "Rolling…";
-    statusSub = "Outcome is resolved on the server; the die follows the fair result.";
-  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    statusTop = resolvedResult.isWin ? "You hit your zone." : "No match this time.";
-    statusSub =
-      "Round is complete. Change zone or stake, then press ROLL DICE for another round.";
-  } else if (uiState === UI_STATE.SESSION_CREATED || uiState === UI_STATE.CHOICE_SELECTED) {
-    statusTop = hasValidZone ? "Ready to roll." : "Choose your zone.";
-    statusSub = hasValidZone
-      ? "Press ROLL DICE to lock your pick and resolve this round."
-      : "Tap LOW or HIGH, then roll from the footer.";
-  } else if (uiState === UI_STATE.RESOLVE_FAILED) {
-    statusTop = "Could not resolve.";
-    statusSub = "Check your connection and try ROLL DICE again.";
-  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
-    statusTop = "Migration pending.";
-    statusSub = "This environment is updating. Try again shortly.";
-  }
-
   let payoutBandLabel = "Payout if win";
   let payoutBandValue = formatCompact(summaryWin);
   let payoutCaption = `×${DICE_PICK_WIN_MULTIPLIER} multiplier · play ${formatCompact(summaryPlay)}`;
@@ -1289,8 +1253,6 @@ export default function DicePickPage() {
           popupLine2={popupLine2}
           popupLine3={popupLine3}
           sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

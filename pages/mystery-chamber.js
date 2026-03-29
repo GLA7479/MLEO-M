@@ -252,8 +252,6 @@ function mysteryChamberStripModel(chamberCount, uiState, chambersCleared, curren
 
 function MysteryChamberGameplayPanel({
   sessionNotice,
-  statusTop,
-  statusSub,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -288,17 +286,6 @@ function MysteryChamberGameplayPanel({
           >
             {showSession ? sessionNotice : "\u00a0"}
           </p>
-        </div>
-
-        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
-          <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
-            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
-              {statusTop}
-            </p>
-          </div>
-          <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
-            <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">{statusSub}</p>
-          </div>
         </div>
 
         <SoloV2ProgressStrip
@@ -1317,57 +1304,6 @@ export default function MysteryChamberPage() {
     interstitialSafeSigil == null;
   const exitDisabled = busyFooter;
 
-  let statusTop = "Press START MYSTERY CHAMBER to begin.";
-  let statusSub =
-    "Chambers 1–3 each have two safe sigils; chamber 4 has one. Four sigils shown every chamber.";
-
-  const cleared = playing?.chambersCleared ?? 0;
-  const curCh = playing?.currentChamberIndex ?? 0;
-
-  if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_submitted") {
-    statusTop = "Resolving…";
-    statusSub = "Checking your sigil on the server.";
-  } else if (interstitialSafeSigil != null) {
-    const nextHuman = Math.min(
-      MYSTERY_CHAMBER_CHAMBER_COUNT,
-      Math.max(1, Math.floor(Number(curCh) || 0) + 1),
-    );
-    statusTop = "Chamber cleared — safe path.";
-    statusSub = `Next: Chamber ${nextHuman} of ${MYSTERY_CHAMBER_CHAMBER_COUNT}. Sigils unlock in a moment — then choose again; the same glyph is a new pick for this chamber.`;
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_required" && !localAnim) {
-    statusTop = `Chamber ${curCh + 1} of ${MYSTERY_CHAMBER_CHAMBER_COUNT}. Exit now or continue.`;
-    const nSafe = MYSTERY_CHAMBER_SAFE_COUNT_BY_STEP[curCh] ?? 1;
-    statusSub =
-      nSafe === 2
-        ? "Two of four sigils are safe — pick one to continue."
-        : "Only one sigil is safe in this chamber — choose carefully.";
-  }
-  if (localAnim?.phase === "success") {
-    statusTop = "Safe path found.";
-    const nextHuman = (playing?.currentChamberIndex ?? curCh) + 1;
-    statusSub = `Chamber ${Math.min(MYSTERY_CHAMBER_CHAMBER_COUNT, Math.max(1, nextHuman))} — choose your next sigil.`;
-  }
-  if (localAnim?.phase === "fail") {
-    const fc = Math.floor(
-      Number(localAnim.failChamberIndex ?? persistedBoard?.finalChamberIndex ?? 0) || 0,
-    );
-    statusTop = `Wrong sigil. The run ended in Chamber ${fc + 1}.`;
-    statusSub = "The run is over.";
-  }
-  if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "cashout") {
-    statusTop = `Exited after ${persistedBoard.chambersCleared || cleared || 0} chamber(s) cleared.`;
-    statusSub = "Secured return paid.";
-  }
-  if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "full_clear") {
-    statusTop = "Final chamber cleared.";
-    statusSub = "Maximum secured return.";
-  }
-  if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "fail" && !localAnim) {
-    const fc = persistedBoard?.finalChamberIndex ?? 0;
-    statusTop = `Wrong sigil. The run ended in Chamber ${fc + 1}.`;
-    statusSub = "The run is over.";
-  }
-
   const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.settlementSummary?.isWin);
   const tk = String(resolvedResult?.terminalKind || "");
   const delta = Number(resolvedResult?.settlementSummary?.netDelta ?? 0);
@@ -1545,8 +1481,6 @@ export default function MysteryChamberPage() {
       gameplaySlot={
         <MysteryChamberGameplayPanel
           sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

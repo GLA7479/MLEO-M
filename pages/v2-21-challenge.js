@@ -196,17 +196,6 @@ function Challenge21GameplayPanel({
           </p>
         </div>
 
-        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
-          <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
-            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
-              {statusTop}
-            </p>
-          </div>
-          <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
-            <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">{statusSub}</p>
-          </div>
-        </div>
-
         <SoloV2ProgressStrip
           keyPrefix="c21"
           rowLabel="Round"
@@ -226,7 +215,6 @@ function Challenge21GameplayPanel({
               <TwentyOneChallengeBoard
                 sessionNotice=""
                 hideSessionBanner
-                suppressShellStatus
                 statusTop={statusTop}
                 statusSub={statusSub}
                 playerHands={playerHands}

@@ -127,8 +127,6 @@ function dropRunRoundStripModel(uiState, readState, hasDropPlayback) {
 
 function DropRunGameplayPanel({
   sessionNotice,
-  statusTop,
-  statusSub,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -157,17 +155,6 @@ function DropRunGameplayPanel({
           >
             {showSession ? sessionNotice : "\u00a0"}
           </p>
-        </div>
-
-        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
-          <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
-            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
-              {statusTop}
-            </p>
-          </div>
-          <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
-            <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">{statusSub}</p>
-          </div>
         </div>
 
         <SoloV2ProgressStrip
@@ -863,45 +850,6 @@ export default function DropRunPage() {
 
   const strip = dropRunRoundStripModel(uiState, readState, Boolean(dropPlayback));
 
-  let statusTop = "Press START DROP when you are set.";
-  let statusSub =
-    "Set your play in the bar below, then start. The server seals the path; DROP BALL releases the run.";
-
-  if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
-    statusSub = !vaultReady
-      ? "Shared vault could not be opened. Return to the arcade and try again."
-      : String(errorMessage || "").trim() || "Check your balance and connection, then try START DROP again.";
-  } else if (uiState === UI_STATE.LOADING) {
-    statusTop = "Starting run…";
-    statusSub = "Opening or resuming a session with the server.";
-  } else if (uiState === UI_STATE.SUBMITTING_PICK) {
-    statusTop = "Locking drop…";
-    statusSub = "Sending your play to the server.";
-  } else if (uiState === UI_STATE.RESOLVING && !dropPlayback) {
-    statusTop = "Drawing path…";
-    statusSub = "Server is sealing the bounce path for this drop.";
-  } else if (dropPlayback) {
-    statusTop = "Dropping…";
-    statusSub = "Follow the ball — it lands in the box that sets this round’s multiplier.";
-  } else if (readState === "gate_submitted") {
-    statusTop = "Starting drop…";
-    statusSub = "Resolving gate with the server.";
-  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    statusTop = resolvedResult.isWin || resolvedResult.won ? "Payout box hit." : "No payout this time.";
-    statusSub =
-      "Round is complete. The board keeps the last drop until you press START DROP again — there is no auto-start.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready") {
-    statusTop = "Ready to drop.";
-    statusSub = "Press DROP BALL in the footer to release the ball through the field.";
-  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
-    statusTop = "Migration pending.";
-    statusSub = "This environment is updating. Try again shortly.";
-  } else if (uiState === UI_STATE.IDLE) {
-    statusTop = "Drop Run";
-    statusSub = "Plinko-style field — bottom box sets your multiplier on this play.";
-  }
-
   let payoutBandLabel = "Max win";
   let payoutBandValue = formatCompact(summaryWin);
 
@@ -1078,8 +1026,6 @@ export default function DropRunPage() {
       gameplaySlot={
         <DropRunGameplayPanel
           sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

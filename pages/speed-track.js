@@ -120,8 +120,6 @@ function SpeedTrackGameplayPanel({
   shakeLane,
   onPickRoute,
   sessionNotice,
-  statusTop,
-  statusSub,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -185,17 +183,6 @@ function SpeedTrackGameplayPanel({
           >
             {showSession ? sessionNotice : "\u00a0"}
           </p>
-        </div>
-
-        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
-          <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
-            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
-              {statusTop}
-            </p>
-          </div>
-          <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
-            <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">{statusSub}</p>
-          </div>
         </div>
 
         <SoloV2ProgressStrip
@@ -1000,60 +987,6 @@ export default function SpeedTrackPage() {
   const strip = speedTrackStripModel(checkpointTotal, uiState, nCleared, stripTerminalKind);
   const stepLabels = Array.from({ length: strip.stepTotal }, (_, i) => `CP${i + 1}`);
 
-  let statusTop = "Press START RUN when you are set.";
-  let statusSub =
-    "Set play in the bar below, then open a run. Each sector offers three lines — the server seals one blocked line.";
-
-  if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can't start this run.";
-    statusSub = !vaultReady
-      ? "Shared vault could not be opened. Return to the arcade and try again."
-      : String(errorMessage || "").trim() || "Check your balance and connection, then try START RUN again.";
-  } else if (uiState === UI_STATE.LOADING) {
-    statusTop = "Starting run…";
-    statusSub = "Opening or resuming a session with the server.";
-  } else if (uiState === UI_STATE.SUBMITTING_PICK) {
-    statusTop = "Submitting line…";
-    statusSub = "Locking your pick with the server.";
-  } else if (uiState === UI_STATE.RESOLVING || cashOutLoading) {
-    statusTop = cashOutLoading ? "Pitting…" : "Resolving sector…";
-    statusSub = "Outcome is resolved on the server before the board updates.";
-  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    const won = Boolean(resolvedResult.isWin ?? resolvedResult.won);
-    statusTop = won ? "Run closed in your favor." : "Run closed.";
-    const tk = resolvedResult.terminalKind;
-    const lead =
-      tk === "full_clear"
-        ? "Finish line — full clear. "
-        : tk === "blocked"
-          ? "Wrong line — DNF. "
-          : tk === "cashout"
-            ? "Pit stop — payout banked. "
-            : "";
-    statusSub =
-      lead +
-      "Adjust stake if needed, then press START RUN for another run — there is no auto-start after the popup.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "pick_conflict") {
-    statusTop = "State conflict.";
-    statusSub = "Refreshing checkpoint state from the server.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_submitted") {
-    statusTop = "Committing your racing line…";
-    statusSub = "Timing the sector — outcome follows the sealed server draw.";
-  } else if (
-    uiState === UI_STATE.SESSION_ACTIVE &&
-    (readState === "choice_required" || readState === "ready")
-  ) {
-    const cpIdx = Math.floor(Number(playing?.currentCheckpointIndex ?? 0));
-    statusTop = `Sector ${Math.min(cpIdx + 1, checkpointTotal)} — pick your line.`;
-    statusSub = "Inside, center, or outside — one line is blocked; a wrong pick ends the run.";
-  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
-    statusTop = "Migration pending.";
-    statusSub = "This environment is updating. Try again shortly.";
-  } else if (uiState === UI_STATE.IDLE) {
-    statusTop = "Arcade sprint.";
-    statusSub = "Six sectors, three lines each — survive the ladder or bank early at a pit stop.";
-  }
-
   let payoutBandLabel = "Secured payout";
   let payoutBandValue = formatCompact(summaryWin);
 
@@ -1215,8 +1148,6 @@ export default function SpeedTrackPage() {
           shakeLane={shakeLane}
           onPickRoute={handlePickRoute}
           sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

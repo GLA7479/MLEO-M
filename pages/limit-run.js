@@ -137,8 +137,6 @@ function LimitRunGameplayPanel({
   resultLineUi,
   resultToneUi,
   sessionNotice,
-  statusTop,
-  statusSub,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -173,17 +171,6 @@ function LimitRunGameplayPanel({
           >
             {showSession ? sessionNotice : "\u00a0"}
           </p>
-        </div>
-
-        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
-          <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
-            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
-              {statusTop}
-            </p>
-          </div>
-          <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
-            <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">{statusSub}</p>
-          </div>
         </div>
 
         <SoloV2ProgressStrip
@@ -944,42 +931,6 @@ export default function LimitRunPage() {
 
   const strip = limitRunRoundStripModel(uiState, readState);
 
-  let statusTop = "Press START RUN when you are set.";
-  let statusSub =
-    "Set your target multiplier and stake in the bar below, then start. After that, Roll resolves the server draw.";
-
-  if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
-    statusSub = !vaultReady
-      ? "Shared vault could not be opened. Return to the arcade and try again."
-      : String(errorMessage || "").trim() || "Check your balance and connection, then try START RUN again.";
-  } else if (uiState === UI_STATE.LOADING) {
-    statusTop = "Starting run…";
-    statusSub = "Opening or resuming a session with the server.";
-  } else if (uiState === UI_STATE.SUBMITTING_PICK) {
-    statusTop = "Submitting roll…";
-    statusSub = "Locking your target with the server.";
-  } else if (uiState === UI_STATE.RESOLVING || rollingUi) {
-    statusTop = "Drawing multiplier…";
-    statusSub = "Outcome is resolved on the server; the readout follows the fair result.";
-  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    statusTop = resolvedResult.isWin || resolvedResult.won ? "Target beaten." : "Below target this time.";
-    statusSub =
-      "Round is complete. Adjust target or stake, then press START RUN for another round — there is no auto-start.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready") {
-    statusTop = "Ready to roll.";
-    statusSub = "Tap Roll when your target is set. The server draws the multiplier for this round.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "roll_submitted") {
-    statusTop = "Finishing your roll…";
-    statusSub = "Resolving the server draw.";
-  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
-    statusTop = "Migration pending.";
-    statusSub = "This environment is updating. Try again shortly.";
-  } else if (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = "Limbo-style run.";
-    statusSub = "Choose a target, set play, then START RUN. Roll only after the session opens.";
-  }
-
   let payoutBandLabel = "Payout if win";
   let payoutBandValue = formatCompact(summaryWin);
 
@@ -1145,8 +1096,6 @@ export default function LimitRunPage() {
           resultLineUi={resultLineUi}
           resultToneUi={resultToneUi}
           sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

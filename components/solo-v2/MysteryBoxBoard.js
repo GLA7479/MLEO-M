@@ -22,6 +22,8 @@ export default function MysteryBoxBoard({
    * The `flex-1` playfield below grows into the freed space. Unchanged at `lg+` (band was already hidden).
    */
   hideMobilePayoutBand = false,
+  /** Omits the two-line status stack above the round strip; `flex-1` playfield grows. */
+  hideBoardStatusStack = false,
 }) {
   const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
   const cleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
@@ -40,18 +42,20 @@ export default function MysteryBoxBoard({
         </p>
       </div>
 
-      <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
-        <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
-          <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
-            {statusTop}
-          </p>
+      {!hideBoardStatusStack ? (
+        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
+          <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
+            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
+              {statusTop}
+            </p>
+          </div>
+          <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
+            <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">
+              {statusSub}
+            </p>
+          </div>
         </div>
-        <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
-          <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">
-            {statusSub}
-          </p>
-        </div>
-      </div>
+      ) : null}
 
       <SoloV2ProgressStrip
         keyPrefix="mb"

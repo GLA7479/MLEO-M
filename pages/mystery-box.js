@@ -189,8 +189,6 @@ function MysteryBoxGameplayPanel({
   popupLine2,
   popupLine3,
   sessionNotice,
-  statusTop,
-  statusSub,
   stepsComplete,
   currentStepIndex,
   stepTotal,
@@ -208,8 +206,9 @@ function MysteryBoxGameplayPanel({
     <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
       <MysteryBoxBoard
         sessionNotice={sessionNotice}
-        statusTop={statusTop}
-        statusSub={statusSub}
+        statusTop=""
+        statusSub=""
+        hideBoardStatusStack
         stepTotal={stepTotal}
         currentStepIndex={currentStepIndex}
         stepsComplete={stepsComplete}
@@ -1153,41 +1152,6 @@ export default function MysteryBoxPage() {
   const isOpening = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
   const strip = mysteryBoxRoundStripModel(uiState);
 
-  let statusTop = "Press OPEN BOX when you are set.";
-  let statusSub =
-    "One of three boxes holds the prize. Choose A, B, or C, set your play below, then open — the server seals the winning box.";
-
-  if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
-    statusSub = !vaultReady
-      ? "Shared vault could not be opened. Return to the arcade and try again."
-      : String(errorMessage || "").trim() || "Check your balance and connection, then try OPEN BOX again.";
-  } else if (uiState === UI_STATE.LOADING) {
-    statusTop = "Starting round…";
-    statusSub = "Opening or resuming a session with the server.";
-  } else if (uiState === UI_STATE.SUBMITTING_CHOICE) {
-    statusTop = "Locking your pick…";
-    statusSub = "Sending your box choice to the server.";
-  } else if (uiState === UI_STATE.CHOICE_SUBMITTED || isOpening) {
-    statusTop = "Opening…";
-    statusSub = "The server reveals which box held the prize.";
-  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    statusTop = resolvedResult.isWin ? "You found the prize box." : "Not the prize box this time.";
-    statusSub =
-      "Round is complete. Change box or stake, then press OPEN BOX for another round.";
-  } else if (uiState === UI_STATE.SESSION_CREATED || uiState === UI_STATE.CHOICE_SELECTED) {
-    statusTop = hasValidBox ? "Ready to open." : "Choose a box.";
-    statusSub = hasValidBox
-      ? "Press OPEN BOX to lock your pick and reveal the prize box on the server."
-      : "Tap A, B, or C, then open from the footer.";
-  } else if (uiState === UI_STATE.RESOLVE_FAILED) {
-    statusTop = "Could not resolve.";
-    statusSub = "Check your connection and try OPEN BOX again.";
-  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
-    statusTop = "Migration pending.";
-    statusSub = "This environment is updating. Try again shortly.";
-  }
-
   let payoutBandLabel = "Payout if win";
   let payoutBandValue = formatCompact(summaryWin);
   let payoutCaption = `×${MYSTERY_BOX_WIN_MULTIPLIER} multiplier · play ${formatCompact(summaryPlay)}`;
@@ -1409,8 +1373,6 @@ export default function MysteryBoxPage() {
           popupLine2={popupLine2}
           popupLine3={popupLine3}
           sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}
