@@ -126,15 +126,15 @@ function PlayingCard({ rank, suit, tone = "neutral", className = "" }) {
         : "border-white/20 shadow-lg";
   return (
     <div
-      className={`relative flex h-44 w-28 flex-col rounded-xl border-2 bg-zinc-900/90 sm:h-52 sm:w-36 ${ring} ${className}`}
+      className={`relative flex h-[10.5rem] w-[6.85rem] flex-col rounded-xl border-2 bg-zinc-900/90 sm:h-52 sm:w-36 ${ring} ${className}`}
     >
-      <div className={`absolute left-2 top-2 flex flex-col leading-none ${color}`}>
-        <span className="text-2xl font-serif font-bold sm:text-3xl">{rank}</span>
-        <span className="text-xl font-serif sm:text-2xl">{suit}</span>
+      <div className={`absolute left-1.5 top-1.5 flex flex-col leading-none sm:left-2 sm:top-2 ${color}`}>
+        <span className="text-xl font-serif font-bold sm:text-3xl">{rank}</span>
+        <span className="text-lg font-serif sm:text-2xl">{suit}</span>
       </div>
-      <div className={`absolute bottom-2 right-2 flex rotate-180 flex-col leading-none ${color}`}>
-        <span className="text-2xl font-serif font-bold sm:text-3xl">{rank}</span>
-        <span className="text-xl font-serif sm:text-2xl">{suit}</span>
+      <div className={`absolute bottom-1.5 right-1.5 flex rotate-180 flex-col leading-none sm:bottom-2 sm:right-2 ${color}`}>
+        <span className="text-xl font-serif font-bold sm:text-3xl">{rank}</span>
+        <span className="text-lg font-serif sm:text-2xl">{suit}</span>
       </div>
     </div>
   );
@@ -143,7 +143,7 @@ function PlayingCard({ rank, suit, tone = "neutral", className = "" }) {
 function CardBackFace({ className = "" }) {
   return (
     <div
-      className={`relative flex h-44 w-28 flex-col rounded-xl border-2 border-indigo-400/50 bg-gradient-to-br from-indigo-950 via-zinc-900 to-violet-950 shadow-inner sm:h-52 sm:w-36 ${className}`}
+      className={`relative flex h-[10.5rem] w-[6.85rem] flex-col rounded-xl border-2 border-indigo-400/50 bg-gradient-to-br from-indigo-950 via-zinc-900 to-violet-950 shadow-inner sm:h-52 sm:w-36 ${className}`}
     >
       <div className="pointer-events-none absolute inset-0 rounded-[10px] bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.12),transparent_45%)]" />
       <span className="m-auto select-none text-4xl opacity-90 drop-shadow-lg sm:text-5xl" aria-hidden>
@@ -161,7 +161,7 @@ function NextCardReveal({ card, faceUp, outcome }) {
   if (!card?.rank) return null;
   const tone = faceUp ? (outcome === "win" ? "win" : outcome === "loss" ? "loss" : "neutral") : "neutral";
   return (
-    <div className="relative flex h-44 w-28 shrink-0 flex-col items-center justify-center sm:h-52 sm:w-36">
+    <div className="relative flex h-[10.5rem] w-[6.85rem] shrink-0 flex-col items-center justify-center sm:h-52 sm:w-36">
       <div
         className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ease-out ${
           faceUp ? "pointer-events-none scale-95 opacity-0" : "scale-100 opacity-100"
@@ -1107,120 +1107,118 @@ export default function HighLowCardsPage() {
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
-        <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
-          {/* Same column contract as quick-flip: flex-1 main stage + shrink-0 control strip with only pb-2/sm:pb-3 above footer */}
-          <div className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col sm:max-w-lg lg:max-w-2xl">
-            <div className="flex h-4 shrink-0 items-center justify-center px-1 sm:h-[1.125rem]">
-              <p
-                className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-amber-200/85 sm:text-[10px] ${
-                  sessionNotice ? "opacity-100" : "opacity-0"
-                }`}
-              >
-                {sessionNotice || "\u00a0"}
+        <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="mx-auto flex min-h-0 w-full max-w-full flex-1 flex-col sm:max-w-lg lg:max-w-2xl">
+              <div className="flex h-4 shrink-0 items-center justify-center px-1 sm:h-[1.125rem]">
+                <p
+                  className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-amber-200/85 sm:text-[10px] ${
+                    sessionNotice ? "opacity-100" : "opacity-0"
+                  }`}
+                >
+                  {sessionNotice || "\u00a0"}
+                </p>
+              </div>
+              <p className="mb-0.5 line-clamp-3 shrink-0 px-0.5 text-[9px] leading-snug text-zinc-400 sm:mb-1 sm:line-clamp-none sm:px-0 sm:text-xs">
+                See the base card, then call higher or lower. Each win raises your streak and multiplier (+0.206 per win,
+                legacy curve). Cash out anytime after at least one win.
               </p>
-            </div>
-            <p className="mb-1 shrink-0 text-[10px] leading-snug text-zinc-400 sm:text-xs">
-              See the base card, then call higher or lower. Each win raises your streak and multiplier (+0.206 per win,
-              legacy curve). Cash out anytime after at least one win.
-            </p>
 
-            {/* Fixed-height status band: streak / resolving never change layout height */}
-            <div
-              className="relative mx-auto w-full max-w-sm shrink-0 text-zinc-500"
-              style={{ minHeight: "2.875rem" }}
-              aria-live="polite"
-            >
-              <div className="flex h-5 items-center justify-center gap-1 text-[11px] leading-none sm:text-xs">
-                {isRunActive ? (
-                  <>
-                    <span className="font-semibold uppercase tracking-wide text-zinc-400">Run active</span>
-                    <span className="text-zinc-600" aria-hidden>
-                      ·
-                    </span>
-                    <span>
-                      Streak{" "}
-                      <span
-                        className={`inline-block font-bold tabular-nums transition-all duration-300 ${
-                          streakPulse > 0
-                            ? "scale-110 text-emerald-300 drop-shadow-[0_0_10px_rgba(52,211,153,0.45)]"
-                            : "text-amber-200/90"
-                        }`}
-                      >
-                        {streak}
+              <div
+                className="relative mx-auto w-full max-w-full shrink-0 px-0.5 text-zinc-500 min-h-[2.5rem] sm:max-w-sm sm:min-h-[2.875rem]"
+                aria-live="polite"
+              >
+                <div className="flex min-h-[1.25rem] flex-wrap items-center justify-center gap-x-1 gap-y-0.5 text-[10px] leading-tight sm:h-5 sm:min-h-0 sm:text-xs">
+                  {isRunActive ? (
+                    <>
+                      <span className="font-semibold uppercase tracking-wide text-zinc-400">Run active</span>
+                      <span className="text-zinc-600" aria-hidden>
+                        ·
                       </span>
+                      <span>
+                        Streak{" "}
+                        <span
+                          className={`inline-block font-bold tabular-nums transition-all duration-300 ${
+                            streakPulse > 0
+                              ? "scale-110 text-emerald-300 drop-shadow-[0_0_10px_rgba(52,211,153,0.45)]"
+                              : "text-amber-200/90"
+                          }`}
+                        >
+                          {streak}
+                        </span>
+                      </span>
+                      <span className="text-zinc-600" aria-hidden>
+                        ·
+                      </span>
+                      <span className="tabular-nums">×{mult.toFixed(3)}</span>
+                    </>
+                  ) : (
+                    <span className="invisible select-none tabular-nums" aria-hidden>
+                      Run active · Streak 0 · ×1.000
                     </span>
-                    <span className="text-zinc-600" aria-hidden>
-                      ·
+                  )}
+                </div>
+                <div className="relative flex min-h-[1rem] items-center justify-center sm:h-4">
+                  {isRunActive && uiState === UI_STATE.RESOLVING ? (
+                    <span className="text-[9px] font-medium uppercase tracking-wider text-indigo-300/90 sm:text-[10px]">
+                      Resolving turn…
                     </span>
-                    <span className="tabular-nums">×{mult.toFixed(3)}</span>
-                  </>
-                ) : (
-                  <span className="invisible select-none tabular-nums" aria-hidden>
-                    Run active · Streak 0 · ×1.000
-                  </span>
-                )}
+                  ) : (
+                    <span className="invisible text-[9px] leading-none sm:text-[10px]" aria-hidden>
+                      Resolving
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="relative flex h-4 items-center justify-center">
-                {isRunActive && uiState === UI_STATE.RESOLVING ? (
-                  <span className="text-[9px] font-medium uppercase tracking-wider text-indigo-300/90 sm:text-[10px]">
-                    Resolving turn…
-                  </span>
-                ) : (
-                  <span className="invisible text-[9px] leading-none sm:text-[10px]" aria-hidden>
-                    Resolving
-                  </span>
-                )}
-              </div>
-            </div>
 
-            <div className="flex min-h-0 flex-1 flex-col justify-center py-3 sm:py-5">
-              <div className="flex w-full shrink-0 items-start justify-center gap-2 sm:gap-3">
-                {currentCard?.rank ? <PlayingCard rank={currentCard.rank} suit={currentCard.suit || "♠"} /> : null}
-                {revealCardData?.rank ? (
-                  <NextCardReveal card={revealCardData} faceUp={revealFaceUp} outcome={revealOutcome} />
-                ) : uiState === UI_STATE.RESOLVING ? (
-                  <div className="flex h-44 w-28 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-zinc-600/50 bg-zinc-900/40 sm:h-52 sm:w-36">
-                    <span className="px-1 text-[9px] font-medium uppercase tracking-wide text-zinc-500">Next card</span>
-                    <span className="mt-0.5 text-[10px] text-zinc-400 animate-pulse sm:text-xs">Drawing…</span>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Fixed-height strip: buttons while playing; empty reserved height in terminal (popup carries result copy) */}
-            <div className="w-full shrink-0 pb-2 sm:pb-3">
-              {hiLoBottomSlotActive ? (
-                <div className="flex h-[4.5rem] w-full flex-col justify-center overflow-hidden sm:h-[4.75rem]">
-                  {(uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING) && playing ? (
-                    <div className="grid w-full grid-cols-3 gap-2">
-                      <button
-                        type="button"
-                        disabled={uiState !== UI_STATE.PLAYING || guessControlsLocked}
-                        onClick={() => void submitGuessAndResolve("high")}
-                        className="h-11 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-xs font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-40 sm:h-12 sm:text-sm"
-                      >
-                        HIGHER
-                      </button>
-                      <button
-                        type="button"
-                        disabled={uiState !== UI_STATE.PLAYING || !playing?.canCashOut || guessControlsLocked}
-                        onClick={() => void handleCashOut()}
-                        className="h-11 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-700 text-xs font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-30 sm:h-12 sm:text-sm"
-                      >
-                        CASH OUT
-                      </button>
-                      <button
-                        type="button"
-                        disabled={uiState !== UI_STATE.PLAYING || guessControlsLocked}
-                        onClick={() => void submitGuessAndResolve("low")}
-                        className="h-11 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 text-xs font-bold text-white shadow-md disabled:pointer-events-none disabled:opacity-40 sm:h-12 sm:text-sm"
-                      >
-                        LOWER
-                      </button>
+              <div className="flex min-h-0 flex-1 flex-col justify-center py-2 sm:py-5">
+                <div className="flex w-full shrink-0 flex-col items-center justify-center gap-2 sm:flex-row sm:items-start sm:gap-3">
+                  {currentCard?.rank ? <PlayingCard rank={currentCard.rank} suit={currentCard.suit || "♠"} /> : null}
+                  {revealCardData?.rank ? (
+                    <NextCardReveal card={revealCardData} faceUp={revealFaceUp} outcome={revealOutcome} />
+                  ) : uiState === UI_STATE.RESOLVING ? (
+                    <div className="flex h-[10.5rem] w-[6.85rem] shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-zinc-600/50 bg-zinc-900/40 sm:h-52 sm:w-36">
+                      <span className="px-1 text-[9px] font-medium uppercase tracking-wide text-zinc-500">Next card</span>
+                      <span className="mt-0.5 text-[10px] text-zinc-400 animate-pulse sm:text-xs">Drawing…</span>
                     </div>
                   ) : null}
                 </div>
-              ) : null}
+              </div>
+
+              <div className="w-full shrink-0 pb-2 sm:pb-3">
+                {hiLoBottomSlotActive ? (
+                  <div className="flex min-h-[4.25rem] w-full flex-col justify-center sm:min-h-[4.75rem]">
+                    {(uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING) && playing ? (
+                      <div className="grid w-full grid-cols-3 gap-1.5 sm:gap-2">
+                        <button
+                          type="button"
+                          disabled={uiState !== UI_STATE.PLAYING || guessControlsLocked}
+                          onClick={() => void submitGuessAndResolve("high")}
+                          className="min-h-[44px] rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-[10px] font-bold leading-tight text-white shadow-md disabled:pointer-events-none disabled:opacity-40 sm:h-12 sm:text-sm"
+                        >
+                          HIGHER
+                        </button>
+                        <button
+                          type="button"
+                          disabled={uiState !== UI_STATE.PLAYING || !playing?.canCashOut || guessControlsLocked}
+                          onClick={() => void handleCashOut()}
+                          className="min-h-[44px] rounded-xl bg-gradient-to-r from-sky-600 to-indigo-700 text-[10px] font-bold leading-tight text-white shadow-md disabled:pointer-events-none disabled:opacity-30 sm:h-12 sm:text-sm"
+                        >
+                          CASH OUT
+                        </button>
+                        <button
+                          type="button"
+                          disabled={uiState !== UI_STATE.PLAYING || guessControlsLocked}
+                          onClick={() => void submitGuessAndResolve("low")}
+                          className="min-h-[44px] rounded-xl bg-gradient-to-r from-rose-600 to-red-700 text-[10px] font-bold leading-tight text-white shadow-md disabled:pointer-events-none disabled:opacity-40 sm:h-12 sm:text-sm"
+                        >
+                          LOWER
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
 
