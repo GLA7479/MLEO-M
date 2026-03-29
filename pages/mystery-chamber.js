@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import MysteryChamberBoard from "../components/solo-v2/MysteryChamberBoard";
+import SoloV2BoardCashOutControl from "../components/solo-v2/SoloV2BoardCashOutControl";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
   SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
 } from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
+import SoloV2ProgressStrip from "../components/solo-v2/SoloV2ProgressStrip";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import {
   MYSTERY_CHAMBER_CHAMBER_COUNT,
@@ -238,11 +240,27 @@ function visualsFromLocalAnim(anim) {
   return v;
 }
 
+function mysteryChamberStripModel(chamberCount, uiState, chambersCleared, currentChamberIndex, terminalKind) {
+  const total = Math.max(1, Math.floor(Number(chamberCount) || MYSTERY_CHAMBER_CHAMBER_COUNT));
+  const cleared = Math.max(0, Math.min(total, Math.floor(Number(chambersCleared) || 0)));
+  const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentChamberIndex) || 0)));
+  if (uiState === UI_STATE.RESOLVED && terminalKind === "full_clear") {
+    return { stepTotal: total, stepsComplete: total, currentStepIndex: total - 1 };
+  }
+  return { stepTotal: total, stepsComplete: cleared, currentStepIndex: cur };
+}
+
 function MysteryChamberGameplayPanel({
   sessionNotice,
   statusTop,
   statusSub,
-  playing,
+  stepTotal,
+  stepsComplete,
+  currentStepIndex,
+  stepLabels,
+  payoutBandLabel,
+  payoutBandValue,
+  payoutCaption,
   sigilVisuals,
   sigilPickDisabled,
   onSigilPick,
@@ -256,33 +274,113 @@ function MysteryChamberGameplayPanel({
   popupLine2,
   popupLine3,
   resultVaultLabel,
-  securedCaption = "",
 }) {
-  const ch = playing?.chamberCount ?? MYSTERY_CHAMBER_CHAMBER_COUNT;
-  const cur = Math.max(0, Math.floor(Number(playing?.currentChamberIndex) || 0));
-  const cleared = Math.max(0, Math.floor(Number(playing?.chambersCleared) || 0));
-  const sec = playing?.securedReturn != null ? Math.floor(Number(playing.securedReturn)) : 0;
+  const showSession = Boolean(sessionNotice);
+  const total = Math.max(1, Math.floor(Number(stepTotal) || MYSTERY_CHAMBER_CHAMBER_COUNT));
+  const stripCleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
+  const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <MysteryChamberBoard
-          sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
-          chamberTotal={ch}
-          currentChamberIndex={cur}
-          chambersCleared={cleared}
-          securedReturnLabel={formatCompact(sec)}
-          securedCaption={securedCaption}
-          sigilVisuals={sigilVisuals}
-          sigilPickDisabled={sigilPickDisabled}
-          onSigilPick={onSigilPick}
-          exitVisible={exitVisible}
-          exitDisabled={exitDisabled}
-          onExitNow={onExitNow}
-          revealPulse={revealPulse}
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-2 border-amber-900/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-5">
+          <p
+            className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-amber-200/85 sm:text-[10px] ${
+              showSession ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            {showSession ? sessionNotice : "\u00a0"}
+          </p>
+        </div>
+
+        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
+          <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
+            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
+              {statusTop}
+            </p>
+          </div>
+          <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
+            <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">{statusSub}</p>
+          </div>
+        </div>
+
+        <SoloV2ProgressStrip
+          keyPrefix="mc"
+          rowLabel="Chambers"
+          ariaLabel="Chamber progress"
+          stepTotal={total}
+          stepsComplete={stripCleared}
+          currentStepIndex={cur}
+          stepLabels={stepLabels}
         />
+
+        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
+          <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
+            <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">
+              <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
+                {payoutBandLabel}
+              </span>
+              <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
+                {payoutBandValue}
+              </span>
+            </div>
+            <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
+              <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
+                {payoutCaption || "\u00a0"}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(14rem,30vh)]"
+            aria-label="Mystery Chamber sigils"
+          >
+            <div className="flex min-h-0 min-h-[11rem] flex-1 flex-col items-center justify-center px-0.5 py-1 sm:min-h-[12rem] sm:px-1 sm:py-1.5 lg:min-h-0 lg:px-1 lg:py-0.5">
+              <MysteryChamberBoard
+                sigilVisuals={sigilVisuals}
+                sigilPickDisabled={sigilPickDisabled}
+                onSigilPick={onSigilPick}
+                revealPulse={revealPulse}
+              />
+            </div>
+            <div className="hidden shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:flex lg:min-h-[4.25rem] lg:gap-1.5 lg:px-2 lg:py-1.5">
+              <SoloV2BoardCashOutControl
+                show={exitVisible}
+                label="Exit now"
+                loadingLabel="Exit now"
+                disabled={exitDisabled}
+                loading={false}
+                onClick={onExitNow}
+                wrapperClassName="flex w-full shrink-0 justify-center px-1 pb-0 pt-0 sm:px-2"
+              />
+              <div
+                className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:h-8 lg:max-w-2xl"
+                aria-hidden
+              />
+            </div>
+          </div>
+
+          <div className="flex w-full min-w-0 shrink-0 flex-col items-stretch justify-center px-0 py-2 sm:py-2.5 lg:hidden">
+            {exitVisible ? (
+              <button
+                type="button"
+                onClick={onExitNow}
+                disabled={exitDisabled}
+                className={`min-h-[48px] w-full rounded-lg border px-4 py-2.5 text-xs font-extrabold uppercase tracking-wide sm:text-sm ${
+                  exitDisabled
+                    ? "cursor-not-allowed border-white/15 bg-white/5 text-zinc-500"
+                    : "border-amber-400/45 bg-amber-950/40 text-amber-100 active:bg-amber-900/45"
+                }`}
+              >
+                Exit now
+              </button>
+            ) : (
+              <div className="pointer-events-none min-h-[2.5rem] w-full sm:min-h-[2.4rem]" aria-hidden />
+            )}
+          </div>
+        </div>
       </div>
 
       <SoloV2ResultPopup
@@ -1364,9 +1462,37 @@ export default function MysteryChamberPage() {
 
   const boardShowsIdlePreview =
     !sessionLocksSummary && !(uiState === UI_STATE.RESOLVED && persistedBoard);
-  const securedCaptionBoard = boardShowsIdlePreview
+
+  let payoutBandLabel = "Secured return";
+  let payoutBandValue = formatCompact(summaryWin);
+  let payoutCaption = boardShowsIdlePreview
     ? `Full clear (${MYSTERY_CHAMBER_CHAMBER_COUNT} chambers): ${formatCompact(previewMaxClear)}`
     : "";
+
+  if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
+    const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
+    const won = Boolean(resolvedResult?.isWin ?? resolvedResult?.settlementSummary?.isWin);
+    payoutBandLabel = won ? "Return paid" : "Return this round";
+    payoutBandValue = formatCompact(pr);
+    const tk = String(resolvedResult?.terminalKind || "");
+    if (tk === "full_clear") payoutCaption = "All chambers cleared — maximum secured return";
+    else if (tk === "fail") {
+      const fi = Math.floor(Number(resolvedResult?.finalChamberIndex ?? persistedBoard?.finalChamberIndex ?? 0));
+      payoutCaption = Number.isFinite(fi) ? `Wrong sigil in chamber ${fi + 1}` : "Wrong sigil — run ended";
+    } else if (tk === "cashout") payoutCaption = "Exited with secured return banked";
+    else payoutCaption = "Round settled";
+  }
+
+  const stripTerminalKind =
+    uiState === UI_STATE.RESOLVED ? String(resolvedResult?.terminalKind || persistedBoard?.terminalKind || "") : "";
+  const strip = mysteryChamberStripModel(
+    MYSTERY_CHAMBER_CHAMBER_COUNT,
+    uiState,
+    playingForPanel?.chambersCleared ?? 0,
+    playingForPanel?.currentChamberIndex ?? 0,
+    stripTerminalKind,
+  );
+  const stepLabels = Array.from({ length: strip.stepTotal }, (_, i) => `CH${i + 1}`);
 
   const mcSt = mcLocalStats;
   const safePickTotal = totalSuccessfulSafePicks(mcSt);
@@ -1444,6 +1570,10 @@ export default function MysteryChamberPage() {
           void runStartMysteryChamber();
         },
         errorMessage: errorMessage || stakeHint,
+        desktopPayout: {
+          label: payoutBandLabel,
+          value: payoutBandValue,
+        },
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
@@ -1451,7 +1581,13 @@ export default function MysteryChamberPage() {
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          playing={playingForPanel}
+          stepTotal={strip.stepTotal}
+          stepsComplete={strip.stepsComplete}
+          currentStepIndex={strip.currentStepIndex}
+          stepLabels={stepLabels}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           sigilVisuals={sigilVisuals}
           sigilPickDisabled={sigilPickDisabled}
           onSigilPick={handleSigilPick}
@@ -1465,7 +1601,6 @@ export default function MysteryChamberPage() {
           popupLine2={popupLine2}
           popupLine3={popupLine3}
           resultVaultLabel={resultVaultLabel}
-          securedCaption={securedCaptionBoard}
         />
       }
       helpContent={

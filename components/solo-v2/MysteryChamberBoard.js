@@ -1,7 +1,4 @@
-import {
-  MYSTERY_CHAMBER_CHAMBER_COUNT,
-  MYSTERY_CHAMBER_SIGIL_GLYPHS,
-} from "../../lib/solo-v2/mysteryChamberConfig";
+import { MYSTERY_CHAMBER_SIGIL_GLYPHS } from "../../lib/solo-v2/mysteryChamberConfig";
 
 /**
  * @typedef {"idle" | "pending" | "safe" | "fail" | "muted"} SigilVisual
@@ -64,137 +61,31 @@ function SigilTile({ index, visual, disabled, onPick, revealPulse }) {
   );
 }
 
+/**
+ * Inner ladder playfield only — outer notice / strip / payout / exit live on the page (Gold Rush Digger template).
+ */
 export default function MysteryChamberBoard({
-  sessionNotice,
-  statusTop,
-  statusSub,
-  chamberTotal = MYSTERY_CHAMBER_CHAMBER_COUNT,
-  currentChamberIndex = 0,
-  chambersCleared = 0,
-  securedReturnLabel,
-  securedCaption = "",
   sigilVisuals = ["idle", "idle", "idle", "idle"],
   sigilPickDisabled = false,
   onSigilPick,
-  exitVisible = false,
-  exitDisabled = false,
-  onExitNow,
   revealPulse = false,
 }) {
-  const total = Math.max(1, Math.floor(Number(chamberTotal) || MYSTERY_CHAMBER_CHAMBER_COUNT));
-  const showSession = Boolean(sessionNotice);
-
   return (
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border-2 border-amber-900/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-8">
-        <p
-          className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-amber-200/85 sm:text-[10px] ${
-            showSession ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          {showSession ? sessionNotice : "\u00a0"}
-        </p>
-      </div>
-
-      <div className="shrink-0 px-2.5 pb-0 pt-0.5 text-center sm:px-3 sm:pb-0.5 sm:pt-0.5 lg:px-8">
-        <div className="flex min-h-[1.875rem] items-start justify-center sm:min-h-[2rem]">
-          <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-snug text-white sm:text-[13px] sm:leading-snug">
-            {statusTop}
-          </p>
-        </div>
-        <div className="flex min-h-[1.625rem] items-start justify-center sm:min-h-[1.75rem]">
-          <p className="line-clamp-2 w-full text-center text-[9px] leading-snug text-zinc-400 sm:text-[10px]">
-            {statusSub}
-          </p>
-        </div>
-      </div>
-
-      <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-8">
-        <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
-          <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">
-            Chambers
-          </span>
-          <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
-            {Math.min(chambersCleared + 1, total)} / {total}
-          </span>
-        </div>
-        <div
-          className="flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
-          aria-label="Chamber progress"
-        >
-          {Array.from({ length: total }, (_, i) => {
-            const done = i < chambersCleared;
-            const active = i === currentChamberIndex && !done;
-            return (
-              <div
-                key={`ch-${i}`}
-                className={`flex min-w-0 flex-1 flex-col items-center justify-center rounded-[5px] py-1 sm:rounded-md sm:py-1.5 ${
-                  done
-                    ? "bg-emerald-600/35 text-emerald-100"
-                    : active
-                      ? "bg-amber-500/25 text-amber-100 ring-1 ring-inset ring-amber-400/35"
-                      : "bg-zinc-900/90 text-zinc-500"
-                }`}
-              >
-                <span className="text-[10px] font-black tabular-nums sm:text-[11px]">{i + 1}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-8">
-        <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
-          <div className="flex items-center justify-between gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5">
-            <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
-              Secured return
-            </span>
-            <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
-              {securedReturnLabel}
-            </span>
-          </div>
-          <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
-            <span className={`line-clamp-1 ${securedCaption ? "" : "opacity-0"}`}>
-              {securedCaption || "\u00a0"}
-            </span>
-          </p>
-        </div>
-      </div>
-
-      {/* Mobile: 2×2 centered in flex-1. Desktop: row is flex-none so EXIT NOW stays in view (no flex-1 spacer below). */}
-      <div className="flex min-h-0 flex-1 flex-col justify-center px-2 pb-0.5 pt-0 sm:flex-none sm:justify-start sm:px-4 sm:pb-0.5 sm:pt-0 lg:px-8">
-        <div
-          className="mx-auto grid w-full max-w-[17.75rem] grid-cols-2 grid-rows-2 gap-2 sm:mx-0 sm:max-w-none sm:grid-cols-4 sm:grid-rows-1 sm:gap-3 lg:gap-3.5"
-          role="group"
-          aria-label="Sigils"
-        >
-          {[0, 1, 2, 3].map(i => (
-            <SigilTile
-              key={i}
-              index={i}
-              visual={sigilVisuals[i] || "idle"}
-              disabled={sigilPickDisabled || ["safe", "fail", "muted"].includes(sigilVisuals[i])}
-              onPick={onSigilPick}
-              revealPulse={revealPulse && sigilVisuals[i] === "pending"}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="flex shrink-0 justify-center border-t border-amber-900/35 bg-zinc-950/80 px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1 lg:px-8">
-        {exitVisible ? (
-          <button
-            type="button"
-            disabled={exitDisabled}
-            onClick={() => onExitNow?.()}
-            className="mx-auto w-full max-w-sm rounded-xl border-2 border-white/12 bg-white/[0.08] py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-white transition enabled:hover:border-white/18 enabled:hover:bg-white/[0.11] enabled:active:scale-[0.99] enabled:active:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-35 sm:py-2 sm:text-[11px]"
-          >
-            Exit now
-          </button>
-        ) : (
-          <div className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem]" aria-hidden />
-        )}
-      </div>
+    <div
+      className="mx-auto grid w-full max-w-[17.75rem] grid-cols-2 grid-rows-2 gap-2 sm:mx-0 sm:max-w-none sm:grid-cols-4 sm:grid-rows-1 sm:gap-3 lg:gap-3.5"
+      role="group"
+      aria-label="Sigils"
+    >
+      {[0, 1, 2, 3].map(i => (
+        <SigilTile
+          key={i}
+          index={i}
+          visual={sigilVisuals[i] || "idle"}
+          disabled={sigilPickDisabled || ["safe", "fail", "muted"].includes(sigilVisuals[i])}
+          onPick={onSigilPick}
+          revealPulse={revealPulse && sigilVisuals[i] === "pending"}
+        />
+      ))}
     </div>
   );
 }
