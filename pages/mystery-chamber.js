@@ -1254,22 +1254,16 @@ export default function MysteryChamberPage() {
       }}
       topGameStatsSlot={
         <>
-          <span className="min-w-0 whitespace-nowrap text-zinc-500">
-            Play{" "}
-            <span className="inline-block min-w-[8ch] text-right font-semibold tabular-nums text-emerald-200/90">
-              {formatCompact(summaryPlay)}
-            </span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Play</span>
+            <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
           </span>
           <span className="shrink-0 text-zinc-600" aria-hidden>
             ·
           </span>
-          <span className="min-w-0 whitespace-nowrap text-zinc-500">
-            <span className="inline-block w-[5.5rem] shrink-0 text-right max-sm:w-[5.25rem]">
-              {summarySecondStatLabel}
-            </span>{" "}
-            <span className="inline-block min-w-[8ch] text-right font-semibold tabular-nums text-lime-200/90">
-              {formatCompact(summaryWin)}
-            </span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span className="shrink-0">{summarySecondStatLabel}</span>
+            <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
           </span>
         </>
       }

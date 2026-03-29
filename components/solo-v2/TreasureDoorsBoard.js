@@ -22,6 +22,8 @@ export default function TreasureDoorsBoard({
   trapDoors = null,
   revealTraps = false,
   disabled = false,
+  /** When set for the **current** hero chamber, that door stays marked and the others are inactive. */
+  lockedDoorIndex = null,
   pulseCell = null,
   shakeCell = null,
   onPickDoor,
@@ -42,6 +44,12 @@ export default function TreasureDoorsBoard({
       : null;
   const lastDoor =
     lastPickDoor != null && Number.isFinite(Number(lastPickDoor)) ? Math.floor(Number(lastPickDoor)) : null;
+
+  const lockedDoor =
+    lockedDoorIndex != null && Number.isFinite(Number(lockedDoorIndex))
+      ? Math.min(dMax - 1, Math.max(0, Math.floor(Number(lockedDoorIndex))))
+      : null;
+  const chamberPickCommitted = !isTerminalRecap && lockedDoor != null;
 
   /** Chamber shown in hero for terminal recap (trap = fail chamber; full clear = last vault). */
   let heroCh = cur;
@@ -198,7 +206,9 @@ export default function TreasureDoorsBoard({
                 }
               }
 
-              const interactive = !isTerminalRecap && !disabled;
+              const isCommittedHere = chamberPickCommitted && lockedDoor === door;
+              const isDimmedUnpicked = chamberPickCommitted && lockedDoor !== door;
+              const interactive = !isTerminalRecap && !disabled && !chamberPickCommitted;
               const doorBase =
                 "relative flex h-full min-h-[110px] w-full flex-col items-stretch justify-between overflow-hidden rounded-lg border px-0 pb-2 pt-2 transition sm:min-h-[128px]";
 
@@ -208,6 +218,10 @@ export default function TreasureDoorsBoard({
                 interactive
                   ? "cursor-pointer border-zinc-500 hover:border-zinc-400 hover:bg-zinc-900 active:scale-[0.99]"
                   : "border-zinc-700 opacity-75";
+              const stoneCommittedPick =
+                "cursor-default border-amber-400/90 bg-amber-950/35 opacity-100 ring-2 ring-amber-500/50 shadow-[inset_0_1px_0_rgba(251,191,36,0.08)]";
+              const stoneLockedOut =
+                "cursor-not-allowed border-zinc-800 bg-zinc-950/80 opacity-[0.48] saturate-[0.65]";
 
               const recapTrap = recapLabel === "trap" || recapLabel === "trap_opened";
               const recapTrapOpened = recapLabel === "trap_opened";
@@ -218,9 +232,17 @@ export default function TreasureDoorsBoard({
                     type="button"
                     disabled={!interactive}
                     onClick={() => interactive && onPickDoor?.(door)}
-                    className={`${doorBase} ${stoneIdle} ${!isTerminalRecap ? stoneActive : ""} ${
-                      recapTrapOpened ? "border-red-500/80 bg-red-950/40" : ""
-                    } ${recapTrap && !recapTrapOpened ? "border-red-900/50 bg-zinc-950" : ""}`}
+                    className={`${doorBase} ${stoneIdle} ${
+                      isCommittedHere
+                        ? stoneCommittedPick
+                        : isDimmedUnpicked
+                          ? stoneLockedOut
+                          : !isTerminalRecap
+                            ? stoneActive
+                            : ""
+                    } ${recapTrapOpened ? "border-red-500/80 bg-red-950/40" : ""} ${
+                      recapTrap && !recapTrapOpened ? "border-red-900/50 bg-zinc-950" : ""
+                    }`}
                   >
                     {/* Door silhouette: frame + inset panel + hinge strip */}
                     <div
@@ -245,6 +267,12 @@ export default function TreasureDoorsBoard({
                         Door
                       </span>
                     </div>
+
+                    {isCommittedHere ? (
+                      <span className="relative z-[1] mt-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-200/95">
+                        Your pick
+                      </span>
+                    ) : null}
 
                     {pulsing ? (
                       <div

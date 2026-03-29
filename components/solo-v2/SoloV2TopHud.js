@@ -18,7 +18,7 @@ export default function SoloV2TopHud({
   headerVaultBalance = null,
   /** Game-specific stats fragments (e.g. Play / Win), rendered after vault with separators. */
   topGameStatsSlot = null,
-  /** Vault + two stats as three fixed columns (expects slot fragment: stat, dot, stat). */
+  /** Vault + two stats as one compact grouped row (expects slot fragment: stat, dot, stat). */
   stableTripleTopSummary = false,
   giftCount = 0,
   giftMax = 5,
@@ -96,22 +96,20 @@ export default function SoloV2TopHud({
         {showVault || topGameStatsSlot ? (
           useStableTriple ? (
             <div
-              className={`grid grid-cols-3 gap-x-1 tabular-nums sm:gap-x-2 ${summaryRowTone} ${summaryRowTypography}`}
+              className={`flex flex-nowrap items-center justify-center gap-x-1 overflow-x-auto overscroll-x-contain whitespace-nowrap sm:gap-x-1.5 ${summaryRowTone} ${summaryRowTypography}`}
             >
-              <div className="flex min-w-0 items-center justify-center whitespace-nowrap px-0.5 text-center">
-                <span className="min-w-0">
-                  Vault{" "}
-                  <span className="inline-block min-w-[8ch] text-right font-semibold tabular-nums text-emerald-300/95">
-                    {formatCompactNumber(headerVaultBalance)}
-                  </span>
+              <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+                <span>Vault</span>
+                <span className="font-semibold tabular-nums text-emerald-300/95">
+                  {formatCompactNumber(headerVaultBalance)}
                 </span>
-              </div>
-              <div className="flex min-w-0 items-center justify-center whitespace-nowrap px-0.5 text-center">
-                {statsParts[0]}
-              </div>
-              <div className="flex min-w-0 items-center justify-center whitespace-nowrap px-0.5 text-center">
-                {statsParts[2]}
-              </div>
+              </span>
+              <span className="shrink-0 text-zinc-600" aria-hidden>
+                ·
+              </span>
+              {statsParts[0]}
+              {statsParts[1]}
+              {statsParts[2]}
             </div>
           ) : (
             <div

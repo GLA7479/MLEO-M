@@ -59,6 +59,7 @@ function parseWagerInput(raw) {
 function TreasureDoorsGameplayPanel({
   session,
   uiState,
+  pickUiLock,
   pulseCell,
   shakeCell,
   onPickDoor,
@@ -97,6 +98,24 @@ function TreasureDoorsGameplayPanel({
     ? chamberCount
     : Math.floor(Number(playing?.currentChamberIndex ?? 0));
 
+  const pp = td?.pendingPick;
+  const serverLockedDoor =
+    !isTerminal &&
+    td?.readState === "choice_submitted" &&
+    pp != null &&
+    Math.floor(Number(pp.chamberIndex)) === currentChamberIndex &&
+    Number.isFinite(Number(pp.door))
+      ? Math.floor(Number(pp.door))
+      : null;
+  const clientLockedDoor =
+    !isTerminal &&
+    pickUiLock != null &&
+    pickUiLock.chamber === currentChamberIndex &&
+    Number.isFinite(Number(pickUiLock.door))
+      ? Math.floor(Number(pickUiLock.door))
+      : null;
+  const lockedDoorForChamber = serverLockedDoor ?? clientLockedDoor;
+
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg sm:overflow-visible">
       <div className="flex min-h-0 flex-1 flex-col">
@@ -109,6 +128,7 @@ function TreasureDoorsGameplayPanel({
             trapDoors={trapDoors}
             revealTraps={revealTraps}
             disabled={!canPick}
+            lockedDoorIndex={lockedDoorForChamber}
             pulseCell={pulseCell}
             shakeCell={shakeCell}
             onPickDoor={onPickDoor}
@@ -161,6 +181,8 @@ export default function TreasureDoorsPage() {
   const [pulseCell, setPulseCell] = useState(null);
   const [shakeCell, setShakeCell] = useState(null);
   const [cashOutLoading, setCashOutLoading] = useState(false);
+  /** Locks the current chamber to one door immediately on pick (covers gap before server `pendingPick`). */
+  const [pickUiLock, setPickUiLock] = useState(null);
 
   const cycleRef = useRef(0);
   const createInFlightRef = useRef(false);
@@ -173,6 +195,34 @@ export default function TreasureDoorsPage() {
   const resultPopupTimerRef = useRef(null);
 
   const giftShell = useSoloV2GiftShellState();
+
+  useEffect(() => {
+    setPickUiLock(null);
+  }, [session?.id]);
+
+  useEffect(() => {
+    if (uiState === UI_STATE.RESOLVED || uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE) {
+      setPickUiLock(null);
+    }
+  }, [uiState]);
+
+  useEffect(() => {
+    const td = session?.treasureDoors;
+    const playing = td?.playing;
+    if (!pickUiLock) return;
+    const cur = Math.floor(Number(playing?.currentChamberIndex ?? 0));
+    if (cur !== pickUiLock.chamber) {
+      setPickUiLock(null);
+      return;
+    }
+    if (td?.readState === "pick_conflict") {
+      setPickUiLock(null);
+    }
+  }, [
+    session?.treasureDoors?.playing?.currentChamberIndex,
+    session?.treasureDoors?.readState,
+    pickUiLock,
+  ]);
 
   useEffect(() => {
     giftRefreshRef.current = giftShell.refresh;
@@ -470,7 +520,10 @@ export default function TreasureDoorsPage() {
     setUiState(UI_STATE.RESOLVING);
     try {
       const { response, payload, halted } = await postResolve(sessionId, {}, activeCycle);
-      if (halted) return;
+      if (halted) {
+        setPickUiLock(null);
+        return;
+      }
       const status = String(payload?.status || "");
       const result = classifySoloV2ApiResult(response, payload);
 
@@ -480,6 +533,7 @@ export default function TreasureDoorsPage() {
         window.setTimeout(() => setPulseCell(null), 650);
         const readResult = await readSessionTruth(sessionId, activeCycle);
         if (readResult?.halted || !readResult?.ok) {
+          setPickUiLock(null);
           setUiState(UI_STATE.SESSION_ACTIVE);
           return;
         }
@@ -518,6 +572,7 @@ export default function TreasureDoorsPage() {
         setSession(readResult.session);
         applySessionReadState(readResult.session, { resumed: true });
       } else {
+        setPickUiLock(null);
         setUiState(UI_STATE.SESSION_ACTIVE);
       }
     } finally {
@@ -532,6 +587,9 @@ export default function TreasureDoorsPage() {
     if (sid == null || !Number.isFinite(Number(chamber)) || !Number.isFinite(Number(door))) return;
     if (submitInFlightRef.current || resolveInFlightRef.current) return;
     submitInFlightRef.current = true;
+    const chamberFloor = Math.floor(Number(chamber));
+    const doorFloor = Math.floor(Number(door));
+    setPickUiLock({ chamber: chamberFloor, door: doorFloor });
     setUiState(UI_STATE.SUBMITTING_PICK);
     setErrorMessage("");
     const activeCycle = cycleRef.current;
@@ -569,6 +627,7 @@ export default function TreasureDoorsPage() {
           applySessionReadState(rr.session, { resumed: true });
         }
         setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Pick rejected — state refreshed."));
+        setPickUiLock(null);
         setUiState(UI_STATE.SESSION_ACTIVE);
         return;
       }
@@ -576,6 +635,7 @@ export default function TreasureDoorsPage() {
       if (api === SOLO_V2_API_RESULT.CONFLICT && st === "event_rejected") {
         const msg = buildSoloV2ApiErrorMessage(payload, "");
         if (isSoloV2EventRejectedStaleSessionMessage(msg)) {
+          setPickUiLock(null);
           setSession(null);
           setUiState(UI_STATE.IDLE);
           setErrorMessage(msg || "Session expired.");
@@ -584,9 +644,11 @@ export default function TreasureDoorsPage() {
       }
 
       setErrorMessage(buildSoloV2ApiErrorMessage(payload, "Pick failed."));
+      setPickUiLock(null);
       setUiState(UI_STATE.SESSION_ACTIVE);
     } catch (_e) {
       setErrorMessage("Network error while submitting pick.");
+      setPickUiLock(null);
       setUiState(UI_STATE.SESSION_ACTIVE);
     } finally {
       submitInFlightRef.current = false;
@@ -853,6 +915,7 @@ export default function TreasureDoorsPage() {
         <TreasureDoorsGameplayPanel
           session={session}
           uiState={uiState}
+          pickUiLock={pickUiLock}
           pulseCell={pulseCell}
           shakeCell={shakeCell}
           onPickDoor={handlePickDoor}

@@ -62,8 +62,8 @@ export default function SoloV2GameShell({
    */
   mobileHeaderBreathingRoom = false,
   /**
-   * When true with vault + topGameStatsSlot: render Vault | stat | stat as three equal grid columns
-   * so value changes do not re-center the row (opt-in per game).
+   * When true with vault + topGameStatsSlot: render Vault + two stats as one compact flex row
+   * (tight label–value pairs, modest gaps; expects slot fragment: stat, dot, stat).
    */
   stableTripleTopSummary = false,
 }) {
