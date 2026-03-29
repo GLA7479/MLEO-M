@@ -125,7 +125,7 @@ function FlipChoiceTile({ label, value, selectedChoice, disabled, onSelect }) {
   const isSelected = selectedChoice === value;
   const isHeads = value === "heads";
   const shell =
-    "group relative flex h-full min-h-[5.25rem] w-full flex-col items-center justify-center rounded-2xl border-2 text-center shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-150 sm:min-h-[6.1rem] sm:rounded-[1.05rem] lg:min-h-[6.35rem]";
+    "group relative flex h-full min-h-[5.25rem] w-full flex-col items-center justify-center rounded-2xl border-2 text-center shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-150 sm:min-h-[6.1rem] sm:rounded-[1.05rem] lg:min-h-[7.35rem] lg:rounded-[1.12rem]";
 
   let face =
     "border-amber-700/45 bg-gradient-to-b from-zinc-800/95 to-zinc-950 text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ";
@@ -150,14 +150,14 @@ function FlipChoiceTile({ label, value, selectedChoice, disabled, onSelect }) {
       }focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/35`}
     >
       <span
-        className={`mt-0.5 select-none text-[2rem] font-black leading-none tabular-nums sm:text-[2.35rem] lg:text-[2.5rem] ${
+        className={`mt-0.5 select-none text-[2rem] font-black leading-none tabular-nums sm:text-[2.35rem] lg:text-[2.85rem] ${
           isSelected ? "" : "text-amber-100/95"
         }`}
         aria-hidden
       >
         {isHeads ? "H" : "T"}
       </span>
-      <span className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/38 sm:text-[10px]">
+      <span className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/38 sm:text-[10px] lg:text-[11px]">
         {label}
       </span>
     </button>
@@ -212,7 +212,7 @@ function QuickFlipGameplayPanel({
   const coinPhase = isFlipping ? "flipping" : coinResolvedFace ? "resolved" : "idle";
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
       <div className="flex min-h-0 flex-1 flex-col">
         <QuickFlipBoard
           sessionNotice={sessionNotice}
@@ -227,7 +227,7 @@ function QuickFlipGameplayPanel({
           hintLine={hintLine}
           coinSlot={<QuickFlipCoinDisplay phase={coinPhase} resolvedFace={coinResolvedFace} />}
           choiceSlot={
-            <div className="grid w-full grid-cols-2 gap-2 sm:gap-3" role="group" aria-label="Choose side">
+            <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Choose side">
               <FlipChoiceTile
                 label="Heads"
                 value="heads"
@@ -1199,7 +1199,7 @@ export default function QuickFlipPage() {
     <SoloV2GameShell
       title="Quick Flip"
       subtitle="One honest flip — sealed on the server before you see it."
-      layoutMaxWidthClass="max-w-full sm:max-w-2xl"
+      layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
       gameplayScrollable={false}
