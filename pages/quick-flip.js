@@ -211,39 +211,37 @@ function QuickFlipGameplayPanel({
   const coinPhase = isFlipping ? "flipping" : coinResolvedFace ? "resolved" : "idle";
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <QuickFlipBoard
-          sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
-          stepTotal={stepTotal}
-          currentStepIndex={currentStepIndex}
-          stepsComplete={stepsComplete}
-          payoutBandLabel={payoutBandLabel}
-          payoutBandValue={payoutBandValue}
-          payoutCaption={payoutCaption}
-          coinSlot={<QuickFlipCoinDisplay phase={coinPhase} resolvedFace={coinResolvedFace} />}
-          choiceSlot={
-            <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Choose side">
-              <FlipChoiceTile
-                label="Heads"
-                value="heads"
-                selectedChoice={selectedChoice}
-                disabled={!canChoose}
-                onSelect={onSelectChoice}
-              />
-              <FlipChoiceTile
-                label="Tails"
-                value="tails"
-                selectedChoice={selectedChoice}
-                disabled={!canChoose}
-                onSelect={onSelectChoice}
-              />
-            </div>
-          }
-        />
-      </div>
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
+      <QuickFlipBoard
+        sessionNotice={sessionNotice}
+        statusTop={statusTop}
+        statusSub={statusSub}
+        stepTotal={stepTotal}
+        currentStepIndex={currentStepIndex}
+        stepsComplete={stepsComplete}
+        payoutBandLabel={payoutBandLabel}
+        payoutBandValue={payoutBandValue}
+        payoutCaption={payoutCaption}
+        coinSlot={<QuickFlipCoinDisplay phase={coinPhase} resolvedFace={coinResolvedFace} />}
+        choiceSlot={
+          <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Choose side">
+            <FlipChoiceTile
+              label="Heads"
+              value="heads"
+              selectedChoice={selectedChoice}
+              disabled={!canChoose}
+              onSelect={onSelectChoice}
+            />
+            <FlipChoiceTile
+              label="Tails"
+              value="tails"
+              selectedChoice={selectedChoice}
+              disabled={!canChoose}
+              onSelect={onSelectChoice}
+            />
+          </div>
+        }
+      />
 
       <SoloV2ResultPopup
         open={resultPopupOpen}

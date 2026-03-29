@@ -137,20 +137,6 @@ export default function TreasureDoorsBoard({
               aria-hidden
             />
           ) : null}
-          <div className="mb-2 border-b border-zinc-800 pb-2 text-center">
-            <p className="min-h-[1.125rem] text-[11px] font-bold uppercase leading-tight tracking-[0.12em] text-zinc-200 sm:min-h-[1.25rem] sm:text-xs">
-              {isTerminalRecap ? "Vault sealed" : `Chamber ${cur + 1} of ${chMax}`}
-            </p>
-            <p className="mt-0.5 min-h-[1.5625rem] text-[10px] leading-tight text-zinc-500 line-clamp-2 sm:min-h-[1.75rem] sm:text-[11px]">
-              {isTerminalRecap
-                ? fk === "trap"
-                  ? "Trap triggered — other doors were safe"
-                  : fk === "cashout"
-                    ? "You banked from the corridor"
-                    : "Every chamber cleared — crown vault"
-                : "Two safe doors · one trap · choose carefully"}
-            </p>
-          </div>
 
           <div className="relative flex min-h-[118px] w-full justify-center sm:min-h-[136px]">
             <div className="flex items-stretch justify-center gap-5 sm:gap-6">

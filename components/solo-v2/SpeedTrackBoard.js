@@ -57,8 +57,10 @@ export default function SpeedTrackBoard({
   );
 
   const inPlay = !revealBlocked && !terminalKind;
-  const showHazardCopy = inPlay && lockedRouteIndex == null;
-  const showLockedLane = inPlay && lockedRouteIndex != null && Number.isFinite(Number(lockedRouteIndex));
+  const lockedIx =
+    inPlay && lockedRouteIndex != null && Number.isFinite(Number(lockedRouteIndex))
+      ? Math.floor(Number(lockedRouteIndex))
+      : null;
 
   useEffect(() => {
     if (pulseLane != null && Number.isFinite(Number(pulseLane.routeIndex))) {
@@ -68,8 +70,6 @@ export default function SpeedTrackBoard({
     }
     return undefined;
   }, [pulseLane]);
-
-  const lockedIx = showLockedLane ? Math.floor(Number(lockedRouteIndex)) : null;
 
   function laneFill(lane) {
     const blocked =
@@ -159,47 +159,6 @@ export default function SpeedTrackBoard({
 
       {/* Card: column flex; only middle row grows — route row never clipped */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-2 border-cyan-600/40 bg-zinc-900">
-        <div className="shrink-0 px-2 pb-1 pt-2">
-          <div className="mb-0.5 flex flex-wrap items-baseline justify-center gap-x-2 text-center">
-            <span className="text-[11px] font-black uppercase tracking-widest text-cyan-200 sm:text-xs">
-              {terminalKind === "full_clear"
-                ? "Finish line"
-                : terminalKind === "blocked"
-                  ? "Wrong line"
-                  : terminalKind === "cashout"
-                    ? "Pit stop"
-                    : `Checkpoint ${Math.min(safeCp + 1, checkpointCount)}`}
-            </span>
-            <span className="text-[10px] font-semibold uppercase text-zinc-500">
-              {terminalKind === "full_clear"
-                ? "Full clear"
-                : terminalKind === "blocked"
-                  ? "DNF"
-                  : terminalKind === "cashout"
-                    ? "Banked"
-                    : "Hazard sector"}
-            </span>
-          </div>
-          {showHazardCopy && (
-            <p className="mx-auto line-clamp-3 max-w-[min(100%,320px)] text-center text-[10px] font-semibold leading-snug text-amber-100/90 sm:text-[11px]">
-              One line is <span className="text-rose-300">blocked</span> — pick inside, center, or outside. Wrong line
-              ends the run.
-            </p>
-          )}
-          {showLockedLane && lockedIx != null && (
-            <p className="text-center text-[10px] font-bold uppercase text-cyan-200">Line locked…</p>
-          )}
-          {revealBlocked && terminalKind === "blocked" && (
-            <p className="text-center text-[11px] font-extrabold text-rose-200">Blocked lane shown below</p>
-          )}
-          {terminalKind === "cashout" && (
-            <p className="text-center text-[10px] text-zinc-400">Secured payout banked.</p>
-          )}
-          {terminalKind === "full_clear" && (
-            <p className="text-center text-[11px] font-bold text-emerald-300">All sectors clear</p>
-          )}
-        </div>
-
         {/* SVG consumes all flex space above route buttons */}
         <div className="min-h-0 flex-1 w-full min-w-0 px-1 sm:px-2">
           <svg
@@ -274,8 +233,8 @@ export default function SpeedTrackBoard({
           </svg>
         </div>
 
-        <div className="shrink-0 border-t border-cyan-600/30 bg-zinc-950 px-1.5 py-2 sm:px-2">
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+        <div className="shrink-0 border-t border-cyan-600/30 bg-zinc-950 px-1.5 py-2 sm:px-2 lg:px-2 lg:py-1.5">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 lg:gap-1.5">
             {ROUTE_KEYS.map((key, idx) => {
               const blocked =
                 revealBlocked && Array.isArray(blockedRoutes) && blockedRoutes[cpForLanes] === idx;

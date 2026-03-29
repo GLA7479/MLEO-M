@@ -6,6 +6,7 @@ import SoloV2ResultPopup, {
   SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
 } from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
+import SoloV2ProgressStrip from "../components/solo-v2/SoloV2ProgressStrip";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
 import {
@@ -177,9 +178,9 @@ function SpeedTrackGameplayPanel({
   const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-2 border-amber-900/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-8">
+        <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-5">
           <p
             className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-amber-200/85 sm:text-[10px] ${
               showSession ? "opacity-100" : "opacity-0"
@@ -189,7 +190,7 @@ function SpeedTrackGameplayPanel({
           </p>
         </div>
 
-        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-8">
+        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
           <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
             <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
               {statusTop}
@@ -200,42 +201,17 @@ function SpeedTrackGameplayPanel({
           </div>
         </div>
 
-        <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-8">
-          <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
-            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">Sectors</span>
-            <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
-              {Math.min(stripCleared + 1, total)} / {total}
-            </span>
-          </div>
-          <div
-            className="flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
-            aria-label="Sector progress"
-          >
-            {Array.from({ length: total }, (_, i) => {
-              const done = i < stripCleared;
-              const active = i === cur && !done;
-              const label = stepLabels[i] ?? `CP${i + 1}`;
-              return (
-                <div
-                  key={`st-step-${i}`}
-                  className={`flex min-w-0 flex-1 flex-col items-center justify-center rounded-[5px] py-1 sm:rounded-md sm:py-1.5 ${
-                    done
-                      ? "bg-emerald-600/35 text-emerald-100"
-                      : active
-                        ? "bg-amber-500/25 text-amber-100 ring-1 ring-inset ring-amber-400/35"
-                        : "bg-zinc-900/90 text-zinc-500"
-                  }`}
-                >
-                  <span className="px-0.5 text-center text-[8px] font-extrabold uppercase tracking-wide sm:text-[9px]">
-                    {label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <SoloV2ProgressStrip
+          keyPrefix="st"
+          rowLabel="Sectors"
+          ariaLabel="Sector progress"
+          stepTotal={total}
+          stepsComplete={stripCleared}
+          currentStepIndex={cur}
+          stepLabels={stepLabels}
+        />
 
-        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-8 lg:hidden">
+        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
           <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
             <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">
               <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
@@ -253,12 +229,12 @@ function SpeedTrackGameplayPanel({
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-6 lg:pb-2">
+        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
           <div
-            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(24rem,52vh)]"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(14rem,30vh)]"
             aria-label="Speed Track course"
           >
-            <div className="flex min-h-0 min-h-[11rem] flex-1 flex-col px-0.5 pb-0.5 pt-1 sm:min-h-[12rem] sm:px-1 sm:pb-1 sm:pt-1.5 lg:min-h-0">
+            <div className="flex min-h-0 min-h-[11rem] flex-1 flex-col px-0.5 pb-0.5 pt-1 sm:min-h-[12rem] sm:px-1 sm:pb-1 sm:pt-1.5 lg:min-h-0 lg:px-1 lg:py-0.5">
               <SpeedTrackBoard
                 checkpointCount={checkpointCount}
                 currentCheckpointIndex={currentCheckpointIndex}
@@ -280,7 +256,7 @@ function SpeedTrackGameplayPanel({
                 hideCheckpointRibbon
               />
             </div>
-            <div className="hidden shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:flex lg:min-h-[5.5rem]">
+            <div className="hidden shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:flex lg:min-h-[4.25rem] lg:gap-1.5 lg:px-2 lg:py-1.5">
               <SoloV2BoardCashOutControl
                 show={showBoardCashOut}
                 label={boardCashOutLabel}
@@ -291,7 +267,7 @@ function SpeedTrackGameplayPanel({
                 wrapperClassName="flex w-full shrink-0 justify-center px-1 pb-0 pt-0 sm:px-2"
               />
               <div
-                className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:max-w-2xl"
+                className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:h-8 lg:max-w-2xl"
                 aria-hidden
               />
             </div>
@@ -1066,7 +1042,17 @@ export default function SpeedTrackPage() {
   } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
     const won = Boolean(resolvedResult.isWin ?? resolvedResult.won);
     statusTop = won ? "Run closed in your favor." : "Run closed.";
+    const tk = resolvedResult.terminalKind;
+    const lead =
+      tk === "full_clear"
+        ? "Finish line — full clear. "
+        : tk === "blocked"
+          ? "Wrong line — DNF. "
+          : tk === "cashout"
+            ? "Pit stop — payout banked. "
+            : "";
     statusSub =
+      lead +
       "Adjust stake if needed, then press START RUN for another run — there is no auto-start after the popup.";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "pick_conflict") {
     statusTop = "State conflict.";
@@ -1078,7 +1064,8 @@ export default function SpeedTrackPage() {
     uiState === UI_STATE.SESSION_ACTIVE &&
     (readState === "choice_required" || readState === "ready")
   ) {
-    statusTop = "Pick your line.";
+    const cpIdx = Math.floor(Number(playing?.currentCheckpointIndex ?? 0));
+    statusTop = `Sector ${Math.min(cpIdx + 1, checkpointTotal)} — pick your line.`;
     statusSub = "Inside, center, or outside — one line is blocked; a wrong pick ends the run.";
   } else if (uiState === UI_STATE.PENDING_MIGRATION) {
     statusTop = "Migration pending.";

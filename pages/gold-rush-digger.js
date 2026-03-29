@@ -6,6 +6,7 @@ import SoloV2ResultPopup, {
   SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
 } from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
+import SoloV2ProgressStrip from "../components/solo-v2/SoloV2ProgressStrip";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
 import {
@@ -189,40 +190,15 @@ function GoldRushGameplayPanel({
           </div>
         </div>
 
-        <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-5">
-          <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
-            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">Depth</span>
-            <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
-              {Math.min(stripCleared + 1, total)} / {total}
-            </span>
-          </div>
-          <div
-            className="flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
-            aria-label="Row progress"
-          >
-            {Array.from({ length: total }, (_, i) => {
-              const done = i < stripCleared;
-              const active = i === cur && !done;
-              const label = stepLabels[i] ?? `R${i + 1}`;
-              return (
-                <div
-                  key={`gr-step-${i}`}
-                  className={`flex min-w-0 flex-1 flex-col items-center justify-center rounded-[5px] py-1 sm:rounded-md sm:py-1.5 ${
-                    done
-                      ? "bg-emerald-600/35 text-emerald-100"
-                      : active
-                        ? "bg-amber-500/25 text-amber-100 ring-1 ring-inset ring-amber-400/35"
-                        : "bg-zinc-900/90 text-zinc-500"
-                  }`}
-                >
-                  <span className="px-0.5 text-center text-[8px] font-extrabold uppercase tracking-wide sm:text-[9px]">
-                    {label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <SoloV2ProgressStrip
+          keyPrefix="gr"
+          rowLabel="Depth"
+          ariaLabel="Row progress"
+          stepTotal={total}
+          stepsComplete={stripCleared}
+          currentStepIndex={cur}
+          stepLabels={stepLabels}
+        />
 
         <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
           <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">

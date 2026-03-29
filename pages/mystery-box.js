@@ -205,47 +205,45 @@ function MysteryBoxGameplayPanel({
   const canPick = !isOpening && uiState !== UI_STATE.LOADING && !isPickLocked;
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <MysteryBoxBoard
-          sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
-          stepTotal={stepTotal}
-          currentStepIndex={currentStepIndex}
-          stepsComplete={stepsComplete}
-          stepLabels={["Choose", "Open"]}
-          payoutBandLabel={payoutBandLabel}
-          payoutBandValue={payoutBandValue}
-          payoutCaption={payoutCaption}
-          accentSlot={<MysteryBoxAccent winningBoxIndex={winningBoxIndex} />}
-          boxesSlot={
-            <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Choose a box">
-              <MysteryBoxTile
-                index={0}
-                letter="A"
-                selectedBox={selectedBox}
-                disabled={!canPick}
-                onSelect={onSelectBox}
-              />
-              <MysteryBoxTile
-                index={1}
-                letter="B"
-                selectedBox={selectedBox}
-                disabled={!canPick}
-                onSelect={onSelectBox}
-              />
-              <MysteryBoxTile
-                index={2}
-                letter="C"
-                selectedBox={selectedBox}
-                disabled={!canPick}
-                onSelect={onSelectBox}
-              />
-            </div>
-          }
-        />
-      </div>
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
+      <MysteryBoxBoard
+        sessionNotice={sessionNotice}
+        statusTop={statusTop}
+        statusSub={statusSub}
+        stepTotal={stepTotal}
+        currentStepIndex={currentStepIndex}
+        stepsComplete={stepsComplete}
+        stepLabels={["Choose", "Open"]}
+        payoutBandLabel={payoutBandLabel}
+        payoutBandValue={payoutBandValue}
+        payoutCaption={payoutCaption}
+        accentSlot={<MysteryBoxAccent winningBoxIndex={winningBoxIndex} />}
+        boxesSlot={
+          <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Choose a box">
+            <MysteryBoxTile
+              index={0}
+              letter="A"
+              selectedBox={selectedBox}
+              disabled={!canPick}
+              onSelect={onSelectBox}
+            />
+            <MysteryBoxTile
+              index={1}
+              letter="B"
+              selectedBox={selectedBox}
+              disabled={!canPick}
+              onSelect={onSelectBox}
+            />
+            <MysteryBoxTile
+              index={2}
+              letter="C"
+              selectedBox={selectedBox}
+              disabled={!canPick}
+              onSelect={onSelectBox}
+            />
+          </div>
+        }
+      />
 
       <SoloV2ResultPopup
         open={resultPopupOpen}

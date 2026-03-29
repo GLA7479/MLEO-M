@@ -207,46 +207,42 @@ function DicePickGameplayPanel({
   const dicePhase = isRolling ? "rolling" : resolvedRoll != null ? "resolved" : "idle";
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <DicePickBoard
-          sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
-          stepTotal={stepTotal}
-          currentStepIndex={currentStepIndex}
-          stepsComplete={stepsComplete}
-          stepLabels={["Choose", "Roll"]}
-          payoutBandLabel={payoutBandLabel}
-          payoutBandValue={payoutBandValue}
-          payoutCaption={payoutCaption}
-          diceSlot={
-            <DicePickDisplay phase={dicePhase} resolvedRoll={resolvedRoll} hideSubcaption />
-          }
-          choiceSlot={
-            <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Pick zone">
-              <DiceZoneTile
-                glyph="L"
-                label="LOW"
-                sub="1–3"
-                value="low"
-                selectedZone={selectedZone}
-                disabled={!canChoose}
-                onSelect={onSelectZone}
-              />
-              <DiceZoneTile
-                glyph="H"
-                label="HIGH"
-                sub="4–6"
-                value="high"
-                selectedZone={selectedZone}
-                disabled={!canChoose}
-                onSelect={onSelectZone}
-              />
-            </div>
-          }
-        />
-      </div>
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
+      <DicePickBoard
+        sessionNotice={sessionNotice}
+        statusTop={statusTop}
+        statusSub={statusSub}
+        stepTotal={stepTotal}
+        currentStepIndex={currentStepIndex}
+        stepsComplete={stepsComplete}
+        stepLabels={["Choose", "Roll"]}
+        payoutBandLabel={payoutBandLabel}
+        payoutBandValue={payoutBandValue}
+        payoutCaption={payoutCaption}
+        diceSlot={<DicePickDisplay phase={dicePhase} resolvedRoll={resolvedRoll} hideSubcaption />}
+        choiceSlot={
+          <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Pick zone">
+            <DiceZoneTile
+              glyph="L"
+              label="LOW"
+              sub="1–3"
+              value="low"
+              selectedZone={selectedZone}
+              disabled={!canChoose}
+              onSelect={onSelectZone}
+            />
+            <DiceZoneTile
+              glyph="H"
+              label="HIGH"
+              sub="4–6"
+              value="high"
+              selectedZone={selectedZone}
+              disabled={!canChoose}
+              onSelect={onSelectZone}
+            />
+          </div>
+        }
+      />
 
       <SoloV2ResultPopup
         open={resultPopupOpen}
