@@ -1031,9 +1031,6 @@ export default function MysteryChamberPage() {
       nSafe === 2
         ? "Two of four sigils are safe — pick one to continue."
         : "Only one sigil is safe in this chamber — choose carefully.";
-    if (cleared >= 1) {
-      hintLine = "Exit now keeps your secured return, or choose a sigil to continue the run.";
-    }
   }
   if (localAnim?.phase === "success") {
     statusTop = "Safe path found.";
