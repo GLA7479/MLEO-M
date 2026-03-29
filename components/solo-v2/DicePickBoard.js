@@ -108,7 +108,7 @@ export default function DicePickBoard({
         </div>
       </div>
 
-      <div className="flex shrink-0 justify-center border-t border-amber-900/35 bg-zinc-950/80 px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1 lg:px-8">
+      <div className="flex shrink-0 justify-center px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1 lg:px-8">
         <div className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:max-w-2xl" aria-hidden />
       </div>
     </div>
