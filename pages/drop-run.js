@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DropRunBoard from "../components/solo-v2/DropRunBoard";
+import SoloV2ProgressStrip from "../components/solo-v2/SoloV2ProgressStrip";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
   SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
@@ -125,15 +126,13 @@ function dropRunRoundStripModel(uiState, readState, hasDropPlayback) {
 }
 
 function DropRunGameplayPanel({
-  uiState,
-  pickingUi,
-  resolvingUi,
   sessionNotice,
   statusTop,
   statusSub,
   stepTotal,
   stepsComplete,
   currentStepIndex,
+  stepLabels,
   payoutBandLabel,
   payoutBandValue,
   payoutCaption,
@@ -145,25 +144,73 @@ function DropRunGameplayPanel({
   dropPlayback,
   onDropAnimationComplete,
 }) {
+  const showSession = Boolean(sessionNotice);
+  const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
+  const stripCleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
+  const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
+
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <DropRunBoard
-          sessionNotice={sessionNotice}
-          pickingUi={pickingUi}
-          resolvingUi={resolvingUi}
-          statusTop={statusTop}
-          statusSub={statusSub}
-          stepTotal={stepTotal}
-          currentStepIndex={currentStepIndex}
-          stepsComplete={stepsComplete}
-          stepLabels={["Session", "Drop"]}
-          payoutBandLabel={payoutBandLabel}
-          payoutBandValue={payoutBandValue}
-          payoutCaption={payoutCaption}
-          dropPlayback={dropPlayback}
-          onDropAnimationComplete={onDropAnimationComplete}
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-2 border-amber-900/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-5">
+          <p
+            className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-amber-200/85 sm:text-[10px] ${
+              showSession ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            {showSession ? sessionNotice : "\u00a0"}
+          </p>
+        </div>
+
+        <div className="shrink-0 space-y-0 px-2.5 py-0 text-center sm:px-3 lg:px-5">
+          <div className="flex min-h-[1.6875rem] items-start justify-center sm:min-h-[2.0625rem]">
+            <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
+              {statusTop}
+            </p>
+          </div>
+          <div className="flex min-h-[1.375rem] items-start justify-center sm:min-h-[1.5625rem]">
+            <p className="line-clamp-2 w-full text-center text-[9px] leading-tight text-zinc-400 sm:text-[10px]">{statusSub}</p>
+          </div>
+        </div>
+
+        <SoloV2ProgressStrip
+          keyPrefix="dr"
+          rowLabel="Round"
+          ariaLabel="Round progress"
+          stepTotal={total}
+          stepsComplete={stripCleared}
+          currentStepIndex={cur}
+          stepLabels={stepLabels}
         />
+
+        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
+          <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
+            <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">
+              <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
+                {payoutBandLabel}
+              </span>
+              <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
+                {payoutBandValue}
+              </span>
+            </div>
+            <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
+              <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
+                {payoutCaption || "\u00a0"}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(14rem,30vh)]"
+            aria-label="Drop Run playfield"
+          >
+            <div className="flex min-h-0 min-h-[11rem] flex-1 flex-col px-0.5 py-1 sm:min-h-[12rem] sm:px-1 sm:py-1.5 lg:min-h-0 lg:px-1 lg:py-0.5">
+              <DropRunBoard dropPlayback={dropPlayback} onDropAnimationComplete={onDropAnimationComplete} />
+            </div>
+          </div>
+        </div>
       </div>
 
       <SoloV2ResultPopup
@@ -1046,19 +1093,21 @@ export default function DropRunPage() {
           else void runStartDrop();
         },
         errorMessage: errorMessage || stakeHint,
+        desktopPayout: {
+          label: payoutBandLabel,
+          value: payoutBandValue,
+        },
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
         <DropRunGameplayPanel
-          uiState={uiState}
-          pickingUi={pickingUi}
-          resolvingUi={uiState === UI_STATE.RESOLVING}
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}
+          stepLabels={["Ready", "Drop"]}
           payoutBandLabel={payoutBandLabel}
           payoutBandValue={payoutBandValue}
           payoutCaption={payoutCaption}
