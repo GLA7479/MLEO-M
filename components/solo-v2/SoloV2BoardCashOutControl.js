@@ -9,11 +9,18 @@ export default function SoloV2BoardCashOutControl({
   disabled = false,
   loading = false,
   onClick,
+  /** Outer wrapper; default is legacy right-aligned strip. Use `justify-center` + width for lower-board placement. */
+  wrapperClassName,
 }) {
   if (!show) return null;
   const inactive = disabled || loading;
   return (
-    <div className="flex shrink-0 justify-end px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1.5 lg:px-8">
+    <div
+      className={
+        wrapperClassName ??
+        "flex shrink-0 justify-end px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1.5 lg:px-8"
+      }
+    >
       <button
         type="button"
         onClick={onClick}

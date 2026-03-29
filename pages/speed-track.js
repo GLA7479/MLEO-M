@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import SpeedTrackBoard from "../components/solo-v2/SpeedTrackBoard";
-import SoloV2BoardPayoutChip from "../components/solo-v2/SoloV2BoardPayoutChip";
 import SoloV2BoardCashOutControl from "../components/solo-v2/SoloV2BoardCashOutControl";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -128,6 +127,7 @@ function SpeedTrackGameplayPanel({
   stepLabels,
   payoutBandLabel,
   payoutBandValue,
+  payoutCaption,
   showBoardCashOut,
   boardCashOutDisabled,
   boardCashOutLoading,
@@ -201,16 +201,11 @@ function SpeedTrackGameplayPanel({
         </div>
 
         <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-8">
-          <div className="mb-0 flex items-center justify-between gap-2 px-0.5 sm:mb-0.5">
-            <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">
-              Sectors
+          <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
+            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">Sectors</span>
+            <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
+              {Math.min(stripCleared + 1, total)} / {total}
             </span>
-            <div className="flex min-w-0 items-center justify-end gap-2">
-              <span className="shrink-0 text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
-                {Math.min(stripCleared + 1, total)} / {total}
-              </span>
-              <SoloV2BoardPayoutChip label={payoutBandLabel} value={payoutBandValue} />
-            </div>
           </div>
           <div
             className="flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
@@ -240,42 +235,86 @@ function SpeedTrackGameplayPanel({
           </div>
         </div>
 
-        <SoloV2BoardCashOutControl
-          show={showBoardCashOut}
-          label={boardCashOutLabel}
-          loadingLabel={boardCashOutLoadingLabel}
-          disabled={boardCashOutDisabled}
-          loading={boardCashOutLoading}
-          onClick={onBoardCashOut}
-        />
-
-        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:px-6 lg:pb-2">
-          <div className="flex min-h-0 flex-1 flex-col">
-            <SpeedTrackBoard
-              checkpointCount={checkpointCount}
-              currentCheckpointIndex={currentCheckpointIndex}
-              clearedCheckpoints={clearedCheckpoints}
-              routeHistory={routeHistory}
-              blockedRoutes={blockedRoutes}
-              revealBlocked={revealBlocked}
-              disabled={!canPick}
-              pulseLane={pulseLane}
-              shakeLane={shakeLane}
-              onPickRoute={onPickRoute}
-              terminalKind={rr?.terminalKind ?? null}
-              failCheckpointIndex={rr?.finalCheckpointIndex ?? null}
-              lockedRouteIndex={
-                st?.readState === "choice_submitted" && st?.pendingPick?.routeIndex != null
-                  ? st.pendingPick.routeIndex
-                  : null
-              }
-              hideCheckpointRibbon
-            />
+        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-8 lg:hidden">
+          <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
+            <div className="flex items-center justify-between gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5">
+              <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
+                {payoutBandLabel}
+              </span>
+              <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
+                {payoutBandValue}
+              </span>
+            </div>
+            <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
+              <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
+                {payoutCaption || "\u00a0"}
+              </span>
+            </p>
           </div>
         </div>
 
-        <div className="flex shrink-0 justify-center px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1 lg:px-8">
-          <div className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:max-w-2xl" aria-hidden />
+        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-6 lg:pb-2">
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(24rem,52vh)]"
+            aria-label="Speed Track course"
+          >
+            <div className="flex min-h-0 min-h-[11rem] flex-1 flex-col px-0.5 pb-0.5 pt-1 sm:min-h-[12rem] sm:px-1 sm:pb-1 sm:pt-1.5 lg:min-h-0">
+              <SpeedTrackBoard
+                checkpointCount={checkpointCount}
+                currentCheckpointIndex={currentCheckpointIndex}
+                clearedCheckpoints={clearedCheckpoints}
+                routeHistory={routeHistory}
+                blockedRoutes={blockedRoutes}
+                revealBlocked={revealBlocked}
+                disabled={!canPick}
+                pulseLane={pulseLane}
+                shakeLane={shakeLane}
+                onPickRoute={onPickRoute}
+                terminalKind={rr?.terminalKind ?? null}
+                failCheckpointIndex={rr?.finalCheckpointIndex ?? null}
+                lockedRouteIndex={
+                  st?.readState === "choice_submitted" && st?.pendingPick?.routeIndex != null
+                    ? st.pendingPick.routeIndex
+                    : null
+                }
+                hideCheckpointRibbon
+              />
+            </div>
+            <div className="hidden shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:flex lg:min-h-[5.5rem]">
+              <SoloV2BoardCashOutControl
+                show={showBoardCashOut}
+                label={boardCashOutLabel}
+                loadingLabel={boardCashOutLoadingLabel}
+                disabled={boardCashOutDisabled}
+                loading={boardCashOutLoading}
+                onClick={onBoardCashOut}
+                wrapperClassName="flex w-full shrink-0 justify-center px-1 pb-0 pt-0 sm:px-2"
+              />
+              <div
+                className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:max-w-2xl"
+                aria-hidden
+              />
+            </div>
+          </div>
+
+          <div className="flex w-full min-w-0 shrink-0 flex-col items-stretch justify-center px-0 py-2 sm:py-2.5 lg:hidden">
+            {showBoardCashOut ? (
+              <button
+                type="button"
+                onClick={onBoardCashOut}
+                disabled={boardCashOutDisabled || boardCashOutLoading}
+                className={`min-h-[48px] w-full rounded-lg border px-4 py-2.5 text-xs font-extrabold uppercase tracking-wide sm:text-sm ${
+                  boardCashOutDisabled || boardCashOutLoading
+                    ? "cursor-not-allowed border-white/15 bg-white/5 text-zinc-500"
+                    : "border-amber-400/45 bg-amber-950/40 text-amber-100 active:bg-amber-900/45"
+                }`}
+              >
+                {boardCashOutLoading ? boardCashOutLoadingLabel : boardCashOutLabel}
+              </button>
+            ) : (
+              <div className="pointer-events-none min-h-[2.5rem] w-full sm:min-h-[2.4rem]" aria-hidden />
+            )}
+          </div>
         </div>
       </div>
 
@@ -1051,12 +1090,20 @@ export default function SpeedTrackPage() {
 
   let payoutBandLabel = "Secured payout";
   let payoutBandValue = formatCompact(summaryWin);
+  let payoutCaption = `Ladder from ×${SPEED_TRACK_MULTIPLIER_LADDER[0]} on a clean first sector`;
 
   if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
     const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
     const won = Boolean(resolvedResult.isWin ?? resolvedResult.won);
     payoutBandLabel = won ? "Return paid" : "Return this round";
     payoutBandValue = formatCompact(pr);
+    const tk = resolvedResult.terminalKind;
+    if (tk === "full_clear") payoutCaption = "Finish line — full ladder cleared";
+    else if (tk === "blocked") {
+      const fi = Math.floor(Number(resolvedResult.finalCheckpointIndex ?? 0));
+      payoutCaption = Number.isFinite(fi) ? `DNF at sector ${fi + 1}` : "Blocked line — DNF";
+    } else if (tk === "cashout") payoutCaption = "Pit stop — secured payout banked";
+    else payoutCaption = "Round settled";
   }
 
   const terminalKind = resolvedResult?.terminalKind;
@@ -1196,6 +1243,10 @@ export default function SpeedTrackPage() {
           void runStartRun();
         },
         errorMessage: errorMessage || stakeHint,
+        desktopPayout: {
+          label: payoutBandLabel,
+          value: payoutBandValue,
+        },
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
@@ -1214,6 +1265,7 @@ export default function SpeedTrackPage() {
           stepLabels={stepLabels}
           payoutBandLabel={payoutBandLabel}
           payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           showBoardCashOut={
             uiState === UI_STATE.SESSION_ACTIVE && !terminalSession && Boolean(stSnap?.canCashOut)
           }
@@ -1239,9 +1291,10 @@ export default function SpeedTrackPage() {
             your secured payout along the multiplier ladder.
           </p>
           <p>
-            After any safe sector, when Pit stop is available, use the amber control on the track panel to bank the secured
-            payout, or keep pushing toward checkpoint 6 for the top multiplier. Gift rounds use freeplay — a loss does not
-            debit your vault; a win credits the full payout.
+            After any safe sector you can use Pit stop — the control sits in the lower band of the course panel, under the
+            track and above the stake bar. Secured payout on small screens appears in the summary strip above the course; on
+            large screens it also appears beside the stake controls. Gift rounds use freeplay — a loss does not debit your
+            vault; a win credits the full payout.
           </p>
           <p>
             After the result popup closes, the finished board stays visible — press START RUN explicitly for the next

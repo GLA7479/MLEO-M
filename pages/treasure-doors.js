@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import TreasureDoorsBoard from "../components/solo-v2/TreasureDoorsBoard";
-import SoloV2BoardPayoutChip from "../components/solo-v2/SoloV2BoardPayoutChip";
 import SoloV2BoardCashOutControl from "../components/solo-v2/SoloV2BoardCashOutControl";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -130,6 +129,7 @@ function TreasureDoorsGameplayPanel({
   stepLabels,
   payoutBandLabel,
   payoutBandValue,
+  payoutCaption,
   showBoardCashOut,
   boardCashOutDisabled,
   boardCashOutLoading,
@@ -216,16 +216,13 @@ function TreasureDoorsGameplayPanel({
         </div>
 
         <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-8">
-          <div className="mb-0 flex items-center justify-between gap-2 px-0.5 sm:mb-0.5">
-            <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">
+          <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
+            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">
               Chambers
             </span>
-            <div className="flex min-w-0 items-center justify-end gap-2">
-              <span className="shrink-0 text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
-                {Math.min(stripCleared + 1, total)} / {total}
-              </span>
-              <SoloV2BoardPayoutChip label={payoutBandLabel} value={payoutBandValue} />
-            </div>
+            <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
+              {Math.min(stripCleared + 1, total)} / {total}
+            </span>
           </div>
           <div
             className="flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
@@ -255,39 +252,64 @@ function TreasureDoorsGameplayPanel({
           </div>
         </div>
 
-        <SoloV2BoardCashOutControl
-          show={showBoardCashOut}
-          label={boardCashOutLabel}
-          loadingLabel={boardCashOutLoadingLabel}
-          disabled={boardCashOutDisabled}
-          loading={boardCashOutLoading}
-          onClick={onBoardCashOut}
-        />
-
-        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:px-6 lg:pb-2">
-          <div className="flex min-h-0 flex-1 flex-col py-0.5">
-            <TreasureDoorsBoard
-              chamberCount={chamberCount}
-              doorCount={doorCount}
-              currentChamberIndex={currentChamberIndex}
-              doorHistory={doorHistory}
-              trapDoors={trapDoors}
-              revealTraps={revealTraps}
-              disabled={!canPick}
-              lockedDoorIndex={lockedDoorForChamber}
-              pulseCell={pulseCell}
-              shakeCell={shakeCell}
-              onPickDoor={onPickDoor}
-              terminalKind={rr?.terminalKind ?? null}
-              finalChamberIndex={rr?.finalChamberIndex ?? null}
-              lastPickDoor={rr?.lastPickDoor ?? null}
-              hideChamberRunStrip
-            />
+        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-8 lg:hidden">
+          <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
+            <div className="flex items-center justify-between gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5">
+              <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
+                {payoutBandLabel}
+              </span>
+              <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
+                {payoutBandValue}
+              </span>
+            </div>
+            <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
+              <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
+                {payoutCaption || "\u00a0"}
+              </span>
+            </p>
           </div>
         </div>
 
-        <div className="flex shrink-0 justify-center px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1 lg:px-8">
-          <div className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:max-w-2xl" aria-hidden />
+        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-6 lg:pb-2">
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(24rem,52vh)]"
+            aria-label="Treasure Doors chamber"
+          >
+            <div className="flex min-h-0 min-h-[11rem] flex-1 flex-col py-0.5 sm:min-h-[12rem] sm:py-1 lg:min-h-0">
+              <TreasureDoorsBoard
+                chamberCount={chamberCount}
+                doorCount={doorCount}
+                currentChamberIndex={currentChamberIndex}
+                doorHistory={doorHistory}
+                trapDoors={trapDoors}
+                revealTraps={revealTraps}
+                disabled={!canPick}
+                lockedDoorIndex={lockedDoorForChamber}
+                pulseCell={pulseCell}
+                shakeCell={shakeCell}
+                onPickDoor={onPickDoor}
+                terminalKind={rr?.terminalKind ?? null}
+                finalChamberIndex={rr?.finalChamberIndex ?? null}
+                lastPickDoor={rr?.lastPickDoor ?? null}
+                hideChamberRunStrip
+              />
+            </div>
+            <div className="flex shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:min-h-[5.5rem]">
+              <SoloV2BoardCashOutControl
+                show={showBoardCashOut}
+                label={boardCashOutLabel}
+                loadingLabel={boardCashOutLoadingLabel}
+                disabled={boardCashOutDisabled}
+                loading={boardCashOutLoading}
+                onClick={onBoardCashOut}
+                wrapperClassName="flex w-full shrink-0 justify-center px-1 pb-0 pt-0 sm:px-2"
+              />
+              <div
+                className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:max-w-2xl"
+                aria-hidden
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1101,12 +1123,20 @@ export default function TreasureDoorsPage() {
 
   let payoutBandLabel = "Secured loot";
   let payoutBandValue = formatCompact(summaryWin);
+  let payoutCaption = `First safe chamber ×${TREASURE_DOORS_MULTIPLIER_LADDER[0]} on this play`;
 
   if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
     const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
     const won = Boolean(resolvedResult.isWin ?? resolvedResult.won);
     payoutBandLabel = won ? "Return paid" : "Return this round";
     payoutBandValue = formatCompact(pr);
+    const tk = resolvedResult.terminalKind;
+    if (tk === "full_clear") payoutCaption = "Crown vault — every chamber cleared";
+    else if (tk === "trap") {
+      const fi = Math.floor(Number(resolvedResult.finalChamberIndex ?? 0));
+      payoutCaption = Number.isFinite(fi) ? `Trap at chamber ${fi + 1}` : "Trap triggered — run lost";
+    } else if (tk === "cashout") payoutCaption = "Banked secured loot — clean exit";
+    else payoutCaption = "Round settled";
   }
 
   const terminalKind = resolvedResult?.terminalKind;
@@ -1246,6 +1276,10 @@ export default function TreasureDoorsPage() {
           void runStartRun();
         },
         errorMessage: errorMessage || stakeHint,
+        desktopPayout: {
+          label: payoutBandLabel,
+          value: payoutBandValue,
+        },
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
@@ -1265,6 +1299,7 @@ export default function TreasureDoorsPage() {
           stepLabels={stepLabels}
           payoutBandLabel={payoutBandLabel}
           payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           showBoardCashOut={
             uiState === UI_STATE.SESSION_ACTIVE && !terminalSession && Boolean(td?.canCashOut)
           }
@@ -1290,9 +1325,10 @@ export default function TreasureDoorsPage() {
             multiplier ladder.
           </p>
           <p>
-            After any safe chamber, when banking is available, use the control on the temple panel to secure loot and exit
-            cleanly, or keep descending toward the crown vault. Gift rounds use freeplay — a loss does not debit your vault; a
-            win credits the full payout.
+            After any safe chamber you can bank secured loot from the lower band of the temple panel, under the doors and
+            above the stake bar. Secured payout on small screens appears in the summary strip above the doors; on large screens
+            it also appears beside the stake controls. Gift rounds use freeplay — a loss does not debit your vault; a win
+            credits the full payout.
           </p>
           <p>
             After the result popup closes, the sealed board recap stays visible — press START RUN explicitly for the next

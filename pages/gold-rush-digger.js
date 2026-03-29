@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import GoldRushDiggerBoard from "../components/solo-v2/GoldRushDiggerBoard";
-import SoloV2BoardPayoutChip from "../components/solo-v2/SoloV2BoardPayoutChip";
 import SoloV2BoardCashOutControl from "../components/solo-v2/SoloV2BoardCashOutControl";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -127,6 +126,7 @@ function GoldRushGameplayPanel({
   stepLabels,
   payoutBandLabel,
   payoutBandValue,
+  payoutCaption,
   showBoardCashOut,
   boardCashOutDisabled,
   boardCashOutLoading,
@@ -190,16 +190,11 @@ function GoldRushGameplayPanel({
         </div>
 
         <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-8">
-          <div className="mb-0 flex items-center justify-between gap-2 px-0.5 sm:mb-0.5">
-            <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">
-              Depth
+          <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
+            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">Depth</span>
+            <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
+              {Math.min(stripCleared + 1, total)} / {total}
             </span>
-            <div className="flex min-w-0 items-center justify-end gap-2">
-              <span className="shrink-0 text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
-                {Math.min(stripCleared + 1, total)} / {total}
-              </span>
-              <SoloV2BoardPayoutChip label={payoutBandLabel} value={payoutBandValue} />
-            </div>
           </div>
           <div
             className="flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
@@ -229,34 +224,59 @@ function GoldRushGameplayPanel({
           </div>
         </div>
 
-        <SoloV2BoardCashOutControl
-          show={showBoardCashOut}
-          label={boardCashOutLabel}
-          loadingLabel={boardCashOutLoadingLabel}
-          disabled={boardCashOutDisabled}
-          loading={boardCashOutLoading}
-          onClick={onBoardCashOut}
-        />
-
-        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:px-6 lg:pb-2">
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-1">
-            <GoldRushDiggerBoard
-              rowCount={rowCount}
-              columnCount={columnCount}
-              currentRowIndex={isTerminal ? rowCount : Math.floor(Number(playing?.currentRowIndex ?? 0))}
-              digHistory={digHistory}
-              bombColumns={bombColumns}
-              revealBombs={revealBombs}
-              disabled={!canDig}
-              pulseCell={pulseCell}
-              shakeCell={shakeCell}
-              onDigColumn={onDigColumn}
-            />
+        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-8 lg:hidden">
+          <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
+            <div className="flex items-center justify-between gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5">
+              <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
+                {payoutBandLabel}
+              </span>
+              <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
+                {payoutBandValue}
+              </span>
+            </div>
+            <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
+              <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
+                {payoutCaption || "\u00a0"}
+              </span>
+            </p>
           </div>
         </div>
 
-        <div className="flex shrink-0 justify-center px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1 lg:px-8">
-          <div className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:max-w-2xl" aria-hidden />
+        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-6 lg:pb-2">
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(24rem,52vh)]"
+            aria-label="Gold Rush dig grid"
+          >
+            <div className="flex min-h-0 min-h-[11rem] flex-1 flex-col items-center justify-center px-0.5 py-1 sm:min-h-[12rem] sm:px-1 sm:py-1.5 lg:min-h-0">
+              <GoldRushDiggerBoard
+                rowCount={rowCount}
+                columnCount={columnCount}
+                currentRowIndex={isTerminal ? rowCount : Math.floor(Number(playing?.currentRowIndex ?? 0))}
+                digHistory={digHistory}
+                bombColumns={bombColumns}
+                revealBombs={revealBombs}
+                disabled={!canDig}
+                pulseCell={pulseCell}
+                shakeCell={shakeCell}
+                onDigColumn={onDigColumn}
+              />
+            </div>
+            <div className="flex shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:min-h-[5.5rem]">
+              <SoloV2BoardCashOutControl
+                show={showBoardCashOut}
+                label={boardCashOutLabel}
+                loadingLabel={boardCashOutLoadingLabel}
+                disabled={boardCashOutDisabled}
+                loading={boardCashOutLoading}
+                onClick={onBoardCashOut}
+                wrapperClassName="flex w-full shrink-0 justify-center px-1 pb-0 pt-0 sm:px-2"
+              />
+              <div
+                className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:max-w-2xl"
+                aria-hidden
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1014,12 +1034,20 @@ export default function GoldRushDiggerPage() {
 
   let payoutBandLabel = "Secured payout";
   let payoutBandValue = formatCompact(summaryWin);
+  let payoutCaption = `First safe row ×${GOLD_RUSH_MULTIPLIER_LADDER[0]} on this play`;
 
   if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
     const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
     const won = Boolean(resolvedResult.isWin ?? resolvedResult.won);
     payoutBandLabel = won ? "Return paid" : "Return this round";
     payoutBandValue = formatCompact(pr);
+    const tk = resolvedResult.terminalKind;
+    if (tk === "full_clear") payoutCaption = "Crown row — full ladder cleared";
+    else if (tk === "bomb") {
+      const fr = Math.floor(Number(resolvedResult.finalRowIndex ?? 0));
+      payoutCaption = Number.isFinite(fr) ? `Bomb at row ${fr + 1}` : "Bomb — run lost";
+    } else if (tk === "cashout") payoutCaption = "Cash out — secured payout banked";
+    else payoutCaption = "Round settled";
   }
 
   const terminalKind = resolvedResult?.terminalKind;
@@ -1159,6 +1187,10 @@ export default function GoldRushDiggerPage() {
           void runStartRun();
         },
         errorMessage: errorMessage || stakeHint,
+        desktopPayout: {
+          label: payoutBandLabel,
+          value: payoutBandValue,
+        },
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
@@ -1177,6 +1209,7 @@ export default function GoldRushDiggerPage() {
           stepLabels={stepLabels}
           payoutBandLabel={payoutBandLabel}
           payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           showBoardCashOut={
             uiState === UI_STATE.SESSION_ACTIVE && !terminalSession && Boolean(gr?.canCashOut)
           }
@@ -1202,9 +1235,10 @@ export default function GoldRushDiggerPage() {
             hitting a bomb ends the run immediately.
           </p>
           <p>
-            After any safe row, when cash out is available, use the control on the dig panel to bank the secured payout, or
-            keep digging toward row six for the crown multiplier. Gift rounds use freeplay — a loss does not debit your vault;
-            a win credits the full payout.
+            After any safe row you may cash out from the lower band of the dig panel, under the grid and above the stake bar.
+            Secured payout on small screens appears in the summary strip above the grid; on large screens it also appears
+            beside the stake controls. Gift rounds use freeplay — a loss does not debit your vault; a win credits the full
+            payout.
           </p>
           <p>
             After the result popup closes, the finished grid recap stays visible — press START RUN explicitly for the next

@@ -29,6 +29,8 @@ export default function SoloV2GameFooter({
   secondaryActionLoading = false,
   secondaryLoadingLabel = "…",
   onSecondaryAction,
+  /** When true, secondary row is hidden from `lg` up (desktop uses an in-board control instead). */
+  secondaryActionLgHidden = false,
   /** When true, omit the primary CTA row (e.g. in-play action lives in the gameplay panel). */
   hidePrimaryAction = false,
   /** When true with hidePrimaryAction, keeps the same vertical band as the primary button (no layout jump). */
@@ -156,6 +158,8 @@ export default function SoloV2GameFooter({
           onClick={onSecondaryAction}
           disabled={secondaryActionDisabled || secondaryActionLoading}
           className={`min-h-[44px] w-full rounded-lg border px-4 py-2 text-xs font-extrabold uppercase tracking-wide sm:text-sm ${
+            secondaryActionLgHidden ? "lg:hidden" : ""
+          } ${
             secondaryActionDisabled || secondaryActionLoading
               ? "cursor-not-allowed border-white/15 bg-white/5 text-zinc-500"
               : "border-amber-400/45 bg-amber-950/40 text-amber-100 hover:bg-amber-900/45"
