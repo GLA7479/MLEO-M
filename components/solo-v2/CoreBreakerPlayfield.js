@@ -119,7 +119,12 @@ export function CoreBreakerChoiceSlot({ pickDisabled, strikingUi, lastFlash, onS
         Three lanes · one unstable · one gem · one safe — each swing
       </p>
 
-      <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Strike lanes">
+      <div
+        className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:gap-6"
+        role="group"
+        aria-label="Strike lanes"
+        aria-busy={Boolean(strikingUi)}
+      >
         {[0, 1, 2].map(col => {
           const fl = lastFlash?.column === col ? lastFlash.outcome : null;
           const ring =
@@ -155,25 +160,25 @@ export function CoreBreakerChoiceSlot({ pickDisabled, strikingUi, lastFlash, onS
         })}
       </div>
 
-      {flashText ? (
+      <div className="flex min-h-[2.625rem] items-start sm:min-h-[2.75rem]">
         <p
-          className={`min-h-[1.25rem] text-center text-[10px] font-bold leading-tight sm:text-[11px] lg:text-left ${
-            lastFlash?.outcome === "unstable"
-              ? "text-red-300/95"
-              : lastFlash?.outcome === "gem"
-                ? "text-cyan-300/95"
-                : "text-amber-200/95"
+          className={`line-clamp-2 w-full text-center text-[10px] leading-tight sm:text-[11px] lg:text-left ${
+            flashText
+              ? `font-bold ${
+                  lastFlash?.outcome === "unstable"
+                    ? "text-red-300/95"
+                    : lastFlash?.outcome === "gem"
+                      ? "text-cyan-300/95"
+                      : "text-amber-200/95"
+                }`
+              : "select-none font-bold text-transparent"
           }`}
           role="status"
           aria-live="polite"
         >
-          {flashText}
+          {flashText || "\u00a0"}
         </p>
-      ) : strikingUi ? (
-        <p className="min-h-[1.25rem] text-center text-[10px] font-medium text-zinc-400 sm:text-[11px] lg:text-left">
-          Resolving…
-        </p>
-      ) : null}
+      </div>
     </div>
   );
 }

@@ -320,7 +320,7 @@ export default function CoreBreakerPage() {
       setVaultBalance(authoritativeBalance);
       if (settlementResult.error) {
         setErrorMessage(settlementResult.error);
-        setSessionNotice("Result resolved, but vault update failed.");
+        setSessionNotice("");
         terminalPopupEligibleRef.current = false;
         if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
         resultPopupTimerRef.current = window.setTimeout(() => {
@@ -329,10 +329,8 @@ export default function CoreBreakerPage() {
         return;
       }
 
-      const delta = Number(settlementSummary.netDelta || 0);
-      const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
       if (settlementResult.applied) {
-        setSessionNotice(`Settled (${deltaLabel}). Vault: ${authoritativeBalance}.`);
+        setSessionNotice("");
         setStats(prev => {
           const entryCost = Number(settlementSummary.entryCost || QUICK_FLIP_CONFIG.entryCost);
           const payoutReturn = Number(settlementSummary.payoutReturn || 0);
@@ -349,7 +347,7 @@ export default function CoreBreakerPage() {
           };
         });
       } else {
-        setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
+        setSessionNotice("");
       }
 
       const shouldOpenTerminalPopup = terminalPopupEligibleRef.current;
@@ -382,7 +380,7 @@ export default function CoreBreakerPage() {
         settlementSummary: cbSnap.resolvedResult.settlementSummary,
       });
       setUiState(UI_STATE.RESOLVED);
-      setSessionNotice(resumed ? "Run finished (restored)." : "");
+      setSessionNotice("");
       setErrorMessage("");
       return;
     }
@@ -398,7 +396,7 @@ export default function CoreBreakerPage() {
     if (readState === "strike_submitted") {
       setInRunLoop(true);
       setUiState(UI_STATE.SESSION_ACTIVE);
-      setSessionNotice(resumed ? "Finishing strike…" : "Resolving…");
+      setSessionNotice("");
       setErrorMessage("");
       return;
     }
@@ -408,9 +406,7 @@ export default function CoreBreakerPage() {
       setResolvedResult(null);
       setUiState(UI_STATE.SESSION_ACTIVE);
       setStrikingUi(false);
-      setSessionNotice(
-        resumed ? "Session restored — pick a lane." : "Pick left, center, or right to strike the core.",
-      );
+      setSessionNotice("");
       setErrorMessage("");
       return;
     }
@@ -855,45 +851,27 @@ export default function CoreBreakerPage() {
   const strikesForStrip = Array.isArray(playing?.strikeHistory) ? playing.strikeHistory.length : 0;
   const strip = coreBreakerStripModel(uiState, readState, strikesForStrip);
 
-  let statusTop = "Press START RUN when you are set.";
-  let statusSub =
-    "Clear all 5 strikes to win — no early exit. Set stake, then START RUN. Gems boost payout; unstable ends the run.";
+  let statusTop = "Press START RUN.";
 
   if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can't start this run.";
-    statusSub = !vaultReady
-      ? "Shared vault could not be opened. Return to the arcade and try again."
-      : String(errorMessage || "").trim() || "Check your balance and connection, then try START RUN again.";
+    statusTop = !vaultReady ? "Vault unavailable." : "Can't start.";
   } else if (uiState === UI_STATE.LOADING) {
     statusTop = "Starting run…";
-    statusSub = "Opening or resuming a session with the server.";
-  } else if (uiState === UI_STATE.SUBMITTING_PICK) {
-    statusTop = "Locking strike…";
-    statusSub = "Sending your pick to the server.";
-  } else if (uiState === UI_STATE.RESOLVING) {
-    statusTop = "Breaking…";
-    statusSub = "Server reveals this swing.";
+  } else if (uiState === UI_STATE.SUBMITTING_PICK || uiState === UI_STATE.RESOLVING) {
+    statusTop = "Working…";
   } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    statusTop = resolvedResult.isWin ? "All 5 strikes survived — you win." : "Unstable hit — run lost.";
-    statusSub = "Round done. Change stake if you want, then START RUN.";
+    statusTop = resolvedResult.isWin ? "You won." : "Run lost.";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready") {
-    if (strikingUi) {
-      statusTop = "Working…";
-      statusSub = "\u00a0";
-    } else {
-      statusTop = `Strike ${strikesForStrip + 1} of ${CORE_BREAKER_STRIKE_STEPS} — clear all ${CORE_BREAKER_STRIKE_STEPS} to win`;
-      statusSub = "No early exit. Safe builds mult · gems boost payout · unstable ends run.";
-    }
+    statusTop = strikingUi ? "Working…" : `Strike ${strikesForStrip + 1} of ${CORE_BREAKER_STRIKE_STEPS}.`;
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "strike_submitted") {
-    statusTop = "Resolving strike…";
-    statusSub = "Applying outcome.";
+    statusTop = "Working…";
   } else if (uiState === UI_STATE.PENDING_MIGRATION) {
     statusTop = "Migration pending.";
-    statusSub = "This environment is updating. Try again shortly.";
   } else if (uiState === UI_STATE.IDLE) {
-    statusTop = "Core Breaker";
-    statusSub = "5 safe strikes to win · gems boost payout · unstable ends run.";
+    statusTop = "Press START RUN.";
   }
+
+  const statusSub = "\u00a0";
 
   let payoutBandLabel = "Max win";
   let payoutBandValue = formatCompact(summaryWin);
