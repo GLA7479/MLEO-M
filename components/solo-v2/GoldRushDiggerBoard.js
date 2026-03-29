@@ -10,7 +10,7 @@ function CellFace({ row, col, phase, pickedCol, bombCol, revealBomb, pulsing, sh
   const isOtherWhenPicked = pickedCol != null && pickedCol !== col;
 
   const base =
-    "flex min-h-[40px] flex-1 items-center justify-center rounded-lg border text-lg font-black transition sm:min-h-[44px]";
+    "flex min-h-[40px] flex-1 items-center justify-center rounded-lg border text-lg font-black transition sm:min-h-[44px] lg:min-h-[36px] lg:text-base";
 
   if (phase === "future") {
     return (
@@ -108,11 +108,11 @@ export default function GoldRushDiggerBoard({
       Array.isArray(bombColumns) && bombColumns.length > r ? Math.floor(Number(bombColumns[r])) : null;
 
     rows.push(
-      <div key={r} className="flex w-full gap-1.5 sm:gap-2">
-        <div className="w-5 shrink-0 pt-2 text-center text-[9px] font-bold tabular-nums text-zinc-500 sm:w-6 sm:text-[10px]">
+      <div key={r} className="flex w-full gap-1.5 sm:gap-2 lg:gap-1">
+        <div className="w-5 shrink-0 pt-2 text-center text-[9px] font-bold tabular-nums text-zinc-500 sm:w-6 sm:text-[10px] lg:w-5 lg:pt-1 lg:text-[9px]">
           {r + 1}
         </div>
-        <div className="flex min-w-0 flex-1 gap-1.5 sm:gap-2">
+        <div className="flex min-w-0 flex-1 gap-1.5 sm:gap-2 lg:gap-1">
           {Array.from({ length: columnCount }).map((_, c) => (
             <CellFace
               key={c}
@@ -133,5 +133,5 @@ export default function GoldRushDiggerBoard({
     );
   }
 
-  return <div className="flex w-full flex-col gap-1.5 sm:gap-2">{rows}</div>;
+  return <div className="flex w-full flex-col gap-1.5 sm:gap-2 lg:gap-1">{rows}</div>;
 }
