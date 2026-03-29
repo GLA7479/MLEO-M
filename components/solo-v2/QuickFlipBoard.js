@@ -1,6 +1,6 @@
 /**
  * Quick Flip board shell — structural mirror of MysteryChamberBoard (card, notice row, status,
- * step strip, payout band, centered playfield, hint row, bottom anchor band). Game-specific coin
+ * step strip, payout band, centered playfield, bottom anchor band). Game-specific coin
  * and choice UI are passed as slots.
  *
  * Layout rule: base + `sm:` preserve phone / small-tablet stack; `lg:` is the desktop composition
@@ -16,7 +16,6 @@ export default function QuickFlipBoard({
   payoutBandLabel = "Payout if win",
   payoutBandValue = "—",
   payoutCaption = "",
-  hintLine = "\u00a0",
   coinSlot,
   choiceSlot,
 }) {
@@ -111,12 +110,6 @@ export default function QuickFlipBoard({
         <div className="mx-auto w-full max-w-[17.75rem] shrink-0 lg:mx-0 lg:max-w-none lg:w-[min(30rem,44%)] lg:min-w-[18rem]">
           {choiceSlot}
         </div>
-      </div>
-
-      <div className="flex min-h-[1.75rem] shrink-0 items-start justify-center px-2 pb-0.5 pt-0 text-center sm:min-h-[1.625rem] sm:items-center sm:px-4 sm:pb-0 sm:pt-0 lg:px-8">
-        <p className="line-clamp-2 w-full text-[9px] font-medium leading-snug text-zinc-400 sm:text-[10px]">
-          {hintLine}
-        </p>
       </div>
 
       <div className="flex shrink-0 justify-center border-t border-amber-900/35 bg-zinc-950/80 px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1 lg:px-8">

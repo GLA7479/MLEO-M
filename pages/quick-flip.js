@@ -195,7 +195,6 @@ function QuickFlipGameplayPanel({
   sessionNotice,
   statusTop,
   statusSub,
-  hintLine,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -224,7 +223,6 @@ function QuickFlipGameplayPanel({
           payoutBandLabel={payoutBandLabel}
           payoutBandValue={payoutBandValue}
           payoutCaption={payoutCaption}
-          hintLine={hintLine}
           coinSlot={<QuickFlipCoinDisplay phase={coinPhase} resolvedFace={coinResolvedFace} />}
           choiceSlot={
             <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Choose side">
@@ -1037,33 +1035,25 @@ export default function QuickFlipPage() {
   let statusTop = "Press FLIP COIN when you are set.";
   let statusSub =
     "Choose Heads or Tails, set your play in the bar below, then flip. The server seals the coin before you see it.";
-  let hintLine = "Fair ×1.92 payout on a winning match — one flip per round.";
 
   if (uiState === UI_STATE.UNAVAILABLE) {
     statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
     statusSub = !vaultReady
       ? "Shared vault could not be opened. Return to the arcade and try again."
       : String(errorMessage || "").trim() || "Check your balance and connection, then try FLIP COIN again.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.LOADING) {
     statusTop = "Starting round…";
     statusSub = "Opening or resuming a session with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SUBMITTING_CHOICE) {
     statusTop = "Locking your pick…";
     statusSub = "Sending Heads or Tails to the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.CHOICE_SUBMITTED || isFlipping) {
     statusTop = "Flipping…";
     statusSub = "Outcome is resolved on the server; the coin follows the fair result.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
     statusTop = resolvedResult.isWin ? "You matched the coin." : "No match this time.";
     statusSub =
       "Round is complete. Change side or stake, then press FLIP COIN for another round.";
-    hintLine = resolvedResult.isWin
-      ? "Vault credit applied after settlement."
-      : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
   } else if (uiState === UI_STATE.SESSION_CREATED || uiState === UI_STATE.CHOICE_SELECTED) {
     statusTop = hasValidSide ? "Ready to flip." : "Choose your side.";
     statusSub = hasValidSide
@@ -1072,11 +1062,9 @@ export default function QuickFlipPage() {
   } else if (uiState === UI_STATE.RESOLVE_FAILED) {
     statusTop = "Could not resolve.";
     statusSub = "Check your connection and try FLIP COIN again.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.PENDING_MIGRATION) {
     statusTop = "Migration pending.";
     statusSub = "This environment is updating. Try again shortly.";
-    hintLine = "\u00a0";
   }
 
   let payoutBandLabel = "Payout if win";
@@ -1279,7 +1267,6 @@ export default function QuickFlipPage() {
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          hintLine={hintLine}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}
