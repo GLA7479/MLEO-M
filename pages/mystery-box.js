@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import MysteryBoxBoard from "../components/solo-v2/MysteryBoxBoard";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -11,7 +12,11 @@ import {
   soloV2GiftConsumeOne,
 } from "../lib/solo-v2/soloV2GiftStorage";
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
-import { MYSTERY_BOX_MIN_WAGER, MYSTERY_BOX_WIN_MULTIPLIER } from "../lib/solo-v2/mysteryBoxConfig";
+import {
+  MYSTERY_BOX_IMPLIED_RTP_PERCENT,
+  MYSTERY_BOX_MIN_WAGER,
+  MYSTERY_BOX_WIN_MULTIPLIER,
+} from "../lib/solo-v2/mysteryBoxConfig";
 import {
   applyMysteryBoxSettlementOnce,
   readQuickFlipSharedVaultBalance,
@@ -44,6 +49,8 @@ const UI_STATE = {
 const STATS_KEY = "solo_v2_mystery_box_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
+/** Beat after resolve before result overlay (Quick Flip mirror). */
+const REVEAL_READABLE_MS = 520;
 
 function parseWagerInput(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
@@ -88,30 +95,110 @@ function boxLabel(index) {
   return "—";
 }
 
-function BoxButton({ index, label, selectedBox, disabled, onSelect }) {
+/** A / B / C tiles — Quick Flip mirror (rounded-2xl sigil-style), 3-up grid. */
+function MysteryBoxTile({ index, letter, selectedBox, disabled, onSelect }) {
   const isSelected = selectedBox === index;
+  const shell =
+    "group relative flex h-full min-h-[5.1rem] w-full flex-col items-center justify-center rounded-2xl border-2 text-center shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-150 sm:min-h-[5.85rem] sm:rounded-[1.05rem] lg:min-h-[6.85rem] lg:rounded-[1.12rem]";
+
+  let face =
+    "border-amber-700/45 bg-gradient-to-b from-zinc-800/95 to-zinc-950 text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ";
+  if (isSelected) {
+    face =
+      "border-amber-400/65 bg-gradient-to-b from-amber-900/45 to-zinc-950 text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(251,191,36,0.2)] ring-2 ring-inset ring-amber-400/25 ";
+  } else {
+    face +=
+      "enabled:hover:border-amber-500/55 enabled:hover:from-zinc-800 enabled:hover:to-zinc-950 enabled:active:scale-[0.98] ";
+  }
+
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={() => onSelect(index)}
-      className={`flex min-h-[72px] flex-1 flex-col items-center justify-center rounded-xl border px-2 py-2 text-sm font-extrabold transition sm:min-h-[84px] ${
-        isSelected
-          ? "border-amber-400/55 bg-amber-500/25 text-amber-50 shadow-md shadow-amber-900/25"
-          : "border-white/25 bg-white/[0.06] text-zinc-100 hover:bg-white/12"
-      } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+      className={`${shell} ${face}${
+        disabled ? "cursor-not-allowed opacity-[0.42] " : ""
+      }focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/35`}
     >
-      <span className="text-2xl sm:text-3xl">{label}</span>
-      <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Pick</span>
+      <span
+        className={`mt-0.5 select-none text-[1.85rem] font-black leading-none tabular-nums sm:text-[2.1rem] lg:text-[2.5rem] ${
+          isSelected ? "text-amber-100" : "text-amber-100/95"
+        }`}
+        aria-hidden
+      >
+        {letter}
+      </span>
+      <span className="mt-1 text-[8px] font-semibold uppercase tracking-[0.14em] text-white/38 sm:text-[9px] lg:text-[10px]">
+        Pick
+      </span>
     </button>
   );
+}
+
+function MysteryBoxAccent({ winningBoxIndex }) {
+  const letters = ["A", "B", "C"];
+  const showWin = winningBoxIndex === 0 || winningBoxIndex === 1 || winningBoxIndex === 2;
+  return (
+    <div
+      className="flex h-[7.25rem] w-[7.25rem] shrink-0 flex-col items-center justify-center rounded-2xl border-2 border-amber-800/50 bg-gradient-to-b from-zinc-800/90 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:h-[8rem] sm:w-[8rem] lg:h-[9.5rem] lg:w-[9.5rem]"
+      aria-hidden
+    >
+      {showWin ? (
+        <>
+          <span className="text-[2.85rem] font-black leading-none text-amber-200 sm:text-[3.25rem] lg:text-5xl">
+            {letters[winningBoxIndex]}
+          </span>
+          <span className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-emerald-300/80 sm:text-[10px]">
+            Prize box
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="text-[2.85rem] font-black leading-none text-zinc-500 sm:text-[3.25rem] lg:text-5xl">?</span>
+          <span className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-zinc-500 sm:text-[10px]">
+            Mystery
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+function mysteryBoxRoundStripModel(uiState) {
+  const stepTotal = 2;
+  if (uiState === UI_STATE.RESOLVED) {
+    return { stepTotal, stepsComplete: 2, currentStepIndex: 1 };
+  }
+  if (
+    uiState === UI_STATE.SUBMITTING_CHOICE ||
+    uiState === UI_STATE.CHOICE_SUBMITTED ||
+    uiState === UI_STATE.RESOLVING
+  ) {
+    return { stepTotal, stepsComplete: 1, currentStepIndex: 1 };
+  }
+  return { stepTotal, stepsComplete: 0, currentStepIndex: 0 };
 }
 
 function MysteryBoxGameplayPanel({
   uiState,
   selectedBox,
   isOpening,
-  resultToast,
+  resultPopupOpen,
+  resolvedIsWin,
+  resultVaultLabel,
+  popupTitle,
+  popupLine2,
+  popupLine3,
+  sessionNotice,
+  statusTop,
+  statusSub,
+  hintLine,
+  stepsComplete,
+  currentStepIndex,
+  stepTotal,
+  payoutBandLabel,
+  payoutBandValue,
+  payoutCaption,
   onSelectBox,
   winningBoxIndex,
   pickedBoxIndex,
@@ -120,76 +207,86 @@ function MysteryBoxGameplayPanel({
   const canPick = !isOpening && uiState !== UI_STATE.LOADING && !isPickLocked;
 
   return (
-    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-2 sm:py-4">
-          <p className="mb-3 max-w-xs text-xs leading-relaxed text-zinc-400 sm:text-sm">
-            One box holds the prize. The server picks the winning box when you open.
-          </p>
-          <div className="grid w-full grid-cols-3 gap-2 sm:gap-3">
-            <BoxButton
-              index={0}
-              label="A"
-              selectedBox={selectedBox}
-              disabled={!canPick}
-              onSelect={onSelectBox}
-            />
-            <BoxButton
-              index={1}
-              label="B"
-              selectedBox={selectedBox}
-              disabled={!canPick}
-              onSelect={onSelectBox}
-            />
-            <BoxButton
-              index={2}
-              label="C"
-              selectedBox={selectedBox}
-              disabled={!canPick}
-              onSelect={onSelectBox}
-            />
-          </div>
-          {uiState !== UI_STATE.IDLE ? (
-            <div className="mt-3 flex h-6 w-full max-w-sm shrink-0 flex-col justify-center sm:mt-4 sm:h-7">
-              {uiState === UI_STATE.RESOLVED && winningBoxIndex !== null && winningBoxIndex !== undefined ? (
-                <p className="text-xs text-zinc-400">
-                  Winning box:{" "}
-                  <span className="font-bold text-amber-200/95">{boxLabel(winningBoxIndex)}</span>
-                </p>
-              ) : (
-                <p className="invisible text-xs leading-tight" aria-hidden>
-                  Winning box: <span className="font-bold">A</span>
-                </p>
-              )}
+        <MysteryBoxBoard
+          sessionNotice={sessionNotice}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          stepTotal={stepTotal}
+          currentStepIndex={currentStepIndex}
+          stepsComplete={stepsComplete}
+          stepLabels={["Choose", "Open"]}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
+          hintLine={hintLine}
+          accentSlot={<MysteryBoxAccent winningBoxIndex={winningBoxIndex} />}
+          boxesSlot={
+            <div className="flex w-full flex-col items-stretch gap-3 lg:gap-4">
+              <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:gap-5" role="group" aria-label="Choose a box">
+                <MysteryBoxTile
+                  index={0}
+                  letter="A"
+                  selectedBox={selectedBox}
+                  disabled={!canPick}
+                  onSelect={onSelectBox}
+                />
+                <MysteryBoxTile
+                  index={1}
+                  letter="B"
+                  selectedBox={selectedBox}
+                  disabled={!canPick}
+                  onSelect={onSelectBox}
+                />
+                <MysteryBoxTile
+                  index={2}
+                  letter="C"
+                  selectedBox={selectedBox}
+                  disabled={!canPick}
+                  onSelect={onSelectBox}
+                />
+              </div>
+              <div className="flex min-h-[1.5rem] w-full shrink-0 flex-col justify-center sm:min-h-[1.625rem]">
+                {uiState === UI_STATE.RESOLVED &&
+                winningBoxIndex !== null &&
+                winningBoxIndex !== undefined &&
+                (winningBoxIndex === 0 || winningBoxIndex === 1 || winningBoxIndex === 2) ? (
+                  <p className="text-[10px] text-zinc-400 sm:text-[11px]">
+                    Winning box:{" "}
+                    <span className="font-bold text-amber-200/95">{boxLabel(winningBoxIndex)}</span>
+                  </p>
+                ) : (
+                  <p className="invisible text-[10px] leading-tight sm:text-[11px]" aria-hidden>
+                    Winning box: <span className="font-bold">A</span>
+                  </p>
+                )}
+              </div>
             </div>
-          ) : null}
-        </div>
+          }
+        />
       </div>
 
       <SoloV2ResultPopup
-        open={Boolean(resultToast)}
-        isWin={Boolean(resultToast?.isWin)}
-        animationKey={`${resultToast?.outcomeLabel ?? ""}-${resultToast?.deltaLabel ?? ""}-${pickedBoxIndex ?? ""}`}
+        open={resultPopupOpen}
+        isWin={resolvedIsWin}
+        resultTone={resolvedIsWin ? "win" : "lose"}
+        animationKey={`${popupLine2}-${popupLine3}-${resultVaultLabel}-${pickedBoxIndex ?? ""}`}
         vaultSlot={
-          resultToast ? (
-            <SoloV2ResultPopupVaultLine isWin={resultToast.isWin} deltaLabel={resultToast.deltaLabel} />
+          resultPopupOpen ? (
+            <SoloV2ResultPopupVaultLine
+              isWin={resolvedIsWin}
+              tone={resolvedIsWin ? "win" : "lose"}
+              deltaLabel={resultVaultLabel}
+            />
           ) : undefined
         }
       >
-        <div className="text-[13px] font-black uppercase tracking-wide">
-          {resultToast?.isWin ? "YOU WIN" : "YOU LOSE"}
-        </div>
+        <div className="text-[13px] font-black uppercase tracking-wide">{popupTitle}</div>
         <div className="mt-1 text-sm font-bold text-white">
-          Your pick:{" "}
-          <span className="text-amber-100">
-            {pickedBoxIndex === 0 || pickedBoxIndex === 1 || pickedBoxIndex === 2
-              ? `Box ${boxLabel(pickedBoxIndex)}`
-              : "—"}
-          </span>
+          <span className="text-amber-100 tabular-nums">{popupLine2}</span>
         </div>
-        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">
-          {resultToast?.outcomeLabel ?? "—"}
-        </div>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">{popupLine3}</div>
       </SoloV2ResultPopup>
     </div>
   );
@@ -205,14 +302,15 @@ export default function MysteryBoxPage() {
   const [, setEventInfo] = useState(null);
   const [resolvedResult, setResolvedResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [, setSessionNotice] = useState("");
+  const [sessionNotice, setSessionNotice] = useState("");
   const [vaultBalance, setVaultBalance] = useState(0);
   const [vaultReady, setVaultReady] = useState(false);
   const [wagerInput, setWagerInput] = useState(String(MYSTERY_BOX_MIN_WAGER));
   const lastPresetAmountRef = useRef(null);
   const [stats, setStats] = useState(readMysteryBoxStats);
-  const [resultToast, setResultToast] = useState(null);
-  const toastTimerRef = useRef(null);
+  const [resultPopupOpen, setResultPopupOpen] = useState(false);
+  const resultPopupTimerRef = useRef(null);
+  const terminalPopupEligibleRef = useRef(false);
   const createInFlightRef = useRef(false);
   const submitInFlightRef = useRef(false);
   const resolveInFlightRef = useRef(false);
@@ -257,13 +355,32 @@ export default function MysteryBoxPage() {
 
   useEffect(() => {
     return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
+      if (resultPopupTimerRef.current) {
+        clearTimeout(resultPopupTimerRef.current);
       }
     };
   }, []);
 
-  /** After the result popup closes: clear terminal session, keep box + wager — one OPEN BOX starts the next round. */
+  const dismissResultPopupAfterTerminalRun = useCallback(() => {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setResultPopupOpen(false);
+  }, []);
+
+  const openResultPopup = useCallback(() => {
+    if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+    setResultPopupOpen(true);
+    resultPopupTimerRef.current = window.setTimeout(() => {
+      resultPopupTimerRef.current = null;
+      dismissResultPopupAfterTerminalRun();
+    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+  }, [dismissResultPopupAfterTerminalRun]);
+
+  /** Hard reset after vault failure or stale recovery — not used on normal popup dismiss (Quick Flip mirror). */
   function resetRoundAfterResultPopup() {
     createInFlightRef.current = false;
     submitInFlightRef.current = false;
@@ -271,7 +388,7 @@ export default function MysteryBoxPage() {
     setSession(null);
     setEventInfo(null);
     setResolvedResult(null);
-    setResultToast(null);
+    setResultPopupOpen(false);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
   }
@@ -285,7 +402,7 @@ export default function MysteryBoxPage() {
     setSelectedBox(null);
     setEventInfo(null);
     setResolvedResult(null);
-    setResultToast(null);
+    setResultPopupOpen(false);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
     setErrorMessage(String(message || "").trim() || "This round is no longer valid. Pick a box and press OPEN BOX.");
@@ -303,8 +420,9 @@ export default function MysteryBoxPage() {
       if (settlementResult.error) {
         setErrorMessage(settlementResult.error);
         setSessionNotice("Result resolved, but vault update failed.");
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = setTimeout(() => {
+        terminalPopupEligibleRef.current = false;
+        if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+        resultPopupTimerRef.current = setTimeout(() => {
           resetRoundAfterResultPopup();
         }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
         return;
@@ -330,23 +448,15 @@ export default function MysteryBoxPage() {
         setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
       }
 
-      const toastDelta = Number(settlementSummary.netDelta || 0);
-      const toastDeltaLabel = toastDelta >= 0 ? `+${toastDelta}` : `${toastDelta}`;
-      const ob = resolvedResult?.outcome;
-      const outcomeLabel =
-        ob === 0 || ob === 1 || ob === 2 ? `Prize was in ${boxLabel(ob)}` : "Round complete";
-      setResultToast({
-        isWin: Boolean(resolvedResult?.isWin),
-        deltaLabel: toastDeltaLabel,
-        outcomeLabel,
-      });
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => {
-        setResultToast(null);
-        resetRoundAfterResultPopup();
-      }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+      const shouldOpenTerminalPopup = terminalPopupEligibleRef.current;
+      terminalPopupEligibleRef.current = false;
+      if (shouldOpenTerminalPopup) {
+        window.setTimeout(() => {
+          openResultPopup();
+        }, REVEAL_READABLE_MS);
+      }
     });
-  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
+  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState, openResultPopup]);
 
   function hydrateResolvedFromSession(sessionPayload) {
     const summary = sessionPayload?.mysteryBox?.resolvedResult || sessionPayload?.serverOutcomeSummary || {};
@@ -501,6 +611,11 @@ export default function MysteryBoxPage() {
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     setSession(null);
     setEventInfo(null);
     setResolvedResult(null);
@@ -554,6 +669,9 @@ export default function MysteryBoxPage() {
             return { ok: false };
           }
           giftRoundMeta?.onGiftConsumed?.();
+          if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => giftRoundMeta?.onGiftConsumed?.());
+          }
         }
         setSession(payload.session);
         setSessionNotice("");
@@ -864,6 +982,10 @@ export default function MysteryBoxPage() {
           onGiftConsumed: () => giftRefreshRef.current?.(),
         });
         if (!boot.ok || activeCycle !== cycleRef.current) return;
+        if (isGiftRound && typeof window !== "undefined" && window.requestAnimationFrame) {
+          giftRefreshRef.current?.();
+          window.requestAnimationFrame(() => giftRefreshRef.current?.());
+        }
         if (boot.alreadyTerminal) return;
         sessionId = boot.session?.id;
         readStateKnown = String(boot.session?.readState || "");
@@ -930,6 +1052,11 @@ export default function MysteryBoxPage() {
     ) {
       return;
     }
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     setSelectedBox(index);
     setErrorMessage("");
     setEventInfo(null);
@@ -968,6 +1095,7 @@ export default function MysteryBoxPage() {
       const result = classifySoloV2ApiResult(response, payload);
 
       if (result === SOLO_V2_API_RESULT.SUCCESS && status === "resolved" && payload?.result) {
+        terminalPopupEligibleRef.current = true;
         setResolvedResult(payload.result);
         setEventInfo(null);
         setSession(previous =>
@@ -1010,6 +1138,136 @@ export default function MysteryBoxPage() {
   const wagerPlayable =
     vaultReady && numericWager >= MYSTERY_BOX_MIN_WAGER && vaultBalance >= numericWager;
 
+  const inActiveRunUi = [
+    UI_STATE.SESSION_CREATED,
+    UI_STATE.CHOICE_SELECTED,
+    UI_STATE.CHOICE_SUBMITTED,
+    UI_STATE.SUBMITTING_CHOICE,
+    UI_STATE.RESOLVING,
+    UI_STATE.LOADING,
+  ].includes(uiState);
+
+  const runEntryFromSession =
+    session != null &&
+    Number(session.entryAmount) >= MYSTERY_BOX_MIN_WAGER &&
+    Number.isFinite(Number(session.entryAmount))
+      ? Math.floor(Number(session.entryAmount))
+      : null;
+
+  const sessionLocksSummary = runEntryFromSession != null && inActiveRunUi;
+
+  const potentialWin = Math.floor(numericWager * MYSTERY_BOX_WIN_MULTIPLIER);
+  const summaryPlay = sessionLocksSummary ? runEntryFromSession : numericWager;
+  const summaryWin = sessionLocksSummary
+    ? Math.floor(Number(summaryPlay) * MYSTERY_BOX_WIN_MULTIPLIER)
+    : potentialWin;
+
+  const idleLike =
+    uiState === UI_STATE.IDLE ||
+    uiState === UI_STATE.UNAVAILABLE ||
+    uiState === UI_STATE.PENDING_MIGRATION ||
+    uiState === UI_STATE.RESOLVED;
+  const stakeExceedsVault =
+    vaultReady &&
+    idleLike &&
+    numericWager >= MYSTERY_BOX_MIN_WAGER &&
+    vaultBalance < numericWager;
+  const stakeHint = stakeExceedsVault
+    ? `Stake exceeds available vault (${formatCompact(vaultBalance)}). Lower amount to play.`
+    : "";
+
+  const isOpening = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
+  const strip = mysteryBoxRoundStripModel(uiState);
+
+  let statusTop = "Press OPEN BOX when you are set.";
+  let statusSub =
+    "One of three boxes holds the prize. Choose A, B, or C, set your play below, then open — the server seals the winning box.";
+  let hintLine = `Fair ×${MYSTERY_BOX_WIN_MULTIPLIER} on a hit — three boxes, ~${MYSTERY_BOX_IMPLIED_RTP_PERCENT}% RTP target.`;
+
+  if (uiState === UI_STATE.UNAVAILABLE) {
+    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
+    statusSub = !vaultReady
+      ? "Shared vault could not be opened. Return to the arcade and try again."
+      : String(errorMessage || "").trim() || "Check your balance and connection, then try OPEN BOX again.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.LOADING) {
+    statusTop = "Starting round…";
+    statusSub = "Opening or resuming a session with the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.SUBMITTING_CHOICE) {
+    statusTop = "Locking your pick…";
+    statusSub = "Sending your box choice to the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.CHOICE_SUBMITTED || isOpening) {
+    statusTop = "Opening…";
+    statusSub = "The server reveals which box held the prize.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    statusTop = resolvedResult.isWin ? "You found the prize box." : "Not the prize box this time.";
+    statusSub =
+      "Round is complete. Change box or stake, then press OPEN BOX for another round.";
+    hintLine = resolvedResult.isWin
+      ? "Vault credit applied after settlement."
+      : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
+  } else if (uiState === UI_STATE.SESSION_CREATED || uiState === UI_STATE.CHOICE_SELECTED) {
+    statusTop = hasValidBox ? "Ready to open." : "Choose a box.";
+    statusSub = hasValidBox
+      ? "Press OPEN BOX to lock your pick and reveal the prize box on the server."
+      : "Tap A, B, or C, then open from the footer.";
+  } else if (uiState === UI_STATE.RESOLVE_FAILED) {
+    statusTop = "Could not resolve.";
+    statusSub = "Check your connection and try OPEN BOX again.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
+    statusTop = "Migration pending.";
+    statusSub = "This environment is updating. Try again shortly.";
+    hintLine = "\u00a0";
+  }
+
+  let payoutBandLabel = "Payout if win";
+  let payoutBandValue = formatCompact(summaryWin);
+  let payoutCaption = `×${MYSTERY_BOX_WIN_MULTIPLIER} multiplier · play ${formatCompact(summaryPlay)}`;
+
+  if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary?.payoutReturn ?? 0)));
+    payoutBandLabel = resolvedResult.isWin ? "Return paid" : "Return this round";
+    payoutBandValue = formatCompact(pr);
+    const ob = resolvedResult.outcome;
+    const winIx = ob === 0 || ob === 1 || ob === 2 ? ob : null;
+    const pickIx =
+      resolvedResult.choice === 0 || resolvedResult.choice === 1 || resolvedResult.choice === 2
+        ? resolvedResult.choice
+        : null;
+    payoutCaption =
+      winIx != null && pickIx != null
+        ? `Prize ${["A", "B", "C"][winIx]} · your pick ${["A", "B", "C"][pickIx]}`
+        : "Round settled.";
+  }
+
+  const resolvedIsWin = Boolean(resolvedResult?.isWin);
+  const deltaVault = Number(resolvedResult?.settlementSummary?.netDelta ?? 0);
+  const resultVaultLabel =
+    resolvedResult?.settlementSummary != null ? `${deltaVault > 0 ? "+" : ""}${formatCompact(deltaVault)}` : "";
+
+  const pickedIxForPopup =
+    resolvedResult?.choice === 0 || resolvedResult?.choice === 1 || resolvedResult?.choice === 2
+      ? resolvedResult.choice
+      : null;
+  let popupTitle = "—";
+  let popupLine2 = "—";
+  let popupLine3 = "—";
+  if (resolvedResult) {
+    const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary?.payoutReturn ?? 0)));
+    const ob = resolvedResult.outcome;
+    const winIx = ob === 0 || ob === 1 || ob === 2 ? ob : null;
+    popupTitle = resolvedIsWin ? "YOU WIN" : "YOU LOSE";
+    popupLine2 = `Return ${formatCompact(pr)}`;
+    popupLine3 =
+      pickedIxForPopup != null && winIx != null
+        ? `Pick ${["A", "B", "C"][pickedIxForPopup]} · prize was ${["A", "B", "C"][winIx]}`
+        : "Round complete";
+  }
+
   useEffect(() => {
     if (!wagerPlayable) return;
     setErrorMessage(prev => {
@@ -1033,6 +1291,12 @@ export default function MysteryBoxPage() {
       UI_STATE.RESOLVING,
       UI_STATE.PENDING_MIGRATION,
     ].includes(uiState);
+
+  const busyFooter =
+    uiState === UI_STATE.LOADING ||
+    uiState === UI_STATE.SUBMITTING_CHOICE ||
+    uiState === UI_STATE.CHOICE_SUBMITTED ||
+    uiState === UI_STATE.RESOLVING;
 
   const isPrimaryLoading =
     uiState === UI_STATE.LOADING || uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
@@ -1063,9 +1327,6 @@ export default function MysteryBoxPage() {
       void runOneClickRound();
     }
   }
-
-  const isOpening = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
-  const potentialWin = Math.floor(numericWager * MYSTERY_BOX_WIN_MULTIPLIER);
 
   const winningBoxResolved =
     uiState === UI_STATE.RESOLVED && resolvedResult?.outcome !== null && resolvedResult?.outcome !== undefined
@@ -1101,8 +1362,12 @@ export default function MysteryBoxPage() {
   return (
     <SoloV2GameShell
       title="Mystery Box"
-      subtitle="Arcade Solo"
+      subtitle="Three boxes — the server seals the prize before you see it."
+      layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
+      mobileHeaderBreathingRoom
+      stableTripleTopSummary
       gameplayScrollable={false}
+      gameplayDesktopUnclipVertical
       menuVaultBalance={vaultBalance}
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
@@ -1112,14 +1377,16 @@ export default function MysteryBoxPage() {
       }}
       topGameStatsSlot={
         <>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Play <span className="font-semibold tabular-nums text-amber-200/90">{formatCompact(numericWager)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Play</span>
+            <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
           </span>
           <span className="shrink-0 text-zinc-600" aria-hidden>
             ·
           </span>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Win <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(potentialWin)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Win</span>
+            <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
           </span>
         </>
       }
@@ -1127,7 +1394,9 @@ export default function MysteryBoxPage() {
         betPresets: BET_PRESETS,
         wagerInput,
         wagerNumeric: numericWager,
-        canEditPlay: !isOpening,
+        canEditPlay: !busyFooter,
+        compactAmountDisplayWhenBlurred: true,
+        formatPresetLabel: v => formatCompact(v),
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
@@ -1157,14 +1426,30 @@ export default function MysteryBoxPage() {
         primaryActionLoading: isPrimaryLoading,
         primaryLoadingLabel: "OPENING...",
         onPrimaryAction: handlePrimaryCta,
-        errorMessage,
+        errorMessage: errorMessage || stakeHint,
       }}
+      soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
         <MysteryBoxGameplayPanel
           uiState={uiState}
           selectedBox={selectedBox}
           isOpening={isOpening}
-          resultToast={resultToast}
+          resultPopupOpen={resultPopupOpen}
+          resolvedIsWin={resolvedIsWin}
+          resultVaultLabel={resultVaultLabel}
+          popupTitle={popupTitle}
+          popupLine2={popupLine2}
+          popupLine3={popupLine3}
+          sessionNotice={sessionNotice}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          hintLine={hintLine}
+          stepTotal={strip.stepTotal}
+          stepsComplete={strip.stepsComplete}
+          currentStepIndex={strip.currentStepIndex}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           onSelectBox={handleSelectBox}
           winningBoxIndex={Number.isFinite(winningBoxResolved) ? winningBoxResolved : null}
           pickedBoxIndex={
@@ -1176,21 +1461,30 @@ export default function MysteryBoxPage() {
       }
       helpContent={
         <div className="space-y-2">
-          <p>1. Tap a box (A, B, or C).</p>
-          <p>2. Set your play amount and press OPEN BOX.</p>
-          <p>3. The server picks the winning box. If it matches your pick, you win.</p>
-          <p>Win pays about ×2.88 on your play (three boxes, ~96% RTP target).</p>
-          <p>Vault updates after the server result, same shared vault as other Solo V2 games.</p>
+          <p>
+            Mystery Box is a single round: choose box A, B, or C, set your play, then press OPEN BOX. The server picks
+            which box held the prize before your client shows the outcome; the shared vault updates from that result.
+          </p>
+          <p>
+            A winning pick pays ×{MYSTERY_BOX_WIN_MULTIPLIER} on your stake ({MYSTERY_BOX_IMPLIED_RTP_PERCENT}% RTP
+            design). Gift rounds use freeplay: a loss does not debit your vault; a win credits the full payout.
+          </p>
+          <p>
+            After a round, the board stays on the reveal until you start again — change box or stake and press OPEN BOX;
+            there is no auto-start.
+          </p>
         </div>
       }
       statsContent={
         <div className="space-y-2">
           <p>Total games: {stats.totalGames}</p>
+          <p>Wins: {stats.wins}</p>
+          <p>Losses: {stats.losses}</p>
           <p>Win rate: {stats.totalGames ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : "0.0"}%</p>
-          <p>Total play: {formatCompact(stats.totalPlay)}</p>
-          <p>Total won: {formatCompact(stats.totalWon)}</p>
+          <p>Total played: {formatCompact(stats.totalPlay)}</p>
+          <p>Total returned: {formatCompact(stats.totalWon)}</p>
           <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
-          <p>Net profit: {formatCompact(stats.totalWon - stats.totalPlay)}</p>
+          <p>Net flow (returned − played): {formatCompact(stats.totalWon - stats.totalPlay)}</p>
         </div>
       }
       resultState={null}
