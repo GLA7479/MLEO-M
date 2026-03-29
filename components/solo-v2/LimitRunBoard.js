@@ -95,7 +95,7 @@ export default function LimitRunBoard({
   };
 
   return (
-    <div className="flex w-full shrink-0 flex-col overflow-hidden">
+    <div className="flex w-full min-h-0 flex-col overflow-hidden max-lg:flex-1 lg:shrink-0">
       <style>{`
         .lr-hero-num { font-size: clamp(1.9rem, 8.5vw, 2.7rem); line-height: 1.02; }
         @media (min-width: 640px) {

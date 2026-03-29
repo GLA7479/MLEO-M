@@ -21,6 +21,11 @@ export default function DicePickBoard({
   mergedPlayfieldSlot = null,
   /** React keys for `SoloV2ProgressStrip` steps; must be unique per route when this board is reused. */
   progressStripKeyPrefix = "dp",
+  /**
+   * Omits the mobile-only (`lg:hidden`) in-board payout band; shell header already shows Play / Max win.
+   * The `flex-1` playfield below grows into the freed space. Unchanged at `lg+` (band was already hidden).
+   */
+  hideMobilePayoutBand = false,
 }) {
   const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
   const cleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
@@ -62,23 +67,25 @@ export default function DicePickBoard({
         stepLabels={stepLabels}
       />
 
-      <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
-        <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
-          <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">
-            <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
-              {payoutBandLabel}
-            </span>
-            <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
-              {payoutBandValue}
-            </span>
+      {!hideMobilePayoutBand ? (
+        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
+          <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
+            <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">
+              <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
+                {payoutBandLabel}
+              </span>
+              <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
+                {payoutBandValue}
+              </span>
+            </div>
+            <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
+              <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
+                {payoutCaption || "\u00a0"}
+              </span>
+            </p>
           </div>
-          <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
-            <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
-              {payoutCaption || "\u00a0"}
-            </span>
-          </p>
         </div>
-      </div>
+      ) : null}
 
       {mergedPlayfieldSlot != null ? (
         <div className="flex min-h-0 flex-1 flex-col px-2 pb-0.5 pt-0 lg:px-4 lg:py-3 lg:pb-3">{mergedPlayfieldSlot}</div>

@@ -125,7 +125,8 @@ function limitRunRoundStripModel(uiState, readState) {
 
 /**
  * Ladder-family shell — mirrors Gold Rush Digger; inner board keeps limbo / target-roll identity.
- * Approved exception: inner playfield wrappers use shrink-0 flex (not the dig-style flex-1 / min-h chain) for limbo UI — keep unless a design pass explicitly retargets vertical fill.
+ * Mobile: playfield column uses flex-1 so height freed by removing the duplicate payout band flows into the board.
+ * Desktop (`lg+`): wrappers stay shrink-0 / flex-none as before.
  */
 function LimitRunGameplayPanel({
   session,
@@ -142,9 +143,6 @@ function LimitRunGameplayPanel({
   stepsComplete,
   currentStepIndex,
   stepLabels,
-  payoutBandLabel,
-  payoutBandValue,
-  payoutCaption,
   onRoll,
   rollDisabled,
   resultPopupOpen,
@@ -198,31 +196,13 @@ function LimitRunGameplayPanel({
           stepLabels={stepLabels}
         />
 
-        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
-          <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
-            <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">
-              <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
-                {payoutBandLabel}
-              </span>
-              <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
-                {payoutBandValue}
-              </span>
-            </div>
-            <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
-              <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
-                {payoutCaption || "\u00a0"}
-              </span>
-            </p>
-          </div>
-        </div>
-
         {/* Approved inner flex variation (see LimitRunGameplayPanel JSDoc) — do not “normalize” to Gold Rush dig-grid flex. */}
-        <div className="flex shrink-0 flex-col px-1 pb-1 sm:px-2 lg:px-4 lg:pb-1.5">
+        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:flex-none lg:shrink-0 lg:px-4 lg:pb-1.5">
           <div
-            className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:flex-none lg:shrink-0"
             aria-label="Limit Run playfield"
           >
-            <div className="shrink-0 px-0.5 py-1 sm:px-1 sm:py-1.5 lg:px-1 lg:py-0.5">
+            <div className="flex min-h-0 flex-1 flex-col px-0.5 py-1 sm:px-1 sm:py-1.5 lg:flex-none lg:shrink-0 lg:px-1 lg:py-0.5">
               <LimitRunBoard
                 targetMultiplier={targetMultiplier}
                 onTargetChange={onTargetChange}
@@ -963,7 +943,6 @@ export default function LimitRunPage() {
   }
 
   const strip = limitRunRoundStripModel(uiState, readState);
-  const winChanceNow = limboWinChancePercent(targetMultiplier);
 
   let statusTop = "Press START RUN when you are set.";
   let statusSub =
@@ -1003,18 +982,11 @@ export default function LimitRunPage() {
 
   let payoutBandLabel = "Payout if win";
   let payoutBandValue = formatCompact(summaryWin);
-  let payoutCaption = `Target ×${Number(targetMultiplier).toFixed(2)} · ~${winChanceNow.toFixed(2)}% hit`;
 
   if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
     const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
     payoutBandLabel = resolvedResult.isWin || resolvedResult.won ? "Return paid" : "Return this round";
     payoutBandValue = formatCompact(pr);
-    const rr0 = Number(resolvedResult.rollMultiplier);
-    const tt0 = Number(resolvedResult.targetMultiplier);
-    payoutCaption =
-      Number.isFinite(rr0) && Number.isFinite(tt0)
-        ? `Rolled ×${rr0.toFixed(2)} vs target ×${tt0.toFixed(2)}`
-        : "Round settled";
   }
 
   const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.won);
@@ -1179,9 +1151,6 @@ export default function LimitRunPage() {
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}
           stepLabels={["Target", "Roll"]}
-          payoutBandLabel={payoutBandLabel}
-          payoutBandValue={payoutBandValue}
-          payoutCaption={payoutCaption}
           onRoll={handleRoll}
           rollDisabled={rollDisabled}
           resultPopupOpen={resultPopupOpen}
