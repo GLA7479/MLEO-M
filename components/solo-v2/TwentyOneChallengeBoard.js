@@ -228,40 +228,69 @@ export default function TwentyOneChallengeBoard({
         <div className="h-0 min-h-0 shrink-0 sm:min-h-[0.85rem]" aria-hidden />
       ) : null}
 
-      <div
-        className="flex min-h-0 flex-1 flex-col justify-start gap-1 sm:gap-2"
-      >
-        {!splitLayout ? (
-          <>
-            <div className="shrink-0 max-sm:pt-1">
-              <div className="mb-0.5 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:mb-0 sm:text-[9px]">
-                Opponent
-              </div>
-              <div className="flex h-[5.75rem] min-h-0 flex-wrap items-center justify-center gap-1 py-0.5 sm:h-[4.65rem] sm:gap-1.5">
-                {opponentRow.length === 0 ? (
-                  <div className="text-xs text-white/35">—</div>
-                ) : (
-                  opponentRow.map(({ key, code, hidden, pulse }) => (
-                    <MiniCard
-                      key={key}
-                      code={code}
-                      hidden={hidden}
-                      variant="dealer"
-                      dealAnimate={pulse}
-                      compact={false}
-                    />
-                  ))
-                )}
-              </div>
-              <div className="mt-0 min-h-[1.05rem] text-[11px] font-bold tabular-nums leading-tight text-white/85 sm:text-xs">
-                {opponentTotalLine}
-              </div>
+      {/* Hand tabs float over the left edge; card rows stay full-width centered — same geometric center as single-hand */}
+      <div className="relative flex min-h-0 flex-1 flex-col justify-start gap-1 sm:gap-2">
+        {splitLayout ? (
+          <div
+            className="absolute left-0 top-0 z-20 flex w-[3.65rem] flex-col items-stretch gap-1.5 pt-0.5"
+            role="tablist"
+            aria-label="Choose hand to view"
+          >
+            {hands.map((_, hi) => {
+              const playingHere = hi === ai;
+              const selected = hi === mobileViewHandIndex;
+              return (
+                <button
+                  key={`mhand-tab-${hi}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setMobileViewHandIndex(hi)}
+                  className={`w-full rounded-lg border px-1 py-2 text-[9px] font-bold uppercase leading-tight transition ${
+                    selected
+                      ? "border-amber-400/60 bg-amber-500/15 text-amber-100"
+                      : "border-white/15 bg-white/[0.06] text-white/70"
+                  } ${playingHere ? "ring-1 ring-amber-400/70 ring-offset-1 ring-offset-zinc-950" : ""}`}
+                >
+                  <span className="block">Hand {hi + 1}</span>
+                  {playingHere ? (
+                    <span className="mt-0.5 block text-[8px] font-extrabold text-amber-200">Play</span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-1 pt-0">
+          <div className="shrink-0 max-sm:pt-1">
+            <div className="mb-0.5 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:mb-0 sm:text-[9px]">
+              Opponent
             </div>
-
-            <div className="shrink-0">
-              <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-amber-200/50 sm:text-[9px]">
-                You
-              </div>
+            <div className="flex h-[5.75rem] min-h-0 w-full flex-wrap items-center justify-center gap-1 py-0.5 sm:h-[4.65rem] sm:gap-1.5">
+              {opponentRow.length === 0 ? (
+                <div className="text-xs text-white/35">—</div>
+              ) : (
+                opponentRow.map(({ key, code, hidden, pulse }) => (
+                  <MiniCard
+                    key={key}
+                    code={code}
+                    hidden={hidden}
+                    variant="dealer"
+                    dealAnimate={pulse}
+                    compact={false}
+                  />
+                ))
+              )}
+            </div>
+            <div className="mt-0 min-h-[1.05rem] text-[11px] font-bold tabular-nums leading-tight text-white/85 sm:text-xs">
+              {opponentTotalLine}
+            </div>
+          </div>
+          <div className="shrink-0">
+            <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-amber-200/50 sm:text-[9px]">
+              You
+            </div>
+            {!splitLayout ? (
               <div className="flex flex-col gap-0 sm:gap-0.5">
                 {hands.length === 0 ? (
                   <div className="flex h-[7.35rem] items-center justify-center text-xs text-white/35 sm:h-[5.6rem]">
@@ -275,90 +304,26 @@ export default function TwentyOneChallengeBoard({
                       hand={h}
                       pulses={pulses}
                       compactCards={false}
-                      cardRowClassName="flex h-[7.2rem] min-h-0 flex-wrap items-center justify-center gap-1 sm:h-[5.45rem] sm:gap-1.5"
+                      cardRowClassName="flex h-[7.2rem] min-h-0 w-full flex-wrap items-center justify-center gap-1 sm:h-[5.45rem] sm:gap-1.5"
                     />
                   ))
                 )}
               </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex min-h-0 flex-1 flex-row items-stretch gap-2">
-              <div
-                className="flex w-[3.65rem] shrink-0 flex-col items-stretch justify-start gap-1.5 self-start pt-0"
-                role="tablist"
-                aria-label="Choose hand to view"
-              >
-                {hands.map((_, hi) => {
-                  const playingHere = hi === ai;
-                  const selected = hi === mobileViewHandIndex;
-                  return (
-                    <button
-                      key={`mhand-tab-${hi}`}
-                      type="button"
-                      role="tab"
-                      aria-selected={selected}
-                      onClick={() => setMobileViewHandIndex(hi)}
-                      className={`w-full rounded-lg border px-1 py-2 text-[9px] font-bold uppercase leading-tight transition ${
-                        selected
-                          ? "border-amber-400/60 bg-amber-500/15 text-amber-100"
-                          : "border-white/15 bg-white/[0.06] text-white/70"
-                      } ${playingHere ? "ring-1 ring-amber-400/70 ring-offset-1 ring-offset-zinc-950" : ""}`}
-                    >
-                      <span className="block">Hand {hi + 1}</span>
-                      {playingHere ? (
-                        <span className="mt-0.5 block text-[8px] font-extrabold text-amber-200">Play</span>
-                      ) : null}
-                    </button>
-                  );
-                })}
+            ) : hands.length === 0 ? (
+              <div className="flex h-[7.35rem] items-center justify-center text-xs text-white/35 sm:h-[5.6rem]">
+                —
               </div>
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1 pt-0">
-                <div className="shrink-0 max-sm:pt-1">
-                  <div className="mb-0.5 text-[8px] font-bold uppercase tracking-wider text-white/40 sm:mb-0 sm:text-[9px]">
-                    Opponent
-                  </div>
-                  <div className="flex h-[5.75rem] min-h-0 flex-wrap items-center justify-center gap-1 py-0.5 sm:h-[4.65rem] sm:gap-1.5">
-                    {opponentRow.length === 0 ? (
-                      <div className="text-xs text-white/35">—</div>
-                    ) : (
-                      opponentRow.map(({ key, code, hidden, pulse }) => (
-                        <MiniCard
-                          key={key}
-                          code={code}
-                          hidden={hidden}
-                          variant="dealer"
-                          dealAnimate={pulse}
-                          compact={false}
-                        />
-                      ))
-                    )}
-                  </div>
-                  <div className="mt-0 min-h-[1.05rem] text-[11px] font-bold tabular-nums leading-tight text-white/85 sm:text-xs">
-                    {opponentTotalLine}
-                  </div>
-                </div>
-                <div className="shrink-0">
-                  <div className="mb-0 text-[8px] font-bold uppercase tracking-wider text-amber-200/50 sm:text-[9px]">
-                    You
-                  </div>
-                  {hands.length === 0 ? (
-                    <div className="flex h-[7.35rem] items-center justify-center text-xs text-white/35">—</div>
-                  ) : (
-                    <ChallengePlayerHandBlock
-                      handIndex={mobileViewHandIndex}
-                      hand={hands[mobileViewHandIndex]}
-                      pulses={pulses}
-                      compactCards={false}
-                      cardRowClassName="flex h-[7.2rem] min-h-0 flex-wrap items-center justify-center gap-1 sm:h-[5.45rem] sm:gap-1.5"
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+            ) : (
+              <ChallengePlayerHandBlock
+                handIndex={mobileViewHandIndex}
+                hand={hands[mobileViewHandIndex]}
+                pulses={pulses}
+                compactCards={false}
+                cardRowClassName="flex h-[7.2rem] min-h-0 w-full flex-wrap items-center justify-center gap-1 sm:h-[5.45rem] sm:gap-1.5"
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       <div className={`${ACTION_MIN_H} mt-auto shrink-0 border-t border-zinc-700/40 pb-0.5 pt-2`}>
