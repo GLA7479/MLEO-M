@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import DicePickBoard from "../components/solo-v2/DicePickBoard";
 import DicePickDisplay from "../components/solo-v2/DicePickDisplay";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -13,7 +14,10 @@ import {
 } from "../lib/solo-v2/soloV2GiftStorage";
 import { useSoloV2GiftShellState } from "../lib/solo-v2/useSoloV2GiftShellState";
 import { QUICK_FLIP_CONFIG } from "../lib/solo-v2/quickFlipConfig";
-import { DICE_PICK_MIN_WAGER, DICE_PICK_WIN_MULTIPLIER } from "../lib/solo-v2/dicePickConfig";
+import {
+  DICE_PICK_MIN_WAGER,
+  DICE_PICK_WIN_MULTIPLIER,
+} from "../lib/solo-v2/dicePickConfig";
 import {
   applyDicePickSettlementOnce,
   readQuickFlipSharedVaultBalance,
@@ -51,6 +55,7 @@ function dicePickDebug(label, data) {
 const STATS_KEY = "solo_v2_dice_pick_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
+const REVEAL_READABLE_MS = 520;
 
 /** Parsed numeric wager from the amount field (0 if empty/invalid). No minimum — playability is gated separately. */
 function parseWagerInput(raw) {
@@ -111,104 +116,149 @@ function writeDicePickStats(nextStats) {
   }
 }
 
-function ChoiceButton({ label, sub, value, selectedChoice, disabled, onSelect }) {
-  const isSelected = selectedChoice === value;
+/** LOW / HIGH — Quick Flip tile rhythm. */
+function DiceZoneTile({ label, sub, value, selectedZone, disabled, onSelect }) {
+  const isSelected = selectedZone === value;
+  const isLow = value === "low";
+  const shell =
+    "group relative flex h-full min-h-[5.25rem] w-full flex-col items-center justify-center rounded-2xl border-2 text-center shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-150 sm:min-h-[6.1rem] sm:rounded-[1.05rem] lg:min-h-[7.35rem] lg:rounded-[1.12rem]";
+
+  let face =
+    "border-amber-700/45 bg-gradient-to-b from-zinc-800/95 to-zinc-950 text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ";
+  if (isSelected && isLow) {
+    face =
+      "border-sky-400/65 bg-gradient-to-b from-sky-900/45 to-zinc-950 text-sky-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(56,189,248,0.15)] ring-2 ring-inset ring-sky-400/20 ";
+  } else if (isSelected && !isLow) {
+    face =
+      "border-orange-400/65 bg-gradient-to-b from-orange-900/45 to-zinc-950 text-orange-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(251,146,60,0.15)] ring-2 ring-inset ring-orange-400/20 ";
+  } else {
+    face +=
+      "enabled:hover:border-amber-500/55 enabled:hover:from-zinc-800 enabled:hover:to-zinc-950 enabled:active:scale-[0.98] ";
+  }
 
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={() => onSelect(value)}
-      className={`flex min-h-[48px] flex-col items-center justify-center rounded-lg border px-2 py-1.5 text-sm font-bold transition sm:min-h-[52px] ${
-        isSelected
-          ? "border-amber-400/50 bg-amber-500/25 text-amber-50"
-          : "border-white/25 bg-white/[0.06] text-zinc-100 hover:bg-white/12"
-      } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
+      className={`${shell} ${face}${
+        disabled ? "cursor-not-allowed opacity-[0.42] " : ""
+      }focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/35`}
     >
-      <span>{label}</span>
-      {sub ? <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide opacity-80">{sub}</span> : null}
+      <span className="text-base font-black uppercase tracking-wide sm:text-lg lg:text-xl">{label}</span>
+      {sub ? (
+        <span className="mt-1 text-[8px] font-semibold uppercase tracking-[0.14em] text-white/38 sm:text-[9px] lg:text-[10px]">
+          {sub}
+        </span>
+      ) : null}
     </button>
   );
 }
 
-function formatPickedZoneLine(zone) {
-  const z = String(zone || "").toLowerCase();
-  if (z === "low") return "Your pick: LOW (1–3)";
-  if (z === "high") return "Your pick: HIGH (4–6)";
-  return "Your pick: —";
+function dicePickRoundStripModel(uiState) {
+  const stepTotal = 2;
+  if (uiState === UI_STATE.RESOLVED) {
+    return { stepTotal, stepsComplete: 2, currentStepIndex: 1 };
+  }
+  if (
+    uiState === UI_STATE.SUBMITTING_CHOICE ||
+    uiState === UI_STATE.CHOICE_SUBMITTED ||
+    uiState === UI_STATE.RESOLVING
+  ) {
+    return { stepTotal, stepsComplete: 1, currentStepIndex: 1 };
+  }
+  return { stepTotal, stepsComplete: 0, currentStepIndex: 0 };
 }
 
-/** Center gameplay — shell owns header, wager, CTA. */
 function DicePickGameplayPanel({
   uiState,
   selectedZone,
   isRolling,
-  resultToast,
   onSelectZone,
   resolvedRoll,
-  resolvedIsWin,
-  pickedZone,
   resultPopupOpen,
+  resolvedIsWin,
+  resultVaultLabel,
+  popupTitle,
+  popupLine2,
+  popupLine3,
+  sessionNotice,
+  statusTop,
+  statusSub,
+  hintLine,
+  stepTotal,
+  stepsComplete,
+  currentStepIndex,
+  payoutBandLabel,
+  payoutBandValue,
+  payoutCaption,
 }) {
   const isChoiceLocked = uiState === UI_STATE.CHOICE_SUBMITTED;
   const canChoose = !isRolling && uiState !== UI_STATE.LOADING && !isChoiceLocked;
 
   const dicePhase = isRolling ? "rolling" : resolvedRoll != null ? "resolved" : "idle";
 
-  const showResultPopup =
-    resultPopupOpen &&
-    resolvedRoll != null &&
-    typeof resolvedIsWin === "boolean";
-
   return (
-    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center py-2 sm:py-4">
-          <DicePickDisplay phase={dicePhase} resolvedRoll={resolvedRoll} />
-        </div>
-
-        <div className="w-full shrink-0 space-y-2.5 pb-2 sm:space-y-3 sm:pb-3">
-          <div className="grid w-full grid-cols-2 gap-2">
-            <ChoiceButton
-              label="LOW"
-              sub="1–3"
-              value="low"
-              selectedChoice={selectedZone}
-              disabled={!canChoose}
-              onSelect={onSelectZone}
-            />
-            <ChoiceButton
-              label="HIGH"
-              sub="4–6"
-              value="high"
-              selectedChoice={selectedZone}
-              disabled={!canChoose}
-              onSelect={onSelectZone}
-            />
-          </div>
-        </div>
+        <DicePickBoard
+          sessionNotice={sessionNotice}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          stepTotal={stepTotal}
+          currentStepIndex={currentStepIndex}
+          stepsComplete={stepsComplete}
+          stepLabels={["Choose", "Roll"]}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
+          hintLine={hintLine}
+          diceSlot={
+            <DicePickDisplay phase={dicePhase} resolvedRoll={resolvedRoll} hideSubcaption />
+          }
+          choiceSlot={
+            <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Pick zone">
+              <DiceZoneTile
+                label="LOW"
+                sub="1–3"
+                value="low"
+                selectedZone={selectedZone}
+                disabled={!canChoose}
+                onSelect={onSelectZone}
+              />
+              <DiceZoneTile
+                label="HIGH"
+                sub="4–6"
+                value="high"
+                selectedZone={selectedZone}
+                disabled={!canChoose}
+                onSelect={onSelectZone}
+              />
+            </div>
+          }
+        />
       </div>
 
       <SoloV2ResultPopup
-        open={showResultPopup}
+        open={resultPopupOpen}
         isWin={resolvedIsWin}
-        animationKey={`${resolvedRoll}-${resolvedIsWin}`}
+        resultTone={resolvedIsWin ? "win" : "lose"}
+        animationKey={`${popupLine2}-${popupLine3}-${resultVaultLabel}`}
         vaultSlot={
-          <SoloV2ResultPopupVaultLine
-            isWin={resolvedIsWin}
-            deltaLabel={resultToast?.deltaLabel}
-          />
+          resultPopupOpen ? (
+            <SoloV2ResultPopupVaultLine
+              isWin={resolvedIsWin}
+              tone={resolvedIsWin ? "win" : "lose"}
+              deltaLabel={resultVaultLabel}
+            />
+          ) : undefined
         }
       >
-        <div className="text-[13px] font-black uppercase tracking-wide">
-          {resolvedIsWin ? "YOU WIN" : "YOU LOSE"}
+        <div className="text-[13px] font-black uppercase tracking-wide">{popupTitle}</div>
+        <div className="mt-1 text-sm font-bold text-white">
+          <span className="text-amber-100 tabular-nums">{popupLine2}</span>
         </div>
-        <div className="mt-1 text-sm font-bold tabular-nums text-white">
-          Rolled <span className="text-amber-100">{resolvedRoll}</span>
-        </div>
-        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">
-          {formatPickedZoneLine(pickedZone)}
-        </div>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">{popupLine3}</div>
       </SoloV2ResultPopup>
     </div>
   );
@@ -224,15 +274,16 @@ export default function DicePickPage() {
   const [eventInfo, setEventInfo] = useState(null);
   const [resolvedResult, setResolvedResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [, setSessionNotice] = useState("");
+  const [sessionNotice, setSessionNotice] = useState("");
   const [vaultBalance, setVaultBalance] = useState(0);
   const [vaultReady, setVaultReady] = useState(false);
   const [wagerInput, setWagerInput] = useState(String(DICE_PICK_MIN_WAGER));
   const lastPresetAmountRef = useRef(null);
   const [stats, setStats] = useState(readDicePickStats);
-  const [resultToast, setResultToast] = useState(null);
-  const [dicePickResultPopupOpen, setDicePickResultPopupOpen] = useState(false);
-  const toastTimerRef = useRef(null);
+  const [resultPopupOpen, setResultPopupOpen] = useState(false);
+  const resultPopupTimerRef = useRef(null);
+  /** True only after a fresh client resolve — avoids auto-opening the terminal popup on resumed resolved sessions. */
+  const terminalPopupEligibleRef = useRef(false);
   const createInFlightRef = useRef(false);
   const submitInFlightRef = useRef(false);
   const resolveInFlightRef = useRef(false);
@@ -277,23 +328,32 @@ export default function DicePickPage() {
 
   useEffect(() => {
     return () => {
-      if (toastTimerRef.current) {
-        clearTimeout(toastTimerRef.current);
+      if (resultPopupTimerRef.current) {
+        clearTimeout(resultPopupTimerRef.current);
       }
     };
   }, []);
 
-  useEffect(() => {
-    if (uiState !== UI_STATE.RESOLVED || !resolvedResult?.sessionId) return undefined;
-    setDicePickResultPopupOpen(true);
-    const t = window.setTimeout(() => {
-      setDicePickResultPopupOpen(false);
-      resetRoundAfterResultPopup();
-    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
-    return () => window.clearTimeout(t);
-  }, [uiState, resolvedResult?.sessionId, resolvedResult?.roll, resolvedResult?.isWin, resolvedResult?.resolvedAt]);
+  const dismissResultPopupAfterTerminalRun = useCallback(() => {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setResultPopupOpen(false);
+  }, []);
 
-  /** After the result popup closes: clear terminal session, keep zone + wager so one ROLL starts a new round. */
+  const openResultPopup = useCallback(() => {
+    if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+    setResultPopupOpen(true);
+    resultPopupTimerRef.current = window.setTimeout(() => {
+      resultPopupTimerRef.current = null;
+      dismissResultPopupAfterTerminalRun();
+    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+  }, [dismissResultPopupAfterTerminalRun]);
+
+  /** Hard reset when vault settlement fails or stale recovery — not used on normal popup dismiss. */
   function resetRoundAfterResultPopup() {
     createInFlightRef.current = false;
     submitInFlightRef.current = false;
@@ -301,7 +361,7 @@ export default function DicePickPage() {
     setSession(null);
     setEventInfo(null);
     setResolvedResult(null);
-    setResultToast(null);
+    setResultPopupOpen(false);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
   }
@@ -315,7 +375,7 @@ export default function DicePickPage() {
     setSelectedZone("");
     setEventInfo(null);
     setResolvedResult(null);
-    setResultToast(null);
+    setResultPopupOpen(false);
     setSessionNotice("");
     setUiState(UI_STATE.IDLE);
     setErrorMessage(
@@ -336,6 +396,11 @@ export default function DicePickPage() {
       if (settlementResult.error) {
         setErrorMessage(settlementResult.error);
         setSessionNotice("Result resolved, but vault update failed.");
+        terminalPopupEligibleRef.current = false;
+        if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+        resultPopupTimerRef.current = setTimeout(() => {
+          resetRoundAfterResultPopup();
+        }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
         return;
       }
 
@@ -367,14 +432,15 @@ export default function DicePickPage() {
         setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
       }
 
-      const toastDelta = Number(settlementSummary.netDelta || 0);
-      const toastDeltaLabel = toastDelta >= 0 ? `+${toastDelta}` : `${toastDelta}`;
-      setResultToast({
-        isWin: Boolean(resolvedResult?.isWin),
-        deltaLabel: toastDeltaLabel,
-      });
+      const shouldOpenTerminalPopup = terminalPopupEligibleRef.current;
+      terminalPopupEligibleRef.current = false;
+      if (shouldOpenTerminalPopup) {
+        window.setTimeout(() => {
+          openResultPopup();
+        }, REVEAL_READABLE_MS);
+      }
     });
-  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState]);
+  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id, uiState, openResultPopup]);
 
   function hydrateResolvedFromSession(sessionPayload) {
     const fromDice = sessionPayload?.dicePick?.resolvedResult;
@@ -510,6 +576,11 @@ export default function DicePickPage() {
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     setSession(null);
     setEventInfo(null);
     setResolvedResult(null);
@@ -550,6 +621,9 @@ export default function DicePickPage() {
             return { ok: false };
           }
           giftRoundMeta?.onGiftConsumed?.();
+          if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => giftRoundMeta?.onGiftConsumed?.());
+          }
         }
         setSession(payload.session);
         setSessionNotice("");
@@ -806,6 +880,10 @@ export default function DicePickPage() {
           onGiftConsumed: () => giftRefreshRef.current?.(),
         });
         if (!boot.ok || activeCycle !== cycleRef.current) return;
+        if (isGiftRound && typeof window !== "undefined" && window.requestAnimationFrame) {
+          giftRefreshRef.current?.();
+          window.requestAnimationFrame(() => giftRefreshRef.current?.());
+        }
         if (boot.alreadyTerminal) return;
         sessionId = boot.session?.id;
         readStateKnown = String(boot.session?.readState || "");
@@ -835,6 +913,11 @@ export default function DicePickPage() {
     ) {
       return;
     }
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     setSelectedZone(zone);
     setErrorMessage("");
     setEventInfo(null);
@@ -873,6 +956,7 @@ export default function DicePickPage() {
       const result = classifySoloV2ApiResult(response, payload);
 
       if (result === SOLO_V2_API_RESULT.SUCCESS && status === "resolved" && payload?.result) {
+        terminalPopupEligibleRef.current = true;
         setResolvedResult(payload.result);
         setEventInfo(null);
         setSession(previous =>
@@ -915,6 +999,124 @@ export default function DicePickPage() {
   const wagerPlayable =
     vaultReady && numericWager >= DICE_PICK_MIN_WAGER && vaultBalance >= numericWager;
 
+  const inActiveRunUi = [
+    UI_STATE.SESSION_CREATED,
+    UI_STATE.CHOICE_SELECTED,
+    UI_STATE.CHOICE_SUBMITTED,
+    UI_STATE.SUBMITTING_CHOICE,
+    UI_STATE.RESOLVING,
+    UI_STATE.LOADING,
+  ].includes(uiState);
+
+  const runEntryFromSession =
+    session != null &&
+    Number(session.entryAmount) >= DICE_PICK_MIN_WAGER &&
+    Number.isFinite(Number(session.entryAmount))
+      ? Math.floor(Number(session.entryAmount))
+      : null;
+
+  const sessionLocksSummary = runEntryFromSession != null && inActiveRunUi;
+
+  const potentialWin = Math.floor(numericWager * DICE_PICK_WIN_MULTIPLIER);
+  const summaryPlay = sessionLocksSummary ? runEntryFromSession : numericWager;
+  const summaryWin = sessionLocksSummary
+    ? Math.floor(Number(summaryPlay) * DICE_PICK_WIN_MULTIPLIER)
+    : potentialWin;
+
+  const idleLike =
+    uiState === UI_STATE.IDLE ||
+    uiState === UI_STATE.UNAVAILABLE ||
+    uiState === UI_STATE.PENDING_MIGRATION ||
+    uiState === UI_STATE.RESOLVED;
+  const stakeExceedsVault =
+    vaultReady &&
+    idleLike &&
+    numericWager >= DICE_PICK_MIN_WAGER &&
+    vaultBalance < numericWager;
+  const stakeHint = stakeExceedsVault
+    ? `Stake exceeds available vault (${formatCompact(vaultBalance)}). Lower amount to play.`
+    : "";
+
+  const isFlipping = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
+  const strip = dicePickRoundStripModel(uiState);
+
+  let statusTop = "Press ROLL DICE when you are set.";
+  let statusSub =
+    "Choose LOW or HIGH, set your play in the bar below, then roll. The server seals the die before you see it.";
+  let hintLine = "Fair ×1.92 payout on a winning zone — one roll per round.";
+
+  if (uiState === UI_STATE.UNAVAILABLE) {
+    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
+    statusSub = !vaultReady
+      ? "Shared vault could not be opened. Return to the arcade and try again."
+      : String(errorMessage || "").trim() || "Check your balance and connection, then try ROLL DICE again.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.LOADING) {
+    statusTop = "Starting round…";
+    statusSub = "Opening or resuming a session with the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.SUBMITTING_CHOICE) {
+    statusTop = "Locking your zone…";
+    statusSub = "Sending LOW or HIGH to the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.CHOICE_SUBMITTED || isFlipping) {
+    statusTop = "Rolling…";
+    statusSub = "Outcome is resolved on the server; the die follows the fair result.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    statusTop = resolvedResult.isWin ? "You hit your zone." : "No match this time.";
+    statusSub =
+      "Round is complete. Change zone or stake, then press ROLL DICE for another round.";
+    hintLine = resolvedResult.isWin
+      ? "Vault credit applied after settlement."
+      : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
+  } else if (uiState === UI_STATE.SESSION_CREATED || uiState === UI_STATE.CHOICE_SELECTED) {
+    statusTop = hasValidZone ? "Ready to roll." : "Choose your zone.";
+    statusSub = hasValidZone
+      ? "Press ROLL DICE to lock your pick and resolve this round."
+      : "Tap LOW or HIGH, then roll from the footer.";
+  } else if (uiState === UI_STATE.RESOLVE_FAILED) {
+    statusTop = "Could not resolve.";
+    statusSub = "Check your connection and try ROLL DICE again.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
+    statusTop = "Migration pending.";
+    statusSub = "This environment is updating. Try again shortly.";
+    hintLine = "\u00a0";
+  }
+
+  let payoutBandLabel = "Payout if win";
+  let payoutBandValue = formatCompact(summaryWin);
+  let payoutCaption = `×${DICE_PICK_WIN_MULTIPLIER} multiplier · play ${formatCompact(summaryPlay)}`;
+
+  if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary?.payoutReturn ?? 0)));
+    payoutBandLabel = resolvedResult.isWin ? "Return paid" : "Return this round";
+    payoutBandValue = formatCompact(pr);
+    const rz = String(resolvedResult.zone || "").toLowerCase();
+    const pickLabel = rz === "low" ? "LOW" : rz === "high" ? "HIGH" : "—";
+    const rNum = Number.isFinite(Number(resolvedResult.roll)) ? Number(resolvedResult.roll) : "—";
+    payoutCaption = `Die ${rNum} · pick ${pickLabel}`;
+  }
+
+  const resolvedIsWin = Boolean(resolvedResult?.isWin);
+  const deltaVault = Number(resolvedResult?.settlementSummary?.netDelta ?? 0);
+  const resultVaultLabel =
+    resolvedResult?.settlementSummary != null ? `${deltaVault > 0 ? "+" : ""}${formatCompact(deltaVault)}` : "";
+
+  let popupTitle = "—";
+  let popupLine2 = "—";
+  let popupLine3 = "—";
+  if (resolvedResult) {
+    const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary?.payoutReturn ?? 0)));
+    const rz = String(resolvedResult.zone || "").toLowerCase();
+    const pickLabel = rz === "low" ? "LOW" : rz === "high" ? "HIGH" : "—";
+    const rNum = Number.isFinite(Number(resolvedResult.roll)) ? Number(resolvedResult.roll) : "—";
+    popupTitle = resolvedIsWin ? "YOU WIN" : "YOU LOSE";
+    popupLine2 = `Return ${formatCompact(pr)}`;
+    popupLine3 = `Pick ${pickLabel} · rolled ${rNum}`;
+  }
+
   useEffect(() => {
     if (!wagerPlayable) return;
     setErrorMessage(prev => {
@@ -940,6 +1142,12 @@ export default function DicePickPage() {
       UI_STATE.RESOLVING,
       UI_STATE.PENDING_MIGRATION,
     ].includes(uiState);
+
+  const busyFooter =
+    uiState === UI_STATE.LOADING ||
+    uiState === UI_STATE.SUBMITTING_CHOICE ||
+    uiState === UI_STATE.CHOICE_SUBMITTED ||
+    uiState === UI_STATE.RESOLVING;
 
   const isPrimaryLoading =
     uiState === UI_STATE.LOADING || uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
@@ -971,9 +1179,6 @@ export default function DicePickPage() {
     }
   }
 
-  const isFlipping = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
-  const potentialWin = Math.floor(numericWager * DICE_PICK_WIN_MULTIPLIER);
-
   const handleGiftPlay = useCallback(() => {
     if (!vaultReady) {
       setErrorMessage("Shared vault unavailable.");
@@ -1003,8 +1208,12 @@ export default function DicePickPage() {
   return (
     <SoloV2GameShell
       title="Dice Pick"
-      subtitle="Arcade Solo"
+      subtitle="One honest d6 roll — sealed on the server before you see it."
+      layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
+      mobileHeaderBreathingRoom
+      stableTripleTopSummary
       gameplayScrollable={false}
+      gameplayDesktopUnclipVertical
       menuVaultBalance={vaultBalance}
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
@@ -1014,14 +1223,16 @@ export default function DicePickPage() {
       }}
       topGameStatsSlot={
         <>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Play <span className="font-semibold tabular-nums text-amber-200/90">{formatCompact(numericWager)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Play</span>
+            <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
           </span>
           <span className="shrink-0 text-zinc-600" aria-hidden>
             ·
           </span>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Win <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(potentialWin)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Win</span>
+            <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
           </span>
         </>
       }
@@ -1029,7 +1240,9 @@ export default function DicePickPage() {
         betPresets: BET_PRESETS,
         wagerInput,
         wagerNumeric: numericWager,
-        canEditPlay: !isFlipping,
+        canEditPlay: !busyFooter,
+        compactAmountDisplayWhenBlurred: true,
+        formatPresetLabel: v => formatCompact(v),
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
@@ -1059,51 +1272,67 @@ export default function DicePickPage() {
         primaryActionLoading: isPrimaryLoading,
         primaryLoadingLabel: "ROLLING...",
         onPrimaryAction: handlePrimaryCta,
-        errorMessage,
+        errorMessage: errorMessage || stakeHint,
       }}
+      soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
         <DicePickGameplayPanel
           uiState={uiState}
           selectedZone={selectedZone}
           isRolling={isFlipping}
-          resultToast={resultToast}
           onSelectZone={handleSelectZone}
           resolvedRoll={
             uiState === UI_STATE.RESOLVED && Number.isFinite(Number(resolvedResult?.roll))
               ? Number(resolvedResult.roll)
               : null
           }
-          resolvedIsWin={
-            uiState === UI_STATE.RESOLVED && resolvedResult != null
-              ? Boolean(resolvedResult.isWin)
-              : null
-          }
-          pickedZone={
-            uiState === UI_STATE.RESOLVED && resolvedResult?.zone
-              ? String(resolvedResult.zone).toLowerCase()
-              : selectedZone
-          }
-          resultPopupOpen={dicePickResultPopupOpen}
+          resultPopupOpen={resultPopupOpen}
+          resolvedIsWin={resolvedIsWin}
+          resultVaultLabel={resultVaultLabel}
+          popupTitle={popupTitle}
+          popupLine2={popupLine2}
+          popupLine3={popupLine3}
+          sessionNotice={sessionNotice}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          hintLine={hintLine}
+          stepTotal={strip.stepTotal}
+          stepsComplete={strip.stepsComplete}
+          currentStepIndex={strip.currentStepIndex}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
         />
       }
       helpContent={
         <div className="space-y-2">
-          <p>1. Choose LOW (1–3) or HIGH (4–6).</p>
-          <p>2. Set your play amount and press ROLL DICE.</p>
-          <p>3. The server rolls a fair d6; if the number lands in your zone, you win.</p>
-          <p>Win ratio is x1.92 per round in this release.</p>
-          <p>Result is server-resolved before vault settlement is applied.</p>
+          <p>
+            Dice Pick is a single d6 round: choose LOW (1–3) or HIGH (4–6), set your play amount, then press ROLL DICE.
+            The server resolves the outcome before the die animation finishes, then your shared vault is updated from that
+            result.
+          </p>
+          <p>
+            A winning zone pays ×{DICE_PICK_WIN_MULTIPLIER} on your stake for this release (96% RTP design). Gift rounds
+            use freeplay mode: a loss does not debit your vault; a win credits the full payout.
+          </p>
+          <p>
+            After a round ends, the board stays on the final face until you start again — adjust zone or stake and press
+            ROLL DICE explicitly; there is no auto-start.
+          </p>
         </div>
       }
       statsContent={
         <div className="space-y-2">
           <p>Total games: {stats.totalGames}</p>
+          <p>Wins: {stats.wins}</p>
+          <p>Losses: {stats.losses}</p>
           <p>Win rate: {stats.totalGames ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : "0.0"}%</p>
-          <p>Total play: {formatCompact(stats.totalPlay)}</p>
-          <p>Total won: {formatCompact(stats.totalWon)}</p>
+          <p>Total played: {formatCompact(stats.totalPlay)}</p>
+          <p>Total returned: {formatCompact(stats.totalWon)}</p>
           <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
-          <p>Net profit: {formatCompact(stats.totalWon - stats.totalPlay)}</p>
-          <p>LOW wins: {stats.lowWins} | HIGH wins: {stats.highWins}</p>
+          <p>Net flow (returned − played): {formatCompact(stats.totalWon - stats.totalPlay)}</p>
+          <p>LOW wins: {stats.lowWins}</p>
+          <p>HIGH wins: {stats.highWins}</p>
         </div>
       }
       resultState={null}

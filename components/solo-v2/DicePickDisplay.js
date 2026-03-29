@@ -48,7 +48,7 @@ function IdleFace() {
   );
 }
 
-export default function DicePickDisplay({ phase, resolvedRoll }) {
+export default function DicePickDisplay({ phase, resolvedRoll, hideSubcaption = false }) {
   const [cycleTick, setCycleTick] = useState(0);
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export default function DicePickDisplay({ phase, resolvedRoll }) {
   const tumbleFace = phase === "rolling" ? (cycleTick % 6) + 1 : 1;
 
   return (
-    <div className="flex w-full max-w-[17rem] flex-col items-center sm:max-w-[19rem]">
+    <div className="flex w-full max-w-[17rem] flex-col items-center sm:max-w-[19rem] lg:max-w-[21rem]">
       <div
         className={`relative ${phase === "idle" ? "animate-dice-idle-float" : ""} ${
           phase === "rolling" ? "animate-dice-roll-tumble" : ""
@@ -82,7 +82,7 @@ export default function DicePickDisplay({ phase, resolvedRoll }) {
         {/* Single die surface — no outer drop shadow blob, no second “backdrop” panel */}
         <div
           className={[
-            "relative flex h-[10.25rem] w-[10.25rem] items-center justify-center rounded-2xl p-4 sm:h-[12.25rem] sm:w-[12.25rem] sm:rounded-3xl sm:p-5",
+            "relative flex h-[10.25rem] w-[10.25rem] items-center justify-center rounded-2xl p-4 sm:h-[12.25rem] sm:w-[12.25rem] sm:rounded-3xl sm:p-5 lg:h-[13.5rem] lg:w-[13.5rem] lg:p-6",
             "border border-white/[0.12]",
             "bg-gradient-to-b from-zinc-800 to-zinc-950",
             "shadow-[inset_0_1px_0_rgba(255,255,255,0.11),inset_0_-4px_14px_rgba(0,0,0,0.42)]",
@@ -105,27 +105,30 @@ export default function DicePickDisplay({ phase, resolvedRoll }) {
         </div>
       </div>
 
-      {/* Fixed-height strip: no jump; win/loss lives in panel popup */}
-      <div
-        className="mt-3 flex w-full flex-col items-center gap-1 sm:mt-3.5"
-        style={{ minHeight: "3.25rem" }}
-      >
-        <div className="flex min-h-[1.25rem] w-full items-center justify-center px-1">
-          {phase === "idle" ? (
-            <p className="text-center text-[11px] font-medium leading-snug text-zinc-500 sm:text-xs">
-              One die · pick <span className="text-zinc-400">LOW</span> or{" "}
-              <span className="text-zinc-400">HIGH</span>
-            </p>
-          ) : null}
-          {phase === "rolling" ? (
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-200/90 sm:text-sm">Rolling…</p>
-          ) : null}
-          {phase === "resolved" ? <span className="invisible text-xs" aria-hidden>
-            Rolling…
-          </span> : null}
+      {!hideSubcaption ? (
+        <div
+          className="mt-3 flex w-full flex-col items-center gap-1 sm:mt-3.5"
+          style={{ minHeight: "3.25rem" }}
+        >
+          <div className="flex min-h-[1.25rem] w-full items-center justify-center px-1">
+            {phase === "idle" ? (
+              <p className="text-center text-[11px] font-medium leading-snug text-zinc-500 sm:text-xs">
+                One die · pick <span className="text-zinc-400">LOW</span> or{" "}
+                <span className="text-zinc-400">HIGH</span>
+              </p>
+            ) : null}
+            {phase === "rolling" ? (
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-200/90 sm:text-sm">Rolling…</p>
+            ) : null}
+            {phase === "resolved" ? (
+              <span className="invisible text-xs" aria-hidden>
+                Rolling…
+              </span>
+            ) : null}
+          </div>
+          <div className="min-h-[1rem]" aria-hidden />
         </div>
-        <div className="min-h-[1rem]" aria-hidden />
-      </div>
+      ) : null}
     </div>
   );
 }

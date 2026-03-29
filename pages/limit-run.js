@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import LimitRunBoard from "../components/solo-v2/LimitRunBoard";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -19,6 +19,7 @@ import {
   limboWinChancePercent,
   normalizeLimitRunTargetMultiplier,
 } from "../lib/solo-v2/limitRunConfig";
+import { QUICK_FLIP_CONFIG } from "../lib/solo-v2/quickFlipConfig";
 import {
   applyLimitRunSettlementOnce,
   readQuickFlipSharedVaultBalance,
@@ -45,8 +46,10 @@ const UI_STATE = {
   RESOLVED: "resolved",
 };
 
+const STATS_KEY = "solo_v2_limit_run_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
+const REVEAL_READABLE_MS = 520;
 
 function parseWagerInput(raw) {
   const digits = String(raw ?? "").replace(/\D/g, "");
@@ -56,7 +59,70 @@ function parseWagerInput(raw) {
   return Math.min(MAX_WAGER, Math.max(0, n));
 }
 
-/** Gameplay slot: single flex-1 board (shell handles wager / START RUN / ad — same anchors as Speed Track). */
+function readLimitRunStats() {
+  if (typeof window === "undefined") {
+    return {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+    };
+  }
+  try {
+    const raw = window.localStorage.getItem(STATS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") throw new Error("invalid");
+    return {
+      totalGames: Number(parsed.totalGames || 0),
+      wins: Number(parsed.wins || 0),
+      losses: Number(parsed.losses || 0),
+      totalPlay: Number(parsed.totalPlay || 0),
+      totalWon: Number(parsed.totalWon || 0),
+      biggestWin: Number(parsed.biggestWin || 0),
+    };
+  } catch {
+    return {
+      totalGames: 0,
+      wins: 0,
+      losses: 0,
+      totalPlay: 0,
+      totalWon: 0,
+      biggestWin: 0,
+    };
+  }
+}
+
+function writeLimitRunStats(next) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STATS_KEY, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+function limitRunRoundStripModel(uiState, readState) {
+  const stepTotal = 2;
+  const rs = String(readState || "");
+  if (uiState === UI_STATE.RESOLVED) {
+    return { stepTotal, stepsComplete: 2, currentStepIndex: 1 };
+  }
+  if (
+    uiState === UI_STATE.SUBMITTING_PICK ||
+    uiState === UI_STATE.RESOLVING ||
+    (uiState === UI_STATE.SESSION_ACTIVE && rs === "roll_submitted")
+  ) {
+    return { stepTotal, stepsComplete: 1, currentStepIndex: 1 };
+  }
+  if (uiState === UI_STATE.SESSION_ACTIVE && rs === "ready") {
+    return { stepTotal, stepsComplete: 1, currentStepIndex: 1 };
+  }
+  return { stepTotal, stepsComplete: 0, currentStepIndex: 0 };
+}
+
+/** Gameplay slot — Quick Flip outer rhythm; board keeps limbo identity (hero, slider, roll). */
 function LimitRunGameplayPanel({
   session,
   uiState,
@@ -67,6 +133,15 @@ function LimitRunGameplayPanel({
   resultLineUi,
   resultToneUi,
   sessionNotice,
+  statusTop,
+  statusSub,
+  hintLine,
+  stepTotal,
+  stepsComplete,
+  currentStepIndex,
+  payoutBandLabel,
+  payoutBandValue,
+  payoutCaption,
   onRoll,
   rollDisabled,
   resultPopupOpen,
@@ -82,7 +157,7 @@ function LimitRunGameplayPanel({
   const projected = limboProjectedPayout(entry, targetMultiplier);
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-1 text-center sm:px-2">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
       <div className="flex min-h-0 flex-1 flex-col">
         <LimitRunBoard
           targetMultiplier={targetMultiplier}
@@ -96,6 +171,16 @@ function LimitRunGameplayPanel({
           onRoll={onRoll}
           rollDisabled={rollDisabled}
           sessionNotice={sessionNotice}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          hintLine={hintLine}
+          stepTotal={stepTotal}
+          currentStepIndex={currentStepIndex}
+          stepsComplete={stepsComplete}
+          stepLabels={["Target", "Roll"]}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           showHeroHint={
             uiState === UI_STATE.SESSION_ACTIVE &&
             String(lr?.readState || "") === "ready" &&
@@ -108,10 +193,15 @@ function LimitRunGameplayPanel({
       <SoloV2ResultPopup
         open={resultPopupOpen}
         isWin={resolvedIsWin}
+        resultTone={resolvedIsWin ? "win" : "lose"}
         animationKey={`${resultPopupRollLabel}-${resultPopupCompareLine}-${resolvedIsWin ? "w" : "l"}-${resultVaultLabel}`}
         vaultSlot={
           resultPopupOpen ? (
-            <SoloV2ResultPopupVaultLine isWin={resolvedIsWin} deltaLabel={resultVaultLabel} />
+            <SoloV2ResultPopupVaultLine
+              isWin={resolvedIsWin}
+              tone={resolvedIsWin ? "win" : "lose"}
+              deltaLabel={resultVaultLabel}
+            />
           ) : undefined
         }
       >
@@ -145,11 +235,9 @@ export default function LimitRunPage() {
   const [rollingUi, setRollingUi] = useState(false);
   const [resultLineUi, setResultLineUi] = useState("");
   const [resultToneUi, setResultToneUi] = useState("neutral");
-  /** After first successful START RUN: stay in run flow — next rounds only need ROLL (session auto-recreated after popup). */
+  /** True while an active server session is in play (ready / roll_submitted). Cleared on terminal resolve. */
   const [inLimitRunLoop, setInLimitRunLoop] = useState(false);
-  const inLimitRunLoopRef = useRef(false);
-  const wagerInputRef = useRef(wagerInput);
-  const vaultBalanceRef = useRef(vaultBalance);
+  const [stats, setStats] = useState(readLimitRunStats);
 
   const cycleRef = useRef(0);
   const createInFlightRef = useRef(false);
@@ -160,6 +248,8 @@ export default function LimitRunPage() {
   const giftRefreshRef = useRef(() => {});
   const lastPresetAmountRef = useRef(null);
   const resultPopupTimerRef = useRef(null);
+  /** True only after a fresh client resolve — avoids auto-opening the terminal popup on resumed resolved sessions. */
+  const terminalPopupEligibleRef = useRef(false);
   const rollAnimTimerRef = useRef(null);
 
   const giftShell = useSoloV2GiftShellState();
@@ -186,16 +276,8 @@ export default function LimitRunPage() {
   }, [session]);
 
   useEffect(() => {
-    inLimitRunLoopRef.current = inLimitRunLoop;
-  }, [inLimitRunLoop]);
-
-  useEffect(() => {
-    wagerInputRef.current = wagerInput;
-  }, [wagerInput]);
-
-  useEffect(() => {
-    vaultBalanceRef.current = vaultBalance;
-  }, [vaultBalance]);
+    writeLimitRunStats(stats);
+  }, [stats]);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,105 +300,106 @@ export default function LimitRunPage() {
     };
   }, []);
 
+  const dismissResultPopupAfterTerminalRun = useCallback(() => {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setResultPopupOpen(false);
+  }, []);
+
+  const openResultPopup = useCallback(() => {
+    if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+    setResultPopupOpen(true);
+    resultPopupTimerRef.current = window.setTimeout(() => {
+      resultPopupTimerRef.current = null;
+      dismissResultPopupAfterTerminalRun();
+    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+  }, [dismissResultPopupAfterTerminalRun]);
+
+  /** Hard reset when vault settlement fails — not used on normal popup dismiss. */
+  function resetRoundAfterResultPopup() {
+    if (rollAnimTimerRef.current) {
+      clearInterval(rollAnimTimerRef.current);
+      rollAnimTimerRef.current = null;
+    }
+    createInFlightRef.current = false;
+    submitInFlightRef.current = false;
+    resolveInFlightRef.current = false;
+    setSession(null);
+    setResolvedResult(null);
+    setResultPopupOpen(false);
+    setInLimitRunLoop(false);
+    setDisplayMultiplierText("—");
+    setRollingUi(false);
+    setResultLineUi("");
+    setResultToneUi("neutral");
+    setSessionNotice("");
+    setUiState(UI_STATE.IDLE);
+  }
+
   useEffect(() => {
+    if (uiState !== UI_STATE.RESOLVED) return;
     const settlementSummary = resolvedResult?.settlementSummary;
     const sessionId = resolvedResult?.sessionId || session?.id;
     if (!sessionId || !settlementSummary) return;
     applyLimitRunSettlementOnce(sessionId, settlementSummary).then(settlementResult => {
       if (!settlementResult) return;
+      const authoritativeBalance = Math.max(0, Number(settlementResult.nextBalance || 0));
+      setVaultBalance(authoritativeBalance);
       if (settlementResult.error) {
         setErrorMessage(settlementResult.error);
+        setSessionNotice("Result resolved, but vault update failed.");
+        terminalPopupEligibleRef.current = false;
+        if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+        resultPopupTimerRef.current = window.setTimeout(() => {
+          resetRoundAfterResultPopup();
+        }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
         return;
       }
+
       const delta = Number(settlementSummary.netDelta || 0);
+      const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
       if (settlementResult.applied) {
-        setVaultBalance(Math.max(0, Number(settlementResult.nextBalance || 0)));
+        setSessionNotice(`Settled (${deltaLabel}). Vault: ${authoritativeBalance}.`);
+        setStats(prev => {
+          const entryCost = Number(settlementSummary.entryCost || QUICK_FLIP_CONFIG.entryCost);
+          const payoutReturn = Number(settlementSummary.payoutReturn || 0);
+          const won = Boolean(resolvedResult?.isWin ?? resolvedResult?.won);
+          return {
+            ...prev,
+            totalGames: Number(prev.totalGames || 0) + 1,
+            wins: Number(prev.wins || 0) + (won ? 1 : 0),
+            losses: Number(prev.losses || 0) + (won ? 0 : 1),
+            totalPlay:
+              Number(prev.totalPlay || 0) + (settlementSummary.fundingSource === "gift" ? 0 : entryCost),
+            totalWon: Number(prev.totalWon || 0) + payoutReturn,
+            biggestWin: Math.max(Number(prev.biggestWin || 0), won ? payoutReturn : 0),
+          };
+        });
+      } else {
+        setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
       }
-      if (settlementResult.applied && delta !== 0) {
-        const sign = delta > 0 ? "+" : "";
-        setSessionNotice(`Vault ${sign}${formatCompact(delta)}`);
+
+      const shouldOpenTerminalPopup = terminalPopupEligibleRef.current;
+      terminalPopupEligibleRef.current = false;
+      if (shouldOpenTerminalPopup) {
+        window.setTimeout(() => {
+          openResultPopup();
+        }, REVEAL_READABLE_MS);
       }
     });
-  }, [resolvedResult?.sessionId, resolvedResult?.settlementSummary, session?.id]);
-
-  /**
-   * After the result popup: clear round UI, then auto-create the next session (same stake as wager field)
-   * so the player can tap ROLL immediately — no second START RUN per round.
-   */
-  async function prepareNextLimitRunRound() {
-    if (resultPopupTimerRef.current) {
-      clearTimeout(resultPopupTimerRef.current);
-      resultPopupTimerRef.current = null;
-    }
-    if (rollAnimTimerRef.current) {
-      clearInterval(rollAnimTimerRef.current);
-      rollAnimTimerRef.current = null;
-    }
-    submitInFlightRef.current = false;
-    resolveInFlightRef.current = false;
-    setResultPopupOpen(false);
-    setResolvedResult(null);
-    setSessionNotice("");
-    setDisplayMultiplierText("—");
-    setRollingUi(false);
-    setResultLineUi("");
-    setResultToneUi("neutral");
-
-    if (!inLimitRunLoopRef.current) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      return;
-    }
-
-    if (!vaultReady) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInLimitRunLoop(false);
-      setErrorMessage("Shared vault unavailable.");
-      return;
-    }
-
-    const wager = parseWagerInput(wagerInputRef.current);
-    if (wager < LIMIT_RUN_MIN_WAGER) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInLimitRunLoop(false);
-      setErrorMessage(`Minimum stake is ${LIMIT_RUN_MIN_WAGER}.`);
-      return;
-    }
-    if (vaultBalanceRef.current < wager) {
-      createInFlightRef.current = false;
-      setSession(null);
-      setUiState(UI_STATE.IDLE);
-      setInLimitRunLoop(false);
-      setErrorMessage(`Insufficient vault balance. Need ${wager} for this round.`);
-      return;
-    }
-
-    cycleRef.current += 1;
-    const activeCycle = cycleRef.current;
-    const boot = await bootstrapSession(wager, activeCycle, SOLO_V2_SESSION_MODE.STANDARD, { isGiftRound: false });
-    if (!boot.ok || boot.alreadyTerminal) {
-      setInLimitRunLoop(false);
-      return;
-    }
-    const lrBoot = boot.session?.limitRun;
-    if (lrBoot?.readState === "roll_submitted" && lrBoot?.canResolveTurn) {
-      void handleResolvePendingRoll(boot.session.id, activeCycle, { animate: false });
-    }
-  }
-
-  function openResultPopup() {
-    if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
-    setResultPopupOpen(true);
-    resultPopupTimerRef.current = window.setTimeout(() => {
-      resultPopupTimerRef.current = null;
-      void prepareNextLimitRunRound();
-    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
-  }
+  }, [
+    resolvedResult?.sessionId,
+    resolvedResult?.settlementSummary,
+    resolvedResult?.isWin,
+    resolvedResult?.won,
+    session?.id,
+    uiState,
+    openResultPopup,
+  ]);
 
   function applySessionReadState(sessionPayload, { resumed = false } = {}) {
     const lrSnap = sessionPayload?.limitRun;
@@ -419,6 +502,11 @@ export default function LimitRunPage() {
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     setSession(null);
     setResolvedResult(null);
     setDisplayMultiplierText("—");
@@ -452,6 +540,9 @@ export default function LimitRunPage() {
             return { ok: false };
           }
           giftRoundMeta?.onGiftConsumed?.();
+          if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => giftRoundMeta?.onGiftConsumed?.());
+          }
         }
         const readResult = await readSessionTruth(payload.session.id, activeCycle);
         if (readResult?.halted) return { ok: false };
@@ -540,13 +631,14 @@ export default function LimitRunPage() {
       setRollingUi(false);
       setResultLineUi(line);
       setResultToneUi(won ? "win" : "lose");
+      setInLimitRunLoop(false);
+      terminalPopupEligibleRef.current = true;
       setResolvedResult({
         ...r,
         sessionId: r.sessionId || sid,
         settlementSummary: r.settlementSummary,
       });
       setUiState(UI_STATE.RESOLVED);
-      openResultPopup();
       return;
     }
 
@@ -565,13 +657,14 @@ export default function LimitRunPage() {
         setRollingUi(false);
         setResultLineUi(line);
         setResultToneUi(won ? "win" : "lose");
+        setInLimitRunLoop(false);
+        terminalPopupEligibleRef.current = true;
         setResolvedResult({
           ...r,
           sessionId: r.sessionId || sid,
           settlementSummary: r.settlementSummary,
         });
         setUiState(UI_STATE.RESOLVED);
-        openResultPopup();
       }
     }, 48);
   }
@@ -714,6 +807,10 @@ export default function LimitRunPage() {
     });
     if (isGiftRound) giftRoundRef.current = false;
     if (!boot.ok || boot.alreadyTerminal) return;
+    if (isGiftRound && typeof window !== "undefined" && window.requestAnimationFrame) {
+      giftRefreshRef.current?.();
+      window.requestAnimationFrame(() => giftRefreshRef.current?.());
+    }
     setInLimitRunLoop(true);
     const lrBoot = boot.session?.limitRun;
     if (lrBoot?.readState === "roll_submitted" && lrBoot?.canResolveTurn) {
@@ -739,7 +836,8 @@ export default function LimitRunPage() {
   const idleLike =
     uiState === UI_STATE.IDLE ||
     uiState === UI_STATE.UNAVAILABLE ||
-    uiState === UI_STATE.PENDING_MIGRATION;
+    uiState === UI_STATE.PENDING_MIGRATION ||
+    uiState === UI_STATE.RESOLVED;
   const stakeExceedsVault =
     vaultReady &&
     idleLike &&
@@ -750,17 +848,39 @@ export default function LimitRunPage() {
     : "";
 
   const canStart =
-    !inLimitRunLoop &&
     wagerPlayable &&
     ![UI_STATE.LOADING, UI_STATE.SUBMITTING_PICK, UI_STATE.RESOLVING, UI_STATE.PENDING_MIGRATION].includes(
       uiState,
     ) &&
-    (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE);
+    (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE || uiState === UI_STATE.RESOLVED);
 
   const isPrimaryLoading = uiState === UI_STATE.LOADING;
 
+  useEffect(() => {
+    if (!wagerPlayable) return;
+    setErrorMessage(prev => {
+      const s = String(prev || "");
+      if (
+        /Session expired\. Press START RUN|Session ended\. Press START RUN|no longer valid\. Press START RUN/i.test(s)
+      ) {
+        return "";
+      }
+      return s;
+    });
+  }, [wagerPlayable]);
+
+  const handleTargetChange = useCallback(next => {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
+    setTargetMultiplier(next);
+  }, []);
+
   const lrSnap = session?.limitRun;
   const playing = lrSnap?.playing;
+  const readState = String(lrSnap?.readState || "");
 
   const runEntryFromSession =
     session != null &&
@@ -792,7 +912,75 @@ export default function LimitRunPage() {
     summaryWin = Math.max(0, Math.floor(Number(ss.payoutReturn) || 0));
   }
 
-  const resolvedIsWin = Boolean(resolvedResult?.isWin);
+  const strip = limitRunRoundStripModel(uiState, readState);
+  const winChanceNow = limboWinChancePercent(targetMultiplier);
+
+  let statusTop = "Press START RUN when you are set.";
+  let statusSub =
+    "Set your target multiplier and stake in the bar below, then start. After that, Roll resolves the server draw.";
+  let hintLine = "Win if the rolled multiplier is greater than or equal to your target — one roll per round.";
+
+  if (uiState === UI_STATE.UNAVAILABLE) {
+    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
+    statusSub = !vaultReady
+      ? "Shared vault could not be opened. Return to the arcade and try again."
+      : String(errorMessage || "").trim() || "Check your balance and connection, then try START RUN again.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.LOADING) {
+    statusTop = "Starting run…";
+    statusSub = "Opening or resuming a session with the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.SUBMITTING_PICK) {
+    statusTop = "Submitting roll…";
+    statusSub = "Locking your target with the server.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.RESOLVING || rollingUi) {
+    statusTop = "Drawing multiplier…";
+    statusSub = "Outcome is resolved on the server; the readout follows the fair result.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    statusTop = resolvedResult.isWin || resolvedResult.won ? "Target beaten." : "Below target this time.";
+    statusSub =
+      "Round is complete. Adjust target or stake, then press START RUN for another round — there is no auto-start.";
+    hintLine =
+      resolvedResult.isWin || resolvedResult.won
+        ? "Vault credit applied after settlement."
+        : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
+  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready") {
+    statusTop = "Ready to roll.";
+    statusSub = "Tap Roll when your target is set. The server draws the multiplier for this round.";
+    hintLine = `Target ×${Number(targetMultiplier).toFixed(2)} · about ${winChanceNow.toFixed(2)}% win chance.`;
+  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "roll_submitted") {
+    statusTop = "Finishing your roll…";
+    statusSub = "Resolving the server draw.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
+    statusTop = "Migration pending.";
+    statusSub = "This environment is updating. Try again shortly.";
+    hintLine = "\u00a0";
+  } else if (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE) {
+    statusTop = "Limbo-style run.";
+    statusSub = "Choose a target, set play, then START RUN. Roll only after the session opens.";
+    hintLine = "Higher targets pay more but hit less often.";
+  }
+
+  let payoutBandLabel = "Payout if win";
+  let payoutBandValue = formatCompact(summaryWin);
+  let payoutCaption = `Target ×${Number(targetMultiplier).toFixed(2)} · ~${winChanceNow.toFixed(2)}% hit`;
+
+  if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
+    const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
+    payoutBandLabel = resolvedResult.isWin || resolvedResult.won ? "Return paid" : "Return this round";
+    payoutBandValue = formatCompact(pr);
+    const rr0 = Number(resolvedResult.rollMultiplier);
+    const tt0 = Number(resolvedResult.targetMultiplier);
+    payoutCaption =
+      Number.isFinite(rr0) && Number.isFinite(tt0)
+        ? `Rolled ×${rr0.toFixed(2)} vs target ×${tt0.toFixed(2)}`
+        : "Round settled";
+  }
+
+  const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.won);
   const rr = Number(resolvedResult?.rollMultiplier);
   const tt = Number(resolvedResult?.targetMultiplier);
   const rOk = Number.isFinite(rr);
@@ -812,16 +1000,26 @@ export default function LimitRunPage() {
       ? `${delta > 0 ? "+" : ""}${formatCompact(delta)}`
       : "";
 
-  function handleGiftPlay() {
+  const handleGiftPlay = useCallback(() => {
     if (!vaultReady) {
       setErrorMessage("Shared vault unavailable.");
       return;
     }
     if (giftShell.giftCount < 1) return;
     if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
+    if (
+      [
+        UI_STATE.LOADING,
+        UI_STATE.SUBMITTING_PICK,
+        UI_STATE.RESOLVING,
+        UI_STATE.PENDING_MIGRATION,
+      ].includes(uiState)
+    ) {
+      return;
+    }
     giftRoundRef.current = true;
     void runStartRun();
-  }
+  }, [vaultReady, giftShell.giftCount, uiState]);
 
   function handlePresetClick(presetValue) {
     const v = Number(presetValue);
@@ -847,7 +1045,6 @@ export default function LimitRunPage() {
     uiState === UI_STATE.RESOLVING ||
     uiState === UI_STATE.LOADING;
 
-  const readState = String(lrSnap?.readState || "");
   const rollDisabled =
     busyFooter ||
     uiState !== UI_STATE.SESSION_ACTIVE ||
@@ -857,8 +1054,10 @@ export default function LimitRunPage() {
   return (
     <SoloV2GameShell
       title="Limit Run"
-      subtitle="Pick a target · Roll · Land on or above it to win"
-      layoutMaxWidthClass="max-w-full sm:max-w-2xl"
+      subtitle="Pick a target multiplier — roll meets or beats it to win."
+      layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
+      mobileHeaderBreathingRoom
+      stableTripleTopSummary
       gameplayScrollable={false}
       gameplayDesktopUnclipVertical
       menuVaultBalance={vaultBalance}
@@ -870,14 +1069,16 @@ export default function LimitRunPage() {
       }}
       topGameStatsSlot={
         <>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Play <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Play</span>
+            <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
           </span>
           <span className="shrink-0 text-zinc-600" aria-hidden>
             ·
           </span>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Win <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Win</span>
+            <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
           </span>
         </>
       }
@@ -886,6 +1087,8 @@ export default function LimitRunPage() {
         wagerInput,
         wagerNumeric: numericWager,
         canEditPlay: !busyFooter,
+        compactAmountDisplayWhenBlurred: true,
+        formatPresetLabel: v => formatCompact(v),
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
@@ -918,17 +1121,27 @@ export default function LimitRunPage() {
         },
         errorMessage: errorMessage || stakeHint,
       }}
+      soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
         <LimitRunGameplayPanel
           session={session}
           uiState={uiState}
           targetMultiplier={targetMultiplier}
-          onTargetChange={setTargetMultiplier}
+          onTargetChange={handleTargetChange}
           displayMultiplierText={displayMultiplierText}
           rollingUi={rollingUi}
           resultLineUi={resultLineUi}
           resultToneUi={resultToneUi}
           sessionNotice={sessionNotice}
+          statusTop={statusTop}
+          statusSub={statusSub}
+          hintLine={hintLine}
+          stepTotal={strip.stepTotal}
+          stepsComplete={strip.stepsComplete}
+          currentStepIndex={strip.currentStepIndex}
+          payoutBandLabel={payoutBandLabel}
+          payoutBandValue={payoutBandValue}
+          payoutCaption={payoutCaption}
           onRoll={handleRoll}
           rollDisabled={rollDisabled}
           resultPopupOpen={resultPopupOpen}
@@ -941,13 +1154,30 @@ export default function LimitRunPage() {
       helpContent={
         <div className="space-y-2">
           <p>
-            Choose a target multiplier (slider or quick presets). Your stake is set when you press START RUN — win
-            chance and projected payout update with the target.
+            Limit Run is a limbo-style round: choose a target multiplier (slider, presets, or custom), set your play
+            amount, then press START RUN. Once the session is ready, tap Roll — the server draws a multiplier before the
+            animation finishes, then your shared vault updates from that result.
           </p>
           <p>
-            Tap Roll: the server draws a random multiplier. If the result is greater than or equal to your target, you
-            win your stake × target; otherwise the round is a loss.
+            You win when the rolled multiplier is greater than or equal to your target; payout scales with your target
+            and stake. Gift rounds use freeplay mode: a loss does not debit your vault; a win credits the full payout.
           </p>
+          <p>
+            After a round ends, the multiplier readout and result line stay visible until you explicitly press START RUN
+            again — there is no auto-start after the summary popup closes.
+          </p>
+        </div>
+      }
+      statsContent={
+        <div className="space-y-2">
+          <p>Total games: {stats.totalGames}</p>
+          <p>Wins: {stats.wins}</p>
+          <p>Losses: {stats.losses}</p>
+          <p>Win rate: {stats.totalGames ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : "0.0"}%</p>
+          <p>Total played: {formatCompact(stats.totalPlay)}</p>
+          <p>Total returned: {formatCompact(stats.totalWon)}</p>
+          <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
+          <p>Net flow (returned − played): {formatCompact(stats.totalWon - stats.totalPlay)}</p>
         </div>
       }
       resultState={null}
