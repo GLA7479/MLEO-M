@@ -916,16 +916,19 @@ export default function HighLowCardsPage() {
     trPopup?.settlementSummary != null ? `${deltaPopup > 0 ? "+" : ""}${formatCompact(deltaPopup)}` : "";
   let popupTitle = wonPopup ? "BANKED" : "RUN OVER";
   let popupLine2 = "—";
-  const popupLine3 =
-    "Adjust play in the bar if you want, then press PLAY for another run — there is no auto-start after the popup.";
+  let popupLine3 = "—";
   if (trPopup) {
-    popupLine2 = wonPopup
-      ? tkPopup === "cashout"
-        ? `Cashed out · streak ${trPopup.streak ?? 0} · return ${formatCompact(prPopup)}`
-        : `Run won · streak ${trPopup.streak ?? 0} · return ${formatCompact(prPopup)}`
-      : trPopup?.lastNextCard?.rank
-        ? `Next ${trPopup.lastNextCard.rank}${trPopup.lastNextCard.suit || "♠"} · streak lost`
-        : "Better luck next run";
+    popupLine2 = `Return ${formatCompact(prPopup)}`;
+    const st = Math.max(0, Math.floor(Number(trPopup.streak ?? 0)));
+    if (wonPopup) {
+      popupLine3 = tkPopup === "cashout" ? `CASH OUT · STREAK ${st}` : `STREAK ${st}`;
+    } else if (trPopup?.lastNextCard?.rank) {
+      const r = trPopup.lastNextCard.rank;
+      const su = trPopup.lastNextCard.suit || "♠";
+      popupLine3 = `NEXT ${r}${su} · MISS`;
+    } else {
+      popupLine3 = "MISS";
+    }
     if (tkPopup === "cashout" && wonPopup) popupTitle = "EXITED";
   }
   const resultTonePopup = wonPopup ? "win" : "lose";
