@@ -1129,6 +1129,7 @@ export default function HighLowCardsPage() {
             payoutBandLabel={payoutBandLabel}
             payoutBandValue={payoutBandValue}
             payoutCaption={payoutCaption}
+            hideMobilePayoutBand
             mergedPlayfieldSlot={
               <HighLowCardsMergedPlayfield
                 currentCard={currentCard}

@@ -220,6 +220,7 @@ function DicePickGameplayPanel({
         payoutBandLabel={payoutBandLabel}
         payoutBandValue={payoutBandValue}
         payoutCaption={payoutCaption}
+        hideMobilePayoutBand
         diceSlot={<DicePickDisplay phase={dicePhase} resolvedRoll={resolvedRoll} hideSubcaption />}
         choiceSlot={
           <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Pick zone">

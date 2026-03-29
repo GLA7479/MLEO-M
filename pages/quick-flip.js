@@ -222,6 +222,7 @@ function QuickFlipGameplayPanel({
         payoutBandLabel={payoutBandLabel}
         payoutBandValue={payoutBandValue}
         payoutCaption={payoutCaption}
+        hideMobilePayoutBand
         coinSlot={<QuickFlipCoinDisplay phase={coinPhase} resolvedFace={coinResolvedFace} />}
         choiceSlot={
           <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Choose side">

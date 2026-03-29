@@ -217,6 +217,7 @@ function MysteryBoxGameplayPanel({
         payoutBandLabel={payoutBandLabel}
         payoutBandValue={payoutBandValue}
         payoutCaption={payoutCaption}
+        hideMobilePayoutBand
         accentSlot={<MysteryBoxAccent winningBoxIndex={winningBoxIndex} />}
         boxesSlot={
           <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Choose a box">

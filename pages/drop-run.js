@@ -133,9 +133,6 @@ function DropRunGameplayPanel({
   stepsComplete,
   currentStepIndex,
   stepLabels,
-  payoutBandLabel,
-  payoutBandValue,
-  payoutCaption,
   resultPopupOpen,
   resolvedIsWin,
   popupLine2,
@@ -182,25 +179,6 @@ function DropRunGameplayPanel({
           currentStepIndex={cur}
           stepLabels={stepLabels}
         />
-
-        {/* Ladder payout subgroup B (footer-driven desktop payout) — see gold-rush-digger gameplay panel comment for subgroup A vs B. */}
-        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
-          <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
-            <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">
-              <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
-                {payoutBandLabel}
-              </span>
-              <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
-                {payoutBandValue}
-              </span>
-            </div>
-            <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
-              <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
-                {payoutCaption || "\u00a0"}
-              </span>
-            </p>
-          </div>
-        </div>
 
         <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
           <div
@@ -926,14 +904,11 @@ export default function DropRunPage() {
 
   let payoutBandLabel = "Max win";
   let payoutBandValue = formatCompact(summaryWin);
-  let payoutCaption = "Best box ×4.75 on stake · outer columns ×0";
 
   if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
     const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
     payoutBandLabel = resolvedResult.isWin || resolvedResult.won ? "Return paid" : "Return this round";
     payoutBandValue = formatCompact(pr);
-    const fb = Number(resolvedResult.finalBay);
-    payoutCaption = Number.isFinite(fb) ? `Landed box ${Math.floor(fb)}` : "Round settled";
   }
 
   const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.won);
@@ -1109,9 +1084,6 @@ export default function DropRunPage() {
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}
           stepLabels={["Ready", "Drop"]}
-          payoutBandLabel={payoutBandLabel}
-          payoutBandValue={payoutBandValue}
-          payoutCaption={payoutCaption}
           resultPopupOpen={resultPopupOpen}
           resolvedIsWin={resolvedIsWin}
           popupLine2={popupLine2}

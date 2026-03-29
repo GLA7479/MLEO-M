@@ -198,6 +198,7 @@ function TripleDiceGameplayPanel({
         payoutBandLabel={payoutBandLabel}
         payoutBandValue={payoutBandValue}
         payoutCaption={payoutCaption}
+        hideMobilePayoutBand
         diceSlot={
           <TripleDiceDiceCluster
             diceValues={diceValues}

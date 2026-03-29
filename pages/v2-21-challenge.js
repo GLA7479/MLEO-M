@@ -149,7 +149,7 @@ function extraStakeForChallenge21Action(decision, playing, baseWager) {
   return 0;
 }
 
-/** Solo V2 ladder chrome (strip + mobile payout band) + bespoke blackjack table (`TwentyOneChallengeBoard`) — intentional; do not fold into a generic ladder board in normalization passes. */
+/** Solo V2 ladder chrome (progress strip) + bespoke blackjack table (`TwentyOneChallengeBoard`) — intentional; do not fold into a generic ladder board in normalization passes. */
 function Challenge21GameplayPanel({
   sessionNotice,
   statusTop,
@@ -158,9 +158,6 @@ function Challenge21GameplayPanel({
   stepsComplete,
   currentStepIndex,
   stepLabels,
-  payoutBandLabel,
-  payoutBandValue,
-  payoutCaption,
   playerHands,
   activeHandIndex,
   playerHand,
@@ -219,24 +216,6 @@ function Challenge21GameplayPanel({
           currentStepIndex={cur}
           stepLabels={stepLabels}
         />
-
-        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
-          <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
-            <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">
-              <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
-                {payoutBandLabel}
-              </span>
-              <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
-                {payoutBandValue}
-              </span>
-            </div>
-            <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
-              <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
-                {payoutCaption || "\u00a0"}
-              </span>
-            </p>
-          </div>
-        </div>
 
         <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
           <div
@@ -1543,18 +1522,12 @@ export default function Challenge21Page() {
 
   let payoutBandLabel = "Win if best hand";
   let payoutBandValue = formatCompact(summaryWin);
-  let payoutCaption = `2.5× blackjack · 2× other wins · play ${formatCompact(summaryPlay)}`;
 
   if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
     const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
     const won = Boolean(resolvedResult.isWin);
     payoutBandLabel = won ? "Return paid" : "Return this round";
     payoutBandValue = formatCompact(pr);
-    payoutCaption = resolvedIsPush
-      ? "Push — stake returned per rules."
-      : won
-        ? "Winning hand(s) paid per table rules."
-        : "Round settled.";
   }
 
   return (
@@ -1642,9 +1615,6 @@ export default function Challenge21Page() {
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}
           stepLabels={stepLabels}
-          payoutBandLabel={payoutBandLabel}
-          payoutBandValue={payoutBandValue}
-          payoutCaption={payoutCaption}
           playerHands={panelPlayerHands}
           activeHandIndex={panelActiveIndex}
           playerHand={displayPlayer}

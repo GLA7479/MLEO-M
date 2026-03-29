@@ -125,9 +125,6 @@ function GoldRushGameplayPanel({
   stepsComplete,
   currentStepIndex,
   stepLabels,
-  payoutBandLabel,
-  payoutBandValue,
-  payoutCaption,
   showBoardCashOut,
   boardCashOutDisabled,
   boardCashOutLoading,
@@ -200,28 +197,8 @@ function GoldRushGameplayPanel({
           stepLabels={stepLabels}
         />
 
-        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
-          <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
-            <div className="flex min-h-[2.125rem] items-center justify-between gap-2 px-2.5 py-0.5 sm:min-h-[2.25rem] sm:px-3 sm:py-1">
-              <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
-                {payoutBandLabel}
-              </span>
-              <span className="truncate text-right text-sm font-black tabular-nums text-amber-100 sm:text-base">
-                {payoutBandValue}
-              </span>
-            </div>
-            <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
-              <span className={`line-clamp-1 ${payoutCaption ? "" : "opacity-0"}`}>
-                {payoutCaption || "\u00a0"}
-              </span>
-            </p>
-          </div>
-        </div>
-
         {/*
-         * Ladder desktop payout — two approved patterns (do not unify without design sign-off):
-         * Subgroup A — in-board desktop band: this page (and Speed Track, Treasure Doors, Mystery Chamber) shows payout/cash-out again under the playfield on lg+ (`lg:flex` block below).
-         * Subgroup B — footer-driven on lg+: mobile payout strip stays `lg:hidden`; desktop uses SoloV2GameFooter.desktopPayout only — e.g. Drop Run, Limit Run, 21 Challenge, DicePickBoard routes.
+         * Desktop: cash-out band under the playfield on lg+ (`lg:flex` below). Footer still carries desktop payout where configured. Mobile duplicate max-win/payout strip removed — shell header shows Play / Max win.
          */}
         <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
           <div
@@ -1034,20 +1011,12 @@ export default function GoldRushDiggerPage() {
 
   let payoutBandLabel = "Secured payout";
   let payoutBandValue = formatCompact(summaryWin);
-  let payoutCaption = `First safe row ×${GOLD_RUSH_MULTIPLIER_LADDER[0]} on this play`;
 
   if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
     const pr = Math.max(0, Math.floor(Number(resolvedResult.settlementSummary.payoutReturn ?? 0)));
     const won = Boolean(resolvedResult.isWin ?? resolvedResult.won);
     payoutBandLabel = won ? "Return paid" : "Return this round";
     payoutBandValue = formatCompact(pr);
-    const tk = resolvedResult.terminalKind;
-    if (tk === "full_clear") payoutCaption = "Crown row — full ladder cleared";
-    else if (tk === "bomb") {
-      const fr = Math.floor(Number(resolvedResult.finalRowIndex ?? 0));
-      payoutCaption = Number.isFinite(fr) ? `Bomb at row ${fr + 1}` : "Bomb — run lost";
-    } else if (tk === "cashout") payoutCaption = "Cash out — secured payout banked";
-    else payoutCaption = "Round settled";
   }
 
   const terminalKind = resolvedResult?.terminalKind;
@@ -1207,9 +1176,6 @@ export default function GoldRushDiggerPage() {
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}
           stepLabels={stepLabels}
-          payoutBandLabel={payoutBandLabel}
-          payoutBandValue={payoutBandValue}
-          payoutCaption={payoutCaption}
           showBoardCashOut={
             uiState === UI_STATE.SESSION_ACTIVE && !terminalSession && Boolean(gr?.canCashOut)
           }

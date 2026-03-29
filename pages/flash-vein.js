@@ -170,6 +170,7 @@ function FlashVeinGameplayPanel({
         payoutBandLabel={payoutBandLabel}
         payoutBandValue={payoutBandValue}
         payoutCaption={payoutCaption}
+        hideMobilePayoutBand
         diceSlot={<FlashVeinDiceSlot lanes={flashLanes} revealPhase={revealPhase} />}
         choiceSlot={
           <FlashVeinChoiceSlot
@@ -1056,7 +1057,7 @@ export default function FlashVeinPage() {
   return (
     <SoloV2GameShell
       title="Flash Vein"
-      subtitle="Memorize the flash. Pick the safe lane. Gem boosts payout. Unstable ends the run."
+      subtitle="Flash, recall, safe pick."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary

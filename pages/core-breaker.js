@@ -165,6 +165,7 @@ function CoreBreakerGameplayPanel({
         payoutBandLabel={payoutBandLabel}
         payoutBandValue={payoutBandValue}
         payoutCaption={payoutCaption}
+        hideMobilePayoutBand
         diceSlot={<CoreBreakerDiceSlot playing={playing} />}
         choiceSlot={
           <CoreBreakerChoiceSlot
@@ -953,7 +954,7 @@ export default function CoreBreakerPage() {
   return (
     <SoloV2GameShell
       title="Core Breaker"
-      subtitle="Break the core in 5 safe strikes. Gems boost payout. Unstable ends the run."
+      subtitle="Five strikes, gems, unstable."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
