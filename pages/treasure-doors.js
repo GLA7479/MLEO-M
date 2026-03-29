@@ -294,7 +294,7 @@ function TreasureDoorsGameplayPanel({
                 hideChamberRunStrip
               />
             </div>
-            <div className="flex shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:min-h-[5.5rem]">
+            <div className="hidden shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:flex lg:min-h-[5.5rem]">
               <SoloV2BoardCashOutControl
                 show={showBoardCashOut}
                 label={boardCashOutLabel}
@@ -309,6 +309,25 @@ function TreasureDoorsGameplayPanel({
                 aria-hidden
               />
             </div>
+          </div>
+
+          <div className="flex w-full min-w-0 shrink-0 flex-col items-stretch justify-center px-0 py-2 sm:py-2.5 lg:hidden">
+            {showBoardCashOut ? (
+              <button
+                type="button"
+                onClick={onBoardCashOut}
+                disabled={boardCashOutDisabled || boardCashOutLoading}
+                className={`min-h-[48px] w-full rounded-lg border px-4 py-2.5 text-xs font-extrabold uppercase tracking-wide sm:text-sm ${
+                  boardCashOutDisabled || boardCashOutLoading
+                    ? "cursor-not-allowed border-white/15 bg-white/5 text-zinc-500"
+                    : "border-amber-400/45 bg-amber-950/40 text-amber-100 active:bg-amber-900/45"
+                }`}
+              >
+                {boardCashOutLoading ? boardCashOutLoadingLabel : boardCashOutLabel}
+              </button>
+            ) : (
+              <div className="pointer-events-none min-h-[2.5rem] w-full sm:min-h-[2.4rem]" aria-hidden />
+            )}
           </div>
         </div>
       </div>
