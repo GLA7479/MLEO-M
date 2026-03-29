@@ -101,9 +101,10 @@ export default function MysteryBoxBoard({
         </div>
       </div>
 
+      {/* Playfield column widths match QuickFlipBoard exactly (coin + choice lane). */}
       <div className="flex min-h-0 flex-1 flex-col justify-center gap-3 px-2 pb-0.5 pt-0 lg:flex-row lg:items-center lg:justify-center lg:gap-14 lg:px-10 lg:py-7 lg:pb-6">
         <div className="flex shrink-0 items-center justify-center">{accentSlot}</div>
-        <div className="mx-auto w-full max-w-[21rem] shrink-0 sm:max-w-[22.5rem] lg:mx-0 lg:max-w-none lg:w-[min(36rem,52%)] lg:min-w-[20rem]">
+        <div className="mx-auto w-full max-w-[17.75rem] shrink-0 lg:mx-0 lg:max-w-none lg:w-[min(30rem,44%)] lg:min-w-[18rem]">
           {boxesSlot}
         </div>
       </div>

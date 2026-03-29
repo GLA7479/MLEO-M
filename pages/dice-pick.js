@@ -116,8 +116,11 @@ function writeDicePickStats(nextStats) {
   }
 }
 
-/** LOW / HIGH — Quick Flip tile rhythm. */
-function DiceZoneTile({ label, sub, value, selectedZone, disabled, onSelect }) {
+/**
+ * LOW / HIGH — mirrors Quick Flip FlipChoiceTile rhythm (primary glyph scale + caption row).
+ * Keeps sky/orange selected faces as dice-zone identity (vs emerald/violet on coin).
+ */
+function DiceZoneTile({ glyph, label, sub, value, selectedZone, disabled, onSelect }) {
   const isSelected = selectedZone === value;
   const isLow = value === "low";
   const shell =
@@ -145,12 +148,18 @@ function DiceZoneTile({ label, sub, value, selectedZone, disabled, onSelect }) {
         disabled ? "cursor-not-allowed opacity-[0.42] " : ""
       }focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/35`}
     >
-      <span className="text-base font-black uppercase tracking-wide sm:text-lg lg:text-xl">{label}</span>
-      {sub ? (
-        <span className="mt-1 text-[8px] font-semibold uppercase tracking-[0.14em] text-white/38 sm:text-[9px] lg:text-[10px]">
-          {sub}
-        </span>
-      ) : null}
+      <span
+        className={`mt-0.5 select-none text-[2rem] font-black leading-none tabular-nums sm:text-[2.35rem] lg:text-[2.85rem] ${
+          isSelected ? "" : "text-amber-100/95"
+        }`}
+        aria-hidden
+      >
+        {glyph}
+      </span>
+      <span className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/38 sm:text-[10px] lg:text-[11px]">
+        {label}
+        {sub ? ` · ${sub}` : ""}
+      </span>
     </button>
   );
 }
@@ -217,6 +226,7 @@ function DicePickGameplayPanel({
           choiceSlot={
             <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Pick zone">
               <DiceZoneTile
+                glyph="L"
                 label="LOW"
                 sub="1–3"
                 value="low"
@@ -225,6 +235,7 @@ function DicePickGameplayPanel({
                 onSelect={onSelectZone}
               />
               <DiceZoneTile
+                glyph="H"
                 label="HIGH"
                 sub="4–6"
                 value="high"
@@ -911,11 +922,6 @@ export default function DicePickPage() {
     ) {
       return;
     }
-    if (resultPopupTimerRef.current) {
-      clearTimeout(resultPopupTimerRef.current);
-      resultPopupTimerRef.current = null;
-    }
-    setResultPopupOpen(false);
     setSelectedZone(zone);
     setErrorMessage("");
     setEventInfo(null);

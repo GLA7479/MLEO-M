@@ -90,16 +90,11 @@ function writeMysteryBoxStats(nextStats) {
   }
 }
 
-function boxLabel(index) {
-  if (index === 0 || index === 1 || index === 2) return `Box ${index + 1}`;
-  return "—";
-}
-
-/** A / B / C tiles — Quick Flip mirror (rounded-2xl sigil-style), 3-up grid. */
+/** A / B / C tiles — same shell + glyph scale as Quick Flip FlipChoiceTile (3-up grid). */
 function MysteryBoxTile({ index, letter, selectedBox, disabled, onSelect }) {
   const isSelected = selectedBox === index;
   const shell =
-    "group relative flex h-full min-h-[5.1rem] w-full flex-col items-center justify-center rounded-2xl border-2 text-center shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-150 sm:min-h-[5.85rem] sm:rounded-[1.05rem] lg:min-h-[6.85rem] lg:rounded-[1.12rem]";
+    "group relative flex h-full min-h-[5.25rem] w-full flex-col items-center justify-center rounded-2xl border-2 text-center shadow-sm transition-[transform,box-shadow,border-color,background-color] duration-150 sm:min-h-[6.1rem] sm:rounded-[1.05rem] lg:min-h-[7.35rem] lg:rounded-[1.12rem]";
 
   let face =
     "border-amber-700/45 bg-gradient-to-b from-zinc-800/95 to-zinc-950 text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ";
@@ -121,43 +116,42 @@ function MysteryBoxTile({ index, letter, selectedBox, disabled, onSelect }) {
       }focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400/35`}
     >
       <span
-        className={`mt-0.5 select-none text-[1.85rem] font-black leading-none tabular-nums sm:text-[2.1rem] lg:text-[2.5rem] ${
-          isSelected ? "text-amber-100" : "text-amber-100/95"
+        className={`mt-0.5 select-none text-[2rem] font-black leading-none tabular-nums sm:text-[2.35rem] lg:text-[2.85rem] ${
+          isSelected ? "" : "text-amber-100/95"
         }`}
         aria-hidden
       >
         {letter}
       </span>
-      <span className="mt-1 text-[8px] font-semibold uppercase tracking-[0.14em] text-white/38 sm:text-[9px] lg:text-[10px]">
+      <span className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white/38 sm:text-[10px] lg:text-[11px]">
         Pick
       </span>
     </button>
   );
 }
 
+/** Accent slot: same outer footprint as QuickFlipCoinDisplay neutral coin (square prize preview). */
 function MysteryBoxAccent({ winningBoxIndex }) {
   const letters = ["A", "B", "C"];
   const showWin = winningBoxIndex === 0 || winningBoxIndex === 1 || winningBoxIndex === 2;
   return (
     <div
-      className="flex h-[7.25rem] w-[7.25rem] shrink-0 flex-col items-center justify-center rounded-2xl border-2 border-amber-800/50 bg-gradient-to-b from-zinc-800/90 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:h-[8rem] sm:w-[8rem] lg:h-[9.5rem] lg:w-[9.5rem]"
+      className="flex h-[7.5rem] w-[7.5rem] shrink-0 flex-col items-center justify-center rounded-2xl border-[3px] border-dashed border-amber-400/45 bg-gradient-to-br from-zinc-600/90 via-zinc-800 to-zinc-950 shadow-[inset_0_2px_12px_rgba(0,0,0,0.45)] sm:h-[9rem] sm:w-[9rem] lg:h-[11rem] lg:w-[11rem]"
       aria-hidden
     >
       {showWin ? (
         <>
-          <span className="text-[2.85rem] font-black leading-none text-amber-200 sm:text-[3.25rem] lg:text-5xl">
+          <span className="text-[3.25rem] font-black leading-none text-amber-100 drop-shadow sm:text-6xl lg:text-7xl">
             {letters[winningBoxIndex]}
           </span>
-          <span className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-emerald-300/80 sm:text-[10px]">
-            Prize box
+          <span className="mt-0.5 text-[11px] font-extrabold uppercase tracking-wide text-emerald-200/90 sm:text-xs">
+            Prize
           </span>
         </>
       ) : (
         <>
-          <span className="text-[2.85rem] font-black leading-none text-zinc-500 sm:text-[3.25rem] lg:text-5xl">?</span>
-          <span className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-zinc-500 sm:text-[10px]">
-            Mystery
-          </span>
+          <span className="text-[2.75rem] font-black leading-none text-zinc-400/95 sm:text-[3.25rem] lg:text-[4rem]">?</span>
+          <span className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 sm:text-[11px]">Box</span>
         </>
       )}
     </div>
@@ -221,45 +215,28 @@ function MysteryBoxGameplayPanel({
           payoutCaption={payoutCaption}
           accentSlot={<MysteryBoxAccent winningBoxIndex={winningBoxIndex} />}
           boxesSlot={
-            <div className="flex w-full flex-col items-stretch gap-3 lg:gap-4">
-              <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:gap-5" role="group" aria-label="Choose a box">
-                <MysteryBoxTile
-                  index={0}
-                  letter="A"
-                  selectedBox={selectedBox}
-                  disabled={!canPick}
-                  onSelect={onSelectBox}
-                />
-                <MysteryBoxTile
-                  index={1}
-                  letter="B"
-                  selectedBox={selectedBox}
-                  disabled={!canPick}
-                  onSelect={onSelectBox}
-                />
-                <MysteryBoxTile
-                  index={2}
-                  letter="C"
-                  selectedBox={selectedBox}
-                  disabled={!canPick}
-                  onSelect={onSelectBox}
-                />
-              </div>
-              <div className="flex min-h-[1.5rem] w-full shrink-0 flex-col justify-center sm:min-h-[1.625rem]">
-                {uiState === UI_STATE.RESOLVED &&
-                winningBoxIndex !== null &&
-                winningBoxIndex !== undefined &&
-                (winningBoxIndex === 0 || winningBoxIndex === 1 || winningBoxIndex === 2) ? (
-                  <p className="text-[10px] text-zinc-400 sm:text-[11px]">
-                    Winning box:{" "}
-                    <span className="font-bold text-amber-200/95">{boxLabel(winningBoxIndex)}</span>
-                  </p>
-                ) : (
-                  <p className="invisible text-[10px] leading-tight sm:text-[11px]" aria-hidden>
-                    Winning box: <span className="font-bold">A</span>
-                  </p>
-                )}
-              </div>
+            <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:gap-6" role="group" aria-label="Choose a box">
+              <MysteryBoxTile
+                index={0}
+                letter="A"
+                selectedBox={selectedBox}
+                disabled={!canPick}
+                onSelect={onSelectBox}
+              />
+              <MysteryBoxTile
+                index={1}
+                letter="B"
+                selectedBox={selectedBox}
+                disabled={!canPick}
+                onSelect={onSelectBox}
+              />
+              <MysteryBoxTile
+                index={2}
+                letter="C"
+                selectedBox={selectedBox}
+                disabled={!canPick}
+                onSelect={onSelectBox}
+              />
             </div>
           }
         />
@@ -1050,11 +1027,6 @@ export default function MysteryBoxPage() {
     ) {
       return;
     }
-    if (resultPopupTimerRef.current) {
-      clearTimeout(resultPopupTimerRef.current);
-      resultPopupTimerRef.current = null;
-    }
-    setResultPopupOpen(false);
     setSelectedBox(index);
     setErrorMessage("");
     setEventInfo(null);

@@ -6,14 +6,15 @@ import { useEffect, useState } from "react";
 function Pip() {
   return (
     <span
-      className="block h-2.5 w-2.5 rounded-full bg-gradient-to-br from-white via-zinc-100 to-zinc-400 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.45),0_1px_2px_rgba(255,255,255,0.35)] ring-1 ring-black/25 sm:h-3 sm:w-3"
+      className="block h-2 w-2 rounded-full bg-gradient-to-br from-white via-zinc-100 to-zinc-400 shadow-[inset_0_-2px_4px_rgba(0,0,0,0.45),0_1px_2px_rgba(255,255,255,0.35)] ring-1 ring-black/25 sm:h-2.5 sm:w-2.5 lg:h-3 lg:w-3"
       aria-hidden
     />
   );
 }
 
 function Face({ n }) {
-  const grid = "grid h-full w-full grid-cols-3 grid-rows-3 gap-x-1 gap-y-1 p-2.5 sm:gap-x-1.5 sm:gap-y-1.5 sm:p-3.5";
+  const grid =
+    "grid h-full w-full grid-cols-3 grid-rows-3 gap-x-0.5 gap-y-0.5 p-1.5 sm:gap-x-1 sm:gap-y-1 sm:p-2.5 lg:gap-x-1.5 lg:gap-y-1.5 lg:p-3";
   const positions = {
     1: [null, null, null, null, "c", null, null, null, null],
     2: ["tl", null, null, null, null, null, null, null, "br"],
@@ -36,14 +37,14 @@ function Face({ n }) {
 
 function IdleFace() {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center gap-1 px-3">
+    <div className="relative flex h-full w-full flex-col items-center justify-center gap-0.5 px-2 sm:gap-1 sm:px-2.5">
       <span
-        className="select-none font-black tabular-nums text-[2.75rem] leading-none text-amber-200/25 sm:text-[3.25rem]"
+        className="select-none font-black tabular-nums text-[2.35rem] leading-none text-amber-200/25 sm:text-[2.85rem] lg:text-[3.25rem]"
         aria-hidden
       >
         ?
       </span>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 sm:text-[11px]">d6</span>
+      <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500 sm:text-[11px]">d6</span>
     </div>
   );
 }
@@ -64,32 +65,32 @@ export default function DicePickDisplay({ phase, resolvedRoll, hideSubcaption = 
   const tumbleFace = phase === "rolling" ? (cycleTick % 6) + 1 : 1;
 
   return (
-    <div className="flex w-full max-w-[17rem] flex-col items-center sm:max-w-[19rem] lg:max-w-[21rem]">
+    <div className="flex flex-col items-center justify-center" aria-live={phase === "rolling" ? "polite" : "off"}>
       <div
-        className={`relative ${phase === "idle" ? "animate-dice-idle-float" : ""} ${
+        className={`relative flex items-center justify-center ${phase === "idle" ? "animate-dice-idle-float" : ""} ${
           phase === "rolling" ? "animate-dice-roll-tumble" : ""
         }`}
       >
         {phase === "idle" ? (
           <div
-            className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl sm:rounded-3xl"
+            className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl sm:rounded-2xl lg:rounded-2xl"
             aria-hidden
           >
             <div className="absolute inset-0 animate-dice-idle-sheen bg-gradient-to-r from-transparent via-white/[0.07] to-transparent" />
           </div>
         ) : null}
 
-        {/* Single die surface — no outer drop shadow blob, no second “backdrop” panel */}
+        {/* Die footprint matches QuickFlipCoinDisplay (7.5 / 9 / 11 rem) for board composition parity */}
         <div
           className={[
-            "relative flex h-[10.25rem] w-[10.25rem] items-center justify-center rounded-2xl p-4 sm:h-[12.25rem] sm:w-[12.25rem] sm:rounded-3xl sm:p-5 lg:h-[13.5rem] lg:w-[13.5rem] lg:p-6",
+            "relative flex h-[7.5rem] w-[7.5rem] items-center justify-center rounded-2xl p-2.5 sm:h-[9rem] sm:w-[9rem] sm:p-3 lg:h-[11rem] lg:w-[11rem] lg:p-4",
             "border border-white/[0.12]",
             "bg-gradient-to-b from-zinc-800 to-zinc-950",
             "shadow-[inset_0_1px_0_rgba(255,255,255,0.11),inset_0_-4px_14px_rgba(0,0,0,0.42)]",
             phase === "rolling" ? "border-amber-400/35" : "",
           ].join(" ")}
         >
-          <div className="relative z-[1] h-[82%] w-[82%]">
+          <div className="relative z-[1] h-[86%] w-[86%]">
             {phase === "idle" ? <IdleFace /> : null}
             {phase === "rolling" ? (
               <div key={tumbleFace} className="h-full w-full">
