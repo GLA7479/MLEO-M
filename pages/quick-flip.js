@@ -193,8 +193,6 @@ function QuickFlipGameplayPanel({
   popupLine2,
   popupLine3,
   sessionNotice,
-  statusTop,
-  statusSub,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -214,8 +212,9 @@ function QuickFlipGameplayPanel({
     <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
       <QuickFlipBoard
         sessionNotice={sessionNotice}
-        statusTop={statusTop}
-        statusSub={statusSub}
+        statusTop=""
+        statusSub=""
+        hideBoardStatusStack
         stepTotal={stepTotal}
         currentStepIndex={currentStepIndex}
         stepsComplete={stepsComplete}
@@ -1031,41 +1030,6 @@ export default function QuickFlipPage() {
   const isFlipping = uiState === UI_STATE.SUBMITTING_CHOICE || uiState === UI_STATE.RESOLVING;
   const strip = quickFlipRoundStripModel(uiState);
 
-  let statusTop = "Press FLIP COIN when you are set.";
-  let statusSub =
-    "Choose Heads or Tails, set your play in the bar below, then flip. The server seals the coin before you see it.";
-
-  if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
-    statusSub = !vaultReady
-      ? "Shared vault could not be opened. Return to the arcade and try again."
-      : String(errorMessage || "").trim() || "Check your balance and connection, then try FLIP COIN again.";
-  } else if (uiState === UI_STATE.LOADING) {
-    statusTop = "Starting round…";
-    statusSub = "Opening or resuming a session with the server.";
-  } else if (uiState === UI_STATE.SUBMITTING_CHOICE) {
-    statusTop = "Locking your pick…";
-    statusSub = "Sending Heads or Tails to the server.";
-  } else if (uiState === UI_STATE.CHOICE_SUBMITTED || isFlipping) {
-    statusTop = "Flipping…";
-    statusSub = "Outcome is resolved on the server; the coin follows the fair result.";
-  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    statusTop = resolvedResult.isWin ? "You matched the coin." : "No match this time.";
-    statusSub =
-      "Round is complete. Change side or stake, then press FLIP COIN for another round.";
-  } else if (uiState === UI_STATE.SESSION_CREATED || uiState === UI_STATE.CHOICE_SELECTED) {
-    statusTop = hasValidSide ? "Ready to flip." : "Choose your side.";
-    statusSub = hasValidSide
-      ? "Press FLIP COIN to lock your pick and resolve this round."
-      : "Tap Heads or Tails, then flip from the footer.";
-  } else if (uiState === UI_STATE.RESOLVE_FAILED) {
-    statusTop = "Could not resolve.";
-    statusSub = "Check your connection and try FLIP COIN again.";
-  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
-    statusTop = "Migration pending.";
-    statusSub = "This environment is updating. Try again shortly.";
-  }
-
   let payoutBandLabel = "Payout if win";
   let payoutBandValue = formatCompact(summaryWin);
   let payoutCaption = `×${QUICK_FLIP_WIN_MULTIPLIER} multiplier · play ${formatCompact(summaryPlay)}`;
@@ -1268,8 +1232,6 @@ export default function QuickFlipPage() {
           popupLine2={popupLine2}
           popupLine3={popupLine3}
           sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

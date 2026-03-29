@@ -133,13 +133,9 @@ function flashVeinStripModel(uiState, readState, playing) {
 }
 
 function FlashVeinGameplayPanel({
-  session,
-  uiState,
   pickingUi,
   lastFlash,
   sessionNotice,
-  statusTop,
-  statusSub,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -162,8 +158,9 @@ function FlashVeinGameplayPanel({
       <DicePickBoard
         progressStripKeyPrefix="flash-vein"
         sessionNotice={sessionNotice}
-        statusTop={statusTop}
-        statusSub={statusSub}
+        statusTop=""
+        statusSub=""
+        hideBoardStatusStack
         stepTotal={stepTotal}
         currentStepIndex={currentStepIndex}
         stepsComplete={stepsComplete}
@@ -969,36 +966,7 @@ export default function FlashVeinPage() {
     summaryWin = Math.max(0, Math.floor(Number(ss.payoutReturn) || 0));
   }
 
-  const roundsDone = Array.isArray(playing?.roundHistory) ? playing.roundHistory.length : 0;
   const strip = flashVeinStripModel(uiState, readState, playing);
-
-  let statusTop = "Press START RUN.";
-
-  if (uiState === UI_STATE.UNAVAILABLE) {
-    statusTop = !vaultReady ? "Vault unavailable." : "Can't start.";
-  } else if (uiState === UI_STATE.LOADING) {
-    statusTop = "Starting run…";
-  } else if (uiState === UI_STATE.SUBMITTING_PICK || uiState === UI_STATE.RESOLVING) {
-    statusTop = "Working…";
-  } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    statusTop = resolvedResult.isWin ? "You won." : "Run lost.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "awaiting_reveal") {
-    statusTop = "Opening flash…";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "pick_pending") {
-    if (revealPhase === "showing") statusTop = "Watch the flash.";
-    else if (revealPhase === "masked" && !memoryPickUnlocked) statusTop = "Lock in…";
-    else if (revealPhase === "masked")
-      statusTop = `Round ${roundsDone + 1} of ${FLASH_VEIN_ROUNDS} — pick your lane.`;
-    else statusTop = "Preparing flash…";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "pick_submitted") {
-    statusTop = "Working…";
-  } else if (uiState === UI_STATE.PENDING_MIGRATION) {
-    statusTop = "Migration pending.";
-  } else if (uiState === UI_STATE.IDLE) {
-    statusTop = "Press START RUN.";
-  }
-
-  const statusSub = "\u00a0";
 
   let payoutBandLabel = "Max win";
   let payoutBandValue = formatCompact(summaryWin);
@@ -1159,13 +1127,9 @@ export default function FlashVeinPage() {
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
         <FlashVeinGameplayPanel
-          session={session}
-          uiState={uiState}
           pickingUi={pickingUi}
           lastFlash={lastFlash}
           sessionNotice={sessionNotice}
-          statusTop={statusTop}
-          statusSub={statusSub}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}
