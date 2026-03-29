@@ -185,7 +185,6 @@ function DicePickGameplayPanel({
   sessionNotice,
   statusTop,
   statusSub,
-  hintLine,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -212,7 +211,6 @@ function DicePickGameplayPanel({
           payoutBandLabel={payoutBandLabel}
           payoutBandValue={payoutBandValue}
           payoutCaption={payoutCaption}
-          hintLine={hintLine}
           diceSlot={
             <DicePickDisplay phase={dicePhase} resolvedRoll={resolvedRoll} hideSubcaption />
           }
@@ -1043,33 +1041,25 @@ export default function DicePickPage() {
   let statusTop = "Press ROLL DICE when you are set.";
   let statusSub =
     "Choose LOW or HIGH, set your play in the bar below, then roll. The server seals the die before you see it.";
-  let hintLine = "Fair ×1.92 payout on a winning zone — one roll per round.";
 
   if (uiState === UI_STATE.UNAVAILABLE) {
     statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
     statusSub = !vaultReady
       ? "Shared vault could not be opened. Return to the arcade and try again."
       : String(errorMessage || "").trim() || "Check your balance and connection, then try ROLL DICE again.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.LOADING) {
     statusTop = "Starting round…";
     statusSub = "Opening or resuming a session with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SUBMITTING_CHOICE) {
     statusTop = "Locking your zone…";
     statusSub = "Sending LOW or HIGH to the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.CHOICE_SUBMITTED || isFlipping) {
     statusTop = "Rolling…";
     statusSub = "Outcome is resolved on the server; the die follows the fair result.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
     statusTop = resolvedResult.isWin ? "You hit your zone." : "No match this time.";
     statusSub =
       "Round is complete. Change zone or stake, then press ROLL DICE for another round.";
-    hintLine = resolvedResult.isWin
-      ? "Vault credit applied after settlement."
-      : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
   } else if (uiState === UI_STATE.SESSION_CREATED || uiState === UI_STATE.CHOICE_SELECTED) {
     statusTop = hasValidZone ? "Ready to roll." : "Choose your zone.";
     statusSub = hasValidZone
@@ -1078,11 +1068,9 @@ export default function DicePickPage() {
   } else if (uiState === UI_STATE.RESOLVE_FAILED) {
     statusTop = "Could not resolve.";
     statusSub = "Check your connection and try ROLL DICE again.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.PENDING_MIGRATION) {
     statusTop = "Migration pending.";
     statusSub = "This environment is updating. Try again shortly.";
-    hintLine = "\u00a0";
   }
 
   let payoutBandLabel = "Payout if win";
@@ -1208,7 +1196,7 @@ export default function DicePickPage() {
   return (
     <SoloV2GameShell
       title="Dice Pick"
-      subtitle="One honest d6 roll — sealed on the server before you see it."
+      subtitle="Fair zone, one roll."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1295,7 +1283,6 @@ export default function DicePickPage() {
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          hintLine={hintLine}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

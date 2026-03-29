@@ -122,7 +122,6 @@ function GoldRushGameplayPanel({
   sessionNotice,
   statusTop,
   statusSub,
-  hintLine,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -161,7 +160,6 @@ function GoldRushGameplayPanel({
   const total = Math.max(1, Math.floor(Number(stepTotal) || rowCount));
   const stripCleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
   const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
-  const hintVisible = String(hintLine || "").trim().length > 0 && hintLine !== "\u00a0";
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
@@ -251,14 +249,6 @@ function GoldRushGameplayPanel({
               onDigColumn={onDigColumn}
             />
           </div>
-
-          {hintVisible ? (
-            <p className="mt-1 line-clamp-2 shrink-0 px-1 text-center text-[9px] font-semibold leading-snug text-zinc-400 sm:px-2 sm:text-[10px] lg:px-0">
-              {hintLine}
-            </p>
-          ) : (
-            <div className="mt-1 h-[2.25rem] shrink-0 sm:h-[2.5rem]" aria-hidden />
-          )}
 
           <div className="mt-1 min-h-10 shrink-0 px-0.5 pb-1 sm:px-1 lg:px-0">
             <button
@@ -992,57 +982,41 @@ export default function GoldRushDiggerPage() {
   let statusTop = "Press START RUN when you are set.";
   let statusSub =
     "Set play in the bar below, then open a run. Each row has three spots — one bomb per row is sealed server-side before you dig.";
-  let hintLine =
-    "Safe digs climb the multiplier ladder; a bomb ends the run. Cash out banks your secured payout without risking the next row.";
 
   if (uiState === UI_STATE.UNAVAILABLE) {
     statusTop = !vaultReady ? "Vault unavailable." : "Can't start this run.";
     statusSub = !vaultReady
       ? "Shared vault could not be opened. Return to the arcade and try again."
       : String(errorMessage || "").trim() || "Check your balance and connection, then try START RUN again.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.LOADING) {
     statusTop = "Starting run…";
     statusSub = "Opening or resuming a session with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SUBMITTING_PICK) {
     statusTop = "Submitting dig…";
     statusSub = "Locking your spot with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVING || cashOutLoading) {
     statusTop = cashOutLoading ? "Cashing out…" : "Resolving this row…";
     statusSub = "Outcome is resolved on the server before the grid updates.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
     const won = Boolean(resolvedResult.isWin ?? resolvedResult.won);
     statusTop = won ? "Run closed in your favor." : "Run closed.";
     statusSub =
       "Adjust stake if needed, then press START RUN for another run — there is no auto-start after the popup.";
-    hintLine = won
-      ? "Vault credit applied after settlement."
-      : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "pick_conflict") {
     statusTop = "State conflict.";
     statusSub = "Refreshing row state from the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_submitted") {
     statusTop = "Pick locked — resolving…";
     statusSub = "The server reveals gold or bomb for this row.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && (readState === "choice_required" || readState === "ready")) {
     statusTop = "Pick a spot on the current row.";
     statusSub = "Three columns — one bomb per row. Your pick is committed when you tap.";
-    hintLine = gr?.canCashOut
-      ? "Cash out (secured) banks your ladder payout now without digging the next row."
-      : "Clear at least one safe row before cash out is offered.";
   } else if (uiState === UI_STATE.PENDING_MIGRATION) {
     statusTop = "Migration pending.";
     statusSub = "This environment is updating. Try again shortly.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.IDLE) {
     statusTop = "Gold rush dig.";
     statusSub = "Six rows, three spots each — survive the ladder or cash out between safe digs.";
-    hintLine = "Row six is the crown tier on the multiplier ladder; one bomb in any row ends the run.";
   }
 
   let payoutBandLabel = "Secured payout";
@@ -1134,7 +1108,7 @@ export default function GoldRushDiggerPage() {
   return (
     <SoloV2GameShell
       title="Gold Rush Digger"
-      subtitle="Six rows, three dig spots each — one bomb per row, sealed before you pick. Climb the ladder or cash out secured."
+      subtitle="Dig rows, dodge bombs."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1215,7 +1189,6 @@ export default function GoldRushDiggerPage() {
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          hintLine={hintLine}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

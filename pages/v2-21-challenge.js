@@ -159,7 +159,6 @@ function Challenge21GameplayPanel({
   payoutBandLabel,
   payoutBandValue,
   payoutCaption,
-  hintLine,
   playerHands,
   activeHandIndex,
   playerHand,
@@ -184,7 +183,6 @@ function Challenge21GameplayPanel({
   const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
   const stripCleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
   const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
-  const hintVisible = String(hintLine || "").trim().length > 0 && hintLine !== "\u00a0";
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
@@ -269,14 +267,6 @@ function Challenge21GameplayPanel({
               actionsHidden={actionsHidden}
             />
           </div>
-
-          {hintVisible ? (
-            <p className="mt-1 line-clamp-2 shrink-0 px-1 text-center text-[9px] font-semibold leading-snug text-zinc-400 sm:px-2 sm:text-[10px] lg:px-0">
-              {hintLine}
-            </p>
-          ) : (
-            <div className="mt-1 h-[2.25rem] shrink-0 sm:h-[2.5rem]" aria-hidden />
-          )}
         </div>
       </div>
 
@@ -1569,19 +1559,10 @@ export default function Challenge21Page() {
         : "Round settled.";
   }
 
-  let hintLine =
-    "Blackjack pays 2.5× on that hand; other wins 2×; opponent draws to 17+ and stands on all 17.";
-  if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    hintLine =
-      "After the popup closes, the final board stays visible — press START 21 CHALLENGE for a new round. There is no auto-start after the popup.";
-  } else if (uiState === UI_STATE.UNAVAILABLE || uiState === UI_STATE.LOADING) {
-    hintLine = "\u00a0";
-  }
-
   return (
     <SoloV2GameShell
       title="21 Challenge"
-      subtitle="Reach 21 without going over."
+      subtitle="Beat the dealer hand."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1662,7 +1643,6 @@ export default function Challenge21Page() {
           payoutBandLabel={payoutBandLabel}
           payoutBandValue={payoutBandValue}
           payoutCaption={payoutCaption}
-          hintLine={hintLine}
           playerHands={panelPlayerHands}
           activeHandIndex={panelActiveIndex}
           playerHand={displayPlayer}

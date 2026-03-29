@@ -246,7 +246,6 @@ function MysteryChamberGameplayPanel({
   sigilVisuals,
   sigilPickDisabled,
   onSigilPick,
-  hintLine,
   exitVisible,
   exitDisabled,
   onExitNow,
@@ -279,7 +278,6 @@ function MysteryChamberGameplayPanel({
           sigilVisuals={sigilVisuals}
           sigilPickDisabled={sigilPickDisabled}
           onSigilPick={onSigilPick}
-          hintLine={hintLine}
           exitVisible={exitVisible}
           exitDisabled={exitDisabled}
           onExitNow={onExitNow}
@@ -1245,7 +1243,6 @@ export default function MysteryChamberPage() {
   let statusTop = "Press START MYSTERY CHAMBER to begin.";
   let statusSub =
     "Chambers 1–3 each have two safe sigils; chamber 4 has one. Four sigils shown every chamber.";
-  let hintLine = "\u00a0";
 
   const cleared = playing?.chambersCleared ?? 0;
   const curCh = playing?.currentChamberIndex ?? 0;
@@ -1292,11 +1289,6 @@ export default function MysteryChamberPage() {
     const fc = persistedBoard?.finalChamberIndex ?? 0;
     statusTop = `Wrong sigil. The run ended in Chamber ${fc + 1}.`;
     statusSub = "The run is over.";
-  }
-
-  if (uiState === UI_STATE.RESOLVED && persistedBoard) {
-    hintLine =
-      "After the popup closes, the final board stays visible — press START MYSTERY CHAMBER for a new run; there is no auto-start or auto-chain.";
   }
 
   const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.settlementSummary?.isWin);
@@ -1386,7 +1378,7 @@ export default function MysteryChamberPage() {
   return (
     <SoloV2GameShell
       title="Mystery Chamber"
-      subtitle="Advance through the chamber run."
+      subtitle="Four chambers, safe picks."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1463,7 +1455,6 @@ export default function MysteryChamberPage() {
           sigilVisuals={sigilVisuals}
           sigilPickDisabled={sigilPickDisabled}
           onSigilPick={handleSigilPick}
-          hintLine={hintLine}
           exitVisible={exitVisible}
           exitDisabled={exitDisabled}
           onExitNow={handleExitNow}

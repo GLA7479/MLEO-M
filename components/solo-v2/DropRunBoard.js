@@ -10,7 +10,6 @@ export default function DropRunBoard({
   resolvingUi = false,
   statusTop = "—",
   statusSub = "",
-  hintLine = "\u00a0",
   stepTotal = 2,
   currentStepIndex = 0,
   stepsComplete = 0,
@@ -38,7 +37,6 @@ export default function DropRunBoard({
   const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
   const cleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
   const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
-  const hintVisible = String(hintLine || "").trim().length > 0 && hintLine !== "\u00a0";
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border-2 border-violet-700/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -133,12 +131,6 @@ export default function DropRunBoard({
             runKey={runKey}
             onAnimationComplete={onDropAnimationComplete}
           />
-        </div>
-
-        <div className="mt-2 flex min-h-[2.25rem] shrink-0 items-start justify-center px-0.5 text-center text-[9px] font-medium leading-snug text-zinc-500 sm:min-h-[2.5rem] sm:text-[10px] lg:mt-0 lg:w-[min(100%,14rem)] lg:items-start lg:justify-start lg:self-stretch lg:border-l lg:border-zinc-700/40 lg:pl-4 lg:pt-1 lg:text-left">
-          <p className="line-clamp-4 w-full lg:line-clamp-none">
-            {hintVisible ? hintLine : pickingUi || resolvingUi ? "\u00a0" : "Outer boxes ×0 — center pays best."}
-          </p>
         </div>
       </div>
     </div>

@@ -131,7 +131,6 @@ function DropRunGameplayPanel({
   sessionNotice,
   statusTop,
   statusSub,
-  hintLine,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -155,7 +154,6 @@ function DropRunGameplayPanel({
           resolvingUi={resolvingUi}
           statusTop={statusTop}
           statusSub={statusSub}
-          hintLine={hintLine}
           stepTotal={stepTotal}
           currentStepIndex={currentStepIndex}
           stepsComplete={stepsComplete}
@@ -842,54 +840,40 @@ export default function DropRunPage() {
   let statusTop = "Press START DROP when you are set.";
   let statusSub =
     "Set your play in the bar below, then start. The server seals the path; DROP BALL releases the run.";
-  let hintLine = "Outer boxes pay ×0; multipliers rise toward the center (up to ×4.75 on your play).";
 
   if (uiState === UI_STATE.UNAVAILABLE) {
     statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
     statusSub = !vaultReady
       ? "Shared vault could not be opened. Return to the arcade and try again."
       : String(errorMessage || "").trim() || "Check your balance and connection, then try START DROP again.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.LOADING) {
     statusTop = "Starting run…";
     statusSub = "Opening or resuming a session with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SUBMITTING_PICK) {
     statusTop = "Locking drop…";
     statusSub = "Sending your play to the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVING && !dropPlayback) {
     statusTop = "Drawing path…";
     statusSub = "Server is sealing the bounce path for this drop.";
-    hintLine = "\u00a0";
   } else if (dropPlayback) {
     statusTop = "Dropping…";
     statusSub = "Follow the ball — it lands in the box that sets this round’s multiplier.";
-    hintLine = "\u00a0";
   } else if (readState === "gate_submitted") {
     statusTop = "Starting drop…";
     statusSub = "Resolving gate with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
     statusTop = resolvedResult.isWin || resolvedResult.won ? "Payout box hit." : "No payout this time.";
     statusSub =
       "Round is complete. The board keeps the last drop until you press START DROP again — there is no auto-start.";
-    hintLine =
-      resolvedResult.isWin || resolvedResult.won
-        ? "Vault credit applied after settlement."
-        : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready") {
     statusTop = "Ready to drop.";
     statusSub = "Press DROP BALL in the footer to release the ball through the field.";
-    hintLine = "One drop per round — path and landing are server-resolved.";
   } else if (uiState === UI_STATE.PENDING_MIGRATION) {
     statusTop = "Migration pending.";
     statusSub = "This environment is updating. Try again shortly.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.IDLE) {
     statusTop = "Drop Run";
     statusSub = "Plinko-style field — bottom box sets your multiplier on this play.";
-    hintLine = "START DROP opens a session; DROP BALL runs the sealed path.";
   }
 
   let payoutBandLabel = "Max win";
@@ -995,7 +979,7 @@ export default function DropRunPage() {
   return (
     <SoloV2GameShell
       title="Drop Run"
-      subtitle="Server-sealed path through the peg field — landing box sets your multiplier."
+      subtitle="Drop sets multiplier."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1072,7 +1056,6 @@ export default function DropRunPage() {
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          hintLine={hintLine}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

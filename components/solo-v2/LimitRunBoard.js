@@ -48,7 +48,7 @@ function commitTargetDraftToNumber(draft) {
 }
 
 /**
- * Limit Run — Quick Flip mirror shell (notice, status, round strip, payout band, hint) + limbo identity
+ * Limit Run — Quick Flip mirror shell (notice, status, round strip, payout band) + limbo identity
  * (hero readout, slider, roll). Mobile stack; `lg+` splits hero | controls — separate desktop target.
  */
 export default function LimitRunBoard({
@@ -62,11 +62,9 @@ export default function LimitRunBoard({
   projectedPayoutLabel = "0",
   onRoll,
   rollDisabled = false,
-  showHeroHint = false,
   sessionNotice = "",
   statusTop = "—",
   statusSub = "",
-  hintLine = "\u00a0",
   stepTotal = 2,
   currentStepIndex = 0,
   stepsComplete = 0,
@@ -92,7 +90,6 @@ export default function LimitRunBoard({
   const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
   const cleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
   const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
-  const hintVisible = String(hintLine || "").trim().length > 0 && hintLine !== "\u00a0";
 
   const [customDraft, setCustomDraft] = useState(() => formatTargetInputFromNumber(targetMultiplier));
 
@@ -319,10 +316,6 @@ export default function LimitRunBoard({
                 </svg>
               </div>
             </div>
-          </div>
-
-          <div className="flex min-h-[2.25rem] items-start justify-center px-0.5 text-center text-[9px] font-medium leading-snug text-zinc-500 sm:min-h-[2.5rem] sm:text-[10px] lg:px-0">
-            <p className="line-clamp-2 w-full">{hintVisible ? hintLine : showHeroHint ? "Set target, then roll. Win if result ≥ target." : "\u00a0"}</p>
           </div>
 
           <div className="grid min-h-[3.35rem] grid-cols-2 gap-2 rounded-lg border border-violet-900/40 bg-zinc-900/80 px-2.5 py-2 text-center sm:min-h-[3.25rem] sm:gap-1.5 sm:px-2 sm:py-2">

@@ -1038,7 +1038,7 @@ export default function HighLowCardsPage() {
   return (
     <SoloV2GameShell
       title="Hi-Lo Cards"
-      subtitle="Call higher or lower on the next card — streak builds your multiplier; cash out or risk it all."
+      subtitle="Higher, lower, build streak."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1119,10 +1119,6 @@ export default function HighLowCardsPage() {
                   {sessionNotice || "\u00a0"}
                 </p>
               </div>
-              <p className="mb-0.5 line-clamp-3 shrink-0 px-0.5 text-[9px] leading-snug text-zinc-400 sm:mb-1 sm:line-clamp-none sm:px-0 sm:text-xs">
-                See the base card, then call higher or lower. Each win raises your streak and multiplier (+0.206 per win,
-                legacy curve). Cash out anytime after at least one win.
-              </p>
 
               <div
                 className="relative mx-auto w-full max-w-full shrink-0 px-0.5 text-zinc-500 min-h-[2.5rem] sm:max-w-sm sm:min-h-[2.875rem]"

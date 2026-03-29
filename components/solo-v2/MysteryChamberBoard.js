@@ -76,7 +76,6 @@ export default function MysteryChamberBoard({
   sigilVisuals = ["idle", "idle", "idle", "idle"],
   sigilPickDisabled = false,
   onSigilPick,
-  hintLine = "\u00a0",
   exitVisible = false,
   exitDisabled = false,
   onExitNow,
@@ -180,12 +179,6 @@ export default function MysteryChamberBoard({
             />
           ))}
         </div>
-      </div>
-
-      <div className="flex min-h-[1.75rem] shrink-0 items-start justify-center px-2 pb-0.5 pt-0 text-center sm:min-h-[1.625rem] sm:items-center sm:px-4 sm:pb-0 sm:pt-0 lg:px-8">
-        <p className="line-clamp-2 w-full text-[9px] font-medium leading-snug text-zinc-400 sm:text-[10px]">
-          {hintLine}
-        </p>
       </div>
 
       <div className="flex shrink-0 justify-center border-t border-amber-900/35 bg-zinc-950/80 px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1 lg:px-8">

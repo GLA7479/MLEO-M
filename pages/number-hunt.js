@@ -136,7 +136,6 @@ function NumberHuntGameplayPanel({
   sessionNotice,
   statusTop,
   statusSub,
-  hintLine,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -154,7 +153,6 @@ function NumberHuntGameplayPanel({
 }) {
   const nh = session?.numberHunt;
   const rawPlaying = nh?.playing;
-  const guessCountSoFar = Array.isArray(rawPlaying?.guessHistory) ? rawPlaying.guessHistory.length : 0;
   const resolved = uiState === UI_STATE.RESOLVED && resolvedResult;
   const playing =
     resolved && resolvedResult
@@ -178,7 +176,6 @@ function NumberHuntGameplayPanel({
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          hintLine={hintLine}
           stepTotal={stepTotal}
           currentStepIndex={currentStepIndex}
           stepsComplete={stepsComplete}
@@ -190,12 +187,6 @@ function NumberHuntGameplayPanel({
           pickDisabled={pickDisabled}
           revealTarget={revealTarget}
           revealWin={revealWin}
-          showHeroHint={
-            uiState === UI_STATE.SESSION_ACTIVE &&
-            String(nh?.readState || "") === "ready" &&
-            !pickingUi &&
-            guessCountSoFar === 0
-          }
         />
       </div>
 
@@ -864,63 +855,48 @@ export default function NumberHuntPage() {
   let statusTop = "Press START HUNT when you are set.";
   let statusSub =
     "Set your play in the bar below, then start. The server holds a secret 1–20; you get up to three guesses with clues.";
-  let hintLine = "Hit on 1st / 2nd / 3rd guess pays ×4.5 / ×2.5 / ×1.5 on your stake (this release).";
 
   if (uiState === UI_STATE.UNAVAILABLE) {
     statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
     statusSub = !vaultReady
       ? "Shared vault could not be opened. Return to the arcade and try again."
       : String(errorMessage || "").trim() || "Check your balance and connection, then try START HUNT again.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.LOADING) {
     statusTop = "Starting hunt…";
     statusSub = "Opening or resuming a session with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SUBMITTING_PICK) {
     statusTop = "Submitting guess…";
     statusSub = "Sending your pick to the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVING) {
     statusTop = "Resolving…";
     statusSub = "Checking your guess against the sealed target.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
     statusTop = resolvedResult.isWin ? "You found the target." : "Out of guesses.";
     statusSub =
       "Round is complete. Adjust stake if you like, then press START HUNT for another round — there is no auto-start.";
-    hintLine = resolvedResult.isWin
-      ? "Vault credit applied after settlement."
-      : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready") {
     if (pickingUi) {
       statusTop = "Checking…";
       statusSub = "\u00a0";
-      hintLine = "\u00a0";
     } else if (guessCountForStrip === 0) {
       statusTop = "Pick your first guess.";
       statusSub = "Hidden number is 1–20 · You have three tries.";
-      hintLine = "Tap a number in range; wrong picks are ruled out with higher / lower clues.";
     } else if (lastClue) {
       statusTop = lastClue;
       statusSub = `Guess ${guessCountForStrip + 1} of ${NUMBER_HUNT_MAX_GUESSES} · use the clues to narrow the range.`;
-      hintLine = "Numbers outside the live range can’t be selected.";
     } else {
       statusTop = "Pick your next guess.";
       statusSub = `Guess ${guessCountForStrip + 1} of ${NUMBER_HUNT_MAX_GUESSES}.`;
-      hintLine = "Use the range row and grid — eliminated numbers stay struck out.";
     }
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "guess_submitted") {
     statusTop = "Finishing your guess…";
     statusSub = "Resolving with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.PENDING_MIGRATION) {
     statusTop = "Migration pending.";
     statusSub = "This environment is updating. Try again shortly.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.IDLE) {
     statusTop = "Number Hunt";
     statusSub = "Three guesses, higher-or-lower clues, range narrows after each miss.";
-    hintLine = "START HUNT locks your stake; picks happen on the board only.";
   }
 
   let payoutBandLabel = "Max win";
@@ -1004,7 +980,7 @@ export default function NumberHuntPage() {
   return (
     <SoloV2GameShell
       title="Number Hunt"
-      subtitle="Three guesses to find a server-sealed number from 1–20."
+      subtitle="Three guesses, one number."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1080,7 +1056,6 @@ export default function NumberHuntPage() {
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          hintLine={hintLine}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

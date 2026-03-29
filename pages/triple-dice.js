@@ -173,7 +173,6 @@ function TripleDiceGameplayPanel({
   payoutBandLabel,
   payoutBandValue,
   payoutCaption,
-  hintLine,
   onRoll,
   rollDisabled,
   optionPickerDisabled,
@@ -187,7 +186,6 @@ function TripleDiceGameplayPanel({
   const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
   const stripCleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
   const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
-  const hintVisible = String(hintLine || "").trim().length > 0 && hintLine !== "\u00a0";
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
@@ -269,14 +267,6 @@ function TripleDiceGameplayPanel({
               optionPickerDisabled={optionPickerDisabled}
             />
           </div>
-
-          {hintVisible ? (
-            <p className="mt-1 line-clamp-2 shrink-0 px-1 text-center text-[9px] font-semibold leading-snug text-zinc-400 sm:px-2 sm:text-[10px] lg:px-0">
-              {hintLine}
-            </p>
-          ) : (
-            <div className="mt-1 h-[2.25rem] shrink-0 sm:h-[2.5rem]" aria-hidden />
-          )}
         </div>
       </div>
 
@@ -1101,17 +1091,6 @@ export default function TripleDicePage() {
     payoutCaption = pzLabel && pzLabel !== "—" ? `Played ${pzLabel} on this round` : "Round settled";
   }
 
-  let hintLine =
-    "TRIPLE pays only when all three dice show the same number — the sum does not decide that lane.";
-  if (uiState === UI_STATE.RESOLVED && resolvedResult) {
-    hintLine =
-      "Press START TRIPLE DICE for another round — there is no auto-start after the popup; the dice stay on the final roll.";
-  } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready" && !rollingUi) {
-    hintLine = `Lane ${normZone.toUpperCase()} · ~${winChance.toFixed(2)}% — switch before you roll if you want different odds.`;
-  } else if (uiState === UI_STATE.UNAVAILABLE || uiState === UI_STATE.LOADING) {
-    hintLine = "\u00a0";
-  }
-
   let statusTop = "Choose 1 of 4 options, then roll.";
   let statusSub = "Pick LOW, MID, HIGH, or TRIPLE — then START TRIPLE DICE.";
   if (rollingUi) {
@@ -1153,7 +1132,7 @@ export default function TripleDicePage() {
   return (
     <SoloV2GameShell
       title="Triple Dice"
-      subtitle="Pick LOW, MID, HIGH, or TRIPLE — three server dice, one roll per session; odds and projected win follow your lane."
+      subtitle="Pick lane, roll once."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1239,7 +1218,6 @@ export default function TripleDicePage() {
           payoutBandLabel={payoutBandLabel}
           payoutBandValue={payoutBandValue}
           payoutCaption={payoutCaption}
-          hintLine={hintLine}
           onRoll={handleRoll}
           rollDisabled={rollDisabled}
           optionPickerDisabled={optionPickerDisabled}

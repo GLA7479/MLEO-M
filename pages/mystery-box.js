@@ -192,7 +192,6 @@ function MysteryBoxGameplayPanel({
   sessionNotice,
   statusTop,
   statusSub,
-  hintLine,
   stepsComplete,
   currentStepIndex,
   stepTotal,
@@ -220,7 +219,6 @@ function MysteryBoxGameplayPanel({
           payoutBandLabel={payoutBandLabel}
           payoutBandValue={payoutBandValue}
           payoutCaption={payoutCaption}
-          hintLine={hintLine}
           accentSlot={<MysteryBoxAccent winningBoxIndex={winningBoxIndex} />}
           boxesSlot={
             <div className="flex w-full flex-col items-stretch gap-3 lg:gap-4">
@@ -1182,33 +1180,25 @@ export default function MysteryBoxPage() {
   let statusTop = "Press OPEN BOX when you are set.";
   let statusSub =
     "One of three boxes holds the prize. Choose A, B, or C, set your play below, then open — the server seals the winning box.";
-  let hintLine = `Fair ×${MYSTERY_BOX_WIN_MULTIPLIER} on a hit — three boxes, ~${MYSTERY_BOX_IMPLIED_RTP_PERCENT}% RTP target.`;
 
   if (uiState === UI_STATE.UNAVAILABLE) {
     statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
     statusSub = !vaultReady
       ? "Shared vault could not be opened. Return to the arcade and try again."
       : String(errorMessage || "").trim() || "Check your balance and connection, then try OPEN BOX again.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.LOADING) {
     statusTop = "Starting round…";
     statusSub = "Opening or resuming a session with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SUBMITTING_CHOICE) {
     statusTop = "Locking your pick…";
     statusSub = "Sending your box choice to the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.CHOICE_SUBMITTED || isOpening) {
     statusTop = "Opening…";
     statusSub = "The server reveals which box held the prize.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
     statusTop = resolvedResult.isWin ? "You found the prize box." : "Not the prize box this time.";
     statusSub =
       "Round is complete. Change box or stake, then press OPEN BOX for another round.";
-    hintLine = resolvedResult.isWin
-      ? "Vault credit applied after settlement."
-      : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
   } else if (uiState === UI_STATE.SESSION_CREATED || uiState === UI_STATE.CHOICE_SELECTED) {
     statusTop = hasValidBox ? "Ready to open." : "Choose a box.";
     statusSub = hasValidBox
@@ -1217,11 +1207,9 @@ export default function MysteryBoxPage() {
   } else if (uiState === UI_STATE.RESOLVE_FAILED) {
     statusTop = "Could not resolve.";
     statusSub = "Check your connection and try OPEN BOX again.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.PENDING_MIGRATION) {
     statusTop = "Migration pending.";
     statusSub = "This environment is updating. Try again shortly.";
-    hintLine = "\u00a0";
   }
 
   let payoutBandLabel = "Payout if win";
@@ -1362,7 +1350,7 @@ export default function MysteryBoxPage() {
   return (
     <SoloV2GameShell
       title="Mystery Box"
-      subtitle="Three boxes — the server seals the prize before you see it."
+      subtitle="Three boxes, one prize."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1443,7 +1431,6 @@ export default function MysteryBoxPage() {
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          hintLine={hintLine}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

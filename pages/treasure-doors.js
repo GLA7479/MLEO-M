@@ -125,7 +125,6 @@ function TreasureDoorsGameplayPanel({
   sessionNotice,
   statusTop,
   statusSub,
-  hintLine,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -187,7 +186,6 @@ function TreasureDoorsGameplayPanel({
   const total = Math.max(1, Math.floor(Number(stepTotal) || chamberCount));
   const stripCleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
   const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
-  const hintVisible = String(hintLine || "").trim().length > 0 && hintLine !== "\u00a0";
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
@@ -282,14 +280,6 @@ function TreasureDoorsGameplayPanel({
               hideChamberRunStrip
             />
           </div>
-
-          {hintVisible ? (
-            <p className="mt-1 line-clamp-2 shrink-0 px-1 text-center text-[9px] font-semibold leading-snug text-zinc-400 sm:px-2 sm:text-[10px] lg:px-0">
-              {hintLine}
-            </p>
-          ) : (
-            <div className="mt-1 h-[2.25rem] shrink-0 sm:h-[2.5rem]" aria-hidden />
-          )}
 
           <div className="mt-1 min-h-10 shrink-0 px-0.5 pb-1 sm:px-1 lg:px-0">
             <button
@@ -1079,57 +1069,41 @@ export default function TreasureDoorsPage() {
   let statusTop = "Press START RUN when you are set.";
   let statusSub =
     "Set play in the bar below, then enter the vault. Each chamber has three doors — two safe, one trap sealed by the server.";
-  let hintLine =
-    "After a safe chamber you can bank secured loot, or descend for a higher ladder payout — one trap ends the run.";
 
   if (uiState === UI_STATE.UNAVAILABLE) {
     statusTop = !vaultReady ? "Vault unavailable." : "Can't start this run.";
     statusSub = !vaultReady
       ? "Shared vault could not be opened. Return to the arcade and try again."
       : String(errorMessage || "").trim() || "Check your balance and connection, then try START RUN again.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.LOADING) {
     statusTop = "Starting run…";
     statusSub = "Opening or resuming a session with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SUBMITTING_PICK) {
     statusTop = "Submitting door…";
     statusSub = "Locking your pick with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVING || cashOutLoading) {
     statusTop = cashOutLoading ? "Sealing vault…" : "Opening the chamber…";
     statusSub = "Outcome is resolved on the server before the doors update.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
     const won = Boolean(resolvedResult.isWin ?? resolvedResult.won);
     statusTop = won ? "Temple run closed in your favor." : "Temple run closed.";
     statusSub =
       "Adjust stake if needed, then press START RUN for another run — there is no auto-start after the popup.";
-    hintLine = won
-      ? "Vault credit applied after settlement."
-      : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "pick_conflict") {
     statusTop = "State conflict.";
     statusSub = "Refreshing chamber state from the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "choice_submitted") {
     statusTop = "Door locked — the vault decides…";
     statusSub = "Resolving this chamber on the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && (readState === "choice_required" || readState === "ready")) {
     statusTop = "Choose a door.";
     statusSub = "Two passages are safe; one is a trap — your pick is committed when you tap.";
-    hintLine = td?.canCashOut
-      ? "Bank secured loot now to exit cleanly without opening the next chamber."
-      : "Clear chambers to build secured loot before banking is offered.";
   } else if (uiState === UI_STATE.PENDING_MIGRATION) {
     statusTop = "Migration pending.";
     statusSub = "This environment is updating. Try again shortly.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.IDLE) {
     statusTop = "Temple run.";
     statusSub = "Five sealed chambers, three doors each — survive the ladder or bank between safe rooms.";
-    hintLine = "Trap doors are server-sealed before you choose; wrong door ends the run immediately.";
   }
 
   let payoutBandLabel = "Secured loot";
@@ -1221,7 +1195,7 @@ export default function TreasureDoorsPage() {
   return (
     <SoloV2GameShell
       title="Treasure Doors"
-      subtitle="Five sealed chambers, three doors each — two safe passages, one server-sealed trap per room."
+      subtitle="Doors, chambers, bank loot."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1303,7 +1277,6 @@ export default function TreasureDoorsPage() {
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          hintLine={hintLine}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

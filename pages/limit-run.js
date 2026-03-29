@@ -135,7 +135,6 @@ function LimitRunGameplayPanel({
   sessionNotice,
   statusTop,
   statusSub,
-  hintLine,
   stepTotal,
   stepsComplete,
   currentStepIndex,
@@ -173,7 +172,6 @@ function LimitRunGameplayPanel({
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          hintLine={hintLine}
           stepTotal={stepTotal}
           currentStepIndex={currentStepIndex}
           stepsComplete={stepsComplete}
@@ -181,12 +179,6 @@ function LimitRunGameplayPanel({
           payoutBandLabel={payoutBandLabel}
           payoutBandValue={payoutBandValue}
           payoutCaption={payoutCaption}
-          showHeroHint={
-            uiState === UI_STATE.SESSION_ACTIVE &&
-            String(lr?.readState || "") === "ready" &&
-            !rollingUi &&
-            !resultLineUi
-          }
         />
       </div>
 
@@ -918,50 +910,37 @@ export default function LimitRunPage() {
   let statusTop = "Press START RUN when you are set.";
   let statusSub =
     "Set your target multiplier and stake in the bar below, then start. After that, Roll resolves the server draw.";
-  let hintLine = "Win if the rolled multiplier is greater than or equal to your target — one roll per round.";
 
   if (uiState === UI_STATE.UNAVAILABLE) {
     statusTop = !vaultReady ? "Vault unavailable." : "Can’t start this round.";
     statusSub = !vaultReady
       ? "Shared vault could not be opened. Return to the arcade and try again."
       : String(errorMessage || "").trim() || "Check your balance and connection, then try START RUN again.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.LOADING) {
     statusTop = "Starting run…";
     statusSub = "Opening or resuming a session with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.SUBMITTING_PICK) {
     statusTop = "Submitting roll…";
     statusSub = "Locking your target with the server.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVING || rollingUi) {
     statusTop = "Drawing multiplier…";
     statusSub = "Outcome is resolved on the server; the readout follows the fair result.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.RESOLVED && resolvedResult) {
     statusTop = resolvedResult.isWin || resolvedResult.won ? "Target beaten." : "Below target this time.";
     statusSub =
       "Round is complete. Adjust target or stake, then press START RUN for another round — there is no auto-start.";
-    hintLine =
-      resolvedResult.isWin || resolvedResult.won
-        ? "Vault credit applied after settlement."
-        : "Paid rounds debit stake on a loss; gift rounds do not debit the vault on a loss.";
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "ready") {
     statusTop = "Ready to roll.";
     statusSub = "Tap Roll when your target is set. The server draws the multiplier for this round.";
-    hintLine = `Target ×${Number(targetMultiplier).toFixed(2)} · about ${winChanceNow.toFixed(2)}% win chance.`;
   } else if (uiState === UI_STATE.SESSION_ACTIVE && readState === "roll_submitted") {
     statusTop = "Finishing your roll…";
     statusSub = "Resolving the server draw.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.PENDING_MIGRATION) {
     statusTop = "Migration pending.";
     statusSub = "This environment is updating. Try again shortly.";
-    hintLine = "\u00a0";
   } else if (uiState === UI_STATE.IDLE || uiState === UI_STATE.UNAVAILABLE) {
     statusTop = "Limbo-style run.";
     statusSub = "Choose a target, set play, then START RUN. Roll only after the session opens.";
-    hintLine = "Higher targets pay more but hit less often.";
   }
 
   let payoutBandLabel = "Payout if win";
@@ -1054,7 +1033,7 @@ export default function LimitRunPage() {
   return (
     <SoloV2GameShell
       title="Limit Run"
-      subtitle="Pick a target multiplier — roll meets or beats it to win."
+      subtitle="Roll meets your target."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1135,7 +1114,6 @@ export default function LimitRunPage() {
           sessionNotice={sessionNotice}
           statusTop={statusTop}
           statusSub={statusSub}
-          hintLine={hintLine}
           stepTotal={strip.stepTotal}
           stepsComplete={strip.stepsComplete}
           currentStepIndex={strip.currentStepIndex}

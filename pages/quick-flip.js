@@ -1186,7 +1186,7 @@ export default function QuickFlipPage() {
   return (
     <SoloV2GameShell
       title="Quick Flip"
-      subtitle="One honest flip — sealed on the server before you see it."
+      subtitle="One fair coin flip."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary

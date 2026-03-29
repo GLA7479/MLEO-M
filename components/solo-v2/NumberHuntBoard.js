@@ -7,17 +7,15 @@ import {
 const NUMBERS = Array.from({ length: NUMBER_HUNT_MAX_NUM - NUMBER_HUNT_MIN_NUM + 1 }, (_, i) => i + NUMBER_HUNT_MIN_NUM);
 
 /**
- * Number Hunt — Quick Flip mirror shell (notice, status, guess strip, payout, hint) + grid identity.
- * Mobile: vertical stack. `lg+`: sidebar (slots, range, hint) | grid — separate desktop target.
+ * Number Hunt — Quick Flip mirror shell (notice, status, guess strip, payout) + grid identity.
+ * Mobile: vertical stack. `lg+`: sidebar (slots, range) | grid — separate desktop target.
  */
 export default function NumberHuntBoard({
   playing = null,
   pickingUi = false,
-  showHeroHint = false,
   sessionNotice = "",
   statusTop = "—",
   statusSub = "",
-  hintLine = "\u00a0",
   stepTotal = NUMBER_HUNT_MAX_GUESSES,
   currentStepIndex = 0,
   stepsComplete = 0,
@@ -39,7 +37,6 @@ export default function NumberHuntBoard({
   const total = Math.max(1, Math.floor(Number(stepTotal) || NUMBER_HUNT_MAX_GUESSES));
   const cleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
   const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
-  const hintVisible = String(hintLine || "").trim().length > 0 && hintLine !== "\u00a0";
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border-2 border-violet-700/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -146,12 +143,6 @@ export default function NumberHuntBoard({
               </span>
             </div>
           </div>
-
-          <div className="hidden min-h-[2.5rem] items-start justify-center text-center text-[9px] font-medium leading-snug text-zinc-500 sm:text-[10px] lg:flex">
-            <p className="line-clamp-3 w-full text-left">
-              {hintVisible ? hintLine : showHeroHint ? "Pick a number 1–20; you have three tries with clues after each miss." : "\u00a0"}
-            </p>
-          </div>
         </div>
 
         <div className="mt-2 flex min-h-0 flex-1 flex-col sm:mt-3 lg:mt-0 lg:min-w-0 lg:justify-center">
@@ -197,12 +188,6 @@ export default function NumberHuntBoard({
                   </button>
                 );
               })}
-          </div>
-
-          <div className="mt-2 flex min-h-[2.25rem] items-start justify-center px-0.5 text-center text-[9px] font-medium leading-snug text-zinc-500 sm:min-h-[2.5rem] sm:text-[10px] lg:hidden">
-            <p className="line-clamp-2 w-full">
-              {hintVisible ? hintLine : showHeroHint ? "Tap a number in range; clues narrow the range." : "\u00a0"}
-            </p>
           </div>
         </div>
       </div>
