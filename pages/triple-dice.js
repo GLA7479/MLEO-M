@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import TripleDiceBoard from "../components/solo-v2/TripleDiceBoard";
+import DicePickBoard from "../components/solo-v2/DicePickBoard";
+import { TripleDiceDiceCluster, TripleDiceZoneRollPanel } from "../components/solo-v2/TripleDiceBoard";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
   SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
@@ -178,103 +179,49 @@ function TripleDiceGameplayPanel({
   optionPickerDisabled,
   resultPopupOpen,
   resolvedIsWin,
+  popupTitle,
   popupLine2,
   popupLine3,
   resultVaultLabel,
 }) {
-  const showSession = Boolean(sessionNotice);
-  const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
-  const stripCleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
-  const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
-
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-2 border-violet-700/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-8">
-          <p
-            className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-violet-200/85 sm:text-[10px] ${
-              showSession ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            {showSession ? sessionNotice : "\u00a0"}
-          </p>
-        </div>
-
-        <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-8">
-          <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
-            <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-violet-200/40 sm:text-[9px]">Round</span>
-            <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
-              {Math.min(stripCleared + 1, total)} / {total}
-            </span>
-          </div>
-          <div
-            className="flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
-            aria-label="Round progress"
-          >
-            {Array.from({ length: total }, (_, i) => {
-              const done = i < stripCleared;
-              const active = i === cur && !done;
-              const label = stepLabels[i] ?? String(i + 1);
-              return (
-                <div
-                  key={`td3-step-${i}`}
-                  className={`flex min-w-0 flex-1 flex-col items-center justify-center rounded-[5px] py-1 sm:rounded-md sm:py-1.5 ${
-                    done
-                      ? "bg-emerald-600/35 text-emerald-100"
-                      : active
-                        ? "bg-violet-500/25 text-violet-100 ring-1 ring-inset ring-violet-400/35"
-                        : "bg-zinc-900/90 text-zinc-500"
-                  }`}
-                >
-                  <span className="px-0.5 text-center text-[9px] font-extrabold uppercase tracking-wide sm:text-[10px]">
-                    {label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="shrink-0 px-2.5 pb-1 pt-0.5 sm:px-3 sm:pb-1.5 sm:pt-1 lg:px-8">
-          <div className="flex flex-col items-center gap-0.5 rounded-xl border border-zinc-700/55 bg-zinc-950/70 px-2 py-1.5 sm:flex-row sm:items-baseline sm:justify-center sm:gap-2 sm:px-3 sm:py-2">
-            <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-zinc-500 sm:text-[9px]">{payoutBandLabel}</span>
-            <span className="text-sm font-black tabular-nums text-amber-100 sm:text-base">{payoutBandValue}</span>
-          </div>
-          <p
-            className={`mt-1 line-clamp-2 min-h-[2.25rem] text-center text-[9px] font-semibold leading-snug text-zinc-400 sm:min-h-[2.5rem] sm:text-[10px] ${
-              payoutCaption ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            {payoutCaption || "\u00a0"}
-          </p>
-        </div>
-
-        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 pt-0 sm:px-2 lg:px-4 lg:pb-2">
-          <div className="flex min-h-0 flex-1 flex-col">
-            <TripleDiceBoard
-              sessionNotice=""
-              hideSessionBanner
-              statusTop={statusTop}
-              statusSub={statusSub}
-              diceValues={diceValues}
-              diceMuted={diceMuted}
-              totalDisplay={totalDisplay}
-              selectedZone={selectedZone}
-              onZoneChange={onZoneChange}
-              rolling={rollingUi}
-              onRoll={onRoll}
-              rollDisabled={rollDisabled}
-              optionPickerDisabled={optionPickerDisabled}
-            />
-          </div>
-        </div>
-      </div>
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
+      <DicePickBoard
+        sessionNotice={sessionNotice}
+        statusTop={statusTop}
+        statusSub={statusSub}
+        stepTotal={stepTotal}
+        currentStepIndex={currentStepIndex}
+        stepsComplete={stepsComplete}
+        stepLabels={stepLabels}
+        payoutBandLabel={payoutBandLabel}
+        payoutBandValue={payoutBandValue}
+        payoutCaption={payoutCaption}
+        diceSlot={
+          <TripleDiceDiceCluster
+            diceValues={diceValues}
+            diceMuted={diceMuted}
+            totalDisplay={totalDisplay}
+            rolling={rollingUi}
+          />
+        }
+        choiceSlot={
+          <TripleDiceZoneRollPanel
+            selectedZone={selectedZone}
+            onZoneChange={onZoneChange}
+            rolling={rollingUi}
+            onRoll={onRoll}
+            rollDisabled={rollDisabled}
+            optionPickerDisabled={optionPickerDisabled}
+          />
+        }
+      />
 
       <SoloV2ResultPopup
         open={resultPopupOpen}
         isWin={resolvedIsWin}
         resultTone={resolvedIsWin ? "win" : "lose"}
-        animationKey={`${popupLine2}-${popupLine3}-${resolvedIsWin ? "w" : "l"}-${resultVaultLabel}`}
+        animationKey={`${popupLine2}-${popupLine3}-${resultVaultLabel}`}
         vaultSlot={
           resultPopupOpen ? (
             <SoloV2ResultPopupVaultLine
@@ -285,9 +232,7 @@ function TripleDiceGameplayPanel({
           ) : undefined
         }
       >
-        <div className="text-[13px] font-black uppercase tracking-wide">
-          {resolvedIsWin ? "YOU WIN" : "YOU LOSE"}
-        </div>
+        <div className="text-[13px] font-black uppercase tracking-wide">{popupTitle}</div>
         <div className="mt-1 text-sm font-bold text-white">
           <span className="text-amber-100 tabular-nums">{popupLine2}</span>
         </div>
@@ -1009,6 +954,11 @@ export default function TripleDicePage() {
       ? "Your pick did not match."
       : "NO MATCH";
 
+  let popupTitle = "—";
+  if (uiState === UI_STATE.RESOLVED && resolvedResult) {
+    popupTitle = resolvedIsWin ? "YOU WIN" : "YOU LOSE";
+  }
+
   const delta = Number(resolvedResult?.settlementSummary?.netDelta ?? 0);
   const resultVaultLabel =
     resolvedResult?.settlementSummary != null ? `${delta > 0 ? "+" : ""}${formatCompact(delta)}` : "";
@@ -1075,7 +1025,7 @@ export default function TripleDicePage() {
   const winChance = tripleDiceWinChancePercent(normZone);
 
   const strip = tripleDiceStripModel(uiState, readState, rollingUi);
-  const stepLabels = ["Session", "Roll"];
+  const stepLabels = ["Choose", "Roll"];
 
   let payoutBandLabel = "Win if hit";
   let payoutBandValue = formatCompact(summaryWin);
@@ -1198,6 +1148,10 @@ export default function TripleDicePage() {
           void runStartTripleDice();
         },
         errorMessage: errorMessage || stakeHint,
+        desktopPayout: {
+          label: payoutBandLabel,
+          value: payoutBandValue,
+        },
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
@@ -1223,6 +1177,7 @@ export default function TripleDicePage() {
           optionPickerDisabled={optionPickerDisabled}
           resultPopupOpen={resultPopupOpen}
           resolvedIsWin={resolvedIsWin}
+          popupTitle={popupTitle}
           popupLine2={popupLine2}
           popupLine3={popupLine3}
           resultVaultLabel={resultVaultLabel}

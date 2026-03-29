@@ -52,112 +52,85 @@ function PipDie({ value, rolling, muted }) {
 }
 
 /**
- * Triple Dice — board only: status → dice → total → 2×2 zones + Roll.
- * Middle band flexes so the footer (selector + Roll) stays visible on desktop without scroll.
+ * Three dice + total — sits in the coin-family `diceSlot` (Quick Flip / Dice Pick rhythm).
+ * No outer card; parent `DicePickBoard` owns chrome and spacing.
  */
-export default function TripleDiceBoard({
-  sessionNotice = "",
-  statusTop = "\u00a0",
-  statusSub = "\u00a0",
-  diceValues = [1, 1, 1],
-  diceMuted = false,
-  totalDisplay = "—",
+export function TripleDiceDiceCluster({ diceValues = [1, 1, 1], diceMuted = false, totalDisplay = "—", rolling = false }) {
+  const d0 = diceValues[0] ?? 1;
+  const d1 = diceValues[1] ?? 1;
+  const d2 = diceValues[2] ?? 1;
+
+  return (
+    <div className="flex min-h-0 w-full flex-col items-center justify-center gap-0 sm:gap-0.5">
+      <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-2.5">
+        <PipDie value={d0} rolling={rolling} muted={diceMuted} />
+        <PipDie value={d1} rolling={rolling} muted={diceMuted} />
+        <PipDie value={d2} rolling={rolling} muted={diceMuted} />
+      </div>
+      <div className="flex h-7 shrink-0 items-center justify-center sm:h-8">
+        <p className="text-base font-black tabular-nums text-violet-100 sm:text-lg" aria-live="polite">
+          Total <span className="text-amber-100/95">{totalDisplay}</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Four-lane picker + Roll — coin-family `choiceSlot`; footer anchor comes from `DicePickBoard`.
+ */
+export function TripleDiceZoneRollPanel({
   selectedZone = "mid",
   onZoneChange,
   rolling = false,
   onRoll,
   rollDisabled = false,
   optionPickerDisabled = false,
-  hideSessionBanner = false,
 }) {
-  const showSession = Boolean(sessionNotice) && !hideSessionBanner;
-  const d0 = diceValues[0] ?? 1;
-  const d1 = diceValues[1] ?? 1;
-  const d2 = diceValues[2] ?? 1;
-
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border-2 border-violet-600/40 bg-zinc-900">
-      {!hideSessionBanner ? (
-        <div className="flex h-5 shrink-0 items-center justify-center px-2 sm:h-6">
-          <p
-            className={`truncate text-center text-[10px] text-emerald-200/75 sm:text-[11px] ${
-              showSession ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            {showSession ? sessionNotice : "\u00a0"}
-          </p>
-        </div>
-      ) : null}
-
-      <div className="shrink-0 px-3 pb-0.5 pt-0.5 text-center sm:px-4 sm:pb-1 lg:px-6">
-        <p className="min-h-[1.2rem] text-[12px] font-bold leading-tight text-white sm:text-sm">{statusTop}</p>
-        <p className="mt-0.5 min-h-[1rem] text-[10px] leading-snug text-zinc-400 sm:text-xs">{statusSub}</p>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-0 px-2 py-0 sm:gap-0.5 sm:px-3 sm:py-0.5 lg:px-5">
-        <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-2.5">
-          <PipDie value={d0} rolling={rolling} muted={diceMuted} />
-          <PipDie value={d1} rolling={rolling} muted={diceMuted} />
-          <PipDie value={d2} rolling={rolling} muted={diceMuted} />
-        </div>
-
-        <div className="flex h-7 shrink-0 items-center justify-center sm:h-8">
-          <p className="text-base font-black tabular-nums text-violet-100 sm:text-lg" aria-live="polite">
-            Total <span className="text-amber-100/95">{totalDisplay}</span>
-          </p>
-        </div>
-      </div>
-
-      <div className="shrink-0 border-t border-violet-600/30 bg-zinc-950 px-2 pb-2 pt-1.5 sm:px-3 sm:pb-2 sm:pt-2 lg:px-6">
-        <div className="mx-auto grid w-full max-w-[17.5rem] grid-cols-2 gap-2 sm:max-w-[17.75rem] sm:gap-2">
-          {ZONE_TILES.map(t => {
-            const active = zoneTileMatches(t, selectedZone);
-            return (
-              <button
-                key={t.zone}
-                type="button"
-                disabled={optionPickerDisabled}
-                onClick={() => onZoneChange?.(t.zone)}
-                className={`flex min-h-[3.35rem] flex-col items-center justify-center rounded-xl border-2 px-2 py-2 text-center shadow-sm transition sm:min-h-[3rem] sm:rounded-lg sm:px-2.5 sm:py-1.5 ${
-                  active
-                    ? "border-violet-300 bg-violet-600/25 text-white shadow-violet-900/30 ring-1 ring-violet-400/35"
-                    : "border-zinc-500/70 bg-zinc-800/95 text-zinc-50 hover:border-violet-500/70 hover:bg-zinc-800"
-                } disabled:cursor-not-allowed disabled:opacity-45`}
+    <div className="flex w-full flex-col">
+      <div className="mx-auto grid w-full max-w-[17.75rem] grid-cols-2 gap-2 sm:max-w-none sm:gap-3 lg:gap-6">
+        {ZONE_TILES.map(t => {
+          const active = zoneTileMatches(t, selectedZone);
+          return (
+            <button
+              key={t.zone}
+              type="button"
+              disabled={optionPickerDisabled}
+              onClick={() => onZoneChange?.(t.zone)}
+              className={`flex min-h-[3.35rem] flex-col items-center justify-center rounded-2xl border-2 px-2 py-2 text-center shadow-sm transition sm:min-h-[3rem] sm:rounded-[1.05rem] sm:px-2.5 sm:py-1.5 lg:min-h-[5.25rem] lg:rounded-[1.12rem] ${
+                active
+                  ? "border-violet-300 bg-violet-600/25 text-white shadow-violet-900/30 ring-2 ring-inset ring-violet-400/20"
+                  : "border-amber-700/45 bg-gradient-to-b from-zinc-800/95 to-zinc-950 text-zinc-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-amber-500/55 hover:from-zinc-800 hover:to-zinc-950 active:scale-[0.98]"
+              } disabled:cursor-not-allowed disabled:opacity-[0.42]`}
+            >
+              <span className={`text-[13px] font-black leading-tight tracking-wide sm:text-sm lg:text-base ${active ? "text-white" : "text-amber-50"}`}>
+                {t.label}
+              </span>
+              <span
+                className={`mt-1 text-[10px] font-semibold uppercase leading-tight tracking-[0.12em] sm:mt-0.5 sm:text-[11px] lg:text-[11px] ${
+                  active ? "text-violet-100" : "text-white/38"
+                }`}
               >
-                <span
-                  className={`text-[13px] font-black leading-tight tracking-wide sm:text-sm ${
-                    active ? "text-white" : "text-violet-50"
-                  }`}
-                >
-                  {t.label}
-                </span>
-                <span
-                  className={`mt-1 text-[10px] font-bold uppercase leading-tight tracking-wide sm:mt-0.5 sm:text-[11px] ${
-                    active ? "text-violet-100" : "text-zinc-300"
-                  }`}
-                >
-                  {t.hint}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <button
-          type="button"
-          disabled={rollDisabled || rolling}
-          onClick={() => onRoll?.()}
-          className={`mx-auto mt-1.5 flex min-h-[44px] w-full max-w-[17.5rem] flex-col items-center justify-center rounded-xl border-2 px-2 py-1.5 text-center transition-colors sm:mt-2 sm:max-w-[17.75rem] sm:min-h-[46px] sm:py-2 ${
-            rollDisabled || rolling
-              ? "cursor-not-allowed border-zinc-700 bg-zinc-900/50 text-zinc-500"
-              : "border-violet-400 bg-violet-950/50 text-violet-50 ring-2 ring-violet-500/25 hover:bg-violet-900/40"
-          }`}
-        >
-          <span className="text-[10px] font-black uppercase leading-tight text-white sm:text-xs">
-            {rolling ? "Rolling…" : "Roll"}
-          </span>
-        </button>
+                {t.hint}
+              </span>
+            </button>
+          );
+        })}
       </div>
+
+      <button
+        type="button"
+        disabled={rollDisabled || rolling}
+        onClick={() => onRoll?.()}
+        className={`mx-auto mt-2 flex min-h-[44px] w-full max-w-[17.75rem] flex-col items-center justify-center rounded-2xl border-2 px-2 py-1.5 text-center transition-colors sm:mt-3 sm:max-w-none sm:min-h-[2.4rem] sm:py-2 lg:min-h-8 ${
+          rollDisabled || rolling
+            ? "cursor-not-allowed border-zinc-700 bg-zinc-900/50 text-zinc-500"
+            : "border-amber-400/55 bg-amber-950/35 text-amber-50 ring-2 ring-amber-500/20 hover:bg-amber-900/35"
+        }`}
+      >
+        <span className="text-[10px] font-black uppercase leading-tight sm:text-xs">{rolling ? "Rolling…" : "Roll"}</span>
+      </button>
     </div>
   );
 }
