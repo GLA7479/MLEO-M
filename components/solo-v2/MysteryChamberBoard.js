@@ -87,9 +87,9 @@ export default function MysteryChamberBoard({
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border-2 border-amber-900/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="flex h-5 shrink-0 items-center justify-center px-2 sm:h-5">
+      <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem]">
         <p
-          className={`line-clamp-1 w-full truncate text-center text-[9px] font-semibold text-amber-200/85 sm:text-[10px] ${
+          className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-amber-200/85 sm:text-[10px] ${
             showSession ? "opacity-100" : "opacity-0"
           }`}
         >
@@ -97,14 +97,14 @@ export default function MysteryChamberBoard({
         </p>
       </div>
 
-      <div className="shrink-0 px-2.5 pb-0 pt-0 text-center sm:px-3 sm:pb-1 sm:pt-1">
-        <div className="flex h-[2.55rem] items-start justify-center sm:h-[2.65rem]">
-          <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-tight text-white sm:text-[13px]">
+      <div className="shrink-0 px-2.5 pb-0 pt-0.5 text-center sm:px-3 sm:pb-0.5 sm:pt-0.5">
+        <div className="flex min-h-[1.875rem] items-start justify-center sm:min-h-[2rem]">
+          <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-snug text-white sm:text-[13px] sm:leading-snug">
             {statusTop}
           </p>
         </div>
-        <div className="flex h-[2.7rem] items-start justify-center sm:h-[2.85rem]">
-          <p className="line-clamp-3 w-full text-center text-[9px] leading-snug text-zinc-400 sm:text-[10px]">
+        <div className="flex min-h-[1.625rem] items-start justify-center sm:min-h-[1.75rem]">
+          <p className="line-clamp-2 w-full text-center text-[9px] leading-snug text-zinc-400 sm:text-[10px]">
             {statusSub}
           </p>
         </div>
@@ -154,14 +154,16 @@ export default function MysteryChamberBoard({
               {securedReturnLabel}
             </span>
           </div>
-          <p className="min-h-[1.25rem] border-t border-white/5 px-2.5 pb-1 pt-0.5 text-right text-[8px] font-medium leading-snug text-zinc-500 sm:min-h-[1.35rem] sm:px-3 sm:pb-1.5 sm:pt-0.5 sm:text-[9px]">
-            <span className={securedCaption ? "" : "opacity-0"}>{securedCaption || "\u00a0"}</span>
+          <p className="min-h-[1.05rem] border-t border-white/5 px-2.5 pb-0.5 pt-0.5 text-right text-[8px] font-medium leading-tight text-zinc-500 sm:min-h-[1.1rem] sm:px-3 sm:pb-1 sm:pt-0.5 sm:text-[9px]">
+            <span className={`line-clamp-1 ${securedCaption ? "" : "opacity-0"}`}>
+              {securedCaption || "\u00a0"}
+            </span>
           </p>
         </div>
       </div>
 
-      {/* Mobile: 2×2 centered in flex-1. Desktop (sm+): single horizontal row, full width — uses canvas width, not a shrunk mobile block. */}
-      <div className="flex min-h-0 flex-1 flex-col justify-center px-2 pb-0.5 pt-0 sm:flex-none sm:justify-start sm:px-4 sm:pb-2 sm:pt-1">
+      {/* Mobile: 2×2 centered in flex-1. Desktop: row is flex-none so EXIT NOW stays in view (no flex-1 spacer below). */}
+      <div className="flex min-h-0 flex-1 flex-col justify-center px-2 pb-0.5 pt-0 sm:flex-none sm:justify-start sm:px-4 sm:pb-1 sm:pt-0.5">
         <div
           className="mx-auto grid w-full max-w-[17.75rem] grid-cols-2 grid-rows-2 gap-2 sm:mx-0 sm:max-w-none sm:grid-cols-4 sm:grid-rows-1 sm:gap-3 lg:gap-3.5"
           role="group"
@@ -180,14 +182,11 @@ export default function MysteryChamberBoard({
         </div>
       </div>
 
-      <div className="flex h-[3rem] shrink-0 items-start justify-center px-2 pt-0.5 text-center sm:h-[2.75rem] sm:items-center sm:px-4 sm:pt-0">
-        <p className="line-clamp-3 w-full text-[9px] font-medium leading-snug text-zinc-400 sm:text-[10px]">
+      <div className="flex min-h-[1.75rem] shrink-0 items-start justify-center px-2 pb-0.5 pt-0 text-center sm:min-h-[1.625rem] sm:items-center sm:px-4 sm:pb-0 sm:pt-0">
+        <p className="line-clamp-2 w-full text-[9px] font-medium leading-snug text-zinc-400 sm:text-[10px]">
           {hintLine}
         </p>
       </div>
-
-      {/* Absorb extra desktop height below the hint so the exit band stays bottom-anchored without a void under the sigil row. */}
-      <div className="hidden min-h-0 shrink-0 sm:block sm:flex-1" aria-hidden />
 
       <div className="shrink-0 border-t border-amber-900/35 bg-zinc-950/80 px-2 py-1.5 sm:px-4 sm:py-2">
         {exitVisible ? (
