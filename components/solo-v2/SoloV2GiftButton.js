@@ -36,7 +36,7 @@ export default function SoloV2GiftButton({
         onClick={() => {
           if (!disabled && typeof onGiftClick === "function") onGiftClick();
         }}
-        className={`inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold leading-none text-white transition hover:bg-white/[0.14] ${
+        className={`inline-flex size-8 touch-manipulation select-none items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.06] text-sm leading-none text-white/90 shadow-sm shadow-black/15 transition-colors hover:border-white/18 hover:bg-white/[0.1] active:bg-white/[0.14] ${
           disabled ? "cursor-not-allowed opacity-50" : ""
         }`}
       >

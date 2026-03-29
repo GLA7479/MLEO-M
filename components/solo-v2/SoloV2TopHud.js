@@ -2,6 +2,10 @@ import { Children } from "react";
 import { formatCompactNumber } from "../../lib/solo-v2/formatCompactNumber";
 import SoloV2GiftButton from "./SoloV2GiftButton";
 
+/** Compact pill controls — readable tap area via padding, not chunky squares. */
+const HUD_CHROME_BTN =
+  "inline-flex h-8 shrink-0 touch-manipulation select-none items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.06] px-3 text-[11px] font-medium text-white/90 shadow-sm shadow-black/15 transition-colors hover:border-white/18 hover:bg-white/[0.1] active:bg-white/[0.14] sm:px-3.5 sm:text-xs";
+
 /**
  * Shared Solo V2 top shell — layout is fixed; title/subtitle/stats/gift data come from props.
  * Left: Back + Gift · Center: title, subtitle, compact stats · Right: Info, Menu (+ optional slot).
@@ -46,12 +50,13 @@ export default function SoloV2TopHud({
         mobileHeaderBreathingRoom ? "py-2" : "py-1.5"
       }`}
     >
-      <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+      <div className="relative z-10 flex shrink-0 items-center gap-1.5 pt-0.5">
         {onBack ? (
           <button
             type="button"
             onClick={onBack}
-            className="rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white"
+            className={HUD_CHROME_BTN}
+            aria-label="Back to arcade"
           >
             Back
           </button>
@@ -69,7 +74,7 @@ export default function SoloV2TopHud({
       </div>
 
       <div
-        className={`min-w-0 justify-self-center px-1 text-center ${
+        className={`relative z-0 min-w-0 justify-self-center px-1 text-center ${
           mobileHeaderBreathingRoom ? "mt-2.5 sm:mt-0" : ""
         }`}
       >
@@ -134,11 +139,11 @@ export default function SoloV2TopHud({
         ) : null}
       </div>
 
-      <div className="flex shrink-0 items-center justify-end gap-1 pt-0.5">
+      <div className="relative z-10 flex shrink-0 items-center justify-end gap-1 pt-0.5">
         <button
           type="button"
           onClick={onOpenInfo}
-          className="rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white"
+          className={HUD_CHROME_BTN}
           aria-label="Help and statistics"
         >
           Info
@@ -146,7 +151,8 @@ export default function SoloV2TopHud({
         <button
           type="button"
           onClick={onOpenMenu}
-          className="rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white"
+          className={HUD_CHROME_BTN}
+          aria-label="Open menu"
         >
           Menu
         </button>

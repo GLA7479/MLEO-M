@@ -117,7 +117,8 @@ export default function SoloV2GameShell({
               <button
                 type="button"
                 onClick={() => setIsResultOpen(true)}
-                className="rounded-lg border border-violet-300/30 bg-violet-500/30 px-2 py-1 text-xs font-semibold text-white"
+                className="inline-flex h-8 touch-manipulation select-none items-center justify-center rounded-full border border-violet-400/25 bg-violet-500/25 px-3 text-[11px] font-medium text-violet-50 shadow-sm shadow-black/20 transition-colors hover:bg-violet-500/35 active:bg-violet-500/40 sm:text-xs"
+                aria-label="View result"
               >
                 Result
               </button>
