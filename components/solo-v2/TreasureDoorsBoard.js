@@ -90,11 +90,9 @@ export default function TreasureDoorsBoard({
         clearedChips.push(
           <span
             key={`chip-${i}`}
-            className="inline-flex shrink-0 items-center gap-0.5 rounded-md border border-zinc-700 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-zinc-400 sm:text-[10px]"
+            className="inline-flex shrink-0 items-center rounded-md border border-zinc-700 bg-zinc-900/90 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-zinc-300 sm:text-[10px]"
           >
-            <span className="text-zinc-500">Ch.{i + 1}</span>
-            <span className="text-zinc-600">·</span>
-            <span className="text-zinc-300">D{d + 1}</span>
+            D{d + 1}
           </span>,
         );
       }

@@ -166,9 +166,9 @@ function GoldRushGameplayPanel({
   const cur = Math.max(0, Math.min(total - 1, Math.floor(Number(currentStepIndex) || 0)));
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
+    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-2 border-amber-900/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-8">
+        <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-5">
           <p
             className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-amber-200/85 sm:text-[10px] ${
               showSession ? "opacity-100" : "opacity-0"
@@ -178,7 +178,7 @@ function GoldRushGameplayPanel({
           </p>
         </div>
 
-        <div className="shrink-0 px-2.5 pb-0 pt-0.5 text-center sm:px-3 sm:pb-0.5 sm:pt-0.5 lg:px-8">
+        <div className="shrink-0 px-2.5 pb-0 pt-0.5 text-center sm:px-3 sm:pb-0.5 sm:pt-0.5 lg:px-5">
           <div className="flex min-h-[1.875rem] items-start justify-center sm:min-h-[2rem]">
             <p className="line-clamp-2 w-full text-center text-[11px] font-bold leading-snug text-white sm:text-[13px] sm:leading-snug">
               {statusTop}
@@ -189,7 +189,7 @@ function GoldRushGameplayPanel({
           </div>
         </div>
 
-        <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-8">
+        <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-5">
           <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
             <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">Depth</span>
             <span className="text-[8px] font-semibold tabular-nums text-zinc-500 sm:text-[9px]">
@@ -224,7 +224,7 @@ function GoldRushGameplayPanel({
           </div>
         </div>
 
-        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-8 lg:hidden">
+        <div className="shrink-0 px-2.5 pb-1 pt-0 sm:px-3 sm:pb-1 lg:px-5 lg:hidden">
           <div className="rounded-lg border border-amber-900/50 bg-zinc-800/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl">
             <div className="flex items-center justify-between gap-2 px-2.5 py-1 sm:px-3 sm:py-1.5">
               <span className="shrink-0 text-[8px] font-bold uppercase tracking-[0.14em] text-amber-200/45 sm:text-[9px]">
@@ -242,9 +242,9 @@ function GoldRushGameplayPanel({
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-6 lg:pb-2">
+        <div className="flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
           <div
-            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(24rem,52vh)]"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(19rem,40vh)]"
             aria-label="Gold Rush dig grid"
           >
             <div className="flex min-h-0 min-h-[11rem] flex-1 flex-col items-center justify-center px-0.5 py-1 sm:min-h-[12rem] sm:px-1 sm:py-1.5 lg:min-h-0">
@@ -261,7 +261,7 @@ function GoldRushGameplayPanel({
                 onDigColumn={onDigColumn}
               />
             </div>
-            <div className="hidden shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:flex lg:min-h-[5.5rem]">
+            <div className="hidden shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:flex lg:min-h-[4.25rem] lg:gap-1.5 lg:px-2 lg:py-1.5">
               <SoloV2BoardCashOutControl
                 show={showBoardCashOut}
                 label={boardCashOutLabel}
@@ -272,7 +272,7 @@ function GoldRushGameplayPanel({
                 wrapperClassName="flex w-full shrink-0 justify-center px-1 pb-0 pt-0 sm:px-2"
               />
               <div
-                className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:max-w-2xl"
+                className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:h-8 lg:max-w-2xl"
                 aria-hidden
               />
             </div>
