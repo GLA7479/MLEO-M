@@ -127,17 +127,48 @@ function mysteryChamberChosenSigilFromResult(r) {
   return c >= 0 && c <= 3 ? c : null;
 }
 
+/**
+ * Fail reveal greens (server safe list is full truth for the step; count follows chamber depth).
+ * Chamber 1: all tiles except wrong (3 green). Chamber 2: both server safes. Chamber 3: one green.
+ * Chamber 4: server safe(s). Wrong pick stays red (painted after greens).
+ */
+function mysteryChamberFailRevealGreenIndices(finalChamberIndex, chosenWrong, serverSafeFull) {
+  const safes = mergeMysteryChamberSafeIndices(serverSafeFull);
+  const fi = Math.floor(Number(finalChamberIndex));
+  const w = chosenWrong;
+  if (!Number.isFinite(fi) || fi < 0 || fi > 3) {
+    return safes;
+  }
+  if (fi === 0 && Number.isFinite(w) && w >= 0 && w <= 3) {
+    return [0, 1, 2, 3].filter(i => i !== w);
+  }
+  if (fi === 1) {
+    return safes;
+  }
+  if (fi === 2) {
+    if (safes.length <= 1) return safes;
+    return [safes[0]];
+  }
+  return safes;
+}
+
 function visualsFromPersistedBoard(pb) {
   const v = defaultVisuals();
   if (!pb || !pb.terminalKind) return v;
   if (pb.terminalKind === "fail") {
-    const set = safeSigilSetFromApiResult(pb);
-    for (const si of set) {
+    const fullSafe = safeSigilSetFromApiResult(pb);
+    const fi = pb.finalChamberIndex != null ? Math.floor(Number(pb.finalChamberIndex)) : 0;
+    const chosen = mysteryChamberChosenSigilFromResult(pb);
+    const w = chosen != null ? chosen : -1;
+    const greens = mysteryChamberFailRevealGreenIndices(
+      Number.isFinite(fi) ? fi : 0,
+      w,
+      fullSafe,
+    );
+    for (const si of greens) {
       if (si >= 0 && si <= 3) v[si] = "safe";
     }
-    const cRaw = pb.chosenSigil ?? pb.lastChosenSigil;
-    const c = Math.floor(Number(cRaw));
-    if (c >= 0 && c <= 3) v[c] = "fail";
+    if (chosen != null) v[chosen] = "fail";
     for (let i = 0; i < 4; i += 1) {
       if (v[i] === "idle") v[i] = "muted";
     }
@@ -176,19 +207,27 @@ function visualsFromLocalAnim(anim) {
     return v;
   }
   if (anim.phase === "fail") {
-    const set = Array.isArray(anim.safeSet)
+    const fullSafe = Array.isArray(anim.safeSet)
       ? anim.safeSet.map(x => Math.floor(Number(x))).filter(n => n >= 0 && n <= 3)
       : anim.safe != null
         ? [Math.floor(Number(anim.safe))].filter(n => n >= 0 && n <= 3)
         : [];
-    for (const si of set) {
+    const fiRaw = anim.failChamberIndex;
+    const fi = fiRaw != null ? Math.floor(Number(fiRaw)) : 0;
+    const chosenRaw = anim.chosen;
+    const w =
+      chosenRaw != null && chosenRaw !== ""
+        ? Math.floor(Number(chosenRaw))
+        : Number.NaN;
+    const greens = mysteryChamberFailRevealGreenIndices(
+      Number.isFinite(fi) ? fi : 0,
+      Number.isFinite(w) && w >= 0 && w <= 3 ? w : -1,
+      fullSafe,
+    );
+    for (const si of greens) {
       if (si >= 0 && si <= 3) v[si] = "safe";
     }
-    const chosenRaw = anim.chosen;
-    if (chosenRaw != null && chosenRaw !== "") {
-      const c = Math.floor(Number(chosenRaw));
-      if (Number.isFinite(c) && c >= 0 && c <= 3) v[c] = "fail";
-    }
+    if (Number.isFinite(w) && w >= 0 && w <= 3) v[w] = "fail";
     for (let i = 0; i < 4; i += 1) {
       if (v[i] === "idle") v[i] = "muted";
     }
@@ -718,6 +757,7 @@ export default function MysteryChamberPage() {
           setLocalAnim({
             chosen: chosenForBoard != null ? chosenForBoard : undefined,
             safeSet: revealedSet,
+            failChamberIndex: r.finalChamberIndex ?? r.chamberIndex,
             phase: "fail",
           });
         } else {
@@ -1081,9 +1121,11 @@ export default function MysteryChamberPage() {
     statusSub = `Chamber ${Math.min(MYSTERY_CHAMBER_CHAMBER_COUNT, Math.max(1, nextHuman))} — choose your next sigil.`;
   }
   if (localAnim?.phase === "fail") {
-    const fc = persistedBoard?.finalChamberIndex ?? 0;
+    const fc = Math.floor(
+      Number(localAnim.failChamberIndex ?? persistedBoard?.finalChamberIndex ?? 0) || 0,
+    );
     statusTop = `Wrong sigil. The run ended in Chamber ${fc + 1}.`;
-    statusSub = "Safe path(s) revealed.";
+    statusSub = "The run is over.";
   }
   if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "cashout") {
     statusTop = `Exited after ${persistedBoard.chambersCleared || cleared || 0} chamber(s) cleared.`;
@@ -1096,20 +1138,7 @@ export default function MysteryChamberPage() {
   if (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "fail" && !localAnim) {
     const fc = persistedBoard?.finalChamberIndex ?? 0;
     statusTop = `Wrong sigil. The run ended in Chamber ${fc + 1}.`;
-    statusSub = "Safe path(s) revealed.";
-  }
-  const failRevealSet =
-    Array.isArray(persistedBoard?.safeSigilSet) && persistedBoard.safeSigilSet.length
-      ? persistedBoard.safeSigilSet
-      : localAnim?.phase === "fail" && Array.isArray(localAnim.safeSet) && localAnim.safeSet.length
-        ? localAnim.safeSet
-        : [];
-  if (
-    (localAnim?.phase === "fail" || (uiState === UI_STATE.RESOLVED && persistedBoard?.terminalKind === "fail")) &&
-    failRevealSet.length
-  ) {
-    const glyphs = failRevealSet.map(i => MYSTERY_CHAMBER_SIGIL_GLYPHS[i]).join(" · ");
-    hintLine = `Safe sigil${failRevealSet.length > 1 ? "s" : ""}: ${glyphs}.`;
+    statusSub = "The run is over.";
   }
 
   const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.settlementSummary?.isWin);
@@ -1206,7 +1235,6 @@ export default function MysteryChamberPage() {
   const avgDepth = averageChamberReached(mcSt);
   const netFlow = mcSt.totalReturned - mcSt.totalPlayed;
   const fmtMcPct = p => (p == null || Number.isNaN(p) ? "—" : `${p.toFixed(1)}%`);
-  const revealFailTotal = mcSt.revealedSafeHits.reduce((a, b) => a + (Number(b) || 0), 0);
 
   return (
     <SoloV2GameShell
@@ -1214,6 +1242,7 @@ export default function MysteryChamberPage() {
       subtitle="Advance through the chamber run."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl"
       mobileHeaderBreathingRoom
+      stableTripleTopSummary
       gameplayScrollable={false}
       gameplayDesktopUnclipVertical
       menuVaultBalance={vaultBalance}
@@ -1225,15 +1254,22 @@ export default function MysteryChamberPage() {
       }}
       topGameStatsSlot={
         <>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Play <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
+          <span className="min-w-0 whitespace-nowrap text-zinc-500">
+            Play{" "}
+            <span className="inline-block min-w-[8ch] text-right font-semibold tabular-nums text-emerald-200/90">
+              {formatCompact(summaryPlay)}
+            </span>
           </span>
           <span className="shrink-0 text-zinc-600" aria-hidden>
             ·
           </span>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            {summarySecondStatLabel}{" "}
-            <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
+          <span className="min-w-0 whitespace-nowrap text-zinc-500">
+            <span className="inline-block w-[5.5rem] shrink-0 text-right max-sm:w-[5.25rem]">
+              {summarySecondStatLabel}
+            </span>{" "}
+            <span className="inline-block min-w-[8ch] text-right font-semibold tabular-nums text-lime-200/90">
+              {formatCompact(summaryWin)}
+            </span>
           </span>
         </>
       }
@@ -1332,12 +1368,6 @@ export default function MysteryChamberPage() {
             Picks by sigil:{" "}
             {MYSTERY_CHAMBER_SIGIL_GLYPHS.map((g, i) => `${g} ${mcSt.picksBySigil[i] || 0}`).join(" · ")}
           </p>
-          {revealFailTotal > 0 ? (
-            <p>
-              Safe sigils revealed after a wrong pick:{" "}
-              {MYSTERY_CHAMBER_SIGIL_GLYPHS.map((g, i) => `${g} ${mcSt.revealedSafeHits[i] || 0}`).join(" · ")}
-            </p>
-          ) : null}
         </div>
       }
       resultState={null}

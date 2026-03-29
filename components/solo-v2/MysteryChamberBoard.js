@@ -188,18 +188,18 @@ export default function MysteryChamberBoard({
         </p>
       </div>
 
-      <div className="shrink-0 border-t border-amber-900/35 bg-zinc-950/80 px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1">
+      <div className="flex shrink-0 justify-center border-t border-amber-900/35 bg-zinc-950/80 px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1">
         {exitVisible ? (
           <button
             type="button"
             disabled={exitDisabled}
             onClick={() => onExitNow?.()}
-            className="w-full rounded-xl border-2 border-white/12 bg-white/[0.08] py-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white transition enabled:hover:border-white/18 enabled:hover:bg-white/[0.11] enabled:active:scale-[0.99] enabled:active:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-35 sm:py-2 sm:text-[11px]"
+            className="mx-auto w-full max-w-sm rounded-xl border-2 border-white/12 bg-white/[0.08] py-2.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-white transition enabled:hover:border-white/18 enabled:hover:bg-white/[0.11] enabled:active:scale-[0.99] enabled:active:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-35 sm:py-2 sm:text-[11px]"
           >
             Exit now
           </button>
         ) : (
-          <div className="h-10 w-full sm:h-[2.4rem]" aria-hidden />
+          <div className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem]" aria-hidden />
         )}
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { Children } from "react";
 import { formatCompactNumber } from "../../lib/solo-v2/formatCompactNumber";
 import SoloV2GiftButton from "./SoloV2GiftButton";
 
@@ -17,6 +18,8 @@ export default function SoloV2TopHud({
   headerVaultBalance = null,
   /** Game-specific stats fragments (e.g. Play / Win), rendered after vault with separators. */
   topGameStatsSlot = null,
+  /** Vault + two stats as three fixed columns (expects slot fragment: stat, dot, stat). */
+  stableTripleTopSummary = false,
   giftCount = 0,
   giftMax = 5,
   giftEnabled = false,
@@ -27,6 +30,15 @@ export default function SoloV2TopHud({
   giftRegenMs = null,
 }) {
   const showVault = headerVaultBalance !== null && headerVaultBalance !== undefined;
+  const statsParts = topGameStatsSlot ? Children.toArray(topGameStatsSlot) : [];
+  const useStableTriple =
+    stableTripleTopSummary && showVault && topGameStatsSlot && statsParts.length >= 3;
+
+  const summaryRowTypography = mobileHeaderBreathingRoom
+    ? "mt-1 text-[13px] leading-snug sm:mt-0.5 sm:leading-tight"
+    : "mt-0.5 text-[13px] leading-tight";
+  const summaryRowTone =
+    "w-full min-w-0 text-zinc-500 [-ms-overflow-style:none] [scrollbar-width:none] sm:text-[15px] [&::-webkit-scrollbar]:hidden";
 
   return (
     <header
@@ -82,28 +94,45 @@ export default function SoloV2TopHud({
           </p>
         ) : null}
         {showVault || topGameStatsSlot ? (
-          <div
-            className={`flex w-full min-w-0 flex-nowrap items-center justify-center gap-x-1.5 overflow-x-auto overscroll-x-contain whitespace-nowrap text-zinc-500 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-x-2 sm:text-[15px] [&::-webkit-scrollbar]:hidden ${
-              mobileHeaderBreathingRoom
-                ? "mt-1 text-[13px] leading-snug sm:mt-0.5 sm:leading-tight"
-                : "mt-0.5 text-[13px] leading-tight"
-            }`}
-          >
-            {showVault ? (
-              <span className="shrink-0">
-                Vault{" "}
-                <span className="font-semibold tabular-nums text-emerald-300/95">
-                  {formatCompactNumber(headerVaultBalance)}
+          useStableTriple ? (
+            <div
+              className={`grid grid-cols-3 gap-x-1 tabular-nums sm:gap-x-2 ${summaryRowTone} ${summaryRowTypography}`}
+            >
+              <div className="flex min-w-0 items-center justify-center whitespace-nowrap px-0.5 text-center">
+                <span className="min-w-0">
+                  Vault{" "}
+                  <span className="inline-block min-w-[8ch] text-right font-semibold tabular-nums text-emerald-300/95">
+                    {formatCompactNumber(headerVaultBalance)}
+                  </span>
                 </span>
-              </span>
-            ) : null}
-            {showVault && topGameStatsSlot ? (
-              <span className="shrink-0 text-zinc-600" aria-hidden>
-                ·
-              </span>
-            ) : null}
-            {topGameStatsSlot}
-          </div>
+              </div>
+              <div className="flex min-w-0 items-center justify-center whitespace-nowrap px-0.5 text-center">
+                {statsParts[0]}
+              </div>
+              <div className="flex min-w-0 items-center justify-center whitespace-nowrap px-0.5 text-center">
+                {statsParts[2]}
+              </div>
+            </div>
+          ) : (
+            <div
+              className={`flex flex-nowrap items-center justify-center gap-x-1.5 overflow-x-auto overscroll-x-contain whitespace-nowrap sm:gap-x-2 ${summaryRowTone} ${summaryRowTypography}`}
+            >
+              {showVault ? (
+                <span className="shrink-0">
+                  Vault{" "}
+                  <span className="font-semibold tabular-nums text-emerald-300/95">
+                    {formatCompactNumber(headerVaultBalance)}
+                  </span>
+                </span>
+              ) : null}
+              {showVault && topGameStatsSlot ? (
+                <span className="shrink-0 text-zinc-600" aria-hidden>
+                  ·
+                </span>
+              ) : null}
+              {topGameStatsSlot}
+            </div>
+          )
         ) : null}
       </div>
 

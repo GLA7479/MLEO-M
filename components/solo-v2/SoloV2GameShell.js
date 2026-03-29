@@ -61,6 +61,11 @@ export default function SoloV2GameShell({
    * and a touch more space before gameplay (redistribute vertical space without scroll).
    */
   mobileHeaderBreathingRoom = false,
+  /**
+   * When true with vault + topGameStatsSlot: render Vault | stat | stat as three equal grid columns
+   * so value changes do not re-center the row (opt-in per game).
+   */
+  stableTripleTopSummary = false,
 }) {
   const [infoTab, setInfoTab] = useState("help");
   const [isInfoOpen, setIsInfoOpen] = useState(false);
@@ -98,6 +103,7 @@ export default function SoloV2GameShell({
           onOpenMenu={() => setIsMenuOpen(true)}
           headerVaultBalance={menuVaultBalance}
           topGameStatsSlot={topGameStatsSlot}
+          stableTripleTopSummary={stableTripleTopSummary}
           giftCount={giftProps.giftCount}
           giftMax={giftProps.giftMax}
           giftEnabled={giftProps.giftEnabled}
