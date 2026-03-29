@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DicePickBoard from "../components/solo-v2/DicePickBoard";
-import { HighLowCardsChoiceSlot, HighLowCardsDiceSlot } from "../components/solo-v2/HighLowCardsBoard";
+import { HighLowCardsMergedPlayfield } from "../components/solo-v2/HighLowCardsBoard";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
@@ -1124,17 +1124,13 @@ export default function HighLowCardsPage() {
             payoutBandLabel={payoutBandLabel}
             payoutBandValue={payoutBandValue}
             payoutCaption={payoutCaption}
-            diceSlot={
-              <HighLowCardsDiceSlot
+            mergedPlayfieldSlot={
+              <HighLowCardsMergedPlayfield
                 currentCard={currentCard}
                 revealCardData={revealCardData}
                 revealFaceUp={revealFaceUp}
                 revealOutcome={revealOutcome}
                 resolving={uiState === UI_STATE.RESOLVING}
-              />
-            }
-            choiceSlot={
-              <HighLowCardsChoiceSlot
                 uiState={uiState}
                 playing={playing}
                 guessControlsLocked={guessControlsLocked}

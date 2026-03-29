@@ -1,7 +1,13 @@
 /**
- * Hi-Lo Cards inner playfield for DicePickBoard slots (coin family).
- * Card faces and reveal animation stay game-specific; chrome lives on the page shell.
+ * Hi-Lo Cards playfield — fixed card stage + fixed action row (no layout jump).
+ * Merged slot for DicePickBoard `mergedPlayfieldSlot` only.
  */
+
+const CELL_DIM = "h-[10.5rem] w-[6.85rem] shrink-0 sm:h-52 sm:w-36";
+
+function EmptyCardCell() {
+  return <div className={`${CELL_DIM} rounded-xl border border-transparent`} aria-hidden />;
+}
 
 function PlayingCard({ rank, suit, tone = "neutral", className = "" }) {
   const isRed = suit === "♥" || suit === "♦";
@@ -14,7 +20,7 @@ function PlayingCard({ rank, suit, tone = "neutral", className = "" }) {
         : "border-white/20 shadow-lg";
   return (
     <div
-      className={`relative flex h-[10.5rem] w-[6.85rem] flex-col rounded-xl border-2 bg-zinc-900/90 sm:h-52 sm:w-36 ${ring} ${className}`}
+      className={`relative flex ${CELL_DIM} flex-col rounded-xl border-2 bg-zinc-900/90 ${ring} ${className}`}
     >
       <div className={`absolute left-1.5 top-1.5 flex flex-col leading-none sm:left-2 sm:top-2 ${color}`}>
         <span className="text-xl font-serif font-bold sm:text-3xl">{rank}</span>
@@ -31,7 +37,7 @@ function PlayingCard({ rank, suit, tone = "neutral", className = "" }) {
 function CardBackFace({ className = "" }) {
   return (
     <div
-      className={`relative flex h-[10.5rem] w-[6.85rem] flex-col rounded-xl border-2 border-indigo-400/50 bg-gradient-to-br from-indigo-950 via-zinc-900 to-violet-950 shadow-inner sm:h-52 sm:w-36 ${className}`}
+      className={`relative flex ${CELL_DIM} flex-col rounded-xl border-2 border-indigo-400/50 bg-gradient-to-br from-indigo-950 via-zinc-900 to-violet-950 shadow-inner ${className}`}
     >
       <div className="pointer-events-none absolute inset-0 rounded-[10px] bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.12),transparent_45%)]" />
       <span className="m-auto select-none text-4xl opacity-90 drop-shadow-lg sm:text-5xl" aria-hidden>
@@ -44,33 +50,36 @@ function CardBackFace({ className = "" }) {
   );
 }
 
+/** Reveal stays inside fixed cell: opacity crossfade only (no scale / vertical pop). Hit·Miss below card. */
 function NextCardReveal({ card, faceUp, outcome }) {
-  if (!card?.rank) return null;
+  if (!card?.rank) return <EmptyCardCell />;
   const tone = faceUp ? (outcome === "win" ? "win" : outcome === "loss" ? "loss" : "neutral") : "neutral";
   return (
-    <div className="relative flex h-[10.5rem] w-[6.85rem] shrink-0 flex-col items-center justify-center sm:h-52 sm:w-36">
-      <div
-        className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ease-out ${
-          faceUp ? "pointer-events-none scale-95 opacity-0" : "scale-100 opacity-100"
-        }`}
-      >
-        <CardBackFace />
-      </div>
-      <div
-        className={`transition-all ease-out ${
-          faceUp ? "scale-100 opacity-100" : "pointer-events-none scale-[0.92] opacity-0"
-        }`}
-        style={{ transitionDuration: "450ms" }}
-      >
-        <PlayingCard rank={card.rank} suit={card.suit || "♠"} tone={tone} />
+    <div className={`relative ${CELL_DIM}`}>
+      <div className="relative h-full w-full overflow-hidden rounded-xl">
+        <div
+          className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ease-out ${
+            faceUp ? "pointer-events-none opacity-0" : "opacity-100"
+          }`}
+        >
+          <CardBackFace />
+        </div>
+        <div
+          className={`absolute inset-0 flex items-center justify-center transition-opacity ease-out ${
+            faceUp ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+          style={{ transitionDuration: "450ms" }}
+        >
+          <PlayingCard rank={card.rank} suit={card.suit || "♠"} tone={tone} />
+        </div>
       </div>
       {faceUp && outcome === "win" ? (
-        <div className="pointer-events-none absolute -top-1.5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-500/95 px-1.5 py-px text-[9px] font-black uppercase tracking-wide text-white shadow-md ring-1 ring-emerald-200/60">
+        <div className="pointer-events-none absolute inset-x-1 bottom-1 z-20 rounded bg-emerald-600/95 py-0.5 text-center text-[8px] font-black uppercase tracking-wide text-white shadow-sm ring-1 ring-emerald-200/50">
           Hit
         </div>
       ) : null}
       {faceUp && outcome === "loss" ? (
-        <div className="pointer-events-none absolute -top-1.5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-rose-600/95 px-1.5 py-px text-[9px] font-black uppercase tracking-wide text-white shadow-md ring-1 ring-rose-200/50">
+        <div className="pointer-events-none absolute inset-x-1 bottom-1 z-20 rounded bg-rose-600/95 py-0.5 text-center text-[8px] font-black uppercase tracking-wide text-white shadow-sm ring-1 ring-rose-200/45">
           Miss
         </div>
       ) : null}
@@ -78,31 +87,18 @@ function NextCardReveal({ card, faceUp, outcome }) {
   );
 }
 
-/** Current + next card column — DicePickBoard `diceSlot`. */
-export function HighLowCardsDiceSlot({
-  currentCard,
-  revealCardData,
-  revealFaceUp,
-  revealOutcome,
-  resolving,
-}) {
+function DrawingPlaceholder() {
   return (
-    <div className="flex min-h-[10.5rem] w-full shrink-0 flex-col items-center justify-center gap-2 sm:min-h-[13rem] sm:flex-row sm:items-start sm:gap-3">
-      {currentCard?.rank ? <PlayingCard rank={currentCard.rank} suit={currentCard.suit || "♠"} /> : null}
-      {revealCardData?.rank ? (
-        <NextCardReveal card={revealCardData} faceUp={revealFaceUp} outcome={revealOutcome} />
-      ) : resolving ? (
-        <div className="flex h-[10.5rem] w-[6.85rem] shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-zinc-600/50 bg-zinc-900/40 sm:h-52 sm:w-36">
-          <span className="px-1 text-[9px] font-medium uppercase tracking-wide text-zinc-500">Next card</span>
-          <span className="mt-0.5 text-[10px] text-zinc-400 animate-pulse sm:text-xs">Drawing…</span>
-        </div>
-      ) : null}
+    <div
+      className={`flex ${CELL_DIM} flex-col items-center justify-center rounded-xl border border-dashed border-zinc-600/50 bg-zinc-900/40`}
+    >
+      <span className="px-1 text-[9px] font-medium uppercase tracking-wide text-zinc-500">Next card</span>
+      <span className="mt-0.5 text-[10px] text-zinc-400 animate-pulse sm:text-xs">Drawing…</span>
     </div>
   );
 }
 
-/** HIGHER / CASH OUT / LOWER — DicePickBoard `choiceSlot`. */
-export function HighLowCardsChoiceSlot({
+function HiLoChoiceButtons({
   uiState,
   playing,
   guessControlsLocked,
@@ -115,7 +111,7 @@ export function HighLowCardsChoiceSlot({
   const canAct = uiState === "playing" && playing;
 
   return (
-    <div className="flex min-h-[4.25rem] w-full flex-col justify-center sm:min-h-[4.75rem]">
+    <div className="flex w-full flex-col">
       {showActionRow && runUi ? (
         <div className="grid w-full grid-cols-3 gap-1.5 sm:gap-2">
           <button
@@ -144,8 +140,70 @@ export function HighLowCardsChoiceSlot({
           </button>
         </div>
       ) : (
-        <div className="min-h-[4.25rem] w-full sm:min-h-[4.75rem]" aria-hidden />
+        <div className="grid min-h-[44px] w-full grid-cols-3 gap-1.5 sm:min-h-12 sm:gap-2" aria-hidden>
+          <span className="invisible min-h-[44px] rounded-xl sm:min-h-12" />
+          <span className="invisible min-h-[44px] rounded-xl sm:min-h-12" />
+          <span className="invisible min-h-[44px] rounded-xl sm:min-h-12" />
+        </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Single playfield: fixed-height L·R card row + actions pinned under cards on mobile,
+ * beside cards on desktop — buttons column height tracks card stage (no vertical recenter jump).
+ */
+export function HighLowCardsMergedPlayfield({
+  currentCard,
+  revealCardData,
+  revealFaceUp,
+  revealOutcome,
+  resolving,
+  uiState,
+  playing,
+  guessControlsLocked,
+  showActionRow,
+  onHigh,
+  onLow,
+  onCashOut,
+}) {
+  const leftCell = currentCard?.rank ? (
+    <PlayingCard rank={currentCard.rank} suit={currentCard.suit || "♠"} />
+  ) : (
+    <EmptyCardCell />
+  );
+
+  const rightCell = revealCardData?.rank ? (
+    <NextCardReveal card={revealCardData} faceUp={revealFaceUp} outcome={revealOutcome} />
+  ) : resolving ? (
+    <DrawingPlaceholder />
+  ) : (
+    <EmptyCardCell />
+  );
+
+  return (
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-8">
+      {/* Fixed card stage: always two cells side-by-side; same height always */}
+      <div className="flex min-h-0 flex-1 items-center justify-center lg:flex-[1.2] lg:items-center">
+        <div className="flex h-[10.5rem] flex-row flex-nowrap items-center justify-center gap-2 sm:h-52 sm:gap-3">
+          <div className="flex shrink-0 items-center justify-center">{leftCell}</div>
+          <div className="flex shrink-0 items-center justify-center">{rightCell}</div>
+        </div>
+      </div>
+
+      {/* Actions: bottom of playfield on mobile; desktop column matches stretch, centers controls */}
+      <div className="mt-auto flex w-full shrink-0 flex-col justify-center lg:mt-0 lg:w-[min(30rem,44%)] lg:min-w-[18rem] lg:self-stretch lg:justify-center">
+        <HiLoChoiceButtons
+          uiState={uiState}
+          playing={playing}
+          guessControlsLocked={guessControlsLocked}
+          showActionRow={showActionRow}
+          onHigh={onHigh}
+          onLow={onLow}
+          onCashOut={onCashOut}
+        />
+      </div>
     </div>
   );
 }

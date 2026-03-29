@@ -17,6 +17,8 @@ export default function DicePickBoard({
   payoutCaption = "",
   diceSlot,
   choiceSlot,
+  /** When set, replaces the dice/choice two-column playfield (Hi-Lo Cards layout fix). Other games omit. */
+  mergedPlayfieldSlot = null,
 }) {
   const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
   const cleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
@@ -76,12 +78,16 @@ export default function DicePickBoard({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-3 px-2 pb-0.5 pt-0 lg:flex-row lg:items-center lg:justify-center lg:gap-8 lg:px-4 lg:py-3 lg:pb-3">
-        <div className="flex shrink-0 items-center justify-center">{diceSlot}</div>
-        <div className="mx-auto w-full max-w-[17.75rem] shrink-0 lg:mx-0 lg:max-w-none lg:w-[min(30rem,44%)] lg:min-w-[18rem]">
-          {choiceSlot}
+      {mergedPlayfieldSlot != null ? (
+        <div className="flex min-h-0 flex-1 flex-col px-2 pb-0.5 pt-0 lg:px-4 lg:py-3 lg:pb-3">{mergedPlayfieldSlot}</div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col justify-center gap-3 px-2 pb-0.5 pt-0 lg:flex-row lg:items-center lg:justify-center lg:gap-8 lg:px-4 lg:py-3 lg:pb-3">
+          <div className="flex shrink-0 items-center justify-center">{diceSlot}</div>
+          <div className="mx-auto w-full max-w-[17.75rem] shrink-0 lg:mx-0 lg:max-w-none lg:w-[min(30rem,44%)] lg:min-w-[18rem]">
+            {choiceSlot}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex shrink-0 justify-center px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1 lg:px-5">
         <div className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:h-8 lg:max-w-2xl" aria-hidden />
