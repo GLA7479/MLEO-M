@@ -46,7 +46,7 @@ export default function SoloV2TopHud({
 
   return (
     <header
-      className={`grid w-full shrink-0 grid-cols-[auto_1fr_auto] items-start gap-x-2 gap-y-0.5 sm:gap-x-3 sm:py-2 lg:gap-x-2 lg:gap-y-0 lg:py-1 ${
+      className={`solo-v2-top-hud grid w-full shrink-0 grid-cols-[auto_1fr_auto] items-start gap-x-2 gap-y-0.5 sm:gap-x-3 sm:py-2 lg:gap-x-2 lg:gap-y-0 lg:py-1 ${
         mobileHeaderBreathingRoom ? "py-2" : "py-1.5"
       }`}
     >

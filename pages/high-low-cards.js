@@ -1079,7 +1079,7 @@ export default function HighLowCardsPage() {
       }}
       soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
-        <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
+        <div className="solo-v2-route-stack relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
           {/* Hi-Lo intentionally uses DicePickBoard `mergedPlayfieldSlot` (card + guess UI) instead of dice/choice columns — do not revert to the default two-slot layout in “consistency” passes. */}
           <DicePickBoard
             progressStripKeyPrefix="high-low-cards"

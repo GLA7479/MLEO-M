@@ -263,3 +263,104 @@ body {
   }
 }
 
+/*
+ * Solo V2 — short-height mobile policy (max-width matches Tailwind `sm` at 640px).
+ * Only narrow + low viewports (e.g. iPhone portrait with browser chrome). No desktop impact.
+ */
+@media (max-width: 639px) and (max-height: 740px) {
+  .solo-v2-game-shell {
+    height: min(100dvh, 100svh);
+    max-height: min(100dvh, 100svh);
+  }
+
+  .solo-v2-game-shell .solo-v2-shell-stack {
+    gap: 0.25rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-gameplay-outer {
+    padding-top: 0 !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-top-hud {
+    padding-top: 0.375rem !important;
+    padding-bottom: 0.375rem !important;
+    row-gap: 0.125rem !important;
+    column-gap: 0.375rem !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-top-hud .justify-self-center {
+    margin-top: 0 !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-game-footer {
+    gap: 0.5rem !important;
+    padding-bottom: 0.125rem !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-ad-slot {
+    min-height: 2.25rem !important;
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-progress-strip {
+    padding-left: 0.375rem !important;
+    padding-right: 0.375rem !important;
+    padding-bottom: 0.125rem !important;
+    padding-top: 0 !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-progress-strip-cells > div {
+    padding-top: 0.125rem !important;
+    padding-bottom: 0.125rem !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-board-frame > div:first-child {
+    height: 0.75rem !important;
+    min-height: 0.75rem !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-board-playfield {
+    gap: 0.5rem !important;
+    padding-left: 0.375rem !important;
+    padding-right: 0.375rem !important;
+    padding-bottom: 0.125rem !important;
+    padding-top: 0 !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-board-anchor {
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-board-anchor .h-10 {
+    height: 2rem !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-route-stack {
+    padding-left: 0.125rem !important;
+    padding-right: 0.125rem !important;
+    padding-top: 0 !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-ladder-playfield-wrap {
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+
+  .solo-v2-game-shell .solo-v2-ladder-play-inner {
+    min-height: 9.5rem !important;
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+
+  .solo-v2-arcade-lobby-main .solo-v2-lobby-stack {
+    gap: 0.375rem !important;
+    padding-left: 0.375rem !important;
+    padding-right: 0.375rem !important;
+  }
+}
+

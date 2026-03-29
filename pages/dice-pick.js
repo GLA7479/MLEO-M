@@ -205,7 +205,7 @@ function DicePickGameplayPanel({
   const dicePhase = isRolling ? "rolling" : resolvedRoll != null ? "resolved" : "idle";
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
+    <div className="solo-v2-route-stack relative flex h-full min-h-0 w-full flex-col px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-4 lg:pt-1">
       <DicePickBoard
         progressStripKeyPrefix="dice-pick"
         sessionNotice={sessionNotice}

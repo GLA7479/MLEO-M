@@ -35,7 +35,7 @@ export default function DicePickBoard({
   const showSession = Boolean(sessionNotice);
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border-2 border-amber-900/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <div className="solo-v2-board-frame flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border-2 border-amber-900/45 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <div className="flex h-4 shrink-0 items-center justify-center px-2 sm:h-[1.125rem] lg:px-5">
         <p
           className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-amber-200/85 sm:text-[10px] ${
@@ -92,9 +92,11 @@ export default function DicePickBoard({
       ) : null}
 
       {mergedPlayfieldSlot != null ? (
-        <div className="flex min-h-0 flex-1 flex-col px-2 pb-0.5 pt-0 lg:px-4 lg:py-3 lg:pb-3">{mergedPlayfieldSlot}</div>
+        <div className="solo-v2-board-playfield flex min-h-0 flex-1 flex-col px-2 pb-0.5 pt-0 lg:px-4 lg:py-3 lg:pb-3">
+          {mergedPlayfieldSlot}
+        </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col justify-center gap-3 px-2 pb-0.5 pt-0 lg:flex-row lg:items-center lg:justify-center lg:gap-8 lg:px-4 lg:py-3 lg:pb-3">
+        <div className="solo-v2-board-playfield flex min-h-0 flex-1 flex-col justify-center gap-3 px-2 pb-0.5 pt-0 lg:flex-row lg:items-center lg:justify-center lg:gap-8 lg:px-4 lg:py-3 lg:pb-3">
           <div className="flex shrink-0 items-center justify-center">{diceSlot}</div>
           <div className="mx-auto w-full max-w-[17.75rem] shrink-0 lg:mx-0 lg:max-w-none lg:w-[min(30rem,44%)] lg:min-w-[18rem]">
             {choiceSlot}
@@ -102,7 +104,7 @@ export default function DicePickBoard({
         </div>
       )}
 
-      <div className="flex shrink-0 justify-center px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1 lg:px-5">
+      <div className="solo-v2-board-anchor flex shrink-0 justify-center px-2 py-1.5 sm:px-4 sm:pb-1.5 sm:pt-1 lg:px-5">
         <div className="h-10 w-full max-w-sm sm:mx-auto sm:h-[2.4rem] lg:h-8 lg:max-w-2xl" aria-hidden />
       </div>
     </div>

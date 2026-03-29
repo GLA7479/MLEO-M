@@ -37,7 +37,7 @@ export default function SoloV2ArcadeLobby() {
           paddingBottom: "max(8px, env(safe-area-inset-bottom))",
         }}
       >
-        <div className="mx-auto flex h-full max-w-2xl min-h-0 flex-col gap-2 px-2 lg:gap-1.5 lg:px-3">
+        <div className="solo-v2-lobby-stack mx-auto flex h-full max-w-2xl min-h-0 flex-col gap-2 px-2 lg:gap-1.5 lg:px-3">
           <header className="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-white/15 bg-black/30 px-2 py-2 lg:gap-1.5 lg:px-2 lg:py-1.5">
             <Link
               href="/mining"

@@ -59,7 +59,7 @@ export default function SoloV2GameFooter({
   const showDesktopPayout = Boolean(payout && (payout.label != null || payout.value != null));
 
   return (
-    <div className="flex w-full shrink-0 flex-col gap-2.5 pb-1 sm:gap-3 sm:pb-2 lg:gap-2 lg:pb-1">
+    <div className="solo-v2-game-footer flex w-full shrink-0 flex-col gap-2.5 pb-1 sm:gap-3 sm:pb-2 lg:gap-2 lg:pb-1">
       <div
         className={`flex min-w-0 flex-col gap-2 lg:gap-1.5 ${showDesktopPayout ? "lg:flex-row lg:items-center lg:gap-2.5" : ""}`}
       >

@@ -19,7 +19,7 @@ export default function SoloV2ProgressStrip({
   const labels = Array.isArray(stepLabels) ? stepLabels : null;
 
   return (
-    <div className="shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-5">
+    <div className="solo-v2-progress-strip shrink-0 px-2.5 pb-0.5 pt-0 sm:px-3 sm:pb-1 lg:px-5">
       <div className="mb-0 flex items-center justify-between px-0.5 sm:mb-0.5">
         <span className="text-[8px] font-bold uppercase tracking-[0.16em] text-amber-200/40 sm:text-[9px]">
           {rowLabel}
@@ -29,7 +29,7 @@ export default function SoloV2ProgressStrip({
         </span>
       </div>
       <div
-        className="flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
+        className="solo-v2-progress-strip-cells flex items-stretch justify-center gap-px rounded-lg border border-zinc-700/60 bg-zinc-950/80 p-px shadow-inner sm:gap-0.5 sm:rounded-xl sm:p-0.5"
         aria-label={ariaLabel}
       >
         {Array.from({ length: total }, (_, i) => {

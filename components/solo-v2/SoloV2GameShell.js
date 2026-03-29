@@ -90,7 +90,7 @@ export default function SoloV2GameShell({
       }}
     >
       <div
-        className={`mx-auto flex h-full w-full min-h-0 flex-col px-3 sm:px-4 lg:px-3.5 ${layoutMaxWidthClass} ${
+        className={`solo-v2-shell-stack mx-auto flex h-full w-full min-h-0 flex-col px-3 sm:px-4 lg:px-3.5 ${layoutMaxWidthClass} ${
           mobileHeaderBreathingRoom ? "gap-2.5 sm:gap-3 lg:gap-2" : "gap-1.5 sm:gap-3 lg:gap-2"
         }`}
       >
@@ -131,12 +131,12 @@ export default function SoloV2GameShell({
         <section
           className={
             gameplayDesktopUnclipVertical
-              ? "min-h-0 flex-1 overflow-hidden sm:overflow-visible"
-              : "min-h-0 flex-1 overflow-hidden"
+              ? "solo-v2-gameplay-section min-h-0 flex-1 overflow-hidden sm:overflow-visible"
+              : "solo-v2-gameplay-section min-h-0 flex-1 overflow-hidden"
           }
         >
           <div
-            className={`flex h-full min-h-0 items-stretch justify-center ${
+            className={`solo-v2-gameplay-outer flex h-full min-h-0 items-stretch justify-center ${
               mobileHeaderBreathingRoom ? "max-sm:pt-1.5 lg:pt-0" : "lg:pt-0"
             }`}
           >
