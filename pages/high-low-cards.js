@@ -41,6 +41,8 @@ const UI_STATE = {
 const STATS_KEY = "solo_v2_high_low_cards_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
 const MAX_WAGER = 1_000_000_000;
+/** Beat after terminal reveal before the result overlay (mirror-game timing). */
+const REVEAL_READABLE_MS = 520;
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
@@ -199,14 +201,15 @@ export default function HighLowCardsPage() {
   const [pendingGuess, setPendingGuess] = useState(null);
   const [terminalResult, setTerminalResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [, setSessionNotice] = useState("");
+  const [sessionNotice, setSessionNotice] = useState("");
   const [vaultBalance, setVaultBalance] = useState(0);
   const [vaultReady, setVaultReady] = useState(false);
   const [wagerInput, setWagerInput] = useState(String(HIGH_LOW_CARDS_MIN_WAGER));
   const lastPresetAmountRef = useRef(null);
   const [stats, setStats] = useState(readStats);
-  const [resultToast, setResultToast] = useState(null);
-  const toastTimerRef = useRef(null);
+  const [resultPopupOpen, setResultPopupOpen] = useState(false);
+  const resultPopupTimerRef = useRef(null);
+  const terminalPopupEligibleRef = useRef(false);
   const createInFlightRef = useRef(false);
   const actionInFlightRef = useRef(false);
   const cycleRef = useRef(0);
@@ -257,7 +260,7 @@ export default function HighLowCardsPage() {
 
   useEffect(() => {
     return () => {
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
     };
   }, []);
 
@@ -270,6 +273,12 @@ export default function HighLowCardsPage() {
   }
 
   function recoverToIdle(message) {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
+    terminalPopupEligibleRef.current = false;
     clearStoredSessionId();
     createInFlightRef.current = false;
     actionInFlightRef.current = false;
@@ -291,6 +300,7 @@ export default function HighLowCardsPage() {
 
     if (st === "resolved" || rs === "resolved") {
       const rr = hl?.resolvedResult;
+      terminalPopupEligibleRef.current = false;
       setPlaying(null);
       setPendingGuess(null);
       if (!preserveReveal) resetRevealVisuals();
@@ -394,25 +404,68 @@ export default function HighLowCardsPage() {
     void tryResumeStoredSession();
   }, [vaultReady, tryResumeStoredSession]);
 
+  const dismissResultPopupAfterTerminalRun = useCallback(() => {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    actionInFlightRef.current = false;
+    setResultPopupOpen(false);
+  }, []);
+
+  const openResultPopup = useCallback(() => {
+    if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+    setResultPopupOpen(true);
+    resultPopupTimerRef.current = window.setTimeout(() => {
+      resultPopupTimerRef.current = null;
+      dismissResultPopupAfterTerminalRun();
+    }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+  }, [dismissResultPopupAfterTerminalRun]);
+
+  function resetRoundAfterResultPopup() {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    clearStoredSessionId();
+    createInFlightRef.current = false;
+    actionInFlightRef.current = false;
+    resetRevealVisuals();
+    setSession(null);
+    setPlaying(null);
+    setPendingGuess(null);
+    setTerminalResult(null);
+    setResultPopupOpen(false);
+    setSessionNotice("");
+    setUiState(UI_STATE.IDLE);
+    terminalPopupEligibleRef.current = false;
+    setErrorMessage(prev => String(prev || "").trim() || "Vault update failed. Adjust play and press PLAY.");
+  }
+
   useEffect(() => {
-    if (uiState !== UI_STATE.TERMINAL) return undefined;
+    if (uiState !== UI_STATE.TERMINAL) return;
     const tr = terminalResult;
     const sid = session?.id;
     const settlementSummary = tr?.settlementSummary;
-    if (!sid || !settlementSummary) return undefined;
-    let cancelled = false;
+    if (!sid || !settlementSummary) return;
     applyHighLowCardsSettlementOnce(sid, settlementSummary).then(sr => {
-      if (cancelled || !sr) return;
-      setVaultBalance(Number(sr.nextBalance || 0));
+      if (!sr) return;
+      const authoritativeBalance = Math.max(0, Number(sr.nextBalance || 0));
+      setVaultBalance(authoritativeBalance);
       if (sr.error) {
         setErrorMessage(sr.error);
-        setSessionNotice("Round ended, but vault update failed.");
-        handlePlayAgain();
+        setSessionNotice("Result resolved, but vault update failed.");
+        terminalPopupEligibleRef.current = false;
+        if (resultPopupTimerRef.current) clearTimeout(resultPopupTimerRef.current);
+        resultPopupTimerRef.current = window.setTimeout(() => {
+          resetRoundAfterResultPopup();
+        }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
         return;
       }
       const entryCost = Number(settlementSummary.entryCost || HIGH_LOW_CARDS_MIN_WAGER);
       const payoutReturn = Number(settlementSummary.payoutReturn || 0);
       const won = Boolean(tr?.isWin);
+      const streakN = Number(tr?.streak ?? 0);
       if (sr.applied) {
         setStats(prev => ({
           ...prev,
@@ -422,41 +475,44 @@ export default function HighLowCardsPage() {
           totalPlay: prev.totalPlay + (settlementSummary.fundingSource === "gift" ? 0 : entryCost),
           totalWon: prev.totalWon + payoutReturn,
           biggestWin: Math.max(prev.biggestWin, won ? payoutReturn : 0),
-          maxStreak: Math.max(prev.maxStreak, Number(tr?.streak || 0)),
+          maxStreak: Math.max(prev.maxStreak, streakN),
         }));
       }
       const delta = Number(settlementSummary.netDelta || 0);
-      const line2 = won
-        ? tr?.terminalKind === "cashout"
-          ? `Cashed out · ${tr?.streak ?? 0} streak · +${formatCompact(payoutReturn)}`
-          : `Run won · ${tr?.streak ?? 0} streak · +${formatCompact(payoutReturn)}`
-        : tr?.lastNextCard?.rank
-          ? `Next card ${tr.lastNextCard.rank}${tr.lastNextCard.suit || "♠"} · streak lost`
-          : "Better luck next run";
-      setResultToast({
-        isWin: won,
-        title: won ? "BANKED" : "RUN OVER",
-        line2,
-        vaultDeltaLabel: `${delta >= 0 ? "+" : ""}${formatCompact(delta)}`,
-      });
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = window.setTimeout(() => {
-        if (cancelled) return;
-        setResultToast(null);
-        handlePlayAgain();
-      }, SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS);
+      const deltaLabel = delta >= 0 ? `+${delta}` : `${delta}`;
+      if (sr.applied) {
+        setSessionNotice(`Settled (${deltaLabel}). Vault: ${authoritativeBalance}.`);
+      } else {
+        setSessionNotice(`Settlement already applied. Vault: ${authoritativeBalance}.`);
+      }
+      const shouldOpenTerminalPopup = terminalPopupEligibleRef.current;
+      terminalPopupEligibleRef.current = false;
+      if (shouldOpenTerminalPopup) {
+        window.setTimeout(() => {
+          openResultPopup();
+        }, REVEAL_READABLE_MS);
+      }
     });
-    return () => {
-      cancelled = true;
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    };
-  }, [uiState, terminalResult?.settlementSummary, session?.id, terminalResult?.isWin, terminalResult?.streak]);
+  }, [
+    uiState,
+    terminalResult?.settlementSummary,
+    session?.id,
+    terminalResult?.isWin,
+    terminalResult?.streak,
+    openResultPopup,
+  ]);
 
   async function bootstrapSession(wager, activeCycle, createSessionMode, giftMeta) {
     const isGiftRound = Boolean(giftMeta?.isGiftRound);
     createInFlightRef.current = true;
     setUiState(UI_STATE.LOADING);
     setErrorMessage("");
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
+    terminalPopupEligibleRef.current = false;
     setTerminalResult(null);
     resetRevealVisuals();
 
@@ -501,6 +557,9 @@ export default function HighLowCardsPage() {
             return { ok: false };
           }
           giftMeta?.onGiftConsumed?.();
+          if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+            window.requestAnimationFrame(() => giftMeta?.onGiftConsumed?.());
+          }
         }
 
         const sid = payload.session.id;
@@ -551,6 +610,9 @@ export default function HighLowCardsPage() {
       setErrorMessage("Vault unavailable.");
       return;
     }
+    if (uiState === UI_STATE.TERMINAL) {
+      handlePlayAgain();
+    }
     const isGiftRound = giftRoundRef.current;
     const wager = isGiftRound ? SOLO_V2_GIFT_ROUND_STAKE : parseWagerInput(wagerInput);
     if (!isGiftRound && wager < HIGH_LOW_CARDS_MIN_WAGER) return;
@@ -564,10 +626,14 @@ export default function HighLowCardsPage() {
     const mode = isGiftRound ? SOLO_V2_SESSION_MODE.FREEPLAY : SOLO_V2_SESSION_MODE.STANDARD;
 
     try {
-      await bootstrapSession(wager, c, mode, {
+      const boot = await bootstrapSession(wager, c, mode, {
         isGiftRound,
         onGiftConsumed: () => giftRefreshRef.current?.(),
       });
+      if (isGiftRound && boot?.ok && typeof window !== "undefined" && window.requestAnimationFrame) {
+        giftRefreshRef.current?.();
+        window.requestAnimationFrame(() => giftRefreshRef.current?.());
+      }
     } finally {
       if (isGiftRound) giftRoundRef.current = false;
     }
@@ -576,6 +642,11 @@ export default function HighLowCardsPage() {
   async function submitGuessAndResolve(guess) {
     const sid = sessionRef.current?.id;
     if (!sid || actionInFlightRef.current || revealAnimatingRef.current) return;
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     actionInFlightRef.current = true;
     cycleRef.current += 1;
     const c = cycleRef.current;
@@ -714,6 +785,7 @@ export default function HighLowCardsPage() {
         isWin: false,
       });
       setSession(prev => (prev ? { ...prev, sessionStatus: "resolved" } : prev));
+      terminalPopupEligibleRef.current = true;
       setUiState(UI_STATE.TERMINAL);
       setSessionNotice("Wrong call — run ended.");
       return;
@@ -764,6 +836,11 @@ export default function HighLowCardsPage() {
       setErrorMessage("Nothing to cash out yet.");
       return;
     }
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
     actionInFlightRef.current = true;
     cycleRef.current += 1;
     const c = cycleRef.current;
@@ -790,6 +867,7 @@ export default function HighLowCardsPage() {
           isWin: true,
         });
         setSession(prev => (prev ? { ...prev, sessionStatus: "resolved" } : prev));
+        terminalPopupEligibleRef.current = true;
         setUiState(UI_STATE.TERMINAL);
         setSessionNotice("Cashed out.");
         return;
@@ -813,6 +891,12 @@ export default function HighLowCardsPage() {
   }
 
   function handlePlayAgain() {
+    if (resultPopupTimerRef.current) {
+      clearTimeout(resultPopupTimerRef.current);
+      resultPopupTimerRef.current = null;
+    }
+    setResultPopupOpen(false);
+    terminalPopupEligibleRef.current = false;
     clearStoredSessionId();
     setSession(null);
     setPlaying(null);
@@ -826,19 +910,86 @@ export default function HighLowCardsPage() {
   const numericWager = parseWagerInput(wagerInput);
   const wagerPlayable =
     vaultReady && numericWager >= HIGH_LOW_CARDS_MIN_WAGER && vaultBalance >= numericWager;
+
+  const idleLike =
+    uiState === UI_STATE.IDLE ||
+    uiState === UI_STATE.UNAVAILABLE ||
+    uiState === UI_STATE.PENDING_MIGRATION ||
+    uiState === UI_STATE.TERMINAL;
+  const stakeExceedsVault =
+    vaultReady &&
+    idleLike &&
+    numericWager >= HIGH_LOW_CARDS_MIN_WAGER &&
+    vaultBalance < numericWager;
+  const stakeHint = stakeExceedsVault
+    ? `Stake exceeds available vault (${formatCompact(vaultBalance)}). Lower amount to play.`
+    : "";
+
   const canStart =
     wagerPlayable &&
     !revealAnimating &&
-    uiState !== UI_STATE.LOADING &&
-    uiState !== UI_STATE.RESOLVING &&
-    uiState !== UI_STATE.PLAYING &&
-    uiState !== UI_STATE.TERMINAL;
+    ![UI_STATE.LOADING, UI_STATE.RESOLVING, UI_STATE.PLAYING, UI_STATE.PENDING_MIGRATION].includes(uiState);
+
+  useEffect(() => {
+    if (!wagerPlayable) return;
+    setErrorMessage(prev => {
+      const s = String(prev || "");
+      if (/Session expired\.|Session ended\.|Press PLAY|no longer valid/i.test(s)) {
+        return "";
+      }
+      return s;
+    });
+  }, [wagerPlayable]);
 
   const currentCard = playing?.currentCard;
   const streak = Number(playing?.streak ?? 0);
   const mult = Number(playing?.multiplier ?? 1);
   const potentialWin =
     session?.entryAmount != null ? payoutFromEntryAndStreak(Number(session.entryAmount), streak) : 0;
+
+  const runEntryFromSession =
+    session != null &&
+    Number(session.entryAmount) >= HIGH_LOW_CARDS_MIN_WAGER &&
+    Number.isFinite(Number(session.entryAmount))
+      ? Math.floor(Number(session.entryAmount))
+      : null;
+  const inActiveRunUi = uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING || uiState === UI_STATE.LOADING;
+
+  let summaryPlay = numericWager;
+  let summaryWin = payoutFromEntryAndStreak(Math.max(HIGH_LOW_CARDS_MIN_WAGER, numericWager), 0);
+  if (runEntryFromSession != null && inActiveRunUi) {
+    summaryPlay = runEntryFromSession;
+    summaryWin = potentialWin;
+  }
+
+  if (uiState === UI_STATE.TERMINAL && terminalResult?.settlementSummary) {
+    const ss = terminalResult.settlementSummary;
+    summaryPlay = Math.max(0, Math.floor(Number(ss.entryCost) || summaryPlay));
+    summaryWin = Math.max(0, Math.floor(Number(ss.payoutReturn) || 0));
+  }
+
+  const trPopup = terminalResult;
+  const wonPopup = Boolean(trPopup?.isWin);
+  const tkPopup = String(trPopup?.terminalKind || "");
+  const prPopup = Math.max(0, Math.floor(Number(trPopup?.settlementSummary?.payoutReturn) || 0));
+  const deltaPopup = Number(trPopup?.settlementSummary?.netDelta ?? 0);
+  const resultVaultLabelPopup =
+    trPopup?.settlementSummary != null ? `${deltaPopup > 0 ? "+" : ""}${formatCompact(deltaPopup)}` : "";
+  let popupTitle = wonPopup ? "BANKED" : "RUN OVER";
+  let popupLine2 = "—";
+  const popupLine3 =
+    "Adjust play in the bar if you want, then press PLAY for another run — there is no auto-start after the popup.";
+  if (trPopup) {
+    popupLine2 = wonPopup
+      ? tkPopup === "cashout"
+        ? `Cashed out · streak ${trPopup.streak ?? 0} · return ${formatCompact(prPopup)}`
+        : `Run won · streak ${trPopup.streak ?? 0} · return ${formatCompact(prPopup)}`
+      : trPopup?.lastNextCard?.rank
+        ? `Next ${trPopup.lastNextCard.rank}${trPopup.lastNextCard.suit || "♠"} · streak lost`
+        : "Better luck next run";
+    if (tkPopup === "cashout" && wonPopup) popupTitle = "EXITED";
+  }
+  const resultTonePopup = wonPopup ? "win" : "lose";
 
   function handlePresetClick(presetValue) {
     const v = Number(presetValue);
@@ -860,16 +1011,24 @@ export default function HighLowCardsPage() {
   }
 
   const handleGiftPlay = useCallback(() => {
-    if (!vaultReady || giftShell.giftCount < 1) return;
-    if ([UI_STATE.LOADING, UI_STATE.RESOLVING, UI_STATE.PLAYING, UI_STATE.PENDING_MIGRATION].includes(uiState)) return;
-    if (revealAnimatingRef.current) return;
+    if (!vaultReady) {
+      setErrorMessage("Shared vault unavailable.");
+      return;
+    }
+    if (giftShell.giftCount < 1) return;
+    if (createInFlightRef.current || actionInFlightRef.current || revealAnimatingRef.current) return;
+    if (
+      [UI_STATE.LOADING, UI_STATE.RESOLVING, UI_STATE.PLAYING, UI_STATE.PENDING_MIGRATION].includes(uiState)
+    ) {
+      return;
+    }
     giftRoundRef.current = true;
     void handleStartPlay();
   }, [vaultReady, giftShell.giftCount, uiState]);
 
   const isRunActive = uiState === UI_STATE.PLAYING || uiState === UI_STATE.RESOLVING;
-  const primaryLabel =
-    uiState === UI_STATE.TERMINAL ? "PLAY" : uiState === UI_STATE.PLAYING ? "Run in progress" : "PLAY";
+  const busyFooter = uiState === UI_STATE.LOADING || (isRunActive && uiState === UI_STATE.RESOLVING);
+  const primaryLabel = uiState === UI_STATE.PLAYING ? "Run in progress" : "PLAY";
   const guessControlsLocked =
     Boolean(pendingGuess) || uiState === UI_STATE.RESOLVING || revealAnimating;
   const hiLoBottomSlotActive =
@@ -879,8 +1038,12 @@ export default function HighLowCardsPage() {
   return (
     <SoloV2GameShell
       title="Hi-Lo Cards"
-      subtitle="Arcade Solo"
+      subtitle="Call higher or lower on the next card — streak builds your multiplier; cash out or risk it all."
+      layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
+      mobileHeaderBreathingRoom
+      stableTripleTopSummary
       gameplayScrollable={false}
+      gameplayDesktopUnclipVertical
       menuVaultBalance={vaultBalance}
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
@@ -890,14 +1053,16 @@ export default function HighLowCardsPage() {
       }}
       topGameStatsSlot={
         <>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Play <span className="font-semibold tabular-nums text-amber-200/90">{formatCompact(numericWager)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Play</span>
+            <span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span>
           </span>
           <span className="shrink-0 text-zinc-600" aria-hidden>
             ·
           </span>
-          <span className="shrink-0 whitespace-nowrap text-zinc-500">
-            Win <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(potentialWin)}</span>
+          <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
+            <span>Win</span>
+            <span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(summaryWin)}</span>
           </span>
         </>
       }
@@ -905,7 +1070,9 @@ export default function HighLowCardsPage() {
         betPresets: BET_PRESETS,
         wagerInput,
         wagerNumeric: numericWager,
-        canEditPlay: !isRunActive && uiState !== UI_STATE.TERMINAL,
+        canEditPlay: !isRunActive && uiState !== UI_STATE.LOADING,
+        compactAmountDisplayWhenBlurred: true,
+        formatPresetLabel: v => formatCompact(v),
         onPresetAmount: handlePresetClick,
         onDecreaseAmount: () => {
           clearPresetChain();
@@ -930,18 +1097,28 @@ export default function HighLowCardsPage() {
           setWagerInput(String(HIGH_LOW_CARDS_MIN_WAGER));
         },
         primaryActionLabel: primaryLabel,
-        primaryActionDisabled: uiState === UI_STATE.TERMINAL ? true : !canStart,
+        primaryActionDisabled: !canStart,
         primaryActionLoading: uiState === UI_STATE.LOADING || (isRunActive && uiState === UI_STATE.RESOLVING),
-        primaryLoadingLabel: uiState === UI_STATE.LOADING ? "STARTING..." : "RESOLVING...",
+        primaryLoadingLabel: uiState === UI_STATE.LOADING ? "STARTING…" : "RESOLVING…",
         onPrimaryAction: () => {
           void handleStartPlay();
         },
-        errorMessage,
+        errorMessage: errorMessage || stakeHint,
       }}
+      soloV2FooterWrapperClassName={busyFooter ? "opacity-95" : ""}
       gameplaySlot={
-        <div className="relative mx-auto flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden px-2 pt-1 text-center sm:max-w-lg">
+        <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden px-1 pt-0 text-center sm:px-2 sm:pt-1 lg:px-5 lg:pt-2">
           {/* Same column contract as quick-flip: flex-1 main stage + shrink-0 control strip with only pb-2/sm:pb-3 above footer */}
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col sm:max-w-lg lg:max-w-2xl">
+            <div className="flex h-4 shrink-0 items-center justify-center px-1 sm:h-[1.125rem]">
+              <p
+                className={`line-clamp-1 w-full text-center text-[9px] font-semibold leading-tight text-amber-200/85 sm:text-[10px] ${
+                  sessionNotice ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                {sessionNotice || "\u00a0"}
+              </p>
+            </div>
             <p className="mb-1 shrink-0 text-[10px] leading-snug text-zinc-400 sm:text-xs">
               See the base card, then call higher or lower. Each win raises your streak and multiplier (+0.206 per win,
               legacy curve). Cash out anytime after at least one win.
@@ -1048,22 +1225,25 @@ export default function HighLowCardsPage() {
           </div>
 
           <SoloV2ResultPopup
-            open={Boolean(resultToast)}
-            isWin={Boolean(resultToast?.isWin)}
-            animationKey={`${resultToast?.title ?? ""}-${resultToast?.vaultDeltaLabel ?? ""}`}
+            open={resultPopupOpen}
+            isWin={wonPopup}
+            resultTone={resultTonePopup}
+            animationKey={`${popupTitle}-${popupLine2}-${resultVaultLabelPopup}`}
             vaultSlot={
-              resultToast ? (
+              resultPopupOpen ? (
                 <SoloV2ResultPopupVaultLine
-                  isWin={resultToast.isWin}
-                  deltaLabel={resultToast.vaultDeltaLabel}
+                  isWin={wonPopup}
+                  tone={resultTonePopup}
+                  deltaLabel={resultVaultLabelPopup}
                 />
               ) : undefined
             }
           >
-            <div className="text-[13px] font-black uppercase tracking-wide">{resultToast?.title}</div>
-            <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">
-              {resultToast?.line2}
+            <div className="text-[13px] font-black uppercase tracking-wide">{popupTitle}</div>
+            <div className="mt-1 text-sm font-bold text-white">
+              <span className="text-amber-100 tabular-nums">{popupLine2}</span>
             </div>
+            <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide opacity-90">{popupLine3}</div>
           </SoloV2ResultPopup>
         </div>
       }
@@ -1073,15 +1253,24 @@ export default function HighLowCardsPage() {
           <p>2. Tap HIGHER or LOWER (or CASH OUT after at least one win).</p>
           <p>3. Each correct guess advances streak; multiplier grows by +0.206 per win (legacy rule).</p>
           <p>4. Wrong guess ends the run; vault settles from server result.</p>
+          <p>
+            Gift rounds use freeplay — a loss does not debit your vault; a win credits the full payout. After the result
+            popup closes, the final cards stay visible — press PLAY explicitly for the next run; there is no auto-start or
+            auto-chain.
+          </p>
         </div>
       }
       statsContent={
         <div className="space-y-2">
           <p>Total games: {stats.totalGames}</p>
+          <p>Wins: {stats.wins}</p>
+          <p>Losses: {stats.losses}</p>
           <p>Win rate: {stats.totalGames ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : "0.0"}%</p>
           <p>Max streak: {stats.maxStreak}</p>
-          <p>Total play: {formatCompact(stats.totalPlay)}</p>
-          <p>Total won: {formatCompact(stats.totalWon)}</p>
+          <p>Total played: {formatCompact(stats.totalPlay)}</p>
+          <p>Total returned: {formatCompact(stats.totalWon)}</p>
+          <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
+          <p>Net flow (returned − played): {formatCompact(stats.totalWon - stats.totalPlay)}</p>
         </div>
       }
       resultState={null}
