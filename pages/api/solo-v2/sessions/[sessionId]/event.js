@@ -32,6 +32,9 @@ import { buildNumberHuntSessionSnapshot } from "../../../../../lib/solo-v2/serve
 import { normalizeNumberHuntGuess } from "../../../../../lib/solo-v2/numberHuntConfig";
 import { buildCoreBreakerSessionSnapshot } from "../../../../../lib/solo-v2/server/coreBreakerSnapshot";
 import { normalizeCoreBreakerColumn } from "../../../../../lib/solo-v2/coreBreakerConfig";
+import { buildFlashVeinSessionSnapshot } from "../../../../../lib/solo-v2/server/flashVeinSnapshot";
+import { normalizeFlashVeinColumn } from "../../../../../lib/solo-v2/flashVeinConfig";
+import { parseFlashVeinActiveSummary } from "../../../../../lib/solo-v2/server/flashVeinEngine";
 import { buildDropRunSessionSnapshot } from "../../../../../lib/solo-v2/server/dropRunSnapshot";
 import {
   buildMysteryChamberSessionSnapshot,
@@ -1149,6 +1152,194 @@ export default async function handler(req, res) {
       }
     }
 
+    const isFlashVeinReveal =
+      sessionRow.game_key === "flash_vein" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "flash_vein_reveal";
+
+    if (isFlashVeinReveal) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Flash Vein reveal is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "flash_vein") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Flash Vein requires gameKey flash_vein.",
+        });
+      }
+
+      const activeFv = parseFlashVeinActiveSummary(sessionRow);
+      if (!activeFv) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Flash Vein session state is missing or invalid.",
+        });
+      }
+
+      const snapshotFv = await buildFlashVeinSessionSnapshot(supabase, sessionRow);
+      if (!snapshotFv.ok) {
+        if (isMissingTable(snapshotFv.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Flash Vein reveal is temporarily unavailable.",
+        });
+      }
+
+      const snapFv = snapshotFv.snapshot;
+      if (snapFv.pickConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "Conflicting picks — refresh session state.",
+        });
+      }
+
+      if (snapFv.pendingPick) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "turn_pending",
+          message: "Resolve the current pick before revealing the next flash.",
+        });
+      }
+
+      const rIdx = activeFv.currentRoundIndex;
+      const lanesRow = activeFv.roundPlan[rIdx];
+      const lanes = Array.isArray(lanesRow) ? [...lanesRow] : [];
+
+      if (activeFv.revealedForRound === rIdx) {
+        return res.status(200).json({
+          ok: true,
+          category: "success",
+          status: "reveal_ready",
+          idempotent: true,
+          reveal: { roundIndex: rIdx, lanes },
+          session: {
+            id: sessionId,
+            sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+          },
+          authority: {
+            eventValidation: "server",
+            gameplayResolution: "deferred",
+          },
+        });
+      }
+
+      const rawSummary = sessionRow.server_outcome_summary || {};
+      const nextSummary = { ...rawSummary, revealedForRound: rIdx };
+
+      const sessionUpdate = await supabase
+        .from("solo_v2_sessions")
+        .update({
+          server_outcome_summary: nextSummary,
+          session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+        })
+        .eq("id", sessionId)
+        .eq("player_ref", playerRef)
+        .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS])
+        .select("id,session_status,server_outcome_summary")
+        .maybeSingle();
+
+      if (sessionUpdate.error) {
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Flash Vein reveal update failed.",
+        });
+      }
+
+      if (!sessionUpdate.data) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "reveal_conflict",
+          message: "Session changed during reveal.",
+        });
+      }
+
+      const revealPayload = { action: "flash_vein_reveal", gameKey: "flash_vein" };
+      const appendReveal = await supabase.rpc("solo_v2_append_session_event", {
+        p_session_id: sessionId,
+        p_player_ref: playerRef,
+        p_event_type: eventType,
+        p_event_payload: revealPayload,
+      });
+
+      if (appendReveal.error) {
+        if (isMissingTable(appendReveal.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "event_rejected",
+          message: appendReveal.error.message,
+        });
+      }
+
+      const evRow = Array.isArray(appendReveal.data) ? appendReveal.data[0] : appendReveal.data;
+
+      return res.status(200).json({
+        ok: true,
+        category: "success",
+        status: "reveal_ready",
+        idempotent: false,
+        reveal: { roundIndex: rIdx, lanes },
+        event: {
+          id: evRow?.event_id || null,
+          eventType,
+        },
+        session: {
+          id: sessionId,
+          sessionStatus: evRow?.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+        },
+        authority: {
+          eventValidation: "server",
+          gameplayResolution: "deferred",
+        },
+      });
+    }
+
     const isCoreBreakerStrike =
       sessionRow.game_key === "core_breaker" &&
       eventType === "client_action" &&
@@ -1263,6 +1454,124 @@ export default async function handler(req, res) {
           category: "conflict",
           status: "invalid_session_state",
           message: "Core Breaker is not accepting strikes right now.",
+        });
+      }
+    }
+
+    const isFlashVeinPick =
+      sessionRow.game_key === "flash_vein" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "flash_vein_pick";
+
+    if (isFlashVeinPick) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Flash Vein pick is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKeyFv = String(eventPayload?.gameKey || "");
+      if (declaredGameKeyFv !== "flash_vein") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Flash Vein requires gameKey flash_vein.",
+        });
+      }
+
+      const columnFv = normalizeFlashVeinColumn(eventPayload?.column);
+      if (columnFv === null) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "flash_vein_pick requires column 0, 1, or 2.",
+        });
+      }
+
+      const snapshotResultFv = await buildFlashVeinSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResultFv.ok) {
+        if (isMissingTable(snapshotResultFv.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Flash Vein pick submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshotFvPick = snapshotResultFv.snapshot;
+      if (snapshotFvPick.pickConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "Conflicting pick events. Refresh session state.",
+        });
+      }
+
+      if (snapshotFvPick.pendingPick) {
+        const pp = snapshotFvPick.pendingPick;
+        const pendingId = pp.pickEventId != null ? Number(pp.pickEventId) : null;
+        const same = Number(pp.column) === columnFv;
+        if (same && Number.isFinite(pendingId) && pendingId > 0) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pendingId,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "turn_pending",
+          message: "Resolve the current pick before submitting a new one.",
+        });
+      }
+
+      if (String(snapshotFvPick.readState || "") !== "pick_pending") {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Flash Vein is not accepting picks right now.",
         });
       }
     }

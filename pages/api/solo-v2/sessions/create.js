@@ -44,6 +44,8 @@ import {
 import { mysteryChamberDebugLog } from "../../../../lib/solo-v2/server/mysteryChamberDebug";
 import { buildCoreBreakerSessionSnapshot } from "../../../../lib/solo-v2/server/coreBreakerSnapshot";
 import { buildCoreBreakerInitialActiveSummary } from "../../../../lib/solo-v2/server/coreBreakerEngine";
+import { buildFlashVeinSessionSnapshot } from "../../../../lib/solo-v2/server/flashVeinSnapshot";
+import { buildFlashVeinInitialActiveSummary } from "../../../../lib/solo-v2/server/flashVeinEngine";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -323,12 +325,15 @@ async function singleActiveGameRowPlayableOrExpire(supabase, existingSummary, pl
     rs === "ready" ||
     rs === "roll_submitted" ||
     rs === "roll_conflict" ||
-      rs === "guess_submitted" ||
-      rs === "guess_conflict" ||
-      rs === "gate_submitted" ||
-      rs === "gate_conflict" ||
-      rs === "action_submitted" ||
-      rs === "action_conflict"
+    rs === "guess_submitted" ||
+    rs === "guess_conflict" ||
+    rs === "gate_submitted" ||
+    rs === "gate_conflict" ||
+    rs === "action_submitted" ||
+    rs === "action_conflict" ||
+    rs === "awaiting_reveal" ||
+    rs === "pick_pending" ||
+    rs === "pick_submitted"
   ) {
     return { ok: true, playable: true };
   }
@@ -526,6 +531,25 @@ async function seedCoreBreakerSessionOrWarn(supabase, gameKey, sessionId, player
 
   if (error) {
     console.error("[solo-v2/create core_breaker] seed failed", { sessionId, error });
+  }
+}
+
+async function seedFlashVeinSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "flash_vein" || !sessionId) return;
+  const summary = buildFlashVeinInitialActiveSummary();
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "flash_vein")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create flash_vein] seed failed", { sessionId, error });
   }
 }
 
@@ -750,6 +774,7 @@ export default async function handler(req, res) {
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
       gameKey === "core_breaker" ||
+      gameKey === "flash_vein" ||
       gameKey === "triple_dice" ||
       gameKey === "challenge_21" ||
       gameKey === "drop_run" ||
@@ -774,7 +799,9 @@ export default async function handler(req, res) {
                         ? buildNumberHuntSessionSnapshot
                         : gameKey === "core_breaker"
                           ? buildCoreBreakerSessionSnapshot
-                          : gameKey === "triple_dice"
+                          : gameKey === "flash_vein"
+                            ? buildFlashVeinSessionSnapshot
+                            : gameKey === "triple_dice"
                             ? buildTripleDiceSessionSnapshot
                             : gameKey === "challenge_21"
                               ? buildChallenge21SessionSnapshot
@@ -899,6 +926,7 @@ export default async function handler(req, res) {
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
       gameKey === "core_breaker" ||
+      gameKey === "flash_vein" ||
       gameKey === "triple_dice" ||
       gameKey === "challenge_21" ||
       gameKey === "drop_run" ||
@@ -949,6 +977,7 @@ export default async function handler(req, res) {
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
       gameKey === "core_breaker" ||
+      gameKey === "flash_vein" ||
       gameKey === "triple_dice" ||
       gameKey === "challenge_21" ||
       gameKey === "drop_run" ||
@@ -981,6 +1010,7 @@ export default async function handler(req, res) {
         await seedLimitRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedNumberHuntSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedCoreBreakerSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedFlashVeinSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedTripleDiceSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedChallenge21SessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedDropRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
@@ -1036,6 +1066,7 @@ export default async function handler(req, res) {
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
       gameKey === "core_breaker" ||
+      gameKey === "flash_vein" ||
       gameKey === "triple_dice" ||
       gameKey === "challenge_21" ||
       gameKey === "drop_run" ||
@@ -1061,7 +1092,9 @@ export default async function handler(req, res) {
                           ? buildNumberHuntSessionSnapshot
                           : gameKey === "core_breaker"
                             ? buildCoreBreakerSessionSnapshot
-                            : gameKey === "triple_dice"
+                            : gameKey === "flash_vein"
+                              ? buildFlashVeinSessionSnapshot
+                              : gameKey === "triple_dice"
                               ? buildTripleDiceSessionSnapshot
                               : gameKey === "challenge_21"
                                 ? buildChallenge21SessionSnapshot
@@ -1136,6 +1169,7 @@ export default async function handler(req, res) {
               await seedLimitRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedNumberHuntSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedCoreBreakerSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedFlashVeinSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedTripleDiceSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedChallenge21SessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedDropRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
@@ -1187,6 +1221,7 @@ export default async function handler(req, res) {
               await seedLimitRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedNumberHuntSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedCoreBreakerSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedFlashVeinSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedTripleDiceSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedChallenge21SessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedDropRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
@@ -1253,6 +1288,7 @@ export default async function handler(req, res) {
     await seedLimitRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedNumberHuntSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedCoreBreakerSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedFlashVeinSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedTripleDiceSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedChallenge21SessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedDropRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);

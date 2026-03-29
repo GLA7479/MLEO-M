@@ -16,6 +16,10 @@ import {
   buildCoreBreakerSessionSnapshot,
   stripCoreBreakerSecretsFromSummary,
 } from "../../../../lib/solo-v2/server/coreBreakerSnapshot";
+import {
+  buildFlashVeinSessionSnapshot,
+  stripFlashVeinSecretsFromSummary,
+} from "../../../../lib/solo-v2/server/flashVeinSnapshot";
 import { buildDropRunSessionSnapshot } from "../../../../lib/solo-v2/server/dropRunSnapshot";
 import {
   buildMysteryChamberSessionSnapshot,
@@ -98,6 +102,7 @@ export default async function handler(req, res) {
     let challenge21Payload = null;
     let dropRunPayload = null;
     let mysteryChamberPayload = null;
+    let flashVeinPayload = null;
 
     if (row.game_key === "quick_flip") {
       const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
@@ -383,6 +388,35 @@ export default async function handler(req, res) {
         canCashOut: cbSnapshot.canCashOut,
         resolvedResult: cbSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "flash_vein") {
+      const fvSnapshotResult = await buildFlashVeinSessionSnapshot(supabase, row);
+      if (!fvSnapshotResult.ok) {
+        if (isMissingTable(fvSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const fvSnapshot = fvSnapshotResult.snapshot;
+      sessionReadState = fvSnapshot.readState;
+      flashVeinPayload = {
+        readState: fvSnapshot.readState,
+        playing: fvSnapshot.playing,
+        pendingPick: fvSnapshot.pendingPick,
+        pickConflict: fvSnapshot.pickConflict,
+        canResolveTurn: fvSnapshot.canResolveTurn,
+        canCashOut: fvSnapshot.canCashOut,
+        resolvedResult: fvSnapshot.resolvedResult,
+      };
     } else if (row.game_key === "triple_dice") {
       const tdSnapshotResult = await buildTripleDiceSessionSnapshot(supabase, row);
       if (!tdSnapshotResult.ok) {
@@ -507,6 +541,8 @@ export default async function handler(req, res) {
         ? stripNumberHuntSecretFromSummary(rawSummary)
         : row.game_key === "core_breaker" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
           ? stripCoreBreakerSecretsFromSummary(rawSummary)
+          : row.game_key === "flash_vein" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
+            ? stripFlashVeinSecretsFromSummary(rawSummary)
         : row.game_key === "challenge_21" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
           ? stripChallenge21SecretsFromSummary(rawSummary)
           : row.game_key === "mystery_chamber" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
@@ -546,6 +582,7 @@ export default async function handler(req, res) {
         challenge21: challenge21Payload,
         dropRun: dropRunPayload,
         mysteryChamber: mysteryChamberPayload,
+        flashVein: flashVeinPayload,
       },
       authority: {
         sessionTruth: "server",
