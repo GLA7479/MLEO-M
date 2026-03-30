@@ -19,11 +19,17 @@ import {
   rpcOv2BoardPathEndTurnSession,
   rpcOv2BoardPathMoveSession,
   rpcOv2BoardPathFinalizeSession,
+  rpcOv2BoardPathFinalizeRoom,
   rpcOv2BoardPathOpenSession,
   rpcOv2BoardPathRequestRematch,
   rpcOv2BoardPathRollSession,
   rpcOv2BoardPathStartNextMatch,
 } from "../lib/online-v2/board-path/ov2BoardPathSessionApi";
+import {
+  normalizeClaimSettlementRpcResult,
+  rpcOv2BoardPathClaimSettlement,
+} from "../lib/online-v2/board-path/ov2BoardPathSettlementApi";
+import { applyBoardPathSettlementClaimLinesToVaultWithTrace } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import {
   OV2_BP_LIVE_SYNC_DEBOUNCE_MS,
   OV2_BP_LIVE_SYNC_STATE,
@@ -44,7 +50,11 @@ import {
   syntheticBoardPathBundleForFixtureHost,
 } from "../lib/online-v2/board-path/ov2BoardPathSessionManager";
 import { resolveBoardPathActiveSeatIndex } from "../lib/online-v2/board-path/ov2BoardPathEngine";
-import { ONLINE_V2_MEMBER_WALLET_STATE, ONLINE_V2_ROOM_PHASE } from "../lib/online-v2/ov2Economy";
+import {
+  ONLINE_V2_GAME_KINDS,
+  ONLINE_V2_MEMBER_WALLET_STATE,
+  ONLINE_V2_ROOM_PHASE,
+} from "../lib/online-v2/ov2Economy";
 import { supabaseMP } from "../lib/supabaseClients";
 
 const BP_SEAT_TONES = /** @type {const} */ (["emerald", "sky", "amber", "violet"]);
@@ -82,6 +92,16 @@ export function useOv2BoardPathSession(baseContext) {
   const [settlementLines, setSettlementLines] = useState(/** @type {Record<string, unknown>[]|null} */ (null));
   const [finalizeError, setFinalizeError] = useState(/** @type {{ code?: string, message?: string }|null} */ (null));
   const [finalizeBusy, setFinalizeBusy] = useState(false);
+  const [boardPathSessions, setBoardPathSessions] = useState(/** @type {Record<string, unknown>[]|null} */ (null));
+  const [roomSettlementLines, setRoomSettlementLines] = useState(/** @type {Record<string, unknown>[]|null} */ (null));
+  const [roomFinalizeError, setRoomFinalizeError] = useState(/** @type {{ code?: string, message?: string }|null} */ (null));
+  const [roomFinalizeBusy, setRoomFinalizeBusy] = useState(false);
+  const [settlementClaimError, setSettlementClaimError] = useState(
+    /** @type {{ code?: string, message?: string }|null} */ (null)
+  );
+  const [settlementClaimBusy, setSettlementClaimBusy] = useState(false);
+  /** @type {import("../lib/online-v2/board-path/ov2BoardPathSettlementDelivery").SettlementClaimLastTouch|null} */
+  const [settlementClaimLastTouch, setSettlementClaimLastTouch] = useState(null);
   const bundleRef = useRef(null);
   bundleRef.current = bundle;
   const fetchWaveRef = useRef(0);
@@ -168,10 +188,19 @@ export function useOv2BoardPathSession(baseContext) {
     }
     setSessionSyncFault(null);
     setLiveSyncError(null);
+    const rm = detailed.room && typeof detailed.room === "object" ? detailed.room : null;
     setRoomSessionPatch(prev => ({
       ...(prev && typeof prev === "object" ? prev : {}),
       active_session_id: String(detailed.activeSessionId),
       match_seq: detailed.roomMatchSeq,
+      ...(rm
+        ? {
+            settlement_status: rm.settlement_status,
+            settlement_revision: rm.settlement_revision,
+            finalized_at: rm.finalized_at,
+            finalized_match_seq: rm.finalized_match_seq,
+          }
+        : {}),
     }));
     setBundle(prev => {
       const next = selectBoardPathBundleAfterFetch(prev, b);
@@ -179,6 +208,8 @@ export function useOv2BoardPathSession(baseContext) {
     });
     setLastSyncAt(Date.now());
     setSettlementLines(Array.isArray(detailed.settlementLines) ? detailed.settlementLines : []);
+    setBoardPathSessions(Array.isArray(detailed.boardPathSessions) ? detailed.boardPathSessions : []);
+    setRoomSettlementLines(Array.isArray(detailed.roomSettlementLines) ? detailed.roomSettlementLines : []);
     return b;
   }, [selfKey]);
 
@@ -283,6 +314,12 @@ export function useOv2BoardPathSession(baseContext) {
       setRematchError(null);
       setSettlementLines(null);
       setFinalizeError(null);
+      setBoardPathSessions(null);
+      setRoomSettlementLines(null);
+      setRoomFinalizeError(null);
+      setSettlementClaimError(null);
+      setSettlementClaimBusy(false);
+      setSettlementClaimLastTouch(null);
       identityPrevRef.current = { roomId, selfKey, matchSeq: ms };
       return;
     }
@@ -299,6 +336,12 @@ export function useOv2BoardPathSession(baseContext) {
       setRematchError(null);
       setSettlementLines(null);
       setFinalizeError(null);
+      setBoardPathSessions(null);
+      setRoomSettlementLines(null);
+      setRoomFinalizeError(null);
+      setSettlementClaimError(null);
+      setSettlementClaimBusy(false);
+      setSettlementClaimLastTouch(null);
       identityPrevRef.current = { roomId, selfKey, matchSeq: ms };
       return;
     }
@@ -335,6 +378,10 @@ export function useOv2BoardPathSession(baseContext) {
     setActionPending(null);
     setRematchError(null);
     setFinalizeError(null);
+    setRoomFinalizeError(null);
+    setSettlementClaimError(null);
+    setSettlementClaimBusy(false);
+    setSettlementClaimLastTouch(null);
   }, [activeSid]);
 
   useEffect(() => {
@@ -517,8 +564,10 @@ export function useOv2BoardPathSession(baseContext) {
     return {
       ...m,
       settlementLines: settlementLines ?? [],
+      boardPathSessions: boardPathSessions ?? [],
+      roomSettlementLines: roomSettlementLines ?? [],
     };
-  }, [baseContext, bundle, roomSessionPatch, effectiveMembers, settlementLines]);
+  }, [baseContext, bundle, roomSessionPatch, effectiveMembers, settlementLines, boardPathSessions, roomSettlementLines]);
 
   const liveDbBoardPath = useMemo(
     () =>
@@ -561,8 +610,26 @@ export function useOv2BoardPathSession(baseContext) {
         finalizeBusy,
         finalizeError,
         liveDbBoardPath,
+        roomFinalizeBusy,
+        roomFinalizeError,
+        settlementClaimBusy,
+        settlementClaimError,
+        settlementClaimLastTouch,
       }),
-    [mergedContext, hostKey, rematchBusy, rematchError, finalizeBusy, finalizeError, liveDbBoardPath]
+    [
+      mergedContext,
+      hostKey,
+      rematchBusy,
+      rematchError,
+      finalizeBusy,
+      finalizeError,
+      liveDbBoardPath,
+      roomFinalizeBusy,
+      roomFinalizeError,
+      settlementClaimBusy,
+      settlementClaimError,
+      settlementClaimLastTouch,
+    ]
   );
 
   const vm = useMemo(
@@ -717,6 +784,119 @@ export function useOv2BoardPathSession(baseContext) {
       setFinalizeBusy(false);
     }
   }, [liveDbBoardPath, roomId, selfKey, isHost, refreshBundleFromServer]);
+
+  const finalizeRoom = useCallback(async () => {
+    if (!liveDbBoardPath || !roomId || !selfKey) return;
+    const hk = hostKeyRef.current;
+    if (!hk || !isHost) return;
+    setRoomFinalizeBusy(true);
+    setRoomFinalizeError(null);
+    try {
+      const raw = await rpcOv2BoardPathFinalizeRoom(supabaseMP, roomId, hk);
+      if (!raw || raw.ok !== true) {
+        const code = typeof raw?.code === "string" ? raw.code : "RPC_REJECTED";
+        const message =
+          typeof raw?.message === "string" ? raw.message : "Server rejected room finalize.";
+        setRoomFinalizeError({ code, message });
+        return;
+      }
+      await refreshBundleFromServer();
+    } catch (e) {
+      setRoomFinalizeError({
+        code: "ROOM_FINALIZE_EXCEPTION",
+        message: e?.message || String(e),
+      });
+    } finally {
+      setRoomFinalizeBusy(false);
+    }
+  }, [liveDbBoardPath, roomId, selfKey, isHost, refreshBundleFromServer]);
+
+  const claimSettlement = useCallback(async () => {
+    if (!liveDbBoardPath || !roomId || !selfKey) return;
+    setSettlementClaimBusy(true);
+    setSettlementClaimError(null);
+    try {
+      const raw = await rpcOv2BoardPathClaimSettlement(supabaseMP, roomId, selfKey);
+      const norm = normalizeClaimSettlementRpcResult(raw);
+      if (!norm.ok) {
+        setSettlementClaimLastTouch(null);
+        setSettlementClaimError({
+          code: norm.code || "CLAIM_REJECTED",
+          message: norm.message || "Settlement claim rejected.",
+        });
+        return;
+      }
+
+      if (norm.lines.length === 0) {
+        setSettlementClaimLastTouch({
+          at: Date.now(),
+          rpcReturnedCount: 0,
+          rpcIdempotentEmpty: Boolean(norm.idempotent),
+          vaultCreditableAttempted: 0,
+          vaultCreditedCount: 0,
+          vaultFailedCount: 0,
+          vaultSkippedLocalIdemCount: 0,
+          vaultGapAfterDbMark: false,
+          vaultSuccessAll: true,
+          lineResults: [],
+        });
+        await refreshBundleFromServer();
+        return;
+      }
+
+      const vaultRows = norm.lines.map(l => ({
+        id: l.id,
+        amount: l.amount,
+        line_kind: l.lineKind,
+        idempotency_key: l.idempotencyKey,
+        match_seq: l.matchSeq,
+      }));
+      const trace = await applyBoardPathSettlementClaimLinesToVaultWithTrace(
+        vaultRows,
+        ONLINE_V2_GAME_KINDS.BOARD_PATH
+      );
+      const gap = trace.failedLines.length > 0;
+      const positives = trace.lineResults.filter(r => r.amount > 0);
+      const vaultSuccessAll =
+        !gap && positives.every(r => r.outcome === "credited" || r.outcome === "skipped_local_idem");
+
+      setSettlementClaimLastTouch({
+        at: Date.now(),
+        rpcReturnedCount: norm.lines.length,
+        rpcIdempotentEmpty: false,
+        vaultCreditableAttempted: positives.length,
+        vaultCreditedCount: trace.creditedCount,
+        vaultFailedCount: trace.failedLines.length,
+        vaultSkippedLocalIdemCount: trace.skippedLocalIdemCount,
+        vaultGapAfterDbMark: gap,
+        vaultSuccessAll,
+        lineResults: trace.lineResults,
+      });
+
+      if (trace.failedLines.length > 0) {
+        const fl = trace.failedLines[0];
+        const partial = trace.creditedCount > 0 || trace.skippedLocalIdemCount > 0;
+        setSettlementClaimError({
+          code: partial ? "VAULT_GAP_PARTIAL" : "VAULT_GAP_NO_DB_RETRY",
+          message:
+            trace.failedLines.length === 1
+              ? `Vault: ${fl.error}`
+              : `Vault: ${trace.failedLines.length} lines failed (${fl.error})`,
+        });
+      } else {
+        setSettlementClaimError(null);
+      }
+      await refreshBundleFromServer();
+    } catch (e) {
+      setSettlementClaimLastTouch(null);
+      setSettlementClaimError({
+        code: "CLAIM_EXCEPTION",
+        message: e?.message || String(e),
+      });
+    } finally {
+      setSettlementClaimBusy(false);
+    }
+  }, [liveDbBoardPath, roomId, selfKey, refreshBundleFromServer]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -1030,5 +1210,11 @@ export function useOv2BoardPathSession(baseContext) {
     finalizeSession: liveDbBoardPath && isHost ? finalizeSession : undefined,
     finalizeBusy,
     finalizeError,
+    finalizeRoom: liveDbBoardPath && isHost ? finalizeRoom : undefined,
+    roomFinalizeBusy,
+    roomFinalizeError,
+    claimSettlement: liveDbBoardPath ? claimSettlement : undefined,
+    settlementClaimBusy,
+    settlementClaimError,
   };
 }

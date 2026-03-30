@@ -99,10 +99,11 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
   const youConn = useSeatOnlyPlayerUi ? Boolean(bp.selfSeat?.connected) : sessionMissingSeats ? false : vm.youConnected;
   const oppConn = useSeatOnlyPlayerUi ? Boolean(oppSeatForUi?.connected) : sessionMissingSeats ? false : vm.oppConnected;
 
-  const showPostFinishRematch = Boolean(bp.liveDbBoardPath && gp?.finished && vm.rematchAllowed);
+  /** Live DB match ended: show post-finish controls even when rematch is blocked (e.g. room finalized). */
+  const showPostFinish = Boolean(bp.liveDbBoardPath && gp?.finished);
 
   const canPrimaryRematch =
-    showPostFinishRematch &&
+    showPostFinish &&
     !vm.rematchBusy &&
     !vm.finalizeBusy &&
     !vm.sessionTransitioning &&
@@ -126,9 +127,9 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
     !gp.actionPending &&
     (gp.selfCanRoll || gp.selfCanMove || gp.selfCanEndTurn);
 
-  const canPrimary = showPostFinishRematch ? canPrimaryRematch : canPrimaryGameplay;
+  const canPrimary = showPostFinish ? canPrimaryRematch : canPrimaryGameplay;
 
-  const primaryMuted = showPostFinishRematch
+  const primaryMuted = showPostFinish
     ? !canPrimaryRematch
     : bp.rollTurn && gp
       ? !canPrimaryGameplay
@@ -136,21 +137,70 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
         ? vm.primary.muted || !bp.canSelfAct
         : vm.primary.muted;
   const showFinalizeSecondary =
-    showPostFinishRematch && (Boolean(vm.canFinalize) || Boolean(vm.finalized) || Boolean(vm.finalizeBusy));
+    showPostFinish && (Boolean(vm.canFinalize) || Boolean(vm.finalized) || Boolean(vm.finalizeBusy));
 
-  const secondaryMuted = showPostFinishRematch
+  const showRoomFinalizeTertiary =
+    showPostFinish &&
+    (Boolean(vm.roomCanFinalize) ||
+      Boolean(vm.roomFinalized) ||
+      Boolean(vm.roomFinalizeBusy) ||
+      Boolean(bp.finalizeRoom));
+
+  const secondaryMuted = showPostFinish
     ? !showFinalizeSecondary
     : hasSession
       ? vm.secondary.muted || !bp.canSelfAct
       : vm.secondary.muted;
 
+  const tertiaryRoomMuted =
+    showPostFinish &&
+    (vm.roomFinalized ||
+      !vm.roomCanFinalize ||
+      Boolean(vm.roomFinalizeBusy) ||
+      Boolean(vm.settlementClaimBusy) ||
+      !bp.finalizeRoom);
+
+  const roomFinalizeLabel = !bp.finalizeRoom
+    ? "Room: host"
+    : vm.roomFinalizeBusy
+      ? "…"
+      : vm.roomFinalized
+        ? "Room ✓"
+        : vm.roomCanFinalize
+          ? "Finalize room"
+          : "Room: locked";
+
   function handleSecondaryPostFinish() {
-    if (!showPostFinishRematch || !vm.canFinalize || vm.finalizeBusy) return;
+    if (!showPostFinish || !vm.canFinalize || vm.finalizeBusy || vm.roomFinalizeBusy || vm.settlementClaimBusy)
+      return;
     void bp.finalizeSession?.();
   }
 
+  function handleTertiaryRoomFinalize() {
+    if (
+      !showPostFinish ||
+      !vm.roomCanFinalize ||
+      vm.roomFinalizeBusy ||
+      !bp.finalizeRoom ||
+      vm.settlementClaimBusy
+    )
+      return;
+    void bp.finalizeRoom();
+  }
+
+  const sdPhase = vm.settlementDeliveryUiPhase;
+  const showSettlementClaimRow =
+    showPostFinish &&
+    vm.roomFinalized &&
+    (Boolean(vm.settlementDeliveryClaimButtonEnabled) ||
+      Boolean(vm.selfCanClaimSettlement) ||
+      Boolean(vm.settlementClaimBusy) ||
+      Boolean(vm.settlementClaimError) ||
+      Boolean(vm.settlementVaultReliabilityGapVisible) ||
+      sdPhase === "vault_success");
+
   function handlePrimaryAction() {
-    if (showPostFinishRematch) {
+    if (showPostFinish) {
       if (!canPrimaryRematch) return;
       if (vm.selfCanRequestRematch) void bp.requestRematch?.();
       else if (vm.selfCanCancelRematch) void bp.cancelRematch?.();
@@ -217,8 +267,28 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
       ? `Settle: ${vm.finalizeError.message}${vm.finalizeError.code ? ` (${vm.finalizeError.code})` : ""}`
       : null;
 
+  const roomFinalizeErrLine =
+    vm.roomFinalizeError?.message != null
+      ? `Room: ${vm.roomFinalizeError.message}${vm.roomFinalizeError.code ? ` (${vm.roomFinalizeError.code})` : ""}`
+      : null;
+
+  const settlementClaimErrLine =
+    vm.settlementClaimError?.message != null
+      ? `Vault: ${vm.settlementClaimError.message}${
+          vm.settlementClaimError.code ? ` (${vm.settlementClaimError.code})` : ""
+        }`
+      : null;
+
+  const roomTotalsCompact =
+    showPostFinish &&
+    Array.isArray(vm.roomSettlementSummary) &&
+    vm.roomSettlementSummary.length > 0 &&
+    (vm.roomFinalized || vm.roomSettlementStatus === "finalized")
+      ? `Totals: ${vm.roomSettlementSummary.map(t => `…${String(t.participantKey).slice(-4)} ${t.totalAmount}`).join(" · ")}`
+      : null;
+
   const settlementStrip =
-    showPostFinishRematch && vm.postFinishStatusLabel ? vm.postFinishStatusLabel : null;
+    showPostFinish && vm.postFinishStatusLabel ? vm.postFinishStatusLabel : null;
 
   const combinedStatus = [
     gameplayStatus,
@@ -232,7 +302,10 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
     actionErrLine,
     rematchErrLine,
     finalizeErrLine,
+    roomFinalizeErrLine,
+    settlementClaimErrLine,
     settlementStrip,
+    roomTotalsCompact,
     liveSyncLine,
   ]
     .filter(Boolean)
@@ -332,27 +405,29 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-col gap-1 md:gap-1.5 lg:flex-row lg:items-stretch lg:gap-2">
+      <div
+        className={`grid shrink-0 gap-1 sm:gap-1.5 lg:gap-2 ${
+          showPostFinish && showRoomFinalizeTertiary ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2"
+        }`}
+      >
         <button
           type="button"
-          disabled={showPostFinishRematch ? !canPrimary : bp.rollTurn ? !canPrimary : true}
+          disabled={showPostFinish ? !canPrimary : bp.rollTurn ? !canPrimary : true}
           onClick={handlePrimaryAction}
           data-ov2-bp-control={gp?.controlIntent ?? vm.primary.intent}
           data-ov2-bp-can-self-act={hasSession ? String(bp.canSelfAct) : undefined}
           title={
-            showPostFinishRematch
-              ? vm.nextMatchLabel || undefined
-              : gp
-                ? gp.allowedActions.join(" · ")
-                : undefined
+            showPostFinish ? vm.nextMatchLabel || (!vm.rematchAllowed ? "Rematch closed" : undefined) : gp
+              ? gp.allowedActions.join(" · ")
+              : undefined
           }
-          className={`min-h-[40px] flex-1 rounded-lg border py-2 text-[11px] font-bold md:min-h-[44px] md:text-xs lg:rounded-xl lg:py-2.5 lg:text-sm ${
+          className={`min-h-[40px] rounded-lg border py-2 text-[11px] font-bold md:min-h-[44px] md:text-xs lg:rounded-xl lg:py-2.5 lg:text-sm ${
             primaryMuted
               ? "border-white/12 bg-white/[0.06] text-zinc-400"
               : "border-emerald-500/40 bg-emerald-900/30 text-emerald-100"
           }`}
         >
-          {showPostFinishRematch
+          {showPostFinish
             ? rematchPrimaryLabel
             : gp
               ? `${gp.primaryActionLabel}${gp.actionPending ? "…" : ""}`
@@ -360,20 +435,28 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
         </button>
         <button
           type="button"
-          disabled={showPostFinishRematch ? !showFinalizeSecondary || vm.finalized || vm.finalizeBusy : true}
+            disabled={
+              showPostFinish
+                ? !showFinalizeSecondary ||
+                  vm.finalized ||
+                  vm.finalizeBusy ||
+                  Boolean(vm.roomFinalizeBusy) ||
+                  Boolean(vm.settlementClaimBusy)
+                : true
+            }
           onClick={() => {
-            if (showPostFinishRematch) handleSecondaryPostFinish();
+            if (showPostFinish) handleSecondaryPostFinish();
           }}
           data-ov2-bp-control={vm.secondary.intent}
           data-ov2-bp-can-self-act={hasSession ? String(bp.canSelfAct) : undefined}
           title={gp ? `Phase: ${gp.gamePhase} · ${gp.allowedActions.join(" · ")}` : undefined}
-          className={`min-h-[40px] flex-1 rounded-lg border py-2 text-[11px] font-semibold md:min-h-[44px] md:text-xs lg:rounded-xl lg:py-2.5 lg:text-sm ${
+          className={`min-h-[40px] rounded-lg border py-2 text-[11px] font-semibold md:min-h-[44px] md:text-xs lg:rounded-xl lg:py-2.5 lg:text-sm ${
             secondaryMuted
               ? "border-white/12 bg-black/35 text-zinc-500"
               : "border-white/12 bg-black/35 text-zinc-400"
           }`}
         >
-          {showPostFinishRematch
+          {showPostFinish
             ? vm.finalizeBusy
               ? "…"
               : vm.finalized
@@ -385,7 +468,51 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
               ? `${vm.secondary.label} · ${gp.finished ? "match over" : gp.gamePhase}`
               : vm.secondary.label}
         </button>
+        {showPostFinish && showRoomFinalizeTertiary ? (
+          <button
+            type="button"
+            disabled={tertiaryRoomMuted}
+            onClick={handleTertiaryRoomFinalize}
+            title={
+              vm.roomFinalized
+                ? "Room finalized — rematch and new matches are closed for this table."
+                : vm.roomStatusLabel || undefined
+            }
+            className={`min-h-[36px] rounded-lg border py-1.5 text-[10px] font-semibold sm:min-h-[40px] md:text-[11px] lg:py-2 ${
+              tertiaryRoomMuted
+                ? "border-white/10 bg-black/30 text-zinc-600"
+                : "border-amber-500/25 bg-amber-950/20 text-amber-100/90"
+            }`}
+          >
+            {roomFinalizeLabel}
+          </button>
+        ) : null}
       </div>
+
+      {showSettlementClaimRow ? (
+        <button
+          type="button"
+          disabled={Boolean(vm.settlementClaimBusy) || !vm.settlementDeliveryClaimButtonEnabled}
+          onClick={() => {
+            if (!bp.claimSettlement || vm.settlementClaimBusy || !vm.settlementDeliveryClaimButtonEnabled) return;
+            void bp.claimSettlement();
+          }}
+          title={(vm.settlementDeliveryHintLine || vm.settlementClaimStatusLabel) ?? undefined}
+          className={`shrink-0 rounded-md border px-2 py-1 text-center text-[10px] font-semibold sm:text-[11px] ${
+            vm.settlementDeliveryClaimButtonEnabled && !vm.settlementClaimBusy
+              ? "border-sky-500/30 bg-sky-950/25 text-sky-100/90"
+              : "border-white/10 bg-black/30 text-zinc-600"
+          }`}
+        >
+          {vm.settlementClaimBusy
+            ? "…"
+            : sdPhase === "vault_success"
+              ? "Sent ✓"
+              : sdPhase === "vault_gap_no_db_retry" || sdPhase === "vault_gap_partial"
+                ? "No DB retry"
+                : "Send to vault"}
+        </button>
+      ) : null}
 
       {showDevPicker ? (
         <div className="flex shrink-0 items-center justify-end gap-1.5 border-t border-white/[0.04] pt-0.5 opacity-70">
