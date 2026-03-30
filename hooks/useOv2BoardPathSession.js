@@ -73,6 +73,15 @@ import { supabaseMP } from "../lib/supabaseClients";
 
 const BP_SEAT_TONES = /** @type {const} */ (["emerald", "sky", "amber", "violet"]);
 
+function ov2BoardPathRtDevLog(payload) {
+  if (typeof window === "undefined") return;
+  const dev =
+    (typeof process !== "undefined" && process.env.NODE_ENV === "development") ||
+    String(window.location.search || "").includes("dev=1");
+  if (!dev) return;
+  console.log("[ov2-bp-rt]", payload);
+}
+
 function ov2StakeDebitLocalKey(roomId, matchSeq, participantKey) {
   return `ov2_bp_stake_debit:${String(roomId)}:${String(Math.floor(Number(matchSeq) || 0))}:${String(participantKey)}`;
 }
@@ -160,6 +169,11 @@ export function useOv2BoardPathSession(baseContext) {
     /** @type {"idle"|"subscribed"|"refreshing"|"error"} */ (OV2_BP_LIVE_SYNC_STATE.IDLE)
   );
   const [liveSyncError, setLiveSyncError] = useState(/** @type {{ code?: string, message?: string }|null} */ (null));
+  /** Supabase Realtime channel.subscribe status (SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT, CLOSED, …). */
+  const [liveRealtimeSubscribeStatus, setLiveRealtimeSubscribeStatus] = useState(/** @type {string|null} */ (null));
+  /** Last `postgres_changes` payload time for this channel (ms). */
+  const [liveRealtimeLastPostgresChangeAt, setLiveRealtimeLastPostgresChangeAt] = useState(/** @type {number|null} */ (null));
+  const [liveRealtimeChannelId, setLiveRealtimeChannelId] = useState(/** @type {string|null} */ (null));
   const [lastSyncAt, setLastSyncAt] = useState(/** @type {number|null} */ (null));
   /** Last completed coordinated bundle fetch (ready, partial, or failed terminal). */
   const [lastBundleSyncAt, setLastBundleSyncAt] = useState(/** @type {number|null} */ (null));
@@ -865,8 +879,21 @@ export function useOv2BoardPathSession(baseContext) {
       isStale: false,
       lastSyncAt,
       syncError: liveSyncError,
+      liveRealtimeChannelId,
+      liveRealtimeSubscribeStatus,
+      liveRealtimeLastPostgresChangeAt,
     }),
-    [liveSyncEnabled, liveSyncState, liveRevision, sessionIdentity, lastSyncAt, liveSyncError]
+    [
+      liveSyncEnabled,
+      liveSyncState,
+      liveRevision,
+      sessionIdentity,
+      lastSyncAt,
+      liveSyncError,
+      liveRealtimeChannelId,
+      liveRealtimeSubscribeStatus,
+      liveRealtimeLastPostgresChangeAt,
+    ]
   );
 
   const postFinishVmSlice = useMemo(
@@ -1245,19 +1272,31 @@ export function useOv2BoardPathSession(baseContext) {
     if (typeof window === "undefined") return undefined;
     if (!liveSyncEnabled || !roomId) {
       setLiveSyncState(OV2_BP_LIVE_SYNC_STATE.IDLE);
+      setLiveRealtimeSubscribeStatus(null);
+      setLiveRealtimeChannelId(null);
+      setLiveRealtimeLastPostgresChangeAt(null);
       return undefined;
     }
 
     const aid =
       activeSid != null && String(activeSid).trim() !== "" ? String(activeSid) : null;
     const channelId = `ov2_bp_rt:${roomId}:${aid ?? "noseats"}`;
+    setLiveRealtimeChannelId(channelId);
+
+    const onPg = (table, payload) => {
+      const at = Date.now();
+      setLiveRealtimeLastPostgresChangeAt(at);
+      ov2BoardPathRtDevLog({ kind: "postgres_changes", table, at, channelId, payloadSummary: payload?.eventType ?? payload?.event ?? null });
+      scheduleDebouncedRefreshRef.current();
+    };
+
     const ch = supabaseMP
       .channel(channelId)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "ov2_rooms", filter: `id=eq.${roomId}` },
-        () => {
-          scheduleDebouncedRefreshRef.current();
+        payload => {
+          onPg("ov2_rooms", payload);
         }
       )
       .on(
@@ -1268,8 +1307,8 @@ export function useOv2BoardPathSession(baseContext) {
           table: "ov2_board_path_sessions",
           filter: `room_id=eq.${roomId}`,
         },
-        () => {
-          scheduleDebouncedRefreshRef.current();
+        payload => {
+          onPg("ov2_board_path_sessions", payload);
         }
       );
 
@@ -1282,8 +1321,8 @@ export function useOv2BoardPathSession(baseContext) {
           table: "ov2_board_path_seats",
           filter: `session_id=eq.${aid}`,
         },
-        () => {
-          scheduleDebouncedRefreshRef.current();
+        payload => {
+          onPg("ov2_board_path_seats", payload);
         }
       );
     }
@@ -1296,8 +1335,8 @@ export function useOv2BoardPathSession(baseContext) {
         table: "ov2_room_members",
         filter: `room_id=eq.${roomId}`,
       },
-      () => {
-        scheduleDebouncedRefreshRef.current();
+      payload => {
+        onPg("ov2_room_members", payload);
       }
     );
 
@@ -1309,8 +1348,8 @@ export function useOv2BoardPathSession(baseContext) {
         table: "ov2_settlement_lines",
         filter: `room_id=eq.${roomId}`,
       },
-      () => {
-        scheduleDebouncedRefreshRef.current();
+      payload => {
+        onPg("ov2_settlement_lines", payload);
       }
     );
 
@@ -1322,12 +1361,14 @@ export function useOv2BoardPathSession(baseContext) {
         table: "ov2_economy_events",
         filter: `room_id=eq.${roomId}`,
       },
-      () => {
-        scheduleDebouncedRefreshRef.current();
+      payload => {
+        onPg("ov2_economy_events", payload);
       }
     );
 
     ch.subscribe((status, err) => {
+      setLiveRealtimeSubscribeStatus(String(status));
+      ov2BoardPathRtDevLog({ kind: "subscribe", status, err: err ?? null, channelId });
       if (status === "SUBSCRIBED") {
         setLiveSyncState(prev =>
           prev === OV2_BP_LIVE_SYNC_STATE.REFRESHING ? prev : OV2_BP_LIVE_SYNC_STATE.SUBSCRIBED
@@ -1343,6 +1384,8 @@ export function useOv2BoardPathSession(baseContext) {
             ? /** @type {{ message?: string }} */ (err).message
             : null) || `Realtime ${String(status).toLowerCase().replace(/_/g, " ")}`;
         setLiveSyncError({ code: String(status), message: msg });
+      } else if (status === "CLOSED") {
+        ov2BoardPathRtDevLog({ kind: "subscribe_closed", channelId });
       }
     });
 
@@ -1353,6 +1396,8 @@ export function useOv2BoardPathSession(baseContext) {
         debounceTimerRef.current = null;
       }
       setLiveSyncState(OV2_BP_LIVE_SYNC_STATE.IDLE);
+      setLiveRealtimeSubscribeStatus(null);
+      setLiveRealtimeChannelId(null);
     };
   }, [liveSyncEnabled, roomId, activeSid]);
 

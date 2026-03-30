@@ -328,6 +328,20 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
   const settlementStrip =
     showPostFinish && vm.postFinishStatusLabel ? vm.postFinishStatusLabel : null;
 
+  const showRtDevStrip =
+    (typeof process !== "undefined" && process.env.NODE_ENV === "development") ||
+    (typeof window !== "undefined" && window.location.search.includes("dev=1"));
+  const bpRtLastLabel =
+    vm.liveRealtimeLastPostgresChangeAt != null
+      ? new Date(vm.liveRealtimeLastPostgresChangeAt).toLocaleTimeString(undefined, { hour12: false })
+      : "—";
+  const bpRtChShort =
+    typeof vm.liveRealtimeChannelId === "string" && vm.liveRealtimeChannelId.length > 0
+      ? vm.liveRealtimeChannelId.length > 42
+        ? `${vm.liveRealtimeChannelId.slice(0, 40)}…`
+        : vm.liveRealtimeChannelId
+      : "—";
+
   const combinedStatus = [
     blockedStatusLine,
     gameplayStatus,
@@ -382,6 +396,20 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
           ) : null}
         </div>
       </div>
+
+      {showRtDevStrip && vm.liveSyncEnabled ? (
+        <div
+          className="shrink-0 rounded-md border border-amber-500/25 bg-amber-950/20 px-1.5 py-0.5 font-mono text-[8px] leading-tight text-amber-100/90 sm:text-[9px]"
+          title="Supabase Realtime channel (dev only)"
+        >
+          <span className="text-amber-400/90">RT board path</span>{" "}
+          <span className="text-zinc-400">{vm.liveRealtimeSubscribeStatus ?? "—"}</span>
+          <span className="text-zinc-600"> · </span>
+          <span className="text-zinc-500">{bpRtChShort}</span>
+          <span className="text-zinc-600"> · </span>
+          <span className="text-zinc-400">last pg {bpRtLastLabel}</span>
+        </div>
+      ) : null}
 
       {vm.coarse !== BOARD_PATH_COARSE.DISCONNECTED ? (
         <div

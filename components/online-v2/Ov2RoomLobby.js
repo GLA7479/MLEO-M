@@ -23,12 +23,23 @@ function ov2StakeDebitLocalKey(roomId, matchSeq, participantKey) {
   return `ov2_stake_debit_v1:${roomId}:${matchSeq}:${participantKey}`;
 }
 
+function ov2LobbyRtDevLog(payload) {
+  if (typeof window === "undefined") return;
+  const dev =
+    (typeof process !== "undefined" && process.env.NODE_ENV === "development") ||
+    String(window.location.search || "").includes("dev=1");
+  if (!dev) return;
+  console.log("[ov2-lobby-rt]", payload);
+}
+
 /**
  * Room lobby: members, ready, host start, then per-seat stake commit (RPC then vault debit).
  */
 export default function Ov2RoomLobby({ roomId, participantId, displayName, onBack, onRoomChanged }) {
   const [room, setRoom] = useState(null);
   const [members, setMembers] = useState([]);
+  const [lobbyRtStatus, setLobbyRtStatus] = useState(/** @type {string|null} */ (null));
+  const [lobbyRtLastEventAt, setLobbyRtLastEventAt] = useState(/** @type {number|null} */ (null));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -94,7 +105,11 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   useEffect(() => {
     if (typeof window === "undefined" || !roomId) return undefined;
     let debounceTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null);
-    const schedule = () => {
+    const channelName = `ov2_room_lobby_rt:${roomId}`;
+    const schedule = (table, payload) => {
+      const at = Date.now();
+      setLobbyRtLastEventAt(at);
+      ov2LobbyRtDevLog({ kind: "postgres_changes", channelName, table, at, event: payload?.eventType ?? payload?.event ?? null });
       if (debounceTimer != null) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         debounceTimer = null;
@@ -102,20 +117,28 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
       }, OV2_BP_LIVE_SYNC_DEBOUNCE_MS);
     };
     const ch = supabaseMP
-      .channel(`ov2_room_lobby_rt:${roomId}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "ov2_rooms", filter: `id=eq.${roomId}` },
-        schedule
+        payload => {
+          schedule("ov2_rooms", payload);
+        }
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "ov2_room_members", filter: `room_id=eq.${roomId}` },
-        schedule
+        payload => {
+          schedule("ov2_room_members", payload);
+        }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        setLobbyRtStatus(String(status));
+        ov2LobbyRtDevLog({ kind: "subscribe", channelName, status, err: err ?? null });
+      });
     return () => {
       void ch.unsubscribe();
+      setLobbyRtStatus(null);
       if (debounceTimer != null) clearTimeout(debounceTimer);
     };
   }, [roomId]);
@@ -254,6 +277,12 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
 
   const lobbyLocked = room.lifecycle_phase !== "lobby";
 
+  const showRtDevStrip =
+    (typeof process !== "undefined" && process.env.NODE_ENV === "development") ||
+    (typeof window !== "undefined" && String(window.location.search || "").includes("dev=1"));
+  const lobbyRtLastLabel =
+    lobbyRtLastEventAt != null ? new Date(lobbyRtLastEventAt).toLocaleTimeString(undefined, { hour12: false }) : "—";
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       <div className="flex shrink-0 items-center gap-2">
@@ -264,6 +293,20 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           Refresh
         </button>
       </div>
+
+      {showRtDevStrip ? (
+        <div
+          className="shrink-0 rounded border border-amber-500/25 bg-amber-950/20 px-2 py-1 font-mono text-[9px] leading-tight text-amber-100/90"
+          title="Supabase Realtime (dev only)"
+        >
+          <span className="text-amber-400/90">RT lobby</span>{" "}
+          <span className="text-zinc-400">{lobbyRtStatus ?? "—"}</span>
+          <span className="text-zinc-600"> · </span>
+          <span className="truncate text-zinc-500">ch ov2_room_lobby_rt:{String(roomId).slice(0, 8)}…</span>
+          <span className="text-zinc-600"> · </span>
+          <span className="text-zinc-400">last evt {lobbyRtLastLabel}</span>
+        </div>
+      ) : null}
 
       <div className="shrink-0 rounded-xl border border-white/10 bg-black/30 p-3">
         <h2 className="text-base font-bold text-white">{room.title || "Table"}</h2>

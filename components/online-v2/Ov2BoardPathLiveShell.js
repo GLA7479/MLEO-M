@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ONLINE_V2_GAME_IDS } from "../../lib/online-v2/onlineV2GameRegistry";
 import { installOv2BoardPathDevSmoke } from "../../lib/online-v2/ov2BoardPathDevSmoke";
 import { fetchOv2RoomById, fetchOv2RoomMembers } from "../../lib/online-v2/ov2RoomsApi";
@@ -11,14 +11,29 @@ import { supabaseMP } from "../../lib/supabaseClients";
 import OnlineV2GamePageShell from "./OnlineV2GamePageShell";
 import Ov2BoardPathScreen from "./Ov2BoardPathScreen";
 
+function parseRoomQueryParam(q) {
+  if (q == null) return null;
+  const s = typeof q === "string" ? q : Array.isArray(q) ? q[0] : null;
+  if (!s || !String(s).trim()) return null;
+  return String(s).trim();
+}
+
 /**
  * Live Board Path: `?room=<uuid>` loads `ov2_rooms` + `ov2_room_members` and passes real context to the screen.
  * Without `room`, the screen uses offline mock scenarios (unchanged).
  */
 export default function Ov2BoardPathLiveShell() {
   const router = useRouter();
-  const roomQuery = router.isReady ? router.query.room : undefined;
-  const roomId = typeof roomQuery === "string" ? roomQuery : Array.isArray(roomQuery) ? roomQuery[0] : null;
+  /** Survives hard refresh before `router.isReady` (Next may omit `query.room` on first paint). */
+  const [bootRoomId, setBootRoomId] = useState(null);
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = new URLSearchParams(window.location.search).get("room");
+    setBootRoomId(raw && raw.trim() ? raw.trim() : null);
+  }, []);
+
+  const routerRoomId = router.isReady ? parseRoomQueryParam(router.query.room) : null;
+  const roomId = router.isReady ? routerRoomId : bootRoomId;
 
   const [participantId, setParticipantId] = useState("");
   const [room, setRoom] = useState(null);
