@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOv2BoardPathSession } from "../../hooks/useOv2BoardPathSession";
+import { BOARD_PATH_PRIMARY_ACTION } from "../../lib/online-v2/board-path/ov2BoardPathEngine";
 import {
   BOARD_PATH_ACTIVE_DETAIL,
   BOARD_PATH_COARSE,
@@ -50,34 +51,108 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
   const hasSeatRows = Boolean(bp.seats?.length);
   const useSeatOnlyPlayerUi = hasSession && hasSeatRows;
   const sessionMissingSeats = hasSession && !hasSeatRows;
+  /** @type {import("../../lib/online-v2/ov2BoardPathAdapter").BoardPathGameplayViewModel|null|undefined} */
+  const gp = useSeatOnlyPlayerUi ? vm.gameplay : null;
 
   const oppSeatForUi = useSeatOnlyPlayerUi ? bp.seats?.find(s => !s.isSelf) ?? null : null;
 
-  const youHighlight = useSeatOnlyPlayerUi
-    ? Boolean(bp.activeSeat && bp.selfSeat && bp.activeSeat.seatIndex === bp.selfSeat.seatIndex)
-    : sessionMissingSeats
-      ? false
-      : vm.matchDetail === BOARD_PATH_MATCH_DETAIL.YOUR_TURN;
-  const oppHighlight = useSeatOnlyPlayerUi
-    ? Boolean(bp.activeSeat && oppSeatForUi && bp.activeSeat.seatIndex === oppSeatForUi.seatIndex)
-    : sessionMissingSeats
-      ? false
-      : vm.matchDetail === BOARD_PATH_MATCH_DETAIL.THEIR_TURN;
+  const youHighlight = gp
+    ? Boolean(gp.selfSeat && gp.activeSeat && gp.selfSeat.seatIndex === gp.activeSeat.seatIndex)
+    : useSeatOnlyPlayerUi
+      ? Boolean(bp.activeSeat && bp.selfSeat && bp.activeSeat.seatIndex === bp.selfSeat.seatIndex)
+      : sessionMissingSeats
+        ? false
+        : vm.matchDetail === BOARD_PATH_MATCH_DETAIL.YOUR_TURN;
+  const oppHighlight = gp
+    ? Boolean(
+        gp.activeSeat &&
+          gp.positions?.some(p => !p.isSelf && p.seatIndex === gp.activeSeat?.seatIndex)
+      )
+    : useSeatOnlyPlayerUi
+      ? Boolean(bp.activeSeat && oppSeatForUi && bp.activeSeat.seatIndex === oppSeatForUi.seatIndex)
+      : sessionMissingSeats
+        ? false
+        : vm.matchDetail === BOARD_PATH_MATCH_DETAIL.THEIR_TURN;
 
-  const youBadge = useSeatOnlyPlayerUi
-    ? bp.selfSeat
-      ? `${bp.selfSeat.displayName}${bp.selfSeat.isSelf ? " · self" : ""}`
-      : "—"
-    : sessionMissingSeats
-      ? "Seats loading…"
-      : vm.playerBadges.you;
-  const oppBadge = useSeatOnlyPlayerUi ? (oppSeatForUi?.displayName ?? "—") : sessionMissingSeats ? "—" : vm.playerBadges.opp;
+  const youProg = gp?.positions?.find(p => p.isSelf);
+  const oppProg = gp?.positions?.find(p => !p.isSelf);
+  const youBadge = gp && youProg
+    ? `${youProg.displayLabel} · ${youProg.position}/${gp.pathLength}${youProg.isWinner ? " · won" : ""}${youProg.isLeader ? " · lead" : ""}`
+    : useSeatOnlyPlayerUi
+      ? bp.selfSeat
+        ? `${bp.selfSeat.displayName} · ${bp.selfSeat.progress}/${gp?.pathLength ?? 30}${bp.selfSeat.finished ? " · won" : ""}`
+        : "—"
+      : sessionMissingSeats
+        ? "Seats loading…"
+        : vm.playerBadges.you;
+  const oppBadge =
+    gp && oppProg
+      ? `${oppProg.displayLabel} · ${oppProg.position}/${gp.pathLength}${oppProg.isWinner ? " · won" : ""}${oppProg.isLeader ? " · lead" : ""}`
+      : useSeatOnlyPlayerUi
+        ? oppSeatForUi
+          ? `${oppSeatForUi.displayName} · ${oppSeatForUi.progress}/${gp?.pathLength ?? 30}${oppSeatForUi.finished ? " · won" : ""}`
+          : "—"
+        : sessionMissingSeats
+          ? "—"
+          : vm.playerBadges.opp;
 
   const youConn = useSeatOnlyPlayerUi ? Boolean(bp.selfSeat?.connected) : sessionMissingSeats ? false : vm.youConnected;
   const oppConn = useSeatOnlyPlayerUi ? Boolean(oppSeatForUi?.connected) : sessionMissingSeats ? false : vm.oppConnected;
 
-  const primaryMuted = hasSession ? vm.primary.muted || !bp.canSelfAct : vm.primary.muted;
-  const secondaryMuted = hasSession ? vm.secondary.muted || !bp.canSelfAct : vm.secondary.muted;
+  const showPostFinishRematch = Boolean(bp.liveDbBoardPath && gp?.finished && vm.rematchAllowed);
+
+  const canPrimaryRematch =
+    showPostFinishRematch &&
+    !vm.rematchBusy &&
+    !vm.sessionTransitioning &&
+    (Boolean(vm.selfCanRequestRematch) ||
+      Boolean(vm.selfCanCancelRematch) ||
+      Boolean(vm.hostCanStartNextMatch));
+
+  const rematchPrimaryLabel = vm.rematchBusy
+    ? "…"
+    : vm.selfCanRequestRematch
+      ? "Request rematch"
+      : vm.selfCanCancelRematch
+        ? "Cancel rematch"
+        : vm.hostCanStartNextMatch
+          ? "Start next match"
+          : "Wait…";
+
+  const canPrimaryGameplay =
+    Boolean(bp.rollTurn) &&
+    Boolean(gp) &&
+    !gp.actionPending &&
+    (gp.selfCanRoll || gp.selfCanMove || gp.selfCanEndTurn);
+
+  const canPrimary = showPostFinishRematch ? canPrimaryRematch : canPrimaryGameplay;
+
+  const primaryMuted = showPostFinishRematch
+    ? !canPrimaryRematch
+    : bp.rollTurn && gp
+      ? !canPrimaryGameplay
+      : hasSession
+        ? vm.primary.muted || !bp.canSelfAct
+        : vm.primary.muted;
+  const secondaryMuted = showPostFinishRematch
+    ? true
+    : hasSession
+      ? vm.secondary.muted || !bp.canSelfAct
+      : vm.secondary.muted;
+
+  function handlePrimaryAction() {
+    if (showPostFinishRematch) {
+      if (!canPrimaryRematch) return;
+      if (vm.selfCanRequestRematch) void bp.requestRematch?.();
+      else if (vm.selfCanCancelRematch) void bp.cancelRematch?.();
+      else if (vm.hostCanStartNextMatch) void bp.startNextMatch?.();
+      return;
+    }
+    if (!canPrimaryGameplay || !gp) return;
+    if (gp.primaryAction === BOARD_PATH_PRIMARY_ACTION.ROLL) void bp.rollTurn?.();
+    else if (gp.primaryAction === BOARD_PATH_PRIMARY_ACTION.MOVE) void bp.moveTurn?.();
+    else if (gp.primaryAction === BOARD_PATH_PRIMARY_ACTION.END_TURN) void bp.endTurn?.();
+  }
 
   const localTransientLine = bp.isStuckWaitingForHost
     ? "Waiting for host session..."
@@ -96,7 +171,51 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
 
   const faultLine = bp.sessionSyncFault?.message || null;
   const activeMissingLine = bp.roomActiveMissingSessionHint || null;
-  const combinedStatus = [vm.turnLine, vm.statusLine, localTransientLine, eventStatusLine, faultLine, activeMissingLine]
+  const devGameplayIssue =
+    typeof window !== "undefined" &&
+    window.location.search.includes("dev=1") &&
+    gp?.shapeInvalid &&
+    gp?.shapeIssue
+      ? `Dev: ${gp.shapeIssue}`
+      : null;
+
+  const gameplayStatus =
+    gp && !gp.shapeInvalid
+      ? `${gp.statusLabel} · step ${gp.turnStep.replace(/_/g, " ")} · T${gp.turnNumber}${gp.showRolledValue ? ` · ${gp.rolledValueLabel}` : ""} · ${gp.nextTurnPhaseLabel}`
+      : gp?.shapeInvalid && gp.shapeIssue
+        ? `Session shape: ${gp.shapeIssue}`
+        : null;
+
+  const actionErrLine =
+    gp?.actionError?.message != null
+      ? `Action error: ${gp.actionError.message}${gp.actionError.code ? ` (${gp.actionError.code})` : ""}`
+      : null;
+
+  const liveSyncLine =
+    vm.liveSyncEnabled && (vm.liveSyncState === "refreshing" || vm.liveSyncState === "error")
+      ? vm.liveSyncState === "error" && vm.syncError?.message
+        ? `Live: ${vm.syncError.message}`
+        : "Live: syncing…"
+      : null;
+
+  const rematchErrLine =
+    vm.rematchError?.message != null
+      ? `Rematch: ${vm.rematchError.message}${vm.rematchError.code ? ` (${vm.rematchError.code})` : ""}`
+      : null;
+
+  const combinedStatus = [
+    gameplayStatus,
+    vm.turnLine,
+    vm.statusLine,
+    localTransientLine,
+    eventStatusLine,
+    faultLine,
+    activeMissingLine,
+    devGameplayIssue,
+    actionErrLine,
+    rematchErrLine,
+    liveSyncLine,
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -108,6 +227,12 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
           <span className="font-semibold text-zinc-400">Rnd {vm.meta.round}</span>
           <span className="text-zinc-600"> · </span>
           <span className="text-zinc-400">Tbl {vm.meta.table}</span>
+          {gp ? (
+            <>
+              <span className="text-zinc-600"> · </span>
+              <span className="text-zinc-500">Path {gp.pathLength}</span>
+            </>
+          ) : null}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0.5 text-[9px] tabular-nums sm:text-[10px]">
           <div className="text-emerald-100/80">
@@ -181,6 +306,7 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
         <div className="flex h-full min-h-0 flex-col p-0.5 sm:p-1 md:p-1.5 lg:p-3">
           <BoardPathPlayfield
             vm={vm}
+            gameplay={gp}
             youTokenTone={useSeatOnlyPlayerUi ? bp.selfSeat?.tokenColor : undefined}
             oppTokenTone={useSeatOnlyPlayerUi ? oppSeatForUi?.tokenColor : undefined}
           />
@@ -190,29 +316,46 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
       <div className="flex shrink-0 flex-col gap-1 md:gap-1.5 lg:flex-row lg:items-stretch lg:gap-2">
         <button
           type="button"
-          disabled
-          data-ov2-bp-control={vm.primary.intent}
+          disabled={showPostFinishRematch ? !canPrimary : bp.rollTurn ? !canPrimary : true}
+          onClick={handlePrimaryAction}
+          data-ov2-bp-control={gp?.controlIntent ?? vm.primary.intent}
           data-ov2-bp-can-self-act={hasSession ? String(bp.canSelfAct) : undefined}
+          title={
+            showPostFinishRematch
+              ? vm.nextMatchLabel || undefined
+              : gp
+                ? gp.allowedActions.join(" · ")
+                : undefined
+          }
           className={`min-h-[40px] flex-1 rounded-lg border py-2 text-[11px] font-bold md:min-h-[44px] md:text-xs lg:rounded-xl lg:py-2.5 lg:text-sm ${
             primaryMuted
               ? "border-white/12 bg-white/[0.06] text-zinc-400"
               : "border-emerald-500/40 bg-emerald-900/30 text-emerald-100"
           }`}
         >
-          {vm.primary.label}
+          {showPostFinishRematch
+            ? rematchPrimaryLabel
+            : gp
+              ? `${gp.primaryActionLabel}${gp.actionPending ? "…" : ""}`
+              : vm.primary.label}
         </button>
         <button
           type="button"
           disabled
           data-ov2-bp-control={vm.secondary.intent}
           data-ov2-bp-can-self-act={hasSession ? String(bp.canSelfAct) : undefined}
+          title={gp ? `Phase: ${gp.gamePhase} · ${gp.allowedActions.join(" · ")}` : undefined}
           className={`min-h-[40px] flex-1 rounded-lg border py-2 text-[11px] font-semibold md:min-h-[44px] md:text-xs lg:rounded-xl lg:py-2.5 lg:text-sm ${
             secondaryMuted
               ? "border-white/12 bg-black/35 text-zinc-500"
               : "border-white/12 bg-black/35 text-zinc-400"
           }`}
         >
-          {vm.secondary.label}
+          {showPostFinishRematch
+            ? vm.nextMatchLabel || "Rematch"
+            : gp
+              ? `${vm.secondary.label} · ${gp.finished ? "match over" : gp.gamePhase}`
+              : vm.secondary.label}
         </button>
       </div>
 
@@ -330,10 +473,17 @@ function PathToken({ who, tone }) {
   );
 }
 
-/** @param {{ vm: import("../../lib/online-v2/ov2BoardPathAdapter").BoardPathViewModel, youTokenTone?: keyof typeof PATH_TOKEN_TONE, oppTokenTone?: keyof typeof PATH_TOKEN_TONE }} props */
-function BoardPathPlayfield({ vm, youTokenTone, oppTokenTone }) {
-  const youSlot = vm.tokenSlots.you;
-  const oppSlot = vm.tokenSlots.opp;
+/**
+ * @param {{
+ *   vm: import("../../lib/online-v2/ov2BoardPathAdapter").BoardPathViewModel,
+ *   gameplay?: import("../../lib/online-v2/ov2BoardPathAdapter").BoardPathGameplayViewModel | null,
+ *   youTokenTone?: keyof typeof PATH_TOKEN_TONE,
+ *   oppTokenTone?: keyof typeof PATH_TOKEN_TONE,
+ * }} props
+ */
+function BoardPathPlayfield({ vm, gameplay, youTokenTone, oppTokenTone }) {
+  const youSlot = gameplay?.tokenSlots?.you ?? vm.tokenSlots.you;
+  const oppSlot = gameplay?.tokenSlots?.opp ?? vm.tokenSlots.opp;
   const youTurn = vm.matchDetail === BOARD_PATH_MATCH_DETAIL.YOUR_TURN;
   const theyTurn = vm.matchDetail === BOARD_PATH_MATCH_DETAIL.THEIR_TURN;
 

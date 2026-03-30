@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BOARD_PATH_SESSION_PHASE,
+  buildBoardPathPostFinishSlice,
   deriveBoardPathViewModel,
 } from "../lib/online-v2/ov2BoardPathAdapter";
 import { canSelfAct } from "../lib/online-v2/board-path/ov2BoardPathControlContract";
@@ -13,8 +14,20 @@ import {
 } from "../lib/online-v2/board-path/ov2BoardPathOpenContract";
 import {
   fetchBoardPathSessionDetailed,
+  fetchOv2RoomMembersForRoom,
+  rpcOv2BoardPathCancelRematch,
+  rpcOv2BoardPathEndTurnSession,
+  rpcOv2BoardPathMoveSession,
   rpcOv2BoardPathOpenSession,
+  rpcOv2BoardPathRequestRematch,
+  rpcOv2BoardPathRollSession,
+  rpcOv2BoardPathStartNextMatch,
 } from "../lib/online-v2/board-path/ov2BoardPathSessionApi";
+import {
+  OV2_BP_LIVE_SYNC_DEBOUNCE_MS,
+  OV2_BP_LIVE_SYNC_STATE,
+  selectBoardPathBundleAfterFetch,
+} from "../lib/online-v2/board-path/ov2BoardPathLiveSync";
 import {
   advanceTurnLocal,
   appendEvent,
@@ -29,6 +42,7 @@ import {
   syntheticBoardPathBundleForFixtureGuest,
   syntheticBoardPathBundleForFixtureHost,
 } from "../lib/online-v2/board-path/ov2BoardPathSessionManager";
+import { resolveBoardPathActiveSeatIndex } from "../lib/online-v2/board-path/ov2BoardPathEngine";
 import { ONLINE_V2_MEMBER_WALLET_STATE, ONLINE_V2_ROOM_PHASE } from "../lib/online-v2/ov2Economy";
 import { supabaseMP } from "../lib/supabaseClients";
 
@@ -54,8 +68,23 @@ export function useOv2BoardPathSession(baseContext) {
   const [bundle, setBundle] = useState(null);
   const [roomSessionPatch, setRoomSessionPatch] = useState(null);
   const [sessionSyncFault, setSessionSyncFault] = useState(null);
+  const [actionPending, setActionPending] = useState(/** @type {null|"roll"|"move"|"end_turn"} */ (null));
+  const [actionError, setActionError] = useState(/** @type {{ code?: string, message?: string }|null} */ (null));
+  const [liveSyncState, setLiveSyncState] = useState(
+    /** @type {"idle"|"subscribed"|"refreshing"|"error"} */ (OV2_BP_LIVE_SYNC_STATE.IDLE)
+  );
+  const [liveSyncError, setLiveSyncError] = useState(/** @type {{ code?: string, message?: string }|null} */ (null));
+  const [lastSyncAt, setLastSyncAt] = useState(/** @type {number|null} */ (null));
+  const [liveMembersOverride, setLiveMembersOverride] = useState(/** @type {unknown[]|null} */ (null));
+  const [rematchError, setRematchError] = useState(/** @type {{ code?: string, message?: string }|null} */ (null));
+  const [rematchBusy, setRematchBusy] = useState(false);
   const bundleRef = useRef(null);
   bundleRef.current = bundle;
+  const fetchWaveRef = useRef(0);
+  const debounceTimerRef = useRef(/** @type {ReturnType<typeof setTimeout>|null} */ (null));
+  const scheduleDebouncedRefreshRef = useRef(() => {});
+  const actionErrorAtRevisionRef = useRef(/** @type {number|null} */ (null));
+  const prevAidForActionsRef = useRef(/** @type {string|null} */ (null));
 
   const room = baseContext?.room && typeof baseContext.room === "object" ? baseContext.room : null;
   const roomId = room?.id != null ? String(room.id) : null;
@@ -76,6 +105,13 @@ export function useOv2BoardPathSession(baseContext) {
     [selfKey, hostKey]
   );
 
+  const roomRef = useRef(room);
+  const membersRef = useRef(members);
+  const hostKeyRef = useRef(hostKey);
+  roomRef.current = room;
+  membersRef.current = members;
+  hostKeyRef.current = hostKey;
+
   const memberSig = useMemo(
     () =>
       members
@@ -90,6 +126,133 @@ export function useOv2BoardPathSession(baseContext) {
     return roomSessionPatch ? { ...room, ...roomSessionPatch } : room;
   }, [room, roomSessionPatch]);
 
+  const roomForPhaseRef = useRef(roomForPhase);
+  roomForPhaseRef.current = roomForPhase;
+
+  const liveSyncEnabled = useMemo(
+    () => Boolean(roomId && selfKey && !boardPathRoomIdIsOfflineFixture(roomId)),
+    [roomId, selfKey]
+  );
+  const liveSyncEnabledRef = useRef(false);
+  liveSyncEnabledRef.current = liveSyncEnabled;
+
+  const applyDetailedToState = useCallback(detailed => {
+    const r = roomRef.current;
+    const hk = hostKeyRef.current || selfKey;
+    if (!r?.id || !selfKey) return null;
+    if (String(detailed.session.id) !== String(detailed.activeSessionId)) {
+      setSessionSyncFault({
+        code: "SESSION_ID_MISMATCH",
+        message: "Session id does not match room active_session_id from server.",
+      });
+      return null;
+    }
+    if (membersRef.current.length > 0 && detailed.seats.length === 0) {
+      setSessionSyncFault({
+        code: "MISSING_SEATS",
+        message: "Session has no seat rows; check the server or refresh.",
+      });
+      return null;
+    }
+    const b = boardPathBundleFromDatabase(r, membersRef.current, selfKey, detailed.session, detailed.seats, hk);
+    if (!b) {
+      setSessionSyncFault({
+        code: "HYDRATE_BUNDLE_INVALID",
+        message: "Session row loaded but seats are missing or invalid.",
+      });
+      return null;
+    }
+    setSessionSyncFault(null);
+    setLiveSyncError(null);
+    setRoomSessionPatch(prev => ({
+      ...(prev && typeof prev === "object" ? prev : {}),
+      active_session_id: String(detailed.activeSessionId),
+      match_seq: detailed.roomMatchSeq,
+    }));
+    setBundle(prev => {
+      const next = selectBoardPathBundleAfterFetch(prev, b);
+      return next ?? prev;
+    });
+    setLastSyncAt(Date.now());
+    return b;
+  }, [selfKey]);
+
+  const coordinatedFetchAndApply = useCallback(async () => {
+    const r = roomRef.current;
+    if (!r?.id || !selfKey || boardPathRoomIdIsOfflineFixture(String(r.id))) return null;
+    const roomIdAtStart = String(r.id);
+    const matchSeqAtStart = nMatchSeq(r.match_seq);
+
+    const wave = ++fetchWaveRef.current;
+    setLiveSyncState(prev =>
+      prev === OV2_BP_LIVE_SYNC_STATE.ERROR ? prev : OV2_BP_LIVE_SYNC_STATE.REFRESHING
+    );
+
+    try {
+      const detailed = await fetchBoardPathSessionDetailed(supabaseMP, roomIdAtStart);
+      if (wave !== fetchWaveRef.current) return null;
+      if (String(roomRef.current?.id) !== roomIdAtStart || nMatchSeq(roomRef.current?.match_seq) !== matchSeqAtStart)
+        return null;
+
+      if (!detailed.ok) {
+        if (detailed.code !== "NO_ACTIVE_SESSION_ID") {
+          setSessionSyncFault({ code: detailed.code, message: detailed.message });
+          setLiveSyncError({ code: detailed.code, message: detailed.message });
+        }
+        return null;
+      }
+
+      if (
+        String(roomRef.current?.id) !== roomIdAtStart ||
+        nMatchSeq(roomRef.current?.match_seq) !== matchSeqAtStart
+      )
+        return null;
+      const out = applyDetailedToState(detailed);
+      if (wave !== fetchWaveRef.current) return null;
+      if (String(roomRef.current?.id) !== roomIdAtStart) return null;
+      const mrows = await fetchOv2RoomMembersForRoom(supabaseMP, roomIdAtStart);
+      if (wave !== fetchWaveRef.current) return out;
+      if (String(roomRef.current?.id) !== roomIdAtStart) return out;
+      if (mrows) setLiveMembersOverride(mrows);
+      return out;
+    } catch (e) {
+      if (wave !== fetchWaveRef.current) return null;
+      if (
+        String(roomRef.current?.id) !== roomIdAtStart ||
+        nMatchSeq(roomRef.current?.match_seq) !== matchSeqAtStart
+      )
+        return null;
+      const msg = e?.message || String(e);
+      console.error("coordinatedFetchAndApply", e);
+      setSessionSyncFault({
+        code: "HYDRATE_EXCEPTION",
+        message: msg,
+      });
+      setLiveSyncError({ code: "REFRESH_EXCEPTION", message: msg });
+      return null;
+    } finally {
+      if (wave === fetchWaveRef.current) {
+        setLiveSyncState(prev => {
+          if (prev === OV2_BP_LIVE_SYNC_STATE.ERROR) return prev;
+          if (!liveSyncEnabledRef.current) return OV2_BP_LIVE_SYNC_STATE.IDLE;
+          return OV2_BP_LIVE_SYNC_STATE.SUBSCRIBED;
+        });
+      }
+    }
+  }, [selfKey, applyDetailedToState]);
+
+  useEffect(() => {
+    scheduleDebouncedRefreshRef.current = () => {
+      if (debounceTimerRef.current != null) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = null;
+        void coordinatedFetchAndApply();
+      }, OV2_BP_LIVE_SYNC_DEBOUNCE_MS);
+    };
+  }, [coordinatedFetchAndApply]);
+
   const isDev = typeof window !== "undefined" && window.location.search.includes("dev=1");
 
   const identityPrevRef = useRef(
@@ -102,27 +265,31 @@ export function useOv2BoardPathSession(baseContext) {
 
   useEffect(() => {
     const aid =
-      activeSid != null && String(activeSid).trim() !== "" ? String(activeSid) : null;
-    const ms = nMatchSeq(matchSeq);
+      roomForPhase?.active_session_id != null && String(roomForPhase.active_session_id).trim() !== ""
+        ? String(roomForPhase.active_session_id)
+        : null;
+    const ms = roomForPhase ? nMatchSeq(roomForPhase.match_seq) : -1;
 
     if (!roomId || !selfKey) {
       setBundle(null);
       setRoomSessionPatch(null);
       setSessionSyncFault(null);
+      setLiveMembersOverride(null);
+      setRematchError(null);
       identityPrevRef.current = { roomId, selfKey, matchSeq: ms };
       return;
     }
 
     const prevId = identityPrevRef.current;
     const identityShift =
-      (prevId.roomId != null && prevId.roomId !== roomId) ||
-      (prevId.selfKey != null && prevId.selfKey !== selfKey) ||
-      (prevId.matchSeq >= 0 && prevId.matchSeq !== ms);
+      (prevId.roomId != null && prevId.roomId !== roomId) || (prevId.selfKey != null && prevId.selfKey !== selfKey);
 
     if (identityShift) {
       setBundle(null);
       setRoomSessionPatch(null);
       setSessionSyncFault(null);
+      setLiveMembersOverride(null);
+      setRematchError(null);
       identityPrevRef.current = { roomId, selfKey, matchSeq: ms };
       return;
     }
@@ -147,7 +314,31 @@ export function useOv2BoardPathSession(baseContext) {
       if (aid != null && aid !== String(prev.localSession.id)) return null;
       return prev;
     });
-  }, [roomId, selfKey, matchSeq, activeSid]);
+  }, [roomId, selfKey, roomForPhase]);
+
+  useEffect(() => {
+    const aid =
+      activeSid != null && String(activeSid).trim() !== "" ? String(activeSid) : null;
+    if (prevAidForActionsRef.current === aid) return;
+    prevAidForActionsRef.current = aid;
+    setActionError(null);
+    actionErrorAtRevisionRef.current = null;
+    setActionPending(null);
+    setRematchError(null);
+  }, [activeSid]);
+
+  useEffect(() => {
+    if (actionError == null) return;
+    const rev = bundle?.localSession?.revision;
+    if (rev == null) return;
+    const at = actionErrorAtRevisionRef.current;
+    if (at == null) return;
+    const rn = Number(rev) || 0;
+    if (rn > at) {
+      setActionError(null);
+      actionErrorAtRevisionRef.current = null;
+    }
+  }, [bundle?.localSession?.revision, bundle?.localSession?.id, actionError]);
 
   useEffect(() => {
     if (!roomId || boardPathRoomIdIsOfflineFixture(roomId)) return;
@@ -230,9 +421,10 @@ export function useOv2BoardPathSession(baseContext) {
         setSessionSyncFault(null);
         setRoomSessionPatch({ active_session_id: String(session.id) });
         setBundle(prev => {
-          if (prev != null && isSameSession(prev.localSession, b.localSession)) return prev;
-          return b;
+          const next = selectBoardPathBundleAfterFetch(prev, b);
+          return next ?? prev;
         });
+        setLastSyncAt(Date.now());
       } catch (e) {
         console.error("ov2_board_path_open_session", e);
         if (!cancelled) {
@@ -257,61 +449,15 @@ export function useOv2BoardPathSession(baseContext) {
     if (cur && String(cur.localSession.id) === String(room.active_session_id)) return undefined;
 
     let cancelled = false;
-    (async () => {
-      try {
-        const detailed = await fetchBoardPathSessionDetailed(supabaseMP, String(room.id));
-        if (cancelled) return;
-        if (!detailed.ok) {
-          if (detailed.code !== "NO_ACTIVE_SESSION_ID") {
-            setSessionSyncFault({ code: detailed.code, message: detailed.message });
-          }
-          return;
-        }
-        if (String(detailed.session.id) !== String(room.active_session_id)) {
-          setSessionSyncFault({
-            code: "SESSION_ID_MISMATCH",
-            message: "Loaded session does not match room.active_session_id.",
-          });
-          return;
-        }
-        if (members.length > 0 && detailed.seats.length === 0) {
-          setSessionSyncFault({
-            code: "MISSING_SEATS",
-            message: "Session has no seat rows; check the server or refresh.",
-          });
-          return;
-        }
-        const hk = hostKey || selfKey;
-        const b = boardPathBundleFromDatabase(room, members, selfKey, detailed.session, detailed.seats, hk);
-        if (!b || cancelled) {
-          if (!cancelled) {
-            setSessionSyncFault({
-              code: "HYDRATE_BUNDLE_INVALID",
-              message: "Session row loaded but seats are missing or invalid.",
-            });
-          }
-          return;
-        }
-        setSessionSyncFault(null);
-        setBundle(prev => {
-          if (prev != null && isSameSession(prev.localSession, b.localSession)) return prev;
-          return b;
-        });
-      } catch (e) {
-        console.error("fetchBoardPathSessionDetailed", e);
-        if (!cancelled) {
-          setSessionSyncFault({
-            code: "HYDRATE_EXCEPTION",
-            message: e?.message || String(e),
-          });
-        }
-      }
+    void (async () => {
+      await coordinatedFetchAndApply();
+      if (cancelled) return;
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [room, roomId, members, selfKey, memberSig, activeSid, hostKey]);
+  }, [room, roomId, members, selfKey, memberSig, activeSid, hostKey, coordinatedFetchAndApply]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -347,12 +493,272 @@ export function useOv2BoardPathSession(baseContext) {
     selfKey,
   ]);
 
+  const effectiveMembers = useMemo(() => {
+    if (liveMembersOverride && Array.isArray(liveMembersOverride)) return liveMembersOverride;
+    return members;
+  }, [liveMembersOverride, members]);
+
   const mergedContext = useMemo(
-    () => mergeBoardPathBundleIntoContext(baseContext || { room: null, members: [], self: null }, bundle, roomSessionPatch),
-    [baseContext, bundle, roomSessionPatch]
+    () =>
+      mergeBoardPathBundleIntoContext(
+        { ...(baseContext || { room: null, members: [], self: null }), members: effectiveMembers },
+        bundle,
+        roomSessionPatch
+      ),
+    [baseContext, bundle, roomSessionPatch, effectiveMembers]
   );
 
-  const vm = useMemo(() => deriveBoardPathViewModel(mergedContext), [mergedContext]);
+  const liveDbBoardPath = useMemo(
+    () =>
+      Boolean(
+        roomId &&
+          selfKey &&
+          !boardPathRoomIdIsOfflineFixture(roomId) &&
+          bundle?.localSession?.meta?.source === "ov2_db"
+      ),
+    [roomId, selfKey, bundle?.localSession?.meta?.source]
+  );
+
+  const sessionIdentity = useMemo(() => {
+    if (!roomId) return null;
+    const aid = activeSid != null && String(activeSid).trim() !== "" ? String(activeSid) : "";
+    const sid = bundle?.localSession?.id != null ? String(bundle.localSession.id) : "";
+    return `${roomId}:${aid}:${sid}`;
+  }, [roomId, activeSid, bundle?.localSession?.id]);
+
+  const liveRevision = bundle?.localSession?.revision ?? null;
+
+  const liveSyncVmSlice = useMemo(
+    () => ({
+      liveSyncEnabled,
+      liveSyncState,
+      liveRevision,
+      sessionIdentity,
+      isStale: false,
+      lastSyncAt,
+      syncError: liveSyncError,
+    }),
+    [liveSyncEnabled, liveSyncState, liveRevision, sessionIdentity, lastSyncAt, liveSyncError]
+  );
+
+  const postFinishVmSlice = useMemo(
+    () => buildBoardPathPostFinishSlice(mergedContext, hostKey, { rematchBusy, rematchError }),
+    [mergedContext, hostKey, rematchBusy, rematchError]
+  );
+
+  const vm = useMemo(
+    () =>
+      deriveBoardPathViewModel(mergedContext, {
+        actionPending,
+        actionError,
+        liveSync: liveSyncVmSlice,
+        postFinish: postFinishVmSlice,
+      }),
+    [mergedContext, actionPending, actionError, liveSyncVmSlice, postFinishVmSlice]
+  );
+
+  const refreshBundleFromServer = useCallback(async () => {
+    return coordinatedFetchAndApply();
+  }, [coordinatedFetchAndApply]);
+
+  const runTurnRpc = useCallback(
+    async (kind, rpcFn) => {
+      if (!liveDbBoardPath || !roomId || !selfKey) return;
+      setActionPending(kind);
+      setActionError(null);
+      try {
+        const revRaw = bundleRef.current?.localSession?.revision;
+        const rev = revRaw != null ? Number(revRaw) : null;
+        const raw = await rpcFn(
+          supabaseMP,
+          roomId,
+          selfKey,
+          rev != null && Number.isFinite(rev) ? rev : null
+        );
+        if (!raw || raw.ok !== true) {
+          const code = typeof raw?.code === "string" ? raw.code : "RPC_REJECTED";
+          const message =
+            typeof raw?.message === "string" ? raw.message : "Server rejected this action.";
+          const errRev = bundleRef.current?.localSession?.revision;
+          actionErrorAtRevisionRef.current = errRev != null ? Number(errRev) || 0 : null;
+          setActionError({ code, message });
+          return;
+        }
+        await refreshBundleFromServer();
+      } catch (e) {
+        const revRaw = bundleRef.current?.localSession?.revision;
+        actionErrorAtRevisionRef.current = revRaw != null ? Number(revRaw) || 0 : null;
+        setActionError({
+          code: "ACTION_EXCEPTION",
+          message: e?.message || String(e),
+        });
+      } finally {
+        setActionPending(null);
+      }
+    },
+    [liveDbBoardPath, roomId, selfKey, refreshBundleFromServer]
+  );
+
+  const rollTurn = useCallback(async () => {
+    await runTurnRpc("roll", rpcOv2BoardPathRollSession);
+  }, [runTurnRpc]);
+
+  const moveTurn = useCallback(async () => {
+    await runTurnRpc("move", rpcOv2BoardPathMoveSession);
+  }, [runTurnRpc]);
+
+  const endTurn = useCallback(async () => {
+    await runTurnRpc("end_turn", rpcOv2BoardPathEndTurnSession);
+  }, [runTurnRpc]);
+
+  const runRematchRpc = useCallback(
+    async rpcFn => {
+      if (!liveDbBoardPath || !roomId || !selfKey) return;
+      setRematchBusy(true);
+      setRematchError(null);
+      try {
+        const raw = await rpcFn(supabaseMP, roomId, selfKey);
+        if (!raw || raw.ok !== true) {
+          const code = typeof raw?.code === "string" ? raw.code : "RPC_REJECTED";
+          const message =
+            typeof raw?.message === "string" ? raw.message : "Server rejected this action.";
+          setRematchError({ code, message });
+          return;
+        }
+        await refreshBundleFromServer();
+      } catch (e) {
+        setRematchError({
+          code: "REMATCH_EXCEPTION",
+          message: e?.message || String(e),
+        });
+      } finally {
+        setRematchBusy(false);
+      }
+    },
+    [liveDbBoardPath, roomId, selfKey, refreshBundleFromServer]
+  );
+
+  const requestRematch = useCallback(async () => {
+    await runRematchRpc(rpcOv2BoardPathRequestRematch);
+  }, [runRematchRpc]);
+
+  const cancelRematch = useCallback(async () => {
+    await runRematchRpc(rpcOv2BoardPathCancelRematch);
+  }, [runRematchRpc]);
+
+  const startNextMatch = useCallback(async () => {
+    if (!liveDbBoardPath || !roomId || !selfKey) return;
+    const expectedMs = nMatchSeq(roomForPhaseRef.current?.match_seq);
+    setRematchBusy(true);
+    setRematchError(null);
+    try {
+      const raw = await rpcOv2BoardPathStartNextMatch(supabaseMP, roomId, selfKey, expectedMs);
+      if (!raw || raw.ok !== true) {
+        const code = typeof raw?.code === "string" ? raw.code : "RPC_REJECTED";
+        const message =
+          typeof raw?.message === "string" ? raw.message : "Server rejected this action.";
+        setRematchError({ code, message });
+        return;
+      }
+      await refreshBundleFromServer();
+    } catch (e) {
+      setRematchError({
+        code: "REMATCH_EXCEPTION",
+        message: e?.message || String(e),
+      });
+    } finally {
+      setRematchBusy(false);
+    }
+  }, [liveDbBoardPath, roomId, selfKey, refreshBundleFromServer]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    if (!liveSyncEnabled || !roomId) {
+      setLiveSyncState(OV2_BP_LIVE_SYNC_STATE.IDLE);
+      return undefined;
+    }
+
+    const aid =
+      activeSid != null && String(activeSid).trim() !== "" ? String(activeSid) : null;
+    const channelId = `ov2_bp_rt:${roomId}:${aid ?? "noseats"}`;
+    const ch = supabaseMP
+      .channel(channelId)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ov2_rooms", filter: `id=eq.${roomId}` },
+        () => {
+          scheduleDebouncedRefreshRef.current();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "ov2_board_path_sessions",
+          filter: `room_id=eq.${roomId}`,
+        },
+        () => {
+          scheduleDebouncedRefreshRef.current();
+        }
+      );
+
+    if (aid) {
+      ch.on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "ov2_board_path_seats",
+          filter: `session_id=eq.${aid}`,
+        },
+        () => {
+          scheduleDebouncedRefreshRef.current();
+        }
+      );
+    }
+
+    ch.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "ov2_room_members",
+        filter: `room_id=eq.${roomId}`,
+      },
+      () => {
+        scheduleDebouncedRefreshRef.current();
+      }
+    );
+
+    ch.subscribe((status, err) => {
+      if (status === "SUBSCRIBED") {
+        setLiveSyncState(prev =>
+          prev === OV2_BP_LIVE_SYNC_STATE.REFRESHING ? prev : OV2_BP_LIVE_SYNC_STATE.SUBSCRIBED
+        );
+        setLiveSyncError(null);
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        setLiveSyncState(OV2_BP_LIVE_SYNC_STATE.ERROR);
+        const msg =
+          (err &&
+          typeof err === "object" &&
+          "message" in err &&
+          typeof /** @type {{ message?: string }} */ (err).message === "string"
+            ? /** @type {{ message?: string }} */ (err).message
+            : null) || `Realtime ${String(status).toLowerCase().replace(/_/g, " ")}`;
+        setLiveSyncError({ code: String(status), message: msg });
+      }
+    });
+
+    return () => {
+      void ch.unsubscribe();
+      if (debounceTimerRef.current != null) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      setLiveSyncState(OV2_BP_LIVE_SYNC_STATE.IDLE);
+    };
+  }, [liveSyncEnabled, roomId, activeSid]);
 
   const managerSessionPhase = useMemo(
     () =>
@@ -425,34 +831,46 @@ export function useOv2BoardPathSession(baseContext) {
     const aid = room?.active_session_id;
     if (!s?.id || !Array.isArray(rows) || rows.length === 0 || !selfKey) return null;
     if (aid != null && String(aid).trim() !== "" && String(s.id) !== String(aid)) return null;
-    return rows.map((row, i) => ({
-      id: row.id,
-      sessionId: row.session_id,
-      seatIndex: row.seat_index ?? i,
-      participantKey: row.participant_key,
-      displayName: `…${String(row.participant_key).slice(0, 4)}`,
-      isHost: false,
-      isReady: true,
-      isSelf: row.participant_key === selfKey,
-      tokenColor: BP_SEAT_TONES[i % BP_SEAT_TONES.length],
-      progress: 0,
-      finished: false,
-      connected: true,
-    }));
+    const bs = s.board_state ?? s.boardState;
+    const posMap = bs?.positions && typeof bs.positions === "object" ? bs.positions : {};
+    const pathLenRaw = bs?.pathLength ?? bs?.path_length;
+    const pathLen =
+      typeof pathLenRaw === "number" && !Number.isNaN(pathLenRaw)
+        ? Math.max(1, Math.floor(pathLenRaw))
+        : 30;
+    return rows.map((row, i) => {
+      const pk = String(row.participant_key);
+      const rawP = Object.prototype.hasOwnProperty.call(posMap, pk) ? posMap[pk] : 0;
+      const pn = typeof rawP === "number" ? rawP : Number(rawP);
+      const progress = Number.isFinite(pn) ? Math.max(0, Math.min(Math.floor(pn), pathLen)) : 0;
+      return {
+        id: row.id,
+        sessionId: row.session_id,
+        seatIndex: row.seat_index ?? i,
+        participantKey: pk,
+        displayName: `…${String(pk).slice(0, 4)}`,
+        isHost: false,
+        isReady: true,
+        isSelf: pk === selfKey,
+        tokenColor: BP_SEAT_TONES[i % BP_SEAT_TONES.length],
+        progress,
+        finished: progress >= pathLen,
+        connected: true,
+      };
+    });
   }, [bundle?.localSeats, mergedContext?.session, mergedContext?.seats, selfKey, room?.active_session_id]);
 
   const selfSeat = useMemo(() => (seats?.length && selfKey ? seats.find(x => x.isSelf) ?? null : null), [seats, selfKey]);
 
   const activeSeat = useMemo(() => {
     if (!seats?.length || !session) return null;
-    const idx = session.turnMeta?.activeSeatIndex ?? null;
-    if (idx == null) return null;
+    const idx = resolveBoardPathActiveSeatIndex(session);
     return seats.find(x => x.seatIndex === idx) ?? null;
   }, [seats, session]);
 
   const sessionPhase = vm.sessionPhase;
 
-  const canSelfActFlag = useMemo(() => canSelfAct(session, selfSeat), [session, selfSeat]);
+  const canSelfActFlag = useMemo(() => canSelfAct(session, selfSeat, seats ?? []), [session, selfSeat, seats]);
 
   const canBoardPathDebugMutate = useMemo(() => {
     if (!isDev || !bundle?.localSession) return false;
@@ -519,5 +937,22 @@ export function useOv2BoardPathSession(baseContext) {
     lastEvent,
     sessionSyncFault,
     roomActiveMissingSessionHint,
+    liveDbBoardPath,
+    rollTurn: liveDbBoardPath ? rollTurn : undefined,
+    moveTurn: liveDbBoardPath ? moveTurn : undefined,
+    endTurn: liveDbBoardPath ? endTurn : undefined,
+    actionPending,
+    actionError,
+    liveSyncEnabled,
+    liveSyncState,
+    liveRevision,
+    sessionIdentity,
+    lastSyncAt,
+    liveSyncError,
+    requestRematch: liveDbBoardPath ? requestRematch : undefined,
+    cancelRematch: liveDbBoardPath ? cancelRematch : undefined,
+    startNextMatch: liveDbBoardPath ? startNextMatch : undefined,
+    rematchBusy,
+    rematchError,
   };
 }
