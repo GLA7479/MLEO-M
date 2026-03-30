@@ -6,7 +6,6 @@ import {
   BOARD_PATH_SESSION_PIPELINE_STATUS,
   getBoardPathBlockedStatusLine,
   isBoardPathPostFinishPipeline,
-  resolveBoardPathActions,
   resolveBoardPathPrimaryPressEnabled,
   resolveBoardPathSettlementClaimRowVisible,
 } from "../../lib/online-v2/board-path/ov2BoardPathActionContract";
@@ -56,40 +55,11 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
     };
   }, [bp.debugAdvanceTurn]);
 
-  const actions = useMemo(
-    () =>
-      vm
-        ? resolveBoardPathActions(vm, {
-            commitStake: bp.commitStake,
-            rollTurn: bp.rollTurn,
-            chooseToken: bp.chooseToken,
-            moveTurn: bp.moveTurn,
-            endTurn: bp.endTurn,
-            claimSettlement: bp.claimSettlement,
-            requestRematch: bp.requestRematch,
-            cancelRematch: bp.cancelRematch,
-            startNewMatch: bp.startNewMatch,
-            finalizeSession: bp.finalizeSession,
-            finalizeRoom: bp.finalizeRoom,
-          })
-        : null,
-    [
-      vm,
-      bp.commitStake,
-      bp.rollTurn,
-      bp.chooseToken,
-      bp.moveTurn,
-      bp.endTurn,
-      bp.claimSettlement,
-      bp.requestRematch,
-      bp.cancelRematch,
-      bp.startNewMatch,
-      bp.finalizeSession,
-      bp.finalizeRoom,
-    ]
-  );
+  const actions = bp.boardPathActions;
 
   if (!vm || !actions) return null;
+
+  const pm = bp.postMatchActionSurface;
 
   const hasSession = Boolean(vm.session?.id);
   const hasSeatRows = Boolean(vm.seatRows?.length);
@@ -162,37 +132,33 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
 
   const showPostFinish = isBoardPathPostFinishPipeline(vm);
 
-  const rematchPrimaryLabel = vm.rematchBusy
-    ? "…"
-    : vm.selfCanRequestRematch
-      ? "Request rematch"
-      : vm.selfCanCancelRematch
-        ? "Cancel rematch"
-        : vm.hostCanStartNextMatch
-          ? "Start next match"
-          : "Wait…";
+  const gPlay = bp.gameplayActionSurface;
 
-  const canPressPrimary = resolveBoardPathPrimaryPressEnabled(vm, actions, gp);
+  const canPressPrimary =
+    actions.controlSurface === BOARD_PATH_CONTROL_SURFACE.TURN_ACTIONS
+      ? gPlay.gameplayInteractionEnabled
+      : resolveBoardPathPrimaryPressEnabled(vm, actions, gp);
 
   const primaryMuted = actions.isBlocked || !canPressPrimary;
 
   const showFinalizeSecondary =
-    showPostFinish && (Boolean(vm.canFinalize) || Boolean(vm.finalized) || Boolean(vm.finalizeBusy));
+    showPostFinish &&
+    (pm.canFinalizeSession || Boolean(vm.finalized) || Boolean(vm.finalizeBusy));
 
   const showRoomFinalizeTertiary =
     showPostFinish &&
-    (Boolean(vm.roomCanFinalize) ||
+    (pm.canFinalizeRoom ||
       Boolean(vm.roomFinalized) ||
       Boolean(vm.roomFinalizeBusy) ||
       Boolean(bp.finalizeRoom));
 
   const secondaryMuted = showPostFinish
-    ? !showFinalizeSecondary
+    ? !vm.finalized && !vm.finalizeBusy && !pm.canFinalizeSession
     : actions.controlSurface === BOARD_PATH_CONTROL_SURFACE.TURN_ACTIONS && hasSession
       ? vm.secondary.muted || !vm.canSelfAct
       : vm.secondary.muted;
 
-  const tertiaryRoomMuted = showPostFinish && !actions.canFinalizeRoom;
+  const tertiaryRoomMuted = showPostFinish && !pm.canFinalizeRoom;
 
   const roomFinalizeLabel = !bp.finalizeRoom
     ? "Room: host"
@@ -205,12 +171,12 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
           : "Room: locked";
 
   function handleSecondaryPostFinish() {
-    if (!actions.canFinalizeSession) return;
+    if (!pm.canFinalizeSession) return;
     void bp.finalizeSession?.();
   }
 
   function handleTertiaryRoomFinalize() {
-    if (!actions.canFinalizeRoom) return;
+    if (!pm.canFinalizeRoom) return;
     void bp.finalizeRoom?.();
   }
 
@@ -282,6 +248,13 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
         : "Live: syncing…"
       : null;
 
+  const turnPipelineLine =
+    actions.controlSurface === BOARD_PATH_CONTROL_SURFACE.TURN_ACTIONS
+      ? `Play: ${gPlay.turnPipelineState.replace(/^turn_/, "").replace(/_/g, " ")}`
+      : null;
+
+  const postMatchPipelineLine = showPostFinish ? `Post: ${pm.postMatchPipelineState}` : null;
+
   const bundleSyncLine =
     vm.liveSyncEnabled && vm.bundleSyncState && vm.bundleSyncState !== BOARD_PATH_BUNDLE_SYNC_STATE.IDLE
       ? vm.bundleSyncState === BOARD_PATH_BUNDLE_SYNC_STATE.LOADING_BUNDLE
@@ -300,6 +273,25 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
                     vm.bundleSyncError.code ? ` (${vm.bundleSyncError.code})` : ""
                   }`
                 : "Bundle: failed"
+              : null
+      : null;
+
+  const sessionOpenLine =
+    vm.liveSyncEnabled &&
+    (vm.sessionOpenBusy ||
+      vm.sessionOpenError ||
+      vm.canRetrySessionOpen ||
+      vm.canAttemptSessionOpen)
+      ? vm.sessionOpenBusy
+        ? "Session open: working…"
+        : vm.sessionOpenError?.message
+          ? `Session open: failed — ${vm.sessionOpenError.message}${
+              vm.sessionOpenError.code ? ` (${vm.sessionOpenError.code})` : ""
+            }`
+          : vm.canRetrySessionOpen
+            ? "Session open: retry available"
+            : vm.canAttemptSessionOpen
+              ? "Session open: host can start match session"
               : null
       : null;
 
@@ -354,6 +346,9 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
     roomTotalsCompact,
     liveSyncLine,
     bundleSyncLine,
+    sessionOpenLine,
+    turnPipelineLine,
+    postMatchPipelineLine,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -424,6 +419,25 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
         {combinedStatus}
       </div>
 
+      {vm.liveSyncEnabled &&
+      (vm.canAttemptSessionOpen || vm.canRetrySessionOpen || vm.sessionOpenBusy) ? (
+        <button
+          type="button"
+          disabled={
+            Boolean(vm.sessionOpenBusy) || (!vm.canAttemptSessionOpen && !vm.canRetrySessionOpen)
+          }
+          onClick={() => void bp.attemptSessionOpen?.()}
+          data-ov2-bp-session-open={vm.sessionOpenBusy ? "busy" : "idle"}
+          className="shrink-0 rounded-md border border-sky-500/25 bg-sky-950/20 px-2 py-1 text-center text-[10px] font-semibold text-sky-100/90 sm:text-[11px]"
+        >
+          {vm.sessionOpenBusy
+            ? "Opening session…"
+            : vm.canRetrySessionOpen
+              ? "Retry open session"
+              : "Open match session"}
+        </button>
+      ) : null}
+
       <div className="grid shrink-0 grid-cols-2 gap-1 sm:gap-1.5 lg:gap-2">
         <PlayerPanel
           title="You"
@@ -444,6 +458,8 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
       <div
         className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/15 bg-gradient-to-b from-zinc-900/80 to-black/50 md:rounded-xl lg:rounded-2xl lg:border-white/20"
         data-ov2-bp-session-state={vm.sessionState}
+        data-ov2-bp-turn-pipeline={gPlay.turnPipelineState}
+        data-ov2-bp-post-match-pipeline={pm.postMatchPipelineState}
         data-ov2-bp-actions-waiting={actions.isWaiting ? "1" : "0"}
         data-ov2-bp-actions-blocked={actions.isBlocked ? "1" : "0"}
       >
@@ -467,6 +483,7 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
           disabled={!canPressPrimary}
           onClick={handlePrimaryAction}
           data-ov2-bp-control={gp?.controlIntent ?? vm.primary.intent}
+          data-ov2-bp-turn-pipeline={gPlay.turnPipelineState}
           data-ov2-bp-can-self-act={hasSession ? String(vm.canSelfAct) : undefined}
           title={
             actions.controlSurface === BOARD_PATH_CONTROL_SURFACE.BLOCKED
@@ -486,19 +503,22 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
           {actions.controlSurface === BOARD_PATH_CONTROL_SURFACE.BLOCKED
             ? "Blocked"
             : actions.controlSurface === BOARD_PATH_CONTROL_SURFACE.REMATCH_FLOW
-              ? rematchPrimaryLabel
-              : actions.controlSurface === BOARD_PATH_CONTROL_SURFACE.TURN_ACTIONS && gp
-                ? `${gp.primaryActionLabel}${gp.actionPending ? "…" : ""}`
+              ? pm.postMatchPrimaryActionLabel
+              : actions.controlSurface === BOARD_PATH_CONTROL_SURFACE.TURN_ACTIONS
+                ? `${gPlay.primaryGameplayActionLabel}${gPlay.gameplayInteractionBusy ? "…" : ""}`
                 : actions.controlSurface === BOARD_PATH_CONTROL_SURFACE.COMMIT_STAKE
                   ? `${vm.primary.label}${vm.commitStakeBusy ? "…" : ""}`
-                  : vm.primary.label}
+                  : typeof pm.postMatchPrimaryActionLabel === "string" &&
+                      pm.postMatchPrimaryActionLabel.trim() !== ""
+                    ? pm.postMatchPrimaryActionLabel
+                    : vm.primary.label}
         </button>
         <button
           type="button"
           disabled={
             actions.isBlocked ||
             actions.controlSurface === BOARD_PATH_CONTROL_SURFACE.BLOCKED ||
-            (showPostFinish ? !actions.canFinalizeSession || vm.finalized || vm.finalizeBusy : true)
+            (showPostFinish ? !pm.canFinalizeSession || vm.finalized || vm.finalizeBusy : true)
           }
           onClick={() => {
             if (showPostFinish) handleSecondaryPostFinish();
@@ -517,7 +537,7 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
               ? "…"
               : vm.finalized
                 ? "Settled"
-                : vm.canFinalize
+                : pm.canFinalizeSession
                   ? "Finalize (host)"
                   : "Settle: host only"
             : gp

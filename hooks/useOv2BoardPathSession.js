@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildBoardPathPostFinishSlice, deriveBoardPathViewModel } from "../lib/online-v2/ov2BoardPathAdapter";
+import { resolveBoardPathActions } from "../lib/online-v2/board-path/ov2BoardPathActionContract";
+import {
+  BOARD_PATH_GAMEPLAY_ACTION_SURFACE_OFF,
+  deriveBoardPathGameplayActionSurface,
+} from "../lib/online-v2/board-path/ov2BoardPathGameplayActionSurface";
+import {
+  BOARD_PATH_POST_MATCH_ACTION_SURFACE_OFF,
+  deriveBoardPathPostMatchActionSurface,
+} from "../lib/online-v2/board-path/ov2BoardPathPostMatchActionSurface";
 import { canSelfAct } from "../lib/online-v2/board-path/ov2BoardPathControlContract";
 import {
   boardPathRoomIdIsOfflineFixture,
@@ -59,6 +68,7 @@ import {
   BOARD_PATH_BUNDLE_SYNC_STATE,
   fetchBoardPathLiveCoordinatedBundle,
 } from "../lib/online-v2/board-path/ov2BoardPathBundleCoordinator";
+import { canHostAttemptBoardPathSessionOpenRpc } from "../lib/online-v2/board-path/ov2BoardPathSessionOpenFollowUp";
 import { supabaseMP } from "../lib/supabaseClients";
 
 const BP_SEAT_TONES = /** @type {const} */ (["emerald", "sky", "amber", "violet"]);
@@ -129,6 +139,11 @@ export function useOv2BoardPathSession(baseContext) {
   const [bundleSyncError, setBundleSyncError] = useState(
     /** @type {{ code?: string, message?: string }|null} */ (null)
   );
+  const [sessionOpenBusy, setSessionOpenBusy] = useState(false);
+  const [sessionOpenError, setSessionOpenError] = useState(
+    /** @type {{ code?: string, message?: string }|null} */ (null)
+  );
+  const [lastSessionOpenAt, setLastSessionOpenAt] = useState(/** @type {number|null} */ (null));
   const [liveMembersOverride, setLiveMembersOverride] = useState(/** @type {unknown[]|null} */ (null));
   const [rematchError, setRematchError] = useState(/** @type {{ code?: string, message?: string }|null} */ (null));
   const [rematchBusy, setRematchBusy] = useState(false);
@@ -426,6 +441,9 @@ export function useOv2BoardPathSession(baseContext) {
       setBundleSyncState(BOARD_PATH_BUNDLE_SYNC_STATE.IDLE);
       setBundleSyncError(null);
       setLastBundleSyncAt(null);
+      setSessionOpenBusy(false);
+      setSessionOpenError(null);
+      setLastSessionOpenAt(null);
       setLiveMembersOverride(null);
       setRematchError(null);
       setSettlementLines(null);
@@ -451,6 +469,9 @@ export function useOv2BoardPathSession(baseContext) {
       setBundleSyncState(BOARD_PATH_BUNDLE_SYNC_STATE.IDLE);
       setBundleSyncError(null);
       setLastBundleSyncAt(null);
+      setSessionOpenBusy(false);
+      setSessionOpenError(null);
+      setLastSessionOpenAt(null);
       setLiveMembersOverride(null);
       setRematchError(null);
       setSettlementLines(null);
@@ -501,6 +522,7 @@ export function useOv2BoardPathSession(baseContext) {
     setSettlementClaimError(null);
     setSettlementClaimBusy(false);
     setSettlementClaimLastTouch(null);
+    if (aid != null) setSessionOpenError(null);
   }, [activeSid]);
 
   useEffect(() => {
@@ -551,73 +573,6 @@ export function useOv2BoardPathSession(baseContext) {
       const next = syntheticBoardPathBundleForFixtureGuest(room, members, selfKey);
       if (next) setBundle(next);
     }
-  }, [room, roomId, members, selfKey, memberSig, lifecyclePhase, activeSid, hostKeyOnRoom]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!room || !roomId || !selfKey) return;
-    if (boardPathRoomIdIsOfflineFixture(roomId)) return;
-    if (!shouldHostOpenLocalBoardPathSession(room, members, selfKey)) return;
-    if (bundleRef.current) return undefined;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const raw = await rpcOv2BoardPathOpenSession(supabaseMP, roomId, selfKey);
-        if (cancelled) return;
-        if (!raw || raw.ok !== true) {
-          const msg =
-            typeof raw?.message === "string"
-              ? raw.message
-              : "Could not open Board Path session (server rejected or RPC error).";
-          const code = typeof raw?.code === "string" ? raw.code : "OPEN_SESSION_FAILED";
-          setSessionSyncFault({ code, message: msg });
-          return;
-        }
-        const session = raw.session;
-        const seatsRaw = raw.seats;
-        const seats = Array.isArray(seatsRaw) ? seatsRaw : [];
-        if (!session || typeof session !== "object") {
-          setSessionSyncFault({
-            code: "OPEN_SESSION_EMPTY",
-            message: "Open session returned no session payload.",
-          });
-          return;
-        }
-        const b = boardPathBundleFromDatabase(room, members, selfKey, session, seats, selfKey);
-        if (!b || cancelled) {
-          if (!cancelled) {
-            setSessionSyncFault({
-              code: "OPEN_SESSION_BUNDLE_INVALID",
-              message: "Server session or seats could not be loaded into the client.",
-            });
-          }
-          return;
-        }
-        setSessionSyncFault(null);
-        setRoomSessionPatch({ active_session_id: String(session.id) });
-        setBundle(prev => {
-          const next = selectBoardPathBundleAfterFetch(prev, b);
-          return next ?? prev;
-        });
-        setLastSyncAt(Date.now());
-        setLastBundleSyncAt(Date.now());
-        setBundleSyncState(BOARD_PATH_BUNDLE_SYNC_STATE.BUNDLE_READY);
-        setBundleSyncError(null);
-      } catch (e) {
-        console.error("ov2_board_path_open_session", e);
-        if (!cancelled) {
-          setSessionSyncFault({
-            code: "OPEN_SESSION_EXCEPTION",
-            message: e?.message || String(e),
-          });
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [room, roomId, members, selfKey, memberSig, lifecyclePhase, activeSid, hostKeyOnRoom]);
 
   useEffect(() => {
@@ -676,6 +631,88 @@ export function useOv2BoardPathSession(baseContext) {
     if (liveMembersOverride && Array.isArray(liveMembersOverride)) return liveMembersOverride;
     return members;
   }, [liveMembersOverride, members]);
+
+  const effectiveMembersRef = useRef(effectiveMembers);
+  effectiveMembersRef.current = effectiveMembers;
+
+  const canAttemptSessionOpen = useMemo(
+    () =>
+      Boolean(
+        typeof rpcOv2BoardPathOpenSession === "function" &&
+          canHostAttemptBoardPathSessionOpenRpc({
+            roomId,
+            room: roomForPhase,
+            members: effectiveMembers,
+            selfKey,
+            sessionOpenBusy: false,
+          })
+      ),
+    [roomId, roomForPhase, effectiveMembers, selfKey]
+  );
+
+  const canRetrySessionOpen = useMemo(
+    () => Boolean(sessionOpenError && canAttemptSessionOpen && !sessionOpenBusy),
+    [sessionOpenError, canAttemptSessionOpen, sessionOpenBusy]
+  );
+
+  const attemptSessionOpen = useCallback(async () => {
+    if (sessionOpenBusy) return;
+    if (!canAttemptSessionOpen && !canRetrySessionOpen) return;
+    if (typeof rpcOv2BoardPathOpenSession !== "function") return;
+    const rid = roomId;
+    const pk = selfKey;
+    if (!rid || !pk || boardPathRoomIdIsOfflineFixture(rid)) return;
+    if (
+      !canHostAttemptBoardPathSessionOpenRpc({
+        roomId: rid,
+        room: roomForPhaseRef.current,
+        members: effectiveMembersRef.current,
+        selfKey: pk,
+        sessionOpenBusy: false,
+      })
+    )
+      return;
+
+    setSessionOpenBusy(true);
+    setSessionOpenError(null);
+    try {
+      const raw = await rpcOv2BoardPathOpenSession(supabaseMP, rid, pk);
+      if (!raw || raw.ok !== true) {
+        const msg =
+          typeof raw?.message === "string"
+            ? raw.message
+            : "Could not open Board Path session (server rejected or RPC error).";
+        const code = typeof raw?.code === "string" ? raw.code : "OPEN_SESSION_FAILED";
+        setSessionOpenError({ code, message: msg });
+        return;
+      }
+      if (!raw.session || typeof raw.session !== "object") {
+        setSessionOpenError({
+          code: "OPEN_SESSION_EMPTY",
+          message: "Open session returned no session payload.",
+        });
+        return;
+      }
+      setSessionOpenError(null);
+      await coordinatedFetchAndApply();
+    } catch (e) {
+      console.error("ov2_board_path_open_session", e);
+      setSessionOpenError({
+        code: "OPEN_SESSION_EXCEPTION",
+        message: e?.message || String(e),
+      });
+    } finally {
+      setSessionOpenBusy(false);
+      setLastSessionOpenAt(Date.now());
+    }
+  }, [
+    sessionOpenBusy,
+    canAttemptSessionOpen,
+    canRetrySessionOpen,
+    roomId,
+    selfKey,
+    coordinatedFetchAndApply,
+  ]);
 
   const mergedContext = useMemo(() => {
     const m = mergeBoardPathBundleIntoContext(
@@ -1313,7 +1350,35 @@ export function useOv2BoardPathSession(baseContext) {
     };
   }, [canBoardPathDebugMutate, room, members, selfKey]);
 
-  const vm = useMemo(() => {
+  const boardPathActionCallbacks = useMemo(
+    () => ({
+      commitStake,
+      chooseToken: undefined,
+      rollTurn,
+      moveTurn,
+      endTurn,
+      claimSettlement,
+      requestRematch,
+      cancelRematch,
+      startNewMatch: startNextMatch,
+      finalizeSession,
+      finalizeRoom,
+    }),
+    [
+      commitStake,
+      rollTurn,
+      moveTurn,
+      endTurn,
+      claimSettlement,
+      requestRematch,
+      cancelRematch,
+      startNextMatch,
+      finalizeSession,
+      finalizeRoom,
+    ]
+  );
+
+  const vmCore = useMemo(() => {
     const ctxSess = mergedContext?.session ?? null;
     const hasSettlement =
       String(ctxSess?.settlement_status || ctxSess?.settlementStatus || "") === "finalized" ||
@@ -1348,6 +1413,11 @@ export function useOv2BoardPathSession(baseContext) {
       bundleSyncError,
       canRetryBundleSync,
       lastBundleSyncAt,
+      canAttemptSessionOpen,
+      canRetrySessionOpen,
+      sessionOpenBusy,
+      sessionOpenError,
+      lastSessionOpenAt,
     };
   }, [
     legacyVm,
@@ -1369,11 +1439,54 @@ export function useOv2BoardPathSession(baseContext) {
     bundleSyncError,
     canRetryBundleSync,
     lastBundleSyncAt,
+    canAttemptSessionOpen,
+    canRetrySessionOpen,
+    sessionOpenBusy,
+    sessionOpenError,
+    lastSessionOpenAt,
   ]);
+
+  const boardPathActions = useMemo(
+    () => (vmCore ? resolveBoardPathActions(vmCore, boardPathActionCallbacks) : null),
+    [vmCore, boardPathActionCallbacks]
+  );
+
+  const turnActionPending = useMemo(
+    () =>
+      actionPending === "roll" || actionPending === "move" || actionPending === "end_turn"
+        ? actionPending
+        : null,
+    [actionPending]
+  );
+
+  const gameplayActionSurface = useMemo(
+    () =>
+      vmCore && boardPathActions
+        ? deriveBoardPathGameplayActionSurface(vmCore, boardPathActions, turnActionPending)
+        : BOARD_PATH_GAMEPLAY_ACTION_SURFACE_OFF,
+    [vmCore, boardPathActions, turnActionPending]
+  );
+
+  const postMatchActionSurface = useMemo(
+    () =>
+      vmCore && boardPathActions
+        ? deriveBoardPathPostMatchActionSurface(vmCore, boardPathActions)
+        : BOARD_PATH_POST_MATCH_ACTION_SURFACE_OFF,
+    [vmCore, boardPathActions]
+  );
+
+  const vm = useMemo(
+    () =>
+      vmCore ? { ...vmCore, ...gameplayActionSurface, ...postMatchActionSurface } : vmCore,
+    [vmCore, gameplayActionSurface, postMatchActionSurface]
+  );
 
   return {
     mergedContext,
     vm,
+    boardPathActions,
+    gameplayActionSurface,
+    postMatchActionSurface,
     localBundle: bundle,
     localSession: bundle?.localSession ?? null,
     localSeats: bundle?.localSeats ?? null,
@@ -1396,6 +1509,12 @@ export function useOv2BoardPathSession(baseContext) {
     lastBundleSyncAt,
     canRetryBundleSync,
     retryBundleSync,
+    canAttemptSessionOpen,
+    canRetrySessionOpen,
+    sessionOpenBusy,
+    sessionOpenError,
+    lastSessionOpenAt,
+    attemptSessionOpen,
     liveSyncEnabled,
     liveSyncState,
     liveRevision,
