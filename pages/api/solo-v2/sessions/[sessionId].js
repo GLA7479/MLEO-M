@@ -30,6 +30,8 @@ import {
   buildChallenge21SessionSnapshot,
   stripChallenge21SecretsFromSummary,
 } from "../../../../lib/solo-v2/server/challenge21Snapshot";
+import { buildDiamondsSessionSnapshot, stripDiamondsSecretsFromSummary } from "../../../../lib/solo-v2/server/diamondsSnapshot";
+import { buildSoloLadderSessionSnapshot } from "../../../../lib/solo-v2/server/soloLadderSnapshot";
 import { SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
 
 function isMissingTable(error) {
@@ -103,6 +105,8 @@ export default async function handler(req, res) {
     let dropRunPayload = null;
     let mysteryChamberPayload = null;
     let flashVeinPayload = null;
+    let diamondsPayload = null;
+    let soloLadderPayload = null;
 
     if (row.game_key === "quick_flip") {
       const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
@@ -533,6 +537,60 @@ export default async function handler(req, res) {
         canCashOut: mcSnapshot.canCashOut,
         resolvedResult: mcSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "diamonds") {
+      const dSnapshotResult = await buildDiamondsSessionSnapshot(supabase, row);
+      if (!dSnapshotResult.ok) {
+        if (isMissingTable(dSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const dSnapshot = dSnapshotResult.snapshot;
+      sessionReadState = dSnapshot.readState;
+      diamondsPayload = {
+        readState: dSnapshot.readState,
+        playing: dSnapshot.playing,
+        canCashOut: dSnapshot.canCashOut,
+        canReveal: dSnapshot.canReveal,
+        resolvedResult: dSnapshot.resolvedResult,
+      };
+    } else if (row.game_key === "solo_ladder") {
+      const slSnapshotResult = await buildSoloLadderSessionSnapshot(supabase, row);
+      if (!slSnapshotResult.ok) {
+        if (isMissingTable(slSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const slSnapshot = slSnapshotResult.snapshot;
+      sessionReadState = slSnapshot.readState;
+      soloLadderPayload = {
+        readState: slSnapshot.readState,
+        playing: slSnapshot.playing,
+        canCashOut: slSnapshot.canCashOut,
+        canClimb: slSnapshot.canClimb,
+        resolvedResult: slSnapshot.resolvedResult,
+      };
     }
 
     const rawSummary = row.server_outcome_summary || {};
@@ -547,7 +605,9 @@ export default async function handler(req, res) {
           ? stripChallenge21SecretsFromSummary(rawSummary)
           : row.game_key === "mystery_chamber" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
             ? stripMysteryChamberSecretsFromSummary(rawSummary)
-            : rawSummary;
+            : row.game_key === "diamonds" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
+              ? stripDiamondsSecretsFromSummary(rawSummary)
+              : rawSummary;
 
     return res.status(200).json({
       ok: true,
@@ -583,6 +643,8 @@ export default async function handler(req, res) {
         dropRun: dropRunPayload,
         mysteryChamber: mysteryChamberPayload,
         flashVein: flashVeinPayload,
+        diamonds: diamondsPayload,
+        soloLadder: soloLadderPayload,
       },
       authority: {
         sessionTruth: "server",
