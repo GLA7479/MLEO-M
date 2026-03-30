@@ -100,6 +100,38 @@ function boardPathRoomPatchFromRpcRoom(rm) {
   return out;
 }
 
+/**
+ * Room slice from coordinated `ov2_rooms` fetch (PostgREST). Includes explicit `active_session_id: null` when absent.
+ * @param {Record<string, unknown>|null|undefined} rm
+ */
+function boardPathRoomPatchFromCoordinatorRoom(rm) {
+  if (!rm || typeof rm !== "object") return {};
+  const r = /** @type {Record<string, unknown>} */ (rm);
+  /** @type {Record<string, unknown>} */
+  const out = {};
+  if (typeof r.lifecycle_phase === "string") out.lifecycle_phase = r.lifecycle_phase;
+  if (r.active_session_id != null && String(r.active_session_id).trim() !== "") {
+    out.active_session_id = String(r.active_session_id);
+  } else {
+    out.active_session_id = null;
+  }
+  if (r.match_seq != null) out.match_seq = r.match_seq;
+  if (r.pot_locked != null) out.pot_locked = r.pot_locked;
+  if (r.stake_per_seat != null) out.stake_per_seat = r.stake_per_seat;
+  if (typeof r.host_participant_key === "string") out.host_participant_key = r.host_participant_key;
+  if (typeof r.product_game_id === "string") out.product_game_id = r.product_game_id;
+  if (typeof r.title === "string") out.title = r.title;
+  if (r.max_seats != null) out.max_seats = r.max_seats;
+  if (typeof r.is_private === "boolean") out.is_private = r.is_private;
+  if (typeof r.closed_reason === "string") out.closed_reason = r.closed_reason;
+  if (r.meta !== undefined) out.meta = r.meta;
+  if (typeof r.settlement_status === "string") out.settlement_status = r.settlement_status;
+  if (r.settlement_revision != null) out.settlement_revision = r.settlement_revision;
+  if (r.finalized_at !== undefined) out.finalized_at = r.finalized_at;
+  if (r.finalized_match_seq != null) out.finalized_match_seq = r.finalized_match_seq;
+  return out;
+}
+
 function nMatchSeq(v) {
   const n = Math.floor(Number(v));
   return Number.isFinite(n) ? n : 0;
@@ -171,8 +203,6 @@ export function useOv2BoardPathSession(baseContext) {
   const room = baseContext?.room && typeof baseContext.room === "object" ? baseContext.room : null;
   const roomId = room?.id != null ? String(room.id) : null;
   const matchSeq = room?.match_seq;
-  const lifecyclePhase = room?.lifecycle_phase;
-  const activeSid = room?.active_session_id;
   const hostKeyOnRoom = room?.host_participant_key;
   const selfKey = baseContext?.self?.participant_key?.trim() || null;
   const members = Array.isArray(baseContext?.members) ? baseContext.members : [];
@@ -208,6 +238,12 @@ export function useOv2BoardPathSession(baseContext) {
     return roomSessionPatch ? { ...room, ...roomSessionPatch } : room;
   }, [room, roomSessionPatch]);
 
+  const activeSid = useMemo(() => {
+    const id = roomForPhase?.active_session_id;
+    if (id == null || String(id).trim() === "") return null;
+    return String(id);
+  }, [roomForPhase?.active_session_id]);
+
   const roomForPhaseRef = useRef(roomForPhase);
   roomForPhaseRef.current = roomForPhase;
 
@@ -241,7 +277,15 @@ export function useOv2BoardPathSession(baseContext) {
       });
       return null;
     }
-    const b = boardPathBundleFromDatabase(r, mem, selfKey, detailed.session, detailed.seats, hk);
+    const rm = detailed.room && typeof detailed.room === "object" ? detailed.room : null;
+    const coordPatch = rm ? boardPathRoomPatchFromCoordinatorRoom(rm) : {};
+    const roomForBundle = {
+      ...r,
+      ...coordPatch,
+      active_session_id: String(detailed.activeSessionId),
+      match_seq: detailed.roomMatchSeq,
+    };
+    const b = boardPathBundleFromDatabase(roomForBundle, mem, selfKey, detailed.session, detailed.seats, hk);
     if (!b) {
       setSessionSyncFault({
         code: "HYDRATE_BUNDLE_INVALID",
@@ -251,19 +295,11 @@ export function useOv2BoardPathSession(baseContext) {
     }
     setSessionSyncFault(null);
     setLiveSyncError(null);
-    const rm = detailed.room && typeof detailed.room === "object" ? detailed.room : null;
     setRoomSessionPatch(prev => ({
       ...(prev && typeof prev === "object" ? prev : {}),
+      ...coordPatch,
       active_session_id: String(detailed.activeSessionId),
       match_seq: detailed.roomMatchSeq,
-      ...(rm
-        ? {
-            settlement_status: rm.settlement_status,
-            settlement_revision: rm.settlement_revision,
-            finalized_at: rm.finalized_at,
-            finalized_match_seq: rm.finalized_match_seq,
-          }
-        : {}),
     }));
     setBundle(prev => {
       const next = selectBoardPathBundleAfterFetch(prev, b);
@@ -317,6 +353,21 @@ export function useOv2BoardPathSession(baseContext) {
       if (!detailed.ok) {
         markTerminal();
         if (detailed.code === "NO_ACTIVE_SESSION_ID") {
+          const row =
+            "room" in detailed && detailed.room && typeof detailed.room === "object"
+              ? /** @type {Record<string, unknown>} */ (detailed.room)
+              : null;
+          if (row) {
+            const coordPatch = boardPathRoomPatchFromCoordinatorRoom(row);
+            setRoomSessionPatch(prev => ({
+              ...(prev && typeof prev === "object" ? prev : {}),
+              ...coordPatch,
+            }));
+            setSessionSyncFault(null);
+            setLiveSyncError(null);
+          }
+          const membersOkNoSess = Array.isArray(members);
+          if (membersOkNoSess) setLiveMembersOverride(members);
           setBundleSyncState(BOARD_PATH_BUNDLE_SYNC_STATE.BUNDLE_PARTIAL);
           setBundleSyncError(null);
         } else {
@@ -584,7 +635,7 @@ export function useOv2BoardPathSession(baseContext) {
       const next = syntheticBoardPathBundleForFixtureGuest(room, members, selfKey);
       if (next) setBundle(next);
     }
-  }, [room, roomId, members, selfKey, memberSig, lifecyclePhase, activeSid, hostKeyOnRoom]);
+  }, [room, roomId, members, selfKey, memberSig, roomForPhase?.lifecycle_phase, activeSid, hostKeyOnRoom]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

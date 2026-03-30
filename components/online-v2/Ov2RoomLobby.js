@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getOv2MinPlayersForProduct, ONLINE_V2_GAME_IDS, ONLINE_V2_REGISTRY } from "../../lib/online-v2/onlineV2GameRegistry";
+import { OV2_BP_LIVE_SYNC_DEBOUNCE_MS } from "../../lib/online-v2/board-path/ov2BoardPathLiveSync";
 import {
   commitOv2RoomStake,
   fetchOv2RoomById,
@@ -12,6 +13,7 @@ import {
 } from "../../lib/online-v2/ov2RoomsApi";
 import { buildOnlineV2EconomyEventKey, clampSuggestedOnlineV2Stake } from "../../lib/online-v2/ov2Economy";
 import { debitOnlineV2Vault, peekOnlineV2Vault, readOnlineV2Vault } from "../../lib/online-v2/onlineV2VaultBridge";
+import { supabaseMP } from "../../lib/supabaseClients";
 
 function fmtStake(n) {
   return Math.floor(Number(n) || 0).toLocaleString();
@@ -85,6 +87,38 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   useEffect(() => {
     void load();
   }, [load]);
+
+  const loadRef = useRef(load);
+  loadRef.current = load;
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !roomId) return undefined;
+    let debounceTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null);
+    const schedule = () => {
+      if (debounceTimer != null) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        void loadRef.current();
+      }, OV2_BP_LIVE_SYNC_DEBOUNCE_MS);
+    };
+    const ch = supabaseMP
+      .channel(`ov2_room_lobby_rt:${roomId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ov2_rooms", filter: `id=eq.${roomId}` },
+        schedule
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "ov2_room_members", filter: `room_id=eq.${roomId}` },
+        schedule
+      )
+      .subscribe();
+    return () => {
+      void ch.unsubscribe();
+      if (debounceTimer != null) clearTimeout(debounceTimer);
+    };
+  }, [roomId]);
 
   async function ensureBalance(stake) {
     await readOnlineV2Vault({ fresh: true }).catch(() => {});
