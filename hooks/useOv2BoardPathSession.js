@@ -522,8 +522,19 @@ export function useOv2BoardPathSession(baseContext) {
     setSettlementClaimError(null);
     setSettlementClaimBusy(false);
     setSettlementClaimLastTouch(null);
-    if (aid != null) setSessionOpenError(null);
+    if (aid != null) {
+      setSessionOpenError(prev => {
+        if (!prev) return null;
+        if (prev.code === "OPEN_SESSION_HYDRATE_INCOMPLETE") return prev;
+        return null;
+      });
+    }
   }, [activeSid]);
+
+  useEffect(() => {
+    if (bundleSyncState !== BOARD_PATH_BUNDLE_SYNC_STATE.BUNDLE_READY) return;
+    setSessionOpenError(null);
+  }, [bundleSyncState]);
 
   useEffect(() => {
     if (actionError == null) return;
@@ -651,17 +662,54 @@ export function useOv2BoardPathSession(baseContext) {
   );
 
   const canRetrySessionOpen = useMemo(
-    () => Boolean(sessionOpenError && canAttemptSessionOpen && !sessionOpenBusy),
-    [sessionOpenError, canAttemptSessionOpen, sessionOpenBusy]
+    () =>
+      Boolean(
+        sessionOpenError &&
+          !sessionOpenBusy &&
+          (canAttemptSessionOpen ||
+            (sessionOpenError.code === "OPEN_SESSION_HYDRATE_INCOMPLETE" && canRetryBundleSync))
+      ),
+    [sessionOpenError, sessionOpenBusy, canAttemptSessionOpen, canRetryBundleSync]
   );
 
   const attemptSessionOpen = useCallback(async () => {
     if (sessionOpenBusy) return;
     if (!canAttemptSessionOpen && !canRetrySessionOpen) return;
-    if (typeof rpcOv2BoardPathOpenSession !== "function") return;
     const rid = roomId;
     const pk = selfKey;
     if (!rid || !pk || boardPathRoomIdIsOfflineFixture(rid)) return;
+
+    const hydrateIncomplete =
+      sessionOpenError?.code === "OPEN_SESSION_HYDRATE_INCOMPLETE" &&
+      canRetryBundleSync &&
+      !canHostAttemptBoardPathSessionOpenRpc({
+        roomId: rid,
+        room: roomForPhaseRef.current,
+        members: effectiveMembersRef.current,
+        selfKey: pk,
+        sessionOpenBusy: false,
+      });
+
+    if (hydrateIncomplete) {
+      setSessionOpenBusy(true);
+      setSessionOpenError(null);
+      try {
+        const out = await coordinatedFetchAndApply();
+        if (out == null) {
+          setSessionOpenError({
+            code: "OPEN_SESSION_HYDRATE_INCOMPLETE",
+            message:
+              "Session exists on the server but this device did not load table data. Tap Retry table sync.",
+          });
+        }
+      } finally {
+        setSessionOpenBusy(false);
+        setLastSessionOpenAt(Date.now());
+      }
+      return;
+    }
+
+    if (typeof rpcOv2BoardPathOpenSession !== "function") return;
     if (
       !canHostAttemptBoardPathSessionOpenRpc({
         roomId: rid,
@@ -694,7 +742,14 @@ export function useOv2BoardPathSession(baseContext) {
         return;
       }
       setSessionOpenError(null);
-      await coordinatedFetchAndApply();
+      const out = await coordinatedFetchAndApply();
+      if (out == null) {
+        setSessionOpenError({
+          code: "OPEN_SESSION_HYDRATE_INCOMPLETE",
+          message:
+            "Session was created but table data did not load. Tap Retry table sync or Finish loading.",
+        });
+      }
     } catch (e) {
       console.error("ov2_board_path_open_session", e);
       setSessionOpenError({
@@ -709,6 +764,8 @@ export function useOv2BoardPathSession(baseContext) {
     sessionOpenBusy,
     canAttemptSessionOpen,
     canRetrySessionOpen,
+    sessionOpenError,
+    canRetryBundleSync,
     roomId,
     selfKey,
     coordinatedFetchAndApply,

@@ -420,22 +420,44 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
       </div>
 
       {vm.liveSyncEnabled &&
-      (vm.canAttemptSessionOpen || vm.canRetrySessionOpen || vm.sessionOpenBusy) ? (
-        <button
-          type="button"
-          disabled={
-            Boolean(vm.sessionOpenBusy) || (!vm.canAttemptSessionOpen && !vm.canRetrySessionOpen)
-          }
-          onClick={() => void bp.attemptSessionOpen?.()}
-          data-ov2-bp-session-open={vm.sessionOpenBusy ? "busy" : "idle"}
-          className="shrink-0 rounded-md border border-sky-500/25 bg-sky-950/20 px-2 py-1 text-center text-[10px] font-semibold text-sky-100/90 sm:text-[11px]"
-        >
-          {vm.sessionOpenBusy
-            ? "Opening session…"
-            : vm.canRetrySessionOpen
-              ? "Retry open session"
-              : "Open match session"}
-        </button>
+      (vm.canAttemptSessionOpen ||
+        vm.canRetrySessionOpen ||
+        vm.sessionOpenBusy ||
+        vm.canRetryBundleSync) ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-1">
+          {vm.canAttemptSessionOpen || vm.canRetrySessionOpen || vm.sessionOpenBusy ? (
+            <button
+              type="button"
+              disabled={
+                Boolean(vm.sessionOpenBusy) || (!vm.canAttemptSessionOpen && !vm.canRetrySessionOpen)
+              }
+              onClick={() => void bp.attemptSessionOpen?.()}
+              data-ov2-bp-session-open={vm.sessionOpenBusy ? "busy" : "idle"}
+              className="shrink-0 rounded-md border border-sky-500/25 bg-sky-950/20 px-2 py-1 text-center text-[10px] font-semibold text-sky-100/90 sm:text-[11px]"
+            >
+              {vm.sessionOpenBusy
+                ? "Opening session…"
+                : vm.sessionOpenError?.code === "OPEN_SESSION_HYDRATE_INCOMPLETE"
+                  ? "Finish loading table"
+                  : vm.canRetrySessionOpen
+                    ? "Retry open session"
+                    : "Open match session"}
+            </button>
+          ) : null}
+          {vm.canRetryBundleSync ? (
+            <button
+              type="button"
+              disabled={vm.bundleSyncState === BOARD_PATH_BUNDLE_SYNC_STATE.LOADING_BUNDLE}
+              onClick={() => void bp.retryBundleSync?.()}
+              data-ov2-bp-bundle-retry="1"
+              className="shrink-0 rounded-md border border-amber-500/25 bg-amber-950/20 px-2 py-1 text-center text-[10px] font-semibold text-amber-100/90 sm:text-[11px]"
+            >
+              {vm.bundleSyncState === BOARD_PATH_BUNDLE_SYNC_STATE.LOADING_BUNDLE
+                ? "Syncing…"
+                : "Retry table sync"}
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="grid shrink-0 grid-cols-2 gap-1 sm:gap-1.5 lg:gap-2">
