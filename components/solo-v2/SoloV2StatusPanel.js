@@ -35,7 +35,9 @@ export default function SoloV2StatusPanel({ status = "idle", details = "" }) {
   const current = STATUS_UI[status] || STATUS_UI.idle;
 
   return (
-    <section className={`rounded-xl border px-3 py-3 text-center lg:px-2.5 lg:py-2 ${current.tone}`}>
+    <section
+      className={`solo-v2-status-panel rounded-xl border px-3 py-3 text-center lg:px-2.5 lg:py-2 ${current.tone}`}
+    >
       <h2 className="text-sm font-bold lg:text-xs">{current.title}</h2>
       <p className="mt-1 text-xs opacity-90 lg:mt-0.5 lg:text-[11px]">{current.message}</p>
       {details ? <p className="mt-1 text-[11px] opacity-80">{details}</p> : null}
