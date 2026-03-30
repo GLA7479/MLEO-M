@@ -1,11 +1,20 @@
 import { getSupabaseAdmin } from "../../../../lib/server/supabaseAdmin";
 import { parseSessionId, resolvePlayerRef } from "../../../../lib/solo-v2/server/contracts";
 import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
+import { buildOddEvenSessionSnapshot } from "../../../../lib/solo-v2/server/oddEvenSnapshot";
 import { buildMysteryBoxSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 import { buildHighLowCardsSessionSnapshot } from "../../../../lib/solo-v2/server/highLowCardsSnapshot";
 import { buildDicePickSessionSnapshot } from "../../../../lib/solo-v2/server/dicePickSnapshot";
 import { buildGoldRushDiggerSessionSnapshot } from "../../../../lib/solo-v2/server/goldRushDiggerSnapshot";
 import { buildTreasureDoorsSessionSnapshot } from "../../../../lib/solo-v2/server/treasureDoorsSnapshot";
+import {
+  buildVaultDoorsSessionSnapshot,
+  stripVaultDoorsSecretsFromSummary,
+} from "../../../../lib/solo-v2/server/vaultDoorsSnapshot";
+import {
+  buildCrystalPathSessionSnapshot,
+  stripCrystalPathSecretsFromSummary,
+} from "../../../../lib/solo-v2/server/crystalPathSnapshot";
 import { buildSpeedTrackSessionSnapshot } from "../../../../lib/solo-v2/server/speedTrackSnapshot";
 import { buildLimitRunSessionSnapshot } from "../../../../lib/solo-v2/server/limitRunSnapshot";
 import {
@@ -91,11 +100,14 @@ export default async function handler(req, res) {
 
     let sessionReadState = "ready";
     let quickFlipPayload = null;
+    let oddEvenPayload = null;
     let mysteryBoxPayload = null;
     let highLowCardsPayload = null;
     let dicePickPayload = null;
     let goldRushDiggerPayload = null;
     let treasureDoorsPayload = null;
+    let vaultDoorsPayload = null;
+    let crystalPathPayload = null;
     let speedTrackPayload = null;
     let limitRunPayload = null;
     let numberHuntPayload = null;
@@ -134,6 +146,33 @@ export default async function handler(req, res) {
         choiceSubmittedAt: quickFlipSnapshot.choiceSubmittedAt,
         canResolve: quickFlipSnapshot.canResolve,
         resolvedResult: quickFlipSnapshot.resolvedResult,
+      };
+    } else if (row.game_key === "odd_even") {
+      const oddEvenSnapshotResult = await buildOddEvenSessionSnapshot(supabase, row);
+      if (!oddEvenSnapshotResult.ok) {
+        if (isMissingTable(oddEvenSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const oddEvenSnapshot = oddEvenSnapshotResult.snapshot;
+      sessionReadState = oddEvenSnapshot.readState;
+      oddEvenPayload = {
+        choice: oddEvenSnapshot.choice,
+        choiceEventId: oddEvenSnapshot.choiceEventId,
+        choiceSubmittedAt: oddEvenSnapshot.choiceSubmittedAt,
+        canResolve: oddEvenSnapshot.canResolve,
+        resolvedResult: oddEvenSnapshot.resolvedResult,
       };
     } else if (row.game_key === "mystery_box") {
       const mysterySnapshotResult = await buildMysteryBoxSessionSnapshot(supabase, row);
@@ -273,6 +312,64 @@ export default async function handler(req, res) {
         canResolveTurn: tdSnapshot.canResolveTurn,
         canCashOut: tdSnapshot.canCashOut,
         resolvedResult: tdSnapshot.resolvedResult,
+      };
+    } else if (row.game_key === "vault_doors") {
+      const vdSnapshotResult = await buildVaultDoorsSessionSnapshot(supabase, row);
+      if (!vdSnapshotResult.ok) {
+        if (isMissingTable(vdSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const vdSnapshot = vdSnapshotResult.snapshot;
+      sessionReadState = vdSnapshot.readState;
+      vaultDoorsPayload = {
+        readState: vdSnapshot.readState,
+        playing: vdSnapshot.playing,
+        pendingPick: vdSnapshot.pendingPick,
+        pickConflict: vdSnapshot.pickConflict,
+        canResolveTurn: vdSnapshot.canResolveTurn,
+        canCashOut: vdSnapshot.canCashOut,
+        resolvedResult: vdSnapshot.resolvedResult,
+      };
+    } else if (row.game_key === "crystal_path") {
+      const cpSnapshotResult = await buildCrystalPathSessionSnapshot(supabase, row);
+      if (!cpSnapshotResult.ok) {
+        if (isMissingTable(cpSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const cpSnapshot = cpSnapshotResult.snapshot;
+      sessionReadState = cpSnapshot.readState;
+      crystalPathPayload = {
+        readState: cpSnapshot.readState,
+        playing: cpSnapshot.playing,
+        pendingPick: cpSnapshot.pendingPick,
+        pickConflict: cpSnapshot.pickConflict,
+        canResolveTurn: cpSnapshot.canResolveTurn,
+        canCashOut: cpSnapshot.canCashOut,
+        resolvedResult: cpSnapshot.resolvedResult,
       };
     } else if (row.game_key === "speed_track") {
       const stSnapshotResult = await buildSpeedTrackSessionSnapshot(supabase, row);
@@ -607,7 +704,11 @@ export default async function handler(req, res) {
             ? stripMysteryChamberSecretsFromSummary(rawSummary)
             : row.game_key === "diamonds" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
               ? stripDiamondsSecretsFromSummary(rawSummary)
-              : rawSummary;
+              : row.game_key === "vault_doors" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
+                ? stripVaultDoorsSecretsFromSummary(rawSummary)
+                : row.game_key === "crystal_path" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
+                  ? stripCrystalPathSecretsFromSummary(rawSummary)
+                  : rawSummary;
 
     return res.status(200).json({
       ok: true,
@@ -629,11 +730,14 @@ export default async function handler(req, res) {
         resolvedAt: row.resolved_at || null,
         readState: sessionReadState,
         quickFlip: quickFlipPayload,
+        oddEven: oddEvenPayload,
         mysteryBox: mysteryBoxPayload,
         highLowCards: highLowCardsPayload,
         dicePick: dicePickPayload,
         goldRushDigger: goldRushDiggerPayload,
         treasureDoors: treasureDoorsPayload,
+        vaultDoors: vaultDoorsPayload,
+        crystalPath: crystalPathPayload,
         speedTrack: speedTrackPayload,
         limitRun: limitRunPayload,
         numberHunt: numberHuntPayload,

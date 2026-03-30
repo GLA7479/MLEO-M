@@ -6,6 +6,7 @@ import { QUICK_FLIP_CONFIG, QUICK_FLIP_MIN_WAGER } from "../../../../lib/solo-v2
 import { CHALLENGE_21_MIN_WAGER } from "../../../../lib/solo-v2/challenge21Config";
 import { MYSTERY_BOX_MIN_WAGER } from "../../../../lib/solo-v2/mysteryBoxConfig";
 import { buildQuickFlipSessionSnapshot } from "../../../../lib/solo-v2/server/quickFlipSnapshot";
+import { buildOddEvenSessionSnapshot } from "../../../../lib/solo-v2/server/oddEvenSnapshot";
 import { buildMysteryBoxSessionSnapshot } from "../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 import { buildHighLowCardsSessionSnapshot } from "../../../../lib/solo-v2/server/highLowCardsSnapshot";
 import { buildDicePickSessionSnapshot } from "../../../../lib/solo-v2/server/dicePickSnapshot";
@@ -20,6 +21,16 @@ import {
   buildInitialActiveSummary as buildTreasureDoorsInitialActiveSummary,
   generateTrapDoors,
 } from "../../../../lib/solo-v2/server/treasureDoorsEngine";
+import { buildVaultDoorsSessionSnapshot } from "../../../../lib/solo-v2/server/vaultDoorsSnapshot";
+import {
+  buildInitialActiveSummary as buildVaultDoorsInitialActiveSummary,
+  generateVaultTrapLayout,
+} from "../../../../lib/solo-v2/server/vaultDoorsEngine";
+import { buildCrystalPathSessionSnapshot } from "../../../../lib/solo-v2/server/crystalPathSnapshot";
+import {
+  buildInitialActiveSummary as buildCrystalPathInitialActiveSummary,
+  generateSafeColumns,
+} from "../../../../lib/solo-v2/server/crystalPathEngine";
 import { buildSpeedTrackSessionSnapshot } from "../../../../lib/solo-v2/server/speedTrackSnapshot";
 import {
   buildInitialActiveSummary as buildSpeedTrackInitialActiveSummary,
@@ -466,6 +477,44 @@ async function seedTreasureDoorsSessionOrWarn(supabase, gameKey, sessionId, play
   }
 }
 
+async function seedVaultDoorsSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "vault_doors" || !sessionId) return;
+  const summary = buildVaultDoorsInitialActiveSummary(generateVaultTrapLayout());
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "vault_doors")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create vault_doors] seed failed", { sessionId, error });
+  }
+}
+
+async function seedCrystalPathSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "crystal_path" || !sessionId) return;
+  const summary = buildCrystalPathInitialActiveSummary(generateSafeColumns());
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "crystal_path")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create crystal_path] seed failed", { sessionId, error });
+  }
+}
+
 async function seedSpeedTrackSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
   if (gameKey !== "speed_track" || !sessionId) return;
   const summary = buildSpeedTrackInitialActiveSummary(generateBlockedRoutes());
@@ -821,11 +870,14 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin();
 
     if (gameKey === "quick_flip" ||
+      gameKey === "odd_even" ||
       gameKey === "dice_pick" ||
       gameKey === "mystery_box" ||
       gameKey === "high_low_cards" ||
       gameKey === "gold_rush_digger" ||
       gameKey === "treasure_doors" ||
+      gameKey === "vault_doors" ||
+      gameKey === "crystal_path" ||
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
@@ -849,29 +901,35 @@ export default async function handler(req, res) {
                 ? buildGoldRushDiggerSessionSnapshot
                 : gameKey === "treasure_doors"
                   ? buildTreasureDoorsSessionSnapshot
-                  : gameKey === "speed_track"
-                    ? buildSpeedTrackSessionSnapshot
-                    : gameKey === "limit_run"
-                      ? buildLimitRunSessionSnapshot
-                      : gameKey === "number_hunt"
-                        ? buildNumberHuntSessionSnapshot
-                        : gameKey === "core_breaker"
-                          ? buildCoreBreakerSessionSnapshot
-                          : gameKey === "flash_vein"
-                            ? buildFlashVeinSessionSnapshot
-                            : gameKey === "triple_dice"
-                            ? buildTripleDiceSessionSnapshot
-                            : gameKey === "challenge_21"
-                              ? buildChallenge21SessionSnapshot
-                              : gameKey === "drop_run"
-                                ? buildDropRunSessionSnapshot
-                                : gameKey === "mystery_chamber"
-                                    ? buildMysteryChamberSessionSnapshot
-                                    : gameKey === "diamonds"
-                                      ? buildDiamondsSessionSnapshot
-                                      : gameKey === "solo_ladder"
-                                        ? buildSoloLadderSessionSnapshot
-                                        : buildQuickFlipSessionSnapshot;
+                  : gameKey === "vault_doors"
+                    ? buildVaultDoorsSessionSnapshot
+                    : gameKey === "crystal_path"
+                      ? buildCrystalPathSessionSnapshot
+                      : gameKey === "speed_track"
+                        ? buildSpeedTrackSessionSnapshot
+                        : gameKey === "limit_run"
+                          ? buildLimitRunSessionSnapshot
+                          : gameKey === "number_hunt"
+                            ? buildNumberHuntSessionSnapshot
+                            : gameKey === "core_breaker"
+                              ? buildCoreBreakerSessionSnapshot
+                              : gameKey === "flash_vein"
+                                ? buildFlashVeinSessionSnapshot
+                                : gameKey === "triple_dice"
+                                  ? buildTripleDiceSessionSnapshot
+                                  : gameKey === "challenge_21"
+                                    ? buildChallenge21SessionSnapshot
+                                    : gameKey === "drop_run"
+                                      ? buildDropRunSessionSnapshot
+                                      : gameKey === "mystery_chamber"
+                                        ? buildMysteryChamberSessionSnapshot
+                                        : gameKey === "diamonds"
+                                          ? buildDiamondsSessionSnapshot
+                                            : gameKey === "solo_ladder"
+                                            ? buildSoloLadderSessionSnapshot
+                                            : gameKey === "odd_even"
+                                              ? buildOddEvenSessionSnapshot
+                                              : buildQuickFlipSessionSnapshot;
 
       if (!Number.isFinite(entryAmount) || entryAmount < minWager) {
         return res.status(400).json({
@@ -979,11 +1037,14 @@ export default async function handler(req, res) {
     if (
       error &&
       (gameKey === "quick_flip" ||
+      gameKey === "odd_even" ||
       gameKey === "dice_pick" ||
       gameKey === "mystery_box" ||
       gameKey === "high_low_cards" ||
       gameKey === "gold_rush_digger" ||
       gameKey === "treasure_doors" ||
+      gameKey === "vault_doors" ||
+      gameKey === "crystal_path" ||
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
@@ -1032,11 +1093,14 @@ export default async function handler(req, res) {
 
       if (
         (gameKey === "quick_flip" ||
+      gameKey === "odd_even" ||
       gameKey === "dice_pick" ||
       gameKey === "mystery_box" ||
       gameKey === "high_low_cards" ||
       gameKey === "gold_rush_digger" ||
       gameKey === "treasure_doors" ||
+      gameKey === "vault_doors" ||
+      gameKey === "crystal_path" ||
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
@@ -1072,6 +1136,8 @@ export default async function handler(req, res) {
         await seedHighLowCardsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedTreasureDoorsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedVaultDoorsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedCrystalPathSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedSpeedTrackSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedLimitRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedNumberHuntSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
@@ -1125,11 +1191,14 @@ export default async function handler(req, res) {
 
       if (
         (gameKey === "quick_flip" ||
+      gameKey === "odd_even" ||
       gameKey === "dice_pick" ||
       gameKey === "mystery_box" ||
       gameKey === "high_low_cards" ||
       gameKey === "gold_rush_digger" ||
       gameKey === "treasure_doors" ||
+      gameKey === "vault_doors" ||
+      gameKey === "crystal_path" ||
       gameKey === "speed_track" ||
       gameKey === "limit_run" ||
       gameKey === "number_hunt" ||
@@ -1154,29 +1223,35 @@ export default async function handler(req, res) {
                   ? buildGoldRushDiggerSessionSnapshot
                   : gameKey === "treasure_doors"
                     ? buildTreasureDoorsSessionSnapshot
-                    : gameKey === "speed_track"
-                      ? buildSpeedTrackSessionSnapshot
-                      : gameKey === "limit_run"
-                        ? buildLimitRunSessionSnapshot
-                        : gameKey === "number_hunt"
-                          ? buildNumberHuntSessionSnapshot
-                          : gameKey === "core_breaker"
-                            ? buildCoreBreakerSessionSnapshot
-                            : gameKey === "flash_vein"
-                              ? buildFlashVeinSessionSnapshot
-                              : gameKey === "triple_dice"
-                              ? buildTripleDiceSessionSnapshot
-                              : gameKey === "challenge_21"
-                                ? buildChallenge21SessionSnapshot
-                                : gameKey === "drop_run"
-                                  ? buildDropRunSessionSnapshot
-                                  : gameKey === "mystery_chamber"
-                                      ? buildMysteryChamberSessionSnapshot
-                                      : gameKey === "diamonds"
-                                        ? buildDiamondsSessionSnapshot
-                                        : gameKey === "solo_ladder"
-                                          ? buildSoloLadderSessionSnapshot
-                                          : buildQuickFlipSessionSnapshot;
+                    : gameKey === "vault_doors"
+                      ? buildVaultDoorsSessionSnapshot
+                      : gameKey === "crystal_path"
+                        ? buildCrystalPathSessionSnapshot
+                        : gameKey === "speed_track"
+                          ? buildSpeedTrackSessionSnapshot
+                          : gameKey === "limit_run"
+                            ? buildLimitRunSessionSnapshot
+                            : gameKey === "number_hunt"
+                              ? buildNumberHuntSessionSnapshot
+                              : gameKey === "core_breaker"
+                                ? buildCoreBreakerSessionSnapshot
+                                : gameKey === "flash_vein"
+                                  ? buildFlashVeinSessionSnapshot
+                                  : gameKey === "triple_dice"
+                                    ? buildTripleDiceSessionSnapshot
+                                    : gameKey === "challenge_21"
+                                      ? buildChallenge21SessionSnapshot
+                                      : gameKey === "drop_run"
+                                        ? buildDropRunSessionSnapshot
+                                        : gameKey === "mystery_chamber"
+                                          ? buildMysteryChamberSessionSnapshot
+                                          : gameKey === "diamonds"
+                                            ? buildDiamondsSessionSnapshot
+                                            : gameKey === "solo_ladder"
+                                            ? buildSoloLadderSessionSnapshot
+                                            : gameKey === "odd_even"
+                                              ? buildOddEvenSessionSnapshot
+                                              : buildQuickFlipSessionSnapshot;
         const conflictLookup = await healAndReReadActiveSessions(supabase, playerRef, gameKey, "post_unique_conflict");
         if (conflictLookup.ok) {
           const conflictRows = conflictLookup.rows;
@@ -1239,6 +1314,8 @@ export default async function handler(req, res) {
               await seedHighLowCardsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedTreasureDoorsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedVaultDoorsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedCrystalPathSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedSpeedTrackSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedLimitRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedNumberHuntSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
@@ -1293,6 +1370,8 @@ export default async function handler(req, res) {
               await seedHighLowCardsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedTreasureDoorsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedVaultDoorsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedCrystalPathSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedSpeedTrackSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedLimitRunSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedNumberHuntSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
@@ -1362,6 +1441,8 @@ export default async function handler(req, res) {
     await seedHighLowCardsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedGoldRushDiggerSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedTreasureDoorsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedVaultDoorsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedCrystalPathSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedSpeedTrackSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedLimitRunSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedNumberHuntSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);

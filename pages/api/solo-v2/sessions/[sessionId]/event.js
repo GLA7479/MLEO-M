@@ -6,6 +6,7 @@ import {
 } from "../../../../../lib/solo-v2/server/contracts";
 import { SOLO_V2_SESSION_STATUS } from "../../../../../lib/solo-v2/server/sessionTypes";
 import { buildQuickFlipSessionSnapshot, normalizeQuickFlipChoice } from "../../../../../lib/solo-v2/server/quickFlipSnapshot";
+import { buildOddEvenSessionSnapshot, normalizeOddEvenChoice } from "../../../../../lib/solo-v2/server/oddEvenSnapshot";
 import { buildMysteryBoxSessionSnapshot, normalizeMysteryBoxIndex } from "../../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 import { buildHighLowCardsSessionSnapshot, normalizeHighLowGuess } from "../../../../../lib/solo-v2/server/highLowCardsSnapshot";
 import { buildDicePickSessionSnapshot, normalizeDicePickZone } from "../../../../../lib/solo-v2/server/dicePickSnapshot";
@@ -19,6 +20,16 @@ import {
   normalizeTreasureChamberIndex,
   normalizeTreasureDoor,
 } from "../../../../../lib/solo-v2/server/treasureDoorsSnapshot";
+import {
+  buildVaultDoorsSessionSnapshot,
+  normalizeVaultDoor,
+  normalizeVaultRowIndex,
+} from "../../../../../lib/solo-v2/server/vaultDoorsSnapshot";
+import {
+  buildCrystalPathSessionSnapshot,
+  normalizeCrystalRowIndex,
+  normalizeCrystalTile,
+} from "../../../../../lib/solo-v2/server/crystalPathSnapshot";
 import {
   buildSpeedTrackSessionSnapshot,
   normalizeSpeedTrackCheckpointIndex,
@@ -211,6 +222,105 @@ export default async function handler(req, res) {
           category: "conflict",
           status: "choice_already_submitted",
           message: "Quick Flip choice is already locked for this session.",
+        });
+      }
+    }
+
+    const isOddEvenSubmit =
+      sessionRow.game_key === "odd_even" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "odd_even_submit";
+
+    if (isOddEvenSubmit) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Odd/Even choice submit is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "odd_even") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Odd/Even submit requires gameKey odd_even.",
+        });
+      }
+
+      const selectedSide = normalizeOddEvenChoice(eventPayload?.side);
+      if (!selectedSide) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Odd/Even side must be odd or even.",
+        });
+      }
+
+      const snapshotResult = await buildOddEvenSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Choice submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      const priorChoice = normalizeOddEvenChoice(snapshot.choice);
+      if (priorChoice && priorChoice === selectedSide) {
+        return res.status(200).json({
+          ok: true,
+          category: "success",
+          status: "accepted",
+          idempotent: true,
+          event: {
+            id: snapshot.choiceEventId || null,
+            eventType,
+          },
+          session: {
+            id: sessionId,
+            sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+          },
+          authority: {
+            eventValidation: "server",
+            gameplayResolution: "deferred",
+          },
+        });
+      }
+
+      if (priorChoice && priorChoice !== selectedSide) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "choice_already_submitted",
+          message: "Odd/Even choice is already locked for this session.",
         });
       }
     }
@@ -430,6 +540,246 @@ export default async function handler(req, res) {
           category: "conflict",
           status: "pick_conflict",
           message: "A different dig spot is already pending for this row.",
+        });
+      }
+    }
+
+    const isVaultDoorsPick =
+      sessionRow.game_key === "vault_doors" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "vault_doors_pick";
+
+    if (isVaultDoorsPick) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Vault Doors pick is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "vault_doors") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Vault Doors pick requires gameKey vault_doors.",
+        });
+      }
+
+      const rowIndex = normalizeVaultRowIndex(eventPayload?.rowIndex);
+      const column = normalizeVaultDoor(eventPayload?.column);
+      if (rowIndex === null || column === null) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Vault Doors pick requires rowIndex 0..5 and column 0..2.",
+        });
+      }
+
+      const snapshotResult = await buildVaultDoorsSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Vault Doors pick submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.pickConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "Conflicting door picks for this stage. Refresh session state.",
+        });
+      }
+
+      const playing = snapshot.playing;
+      const expectedRow = playing?.currentRowIndex;
+      if (!Number.isFinite(Number(expectedRow)) || rowIndex !== expectedRow) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_row",
+          message: "Pick must target the current stage row.",
+        });
+      }
+
+      if (snapshot.pendingPick) {
+        const pp = snapshot.pendingPick;
+        const same = pp.rowIndex === rowIndex && pp.column === column;
+        if (same) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pp.pickEventId || null,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "A different door is already pending for this row.",
+        });
+      }
+    }
+
+    const isCrystalPathPick =
+      sessionRow.game_key === "crystal_path" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "crystal_path_pick";
+
+    if (isCrystalPathPick) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Crystal Path pick is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "crystal_path") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Crystal Path pick requires gameKey crystal_path.",
+        });
+      }
+
+      const rowIndex = normalizeCrystalRowIndex(eventPayload?.rowIndex);
+      const column = normalizeCrystalTile(eventPayload?.column);
+      if (rowIndex === null || column === null) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Crystal Path pick requires rowIndex 0..5 and column 0..2.",
+        });
+      }
+
+      const snapshotResult = await buildCrystalPathSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Crystal Path pick submission is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.pickConflict) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "Conflicting path picks for this row. Refresh session state.",
+        });
+      }
+
+      const playing = snapshot.playing;
+      const expectedRow = playing?.currentRowIndex;
+      if (!Number.isFinite(Number(expectedRow)) || rowIndex !== expectedRow) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_row",
+          message: "Pick must target the current path row.",
+        });
+      }
+
+      if (snapshot.pendingPick) {
+        const pp = snapshot.pendingPick;
+        const same = pp.rowIndex === rowIndex && pp.column === column;
+        if (same) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: pp.pickEventId || null,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pick_conflict",
+          message: "A different tile is already pending for this row.",
         });
       }
     }
