@@ -6,6 +6,12 @@ import {
 } from "../../../../../lib/solo-v2/server/contracts";
 import { SOLO_V2_SESSION_STATUS } from "../../../../../lib/solo-v2/server/sessionTypes";
 import { buildQuickFlipSessionSnapshot, normalizeQuickFlipChoice } from "../../../../../lib/solo-v2/server/quickFlipSnapshot";
+import { buildPulseLockSessionSnapshot } from "../../../../../lib/solo-v2/server/pulseLockSnapshot";
+import { generatePulseLockRoundConfig } from "../../../../../lib/solo-v2/server/pulseLockEngine";
+import { buildEchoSequenceSessionSnapshot } from "../../../../../lib/solo-v2/server/echoSequenceSnapshot";
+import { buildEchoInitialActiveSummary } from "../../../../../lib/solo-v2/server/echoSequenceEngine";
+import { buildSafeZoneSessionSnapshot } from "../../../../../lib/solo-v2/server/safeZoneSnapshot";
+import { generateSafeZoneRunConfig } from "../../../../../lib/solo-v2/server/safeZoneEngine";
 import { buildOddEvenSessionSnapshot, normalizeOddEvenChoice } from "../../../../../lib/solo-v2/server/oddEvenSnapshot";
 import { buildMysteryBoxSessionSnapshot, normalizeMysteryBoxIndex } from "../../../../../lib/solo-v2/server/mysteryBoxSnapshot";
 import { buildHighLowCardsSessionSnapshot, normalizeHighLowGuess } from "../../../../../lib/solo-v2/server/highLowCardsSnapshot";
@@ -224,6 +230,592 @@ export default async function handler(req, res) {
           message: "Quick Flip choice is already locked for this session.",
         });
       }
+    }
+
+    const isPulseLockStart =
+      sessionRow.game_key === "pulse_lock" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "pulse_start";
+
+    if (isPulseLockStart) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Pulse Lock start is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRaw = sessionRow.expires_at;
+      if (expiresAtRaw) {
+        const expiresMs = new Date(expiresAtRaw).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "pulse_lock") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Pulse Lock start requires gameKey pulse_lock.",
+        });
+      }
+
+      const snapshotResult = await buildPulseLockSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        if (isMissingTable(snapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Pulse Lock start is temporarily unavailable.",
+        });
+      }
+
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.readState !== "pulse_start_required") {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "pulse_already_started",
+          message: "This round already has an active sweep.",
+        });
+      }
+
+      const cfg = generatePulseLockRoundConfig();
+      const roundStartAt = new Date().toISOString();
+      const payload = {
+        gameKey: "pulse_lock",
+        action: "pulse_start",
+        roundStartAt,
+        sweepPeriodMs: cfg.sweepPeriodMs,
+        centerTicks: cfg.centerTicks,
+        rPerfectTicks: cfg.rPerfectTicks,
+        rGoodTicks: cfg.rGoodTicks,
+        rEdgeTicks: cfg.rEdgeTicks,
+      };
+
+      const appendResult = await supabase.rpc("solo_v2_append_session_event", {
+        p_session_id: sessionId,
+        p_player_ref: playerRef,
+        p_event_type: "client_action",
+        p_event_payload: payload,
+      });
+
+      if (appendResult.error) {
+        if (isMissingTable(appendResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "event_rejected",
+          message: appendResult.error.message,
+        });
+      }
+
+      const row = Array.isArray(appendResult.data) ? appendResult.data[0] : appendResult.data;
+      return res.status(200).json({
+        ok: true,
+        category: "success",
+        status: "accepted",
+        event: {
+          id: row?.event_id || null,
+          eventType,
+        },
+        session: {
+          id: sessionId,
+          sessionStatus: row?.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+        },
+        pulseStart: {
+          roundStartAt,
+          sweepPeriodMs: cfg.sweepPeriodMs,
+          centerTicks: cfg.centerTicks,
+          rPerfectTicks: cfg.rPerfectTicks,
+          rGoodTicks: cfg.rGoodTicks,
+          rEdgeTicks: cfg.rEdgeTicks,
+        },
+        authority: {
+          eventValidation: "server",
+          gameplayResolution: "deferred",
+        },
+      });
+    }
+
+    const isPulseLockLock =
+      sessionRow.game_key === "pulse_lock" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "pulse_lock";
+
+    if (isPulseLockLock) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Pulse Lock is only allowed for active sessions.",
+        });
+      }
+
+      const expiresAtRawPl = sessionRow.expires_at;
+      if (expiresAtRawPl) {
+        const expiresMs = new Date(expiresAtRawPl).getTime();
+        if (Number.isFinite(expiresMs) && expiresMs < Date.now()) {
+          return res.status(409).json({
+            ok: false,
+            category: "conflict",
+            status: "invalid_session_state",
+            message: "Session expired.",
+          });
+        }
+      }
+
+      const declaredGameKeyPl = String(eventPayload?.gameKey || "");
+      if (declaredGameKeyPl !== "pulse_lock") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Pulse Lock requires gameKey pulse_lock.",
+        });
+      }
+
+      const snapshotResultPl = await buildPulseLockSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResultPl.ok) {
+        if (isMissingTable(snapshotResultPl.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Pulse Lock is temporarily unavailable.",
+        });
+      }
+
+      const snapPl = snapshotResultPl.snapshot;
+      if (snapPl.readState === "lock_submitted" && snapPl.lockEventId) {
+        return res.status(200).json({
+          ok: true,
+          category: "success",
+          status: "accepted",
+          idempotent: true,
+          event: {
+            id: snapPl.lockEventId || null,
+            eventType,
+          },
+          session: {
+            id: sessionId,
+            sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+          },
+          authority: {
+            eventValidation: "server",
+            gameplayResolution: "deferred",
+          },
+        });
+      }
+
+      if (snapPl.readState !== "pulse_sweeping") {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_pulse_phase",
+          message: "Lock is only valid while the pulse is sweeping.",
+        });
+      }
+
+      const lockServerMs = Date.now();
+      const lockPayload = {
+        gameKey: "pulse_lock",
+        action: "pulse_lock",
+        lockServerMs,
+      };
+
+      const appendLock = await supabase.rpc("solo_v2_append_session_event", {
+        p_session_id: sessionId,
+        p_player_ref: playerRef,
+        p_event_type: "client_action",
+        p_event_payload: lockPayload,
+      });
+
+      if (appendLock.error) {
+        if (isMissingTable(appendLock.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "event_rejected",
+          message: appendLock.error.message,
+        });
+      }
+
+      const lockRow = Array.isArray(appendLock.data) ? appendLock.data[0] : appendLock.data;
+      return res.status(200).json({
+        ok: true,
+        category: "success",
+        status: "accepted",
+        event: {
+          id: lockRow?.event_id || null,
+          eventType,
+        },
+        session: {
+          id: sessionId,
+          sessionStatus: lockRow?.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+        },
+        lock: { lockServerMs },
+        authority: {
+          eventValidation: "server",
+          gameplayResolution: "deferred",
+        },
+      });
+    }
+
+    const isEchoSequenceStart =
+      sessionRow.game_key === "echo_sequence" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "echo_sequence_start";
+
+    if (isEchoSequenceStart) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Echo Sequence start is only allowed for active sessions.",
+        });
+      }
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "echo_sequence") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Echo Sequence start requires gameKey echo_sequence.",
+        });
+      }
+      const snapshotResult = await buildEchoSequenceSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Echo Sequence start is temporarily unavailable.",
+        });
+      }
+      if (snapshotResult.snapshot.playing && snapshotResult.snapshot.readState !== "invalid") {
+        return res.status(200).json({
+          ok: true,
+          category: "success",
+          status: "accepted",
+          idempotent: true,
+          event: { id: null, eventType },
+          session: { id: sessionId, sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS },
+          authority: { eventValidation: "server", gameplayResolution: "deferred" },
+        });
+      }
+      const activeSummary = buildEchoInitialActiveSummary();
+      await supabase
+        .from("solo_v2_sessions")
+        .update({
+          session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+          server_outcome_summary: activeSummary,
+        })
+        .eq("id", sessionId)
+        .eq("player_ref", playerRef)
+        .eq("game_key", "echo_sequence")
+        .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+      const appendStart = await supabase.rpc("solo_v2_append_session_event", {
+        p_session_id: sessionId,
+        p_player_ref: playerRef,
+        p_event_type: "client_action",
+        p_event_payload: {
+          gameKey: "echo_sequence",
+          action: "echo_sequence_start",
+        },
+      });
+      if (appendStart.error) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "event_rejected",
+          message: appendStart.error.message,
+        });
+      }
+      const row = Array.isArray(appendStart.data) ? appendStart.data[0] : appendStart.data;
+      return res.status(200).json({
+        ok: true,
+        category: "success",
+        status: "accepted",
+        event: { id: row?.event_id || null, eventType },
+        session: { id: sessionId, sessionStatus: row?.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS },
+        authority: { eventValidation: "server", gameplayResolution: "deferred" },
+      });
+    }
+
+    const isEchoSequenceChoose =
+      sessionRow.game_key === "echo_sequence" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "echo_sequence_choose";
+
+    if (isEchoSequenceChoose) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Echo Sequence choice is only allowed for active sessions.",
+        });
+      }
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "echo_sequence") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Echo Sequence choice requires gameKey echo_sequence.",
+        });
+      }
+      const roundIndex = Math.floor(Number(eventPayload?.roundIndex));
+      const optionKey = String(eventPayload?.optionKey || "").trim().toUpperCase();
+      if (!Number.isFinite(roundIndex) || roundIndex < 0 || !optionKey) {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Echo Sequence choice requires roundIndex and optionKey.",
+        });
+      }
+      const snapshotResult = await buildEchoSequenceSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Echo Sequence submission is temporarily unavailable.",
+        });
+      }
+      const snapshot = snapshotResult.snapshot;
+      if (snapshot.pendingChoice) {
+        const same =
+          Number(snapshot.pendingChoice.roundIndex) === roundIndex &&
+          String(snapshot.pendingChoice.optionKey || "").toUpperCase() === optionKey;
+        if (same) {
+          return res.status(200).json({
+            ok: true,
+            category: "success",
+            status: "accepted",
+            idempotent: true,
+            event: {
+              id: snapshot.pendingChoice.choiceEventId || null,
+              eventType,
+            },
+            session: {
+              id: sessionId,
+              sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+            },
+            authority: {
+              eventValidation: "server",
+              gameplayResolution: "deferred",
+            },
+          });
+        }
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "choice_already_submitted",
+          message: "Echo Sequence choice is already locked for this round.",
+        });
+      }
+      if (snapshot.playing?.currentRoundIndex !== roundIndex) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_round",
+          message: "Choice round does not match current server round.",
+        });
+      }
+    }
+
+    const isSafeZoneStart =
+      sessionRow.game_key === "safe_zone" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "safe_zone_start";
+
+    if (isSafeZoneStart) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Safe Zone start is only allowed for active sessions.",
+        });
+      }
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "safe_zone") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Safe Zone start requires gameKey safe_zone.",
+        });
+      }
+      const snapshotResult = await buildSafeZoneSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Safe Zone start is temporarily unavailable.",
+        });
+      }
+      if (snapshotResult.snapshot.readState !== "safe_zone_start_required") {
+        return res.status(200).json({
+          ok: true,
+          category: "success",
+          status: "accepted",
+          idempotent: true,
+          event: { id: null, eventType },
+          session: { id: sessionId, sessionStatus: sessionRow.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS },
+          authority: { eventValidation: "server", gameplayResolution: "deferred" },
+        });
+      }
+      const config = generateSafeZoneRunConfig();
+      const roundStartAt = new Date().toISOString();
+      const payload = {
+        gameKey: "safe_zone",
+        action: "safe_zone_start",
+        roundStartAt,
+        config,
+      };
+      const appendResult = await supabase.rpc("solo_v2_append_session_event", {
+        p_session_id: sessionId,
+        p_player_ref: playerRef,
+        p_event_type: "client_action",
+        p_event_payload: payload,
+      });
+      if (appendResult.error) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "event_rejected",
+          message: appendResult.error.message,
+        });
+      }
+      const row = Array.isArray(appendResult.data) ? appendResult.data[0] : appendResult.data;
+      return res.status(200).json({
+        ok: true,
+        category: "success",
+        status: "accepted",
+        event: { id: row?.event_id || null, eventType },
+        session: { id: sessionId, sessionStatus: row?.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS },
+        safeZoneStart: { roundStartAt },
+        authority: { eventValidation: "server", gameplayResolution: "deferred" },
+      });
+    }
+
+    const isSafeZoneControl =
+      sessionRow.game_key === "safe_zone" &&
+      eventType === "client_action" &&
+      eventPayload?.action === "safe_zone_control";
+
+    if (isSafeZoneControl) {
+      if (![SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS].includes(sessionRow.session_status)) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_session_state",
+          message: "Safe Zone control is only allowed for active sessions.",
+        });
+      }
+      const declaredGameKey = String(eventPayload?.gameKey || "");
+      if (declaredGameKey !== "safe_zone") {
+        return res.status(400).json({
+          ok: false,
+          category: "validation_error",
+          status: "invalid_request",
+          message: "Safe Zone control requires gameKey safe_zone.",
+        });
+      }
+      const holdValue = Boolean(eventPayload?.holding);
+      const snapshotResult = await buildSafeZoneSessionSnapshot(supabase, sessionRow);
+      if (!snapshotResult.ok) {
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Safe Zone control is temporarily unavailable.",
+        });
+      }
+      if (!["active", "terminal_pending"].includes(String(snapshotResult.snapshot.readState || ""))) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "invalid_safe_zone_phase",
+          message: "Control is only valid while run is active.",
+        });
+      }
+      const controlPayload = {
+        gameKey: "safe_zone",
+        action: "safe_zone_control",
+        holding: holdValue,
+        serverMs: Date.now(),
+      };
+      const appendControl = await supabase.rpc("solo_v2_append_session_event", {
+        p_session_id: sessionId,
+        p_player_ref: playerRef,
+        p_event_type: "client_action",
+        p_event_payload: controlPayload,
+      });
+      if (appendControl.error) {
+        return res.status(409).json({
+          ok: false,
+          category: "conflict",
+          status: "event_rejected",
+          message: appendControl.error.message,
+        });
+      }
+      const lockRow = Array.isArray(appendControl.data) ? appendControl.data[0] : appendControl.data;
+      return res.status(200).json({
+        ok: true,
+        category: "success",
+        status: "accepted",
+        event: { id: lockRow?.event_id || null, eventType },
+        session: { id: sessionId, sessionStatus: lockRow?.session_status || SOLO_V2_SESSION_STATUS.IN_PROGRESS },
+        authority: { eventValidation: "server", gameplayResolution: "deferred" },
+      });
     }
 
     const isOddEvenSubmit =

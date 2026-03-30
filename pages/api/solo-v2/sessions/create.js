@@ -65,6 +65,9 @@ import {
 import { DIAMONDS_BOMB_COUNT_FOR_DIFFICULTY } from "../../../../lib/solo-v2/diamondsConfig";
 import { buildSoloLadderSessionSnapshot } from "../../../../lib/solo-v2/server/soloLadderSnapshot";
 import { buildSoloLadderInitialActiveSummary } from "../../../../lib/solo-v2/server/soloLadderEngine";
+import { buildPulseLockSessionSnapshot } from "../../../../lib/solo-v2/server/pulseLockSnapshot";
+import { buildEchoSequenceSessionSnapshot } from "../../../../lib/solo-v2/server/echoSequenceSnapshot";
+import { buildSafeZoneSessionSnapshot } from "../../../../lib/solo-v2/server/safeZoneSnapshot";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -888,7 +891,10 @@ export default async function handler(req, res) {
       gameKey === "drop_run" ||
       gameKey === "mystery_chamber" ||
       gameKey === "diamonds" ||
-      gameKey === "solo_ladder") {
+      gameKey === "solo_ladder" ||
+      gameKey === "pulse_lock" ||
+      gameKey === "echo_sequence" ||
+      gameKey === "safe_zone") {
       const minWager = gameKey === "mystery_box" ? MYSTERY_BOX_MIN_WAGER : QUICK_FLIP_MIN_WAGER;
       const buildSnapshot =
         gameKey === "mystery_box"
@@ -925,6 +931,12 @@ export default async function handler(req, res) {
                                         ? buildMysteryChamberSessionSnapshot
                                         : gameKey === "diamonds"
                                           ? buildDiamondsSessionSnapshot
+                                            : gameKey === "pulse_lock"
+                                              ? buildPulseLockSessionSnapshot
+                                            : gameKey === "echo_sequence"
+                                              ? buildEchoSequenceSessionSnapshot
+                                            : gameKey === "safe_zone"
+                                              ? buildSafeZoneSessionSnapshot
                                             : gameKey === "solo_ladder"
                                             ? buildSoloLadderSessionSnapshot
                                             : gameKey === "odd_even"
@@ -1055,7 +1067,10 @@ export default async function handler(req, res) {
       gameKey === "drop_run" ||
       gameKey === "mystery_chamber" ||
       gameKey === "diamonds" ||
-      gameKey === "solo_ladder") &&
+      gameKey === "solo_ladder" ||
+      gameKey === "pulse_lock" ||
+      gameKey === "echo_sequence" ||
+      gameKey === "safe_zone") &&
       isGameNotEnabled(error)
     ) {
       console.warn(`solo-v2 create: ${gameKey} missing/disabled in solo_v2_games, attempting catalog bootstrap`);
@@ -1111,7 +1126,10 @@ export default async function handler(req, res) {
       gameKey === "drop_run" ||
       gameKey === "mystery_chamber" ||
       gameKey === "diamonds" ||
-      gameKey === "solo_ladder") &&
+      gameKey === "solo_ladder" ||
+      gameKey === "pulse_lock" ||
+      gameKey === "echo_sequence" ||
+      gameKey === "safe_zone") &&
         isLegacyDeviceIdNotNullError(error)
       ) {
         console.warn("solo-v2 create: legacy device_id constraint detected, using compat insert path");
@@ -1209,7 +1227,10 @@ export default async function handler(req, res) {
       gameKey === "drop_run" ||
       gameKey === "mystery_chamber" ||
       gameKey === "diamonds" ||
-      gameKey === "solo_ladder") &&
+      gameKey === "solo_ladder" ||
+      gameKey === "pulse_lock" ||
+      gameKey === "echo_sequence" ||
+      gameKey === "safe_zone") &&
         isUniqueConflict(error)
       ) {
         const buildSnapshot =
@@ -1247,6 +1268,12 @@ export default async function handler(req, res) {
                                           ? buildMysteryChamberSessionSnapshot
                                           : gameKey === "diamonds"
                                             ? buildDiamondsSessionSnapshot
+                                            : gameKey === "pulse_lock"
+                                              ? buildPulseLockSessionSnapshot
+                                            : gameKey === "echo_sequence"
+                                              ? buildEchoSequenceSessionSnapshot
+                                            : gameKey === "safe_zone"
+                                              ? buildSafeZoneSessionSnapshot
                                             : gameKey === "solo_ladder"
                                             ? buildSoloLadderSessionSnapshot
                                             : gameKey === "odd_even"

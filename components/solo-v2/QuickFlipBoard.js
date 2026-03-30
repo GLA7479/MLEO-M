@@ -27,6 +27,7 @@ export default function QuickFlipBoard({
   hideMobilePayoutBand = false,
   /** Omits the two-line status stack above the round strip; `flex-1` playfield grows. Quick Flip proof route. */
   hideBoardStatusStack = false,
+  stepLabels = ["Side", "Flip"],
 }) {
   const total = Math.max(1, Math.floor(Number(stepTotal) || 2));
   const cleared = Math.max(0, Math.min(total, Math.floor(Number(stepsComplete) || 0)));
@@ -67,7 +68,7 @@ export default function QuickFlipBoard({
         stepTotal={total}
         stepsComplete={cleared}
         currentStepIndex={cur}
-        stepLabels={["Side", "Flip"]}
+        stepLabels={stepLabels}
       />
 
       {!hideMobilePayoutBand ? (

@@ -41,6 +41,9 @@ import {
 } from "../../../../lib/solo-v2/server/challenge21Snapshot";
 import { buildDiamondsSessionSnapshot, stripDiamondsSecretsFromSummary } from "../../../../lib/solo-v2/server/diamondsSnapshot";
 import { buildSoloLadderSessionSnapshot } from "../../../../lib/solo-v2/server/soloLadderSnapshot";
+import { buildPulseLockSessionSnapshot } from "../../../../lib/solo-v2/server/pulseLockSnapshot";
+import { buildEchoSequenceSessionSnapshot } from "../../../../lib/solo-v2/server/echoSequenceSnapshot";
+import { buildSafeZoneSessionSnapshot } from "../../../../lib/solo-v2/server/safeZoneSnapshot";
 import { SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
 
 function isMissingTable(error) {
@@ -119,6 +122,9 @@ export default async function handler(req, res) {
     let flashVeinPayload = null;
     let diamondsPayload = null;
     let soloLadderPayload = null;
+    let pulseLockPayload = null;
+    let echoSequencePayload = null;
+    let safeZonePayload = null;
 
     if (row.game_key === "quick_flip") {
       const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
@@ -688,6 +694,90 @@ export default async function handler(req, res) {
         canClimb: slSnapshot.canClimb,
         resolvedResult: slSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "pulse_lock") {
+      const plSnapshotResult = await buildPulseLockSessionSnapshot(supabase, row);
+      if (!plSnapshotResult.ok) {
+        if (isMissingTable(plSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const plSnapshot = plSnapshotResult.snapshot;
+      sessionReadState = plSnapshot.readState;
+      pulseLockPayload = {
+        readState: plSnapshot.readState,
+        playing: plSnapshot.playing,
+        pendingLock: plSnapshot.readState === "pulse_sweeping",
+        canResolve: plSnapshot.canResolve,
+        resolvedResult: plSnapshot.resolvedResult,
+      };
+    } else if (row.game_key === "echo_sequence") {
+      const esSnapshotResult = await buildEchoSequenceSessionSnapshot(supabase, row);
+      if (!esSnapshotResult.ok) {
+        if (isMissingTable(esSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const esSnapshot = esSnapshotResult.snapshot;
+      sessionReadState = esSnapshot.readState;
+      echoSequencePayload = {
+        readState: esSnapshot.readState,
+        playing: esSnapshot.playing,
+        pendingChoice: esSnapshot.pendingChoice,
+        choiceConflict: esSnapshot.choiceConflict,
+        canResolveTurn: esSnapshot.canResolveTurn,
+        canCashOut: esSnapshot.canCashOut,
+        resolvedResult: esSnapshot.resolvedResult,
+      };
+    } else if (row.game_key === "safe_zone") {
+      const szSnapshotResult = await buildSafeZoneSessionSnapshot(supabase, row);
+      if (!szSnapshotResult.ok) {
+        if (isMissingTable(szSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 event persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const szSnapshot = szSnapshotResult.snapshot;
+      sessionReadState = szSnapshot.readState;
+      safeZonePayload = {
+        readState: szSnapshot.readState,
+        playing: szSnapshot.playing,
+        canResolve: szSnapshot.canResolve,
+        canCashOut: szSnapshot.canCashOut,
+        pendingState: szSnapshot.pendingState,
+        resolvedResult: szSnapshot.resolvedResult,
+      };
     }
 
     const rawSummary = row.server_outcome_summary || {};
@@ -749,6 +839,9 @@ export default async function handler(req, res) {
         flashVein: flashVeinPayload,
         diamonds: diamondsPayload,
         soloLadder: soloLadderPayload,
+        pulseLock: pulseLockPayload,
+        echoSequence: echoSequencePayload,
+        safeZone: safeZonePayload,
       },
       authority: {
         sessionTruth: "server",
