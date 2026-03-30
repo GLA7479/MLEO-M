@@ -237,7 +237,7 @@ DECLARE
   v_new public.ov2_board_path_sessions%ROWTYPE;
   v_next_ms int;
   v_pos jsonb;
-  v_pk_seat text;
+  v_participant text;
 BEGIN
   IF p_room_id IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'room_id required');
