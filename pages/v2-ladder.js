@@ -102,6 +102,7 @@ function LadderGameplayPanel({
   boardCashOutLabel,
   boardCashOutLoadingLabel,
   onBoardCashOut,
+  reserveClimbSlot,
   showClimb,
   climbDisabled,
   climbLoading,
@@ -163,6 +164,7 @@ function LadderGameplayPanel({
                 terminal={isTerminal}
                 terminalKind={rr?.terminalKind ?? null}
                 failedAtStep={rr?.failedAtStep ?? null}
+                reserveClimbSlot={reserveClimbSlot}
                 showClimb={showClimb}
                 climbDisabled={climbDisabled}
                 climbLoading={climbLoading}
@@ -965,6 +967,7 @@ export default function V2LadderPage() {
         <LadderGameplayPanel
           session={session}
           uiState={uiState}
+          reserveClimbSlot={uiState === UI_STATE.SESSION_ACTIVE && !terminalSession}
           sessionNotice={sessionNotice}
           stepTotal={stepTotal}
           stepsComplete={stepsComplete}

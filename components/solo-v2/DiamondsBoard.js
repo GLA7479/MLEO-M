@@ -9,7 +9,8 @@ const DIFFICULTY_OPTIONS = [
 
 /**
  * 5×5 Diamonds grid — hidden / safe / bomb faces (bombs only when `revealBombs`).
- * Optional idle risk row lives inside this single playfield root (matches one-child play-inner pattern).
+ * Outer layout matches `GoldRushDiggerBoard`: full width of the play-inner slot (no narrow max-width cap on desktop).
+ * Risk preset row uses a fixed min-height (pills or empty) so the grid does not shift when presets hide during play.
  */
 export default function DiamondsBoard({
   gridSize = 5,
@@ -30,13 +31,12 @@ export default function DiamondsBoard({
   const bombSet = revealBombs && Array.isArray(bombIndices) ? new Set(bombIndices.map(i => Math.floor(Number(i)))) : null;
 
   const base =
-    "flex aspect-square min-h-0 w-full max-w-[3.25rem] flex-1 items-center justify-center rounded-md border text-sm font-black transition sm:max-w-[3.5rem] sm:text-base lg:max-w-[3rem] lg:text-sm";
+    "flex min-h-[40px] min-w-0 flex-1 items-center justify-center rounded-lg border text-lg font-black transition sm:min-h-[44px] lg:min-h-[36px] lg:text-base";
 
   const cells = [];
   for (let i = 0; i < total; i += 1) {
     const isSafe = safeSet.has(i);
     const isBombShown = bombSet && bombSet.has(i);
-    const hidden = !isSafe && !isBombShown;
     const pulsing = pulseIndex === i;
     const shaking = shakeIndex === i;
 
@@ -74,31 +74,42 @@ export default function DiamondsBoard({
         </button>
       );
     }
-    cells.push(<div key={i} className="flex min-w-0 flex-1 justify-center p-0.5 sm:p-1">{inner}</div>);
+    cells.push(
+      <div key={i} className="flex min-w-0 flex-1">
+        {inner}
+      </div>,
+    );
   }
 
   return (
-    <div className="flex w-full max-w-[min(100%,20rem)] flex-col gap-1 self-center sm:max-w-[22rem]" aria-label="Diamonds grid">
-      {showRiskPicker ? (
-        <div className="mb-1 flex flex-wrap items-center justify-center gap-1 px-0.5">
-          {DIFFICULTY_OPTIONS.map(opt => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => onDifficultyChange?.(opt.key)}
-              className={`rounded-md border px-2 py-0.5 text-[9px] font-bold sm:py-1 sm:text-[10px] ${
-                difficulty === opt.key
-                  ? "border-amber-400/50 bg-amber-950/50 text-amber-100"
-                  : "border-white/12 bg-zinc-900/40 text-zinc-400 hover:border-white/20"
-              }`}
-            >
-              {opt.label} ({DIAMONDS_BOMB_COUNT_FOR_DIFFICULTY[opt.key] ?? "?"}💣)
-            </button>
-          ))}
-        </div>
-      ) : null}
+    <div
+      className="flex w-full min-w-0 flex-col gap-1.5 sm:gap-2 lg:gap-1"
+      aria-label="Diamonds grid"
+    >
+      <div
+        className="flex min-h-[2.75rem] w-full shrink-0 flex-nowrap items-center justify-center gap-1 overflow-x-auto overflow-y-hidden px-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-1.5"
+        aria-hidden={!showRiskPicker}
+      >
+        {showRiskPicker
+          ? DIFFICULTY_OPTIONS.map(opt => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => onDifficultyChange?.(opt.key)}
+                className={`shrink-0 rounded-md border px-2 py-0.5 text-[9px] font-bold sm:py-1 sm:text-[10px] ${
+                  difficulty === opt.key
+                    ? "border-amber-400/50 bg-amber-950/50 text-amber-100"
+                    : "border-white/12 bg-zinc-900/40 text-zinc-400 hover:border-white/20"
+                }`}
+              >
+                {opt.label} ({DIAMONDS_BOMB_COUNT_FOR_DIFFICULTY[opt.key] ?? "?"}💣)
+              </button>
+            ))
+          : null}
+      </div>
+
       {Array.from({ length: n }, (_, row) => (
-        <div key={row} className="flex w-full min-w-0 justify-center gap-0.5 sm:gap-1">
+        <div key={row} className="flex w-full min-w-0 gap-1.5 sm:gap-2 lg:gap-1">
           {cells.slice(row * n, row * n + n)}
         </div>
       ))}
