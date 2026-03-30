@@ -4857,11 +4857,18 @@ export default function GamesHub() {
                         {text.terms}
                       </button>
                     </div>
-                    <Link href="/arcade-online" className="block">
-                      <span className="flex w-full items-center justify-center bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white py-2 rounded-lg text-[11px] font-bold shadow-md active:opacity-90">
-                        {text.arcadeOnline}
-                      </span>
-                    </Link>
+                    <div className="grid grid-cols-2 gap-1">
+                      <Link href="/arcade-online" className="block">
+                        <span className="flex w-full items-center justify-center bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white py-2 rounded-lg text-[10px] font-bold shadow-md active:opacity-90 text-center leading-tight px-0.5">
+                          Old Online
+                        </span>
+                      </Link>
+                      <Link href="/online-v2" className="block">
+                        <span className="flex w-full items-center justify-center bg-gradient-to-r from-slate-700 to-emerald-700 hover:from-slate-800 hover:to-emerald-800 text-white py-2 rounded-lg text-[10px] font-bold shadow-md active:opacity-90 text-center leading-tight px-0.5">
+                          Online V2
+                        </span>
+                      </Link>
+                    </div>
                   </div>
                 </article>
               </section>
@@ -5071,12 +5078,20 @@ export default function GamesHub() {
                         {text.terms}
                       </button>
                     </div>
-                    <Link
-                      href="/arcade-online"
-                      className="block w-full rounded-xl bg-gradient-to-r from-red-600 to-pink-600 py-2.5 text-center text-sm font-bold text-white shadow-lg hover:from-red-700 hover:to-pink-700 lg:py-3"
-                    >
-                      {text.arcadeOnline}
-                    </Link>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Link
+                        href="/arcade-online"
+                        className="block w-full rounded-xl bg-gradient-to-r from-red-600 to-pink-600 py-2.5 text-center text-sm font-bold text-white shadow-lg hover:from-red-700 hover:to-pink-700 lg:py-3"
+                      >
+                        Old Online
+                      </Link>
+                      <Link
+                        href="/online-v2"
+                        className="block w-full rounded-xl bg-gradient-to-r from-slate-700 to-emerald-700 py-2.5 text-center text-sm font-bold text-white shadow-lg hover:from-slate-800 hover:to-emerald-800 lg:py-3"
+                      >
+                        Online V2
+                      </Link>
+                    </div>
                   </div>
                 </article>
               </section>
