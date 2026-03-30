@@ -104,6 +104,7 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
   const canPrimaryRematch =
     showPostFinishRematch &&
     !vm.rematchBusy &&
+    !vm.finalizeBusy &&
     !vm.sessionTransitioning &&
     (Boolean(vm.selfCanRequestRematch) ||
       Boolean(vm.selfCanCancelRematch) ||
@@ -134,11 +135,19 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
       : hasSession
         ? vm.primary.muted || !bp.canSelfAct
         : vm.primary.muted;
+  const showFinalizeSecondary =
+    showPostFinishRematch && (Boolean(vm.canFinalize) || Boolean(vm.finalized) || Boolean(vm.finalizeBusy));
+
   const secondaryMuted = showPostFinishRematch
-    ? true
+    ? !showFinalizeSecondary
     : hasSession
       ? vm.secondary.muted || !bp.canSelfAct
       : vm.secondary.muted;
+
+  function handleSecondaryPostFinish() {
+    if (!showPostFinishRematch || !vm.canFinalize || vm.finalizeBusy) return;
+    void bp.finalizeSession?.();
+  }
 
   function handlePrimaryAction() {
     if (showPostFinishRematch) {
@@ -203,6 +212,14 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
       ? `Rematch: ${vm.rematchError.message}${vm.rematchError.code ? ` (${vm.rematchError.code})` : ""}`
       : null;
 
+  const finalizeErrLine =
+    vm.finalizeError?.message != null
+      ? `Settle: ${vm.finalizeError.message}${vm.finalizeError.code ? ` (${vm.finalizeError.code})` : ""}`
+      : null;
+
+  const settlementStrip =
+    showPostFinishRematch && vm.postFinishStatusLabel ? vm.postFinishStatusLabel : null;
+
   const combinedStatus = [
     gameplayStatus,
     vm.turnLine,
@@ -214,6 +231,8 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
     devGameplayIssue,
     actionErrLine,
     rematchErrLine,
+    finalizeErrLine,
+    settlementStrip,
     liveSyncLine,
   ]
     .filter(Boolean)
@@ -341,7 +360,10 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
         </button>
         <button
           type="button"
-          disabled
+          disabled={showPostFinishRematch ? !showFinalizeSecondary || vm.finalized || vm.finalizeBusy : true}
+          onClick={() => {
+            if (showPostFinishRematch) handleSecondaryPostFinish();
+          }}
           data-ov2-bp-control={vm.secondary.intent}
           data-ov2-bp-can-self-act={hasSession ? String(bp.canSelfAct) : undefined}
           title={gp ? `Phase: ${gp.gamePhase} · ${gp.allowedActions.join(" · ")}` : undefined}
@@ -352,7 +374,13 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
           }`}
         >
           {showPostFinishRematch
-            ? vm.nextMatchLabel || "Rematch"
+            ? vm.finalizeBusy
+              ? "…"
+              : vm.finalized
+                ? "Settled"
+                : vm.canFinalize
+                  ? "Finalize (host)"
+                  : "Settle: host only"
             : gp
               ? `${vm.secondary.label} · ${gp.finished ? "match over" : gp.gamePhase}`
               : vm.secondary.label}

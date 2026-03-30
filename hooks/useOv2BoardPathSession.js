@@ -18,6 +18,7 @@ import {
   rpcOv2BoardPathCancelRematch,
   rpcOv2BoardPathEndTurnSession,
   rpcOv2BoardPathMoveSession,
+  rpcOv2BoardPathFinalizeSession,
   rpcOv2BoardPathOpenSession,
   rpcOv2BoardPathRequestRematch,
   rpcOv2BoardPathRollSession,
@@ -78,6 +79,9 @@ export function useOv2BoardPathSession(baseContext) {
   const [liveMembersOverride, setLiveMembersOverride] = useState(/** @type {unknown[]|null} */ (null));
   const [rematchError, setRematchError] = useState(/** @type {{ code?: string, message?: string }|null} */ (null));
   const [rematchBusy, setRematchBusy] = useState(false);
+  const [settlementLines, setSettlementLines] = useState(/** @type {Record<string, unknown>[]|null} */ (null));
+  const [finalizeError, setFinalizeError] = useState(/** @type {{ code?: string, message?: string }|null} */ (null));
+  const [finalizeBusy, setFinalizeBusy] = useState(false);
   const bundleRef = useRef(null);
   bundleRef.current = bundle;
   const fetchWaveRef = useRef(0);
@@ -174,6 +178,7 @@ export function useOv2BoardPathSession(baseContext) {
       return next ?? prev;
     });
     setLastSyncAt(Date.now());
+    setSettlementLines(Array.isArray(detailed.settlementLines) ? detailed.settlementLines : []);
     return b;
   }, [selfKey]);
 
@@ -276,6 +281,8 @@ export function useOv2BoardPathSession(baseContext) {
       setSessionSyncFault(null);
       setLiveMembersOverride(null);
       setRematchError(null);
+      setSettlementLines(null);
+      setFinalizeError(null);
       identityPrevRef.current = { roomId, selfKey, matchSeq: ms };
       return;
     }
@@ -290,6 +297,8 @@ export function useOv2BoardPathSession(baseContext) {
       setSessionSyncFault(null);
       setLiveMembersOverride(null);
       setRematchError(null);
+      setSettlementLines(null);
+      setFinalizeError(null);
       identityPrevRef.current = { roomId, selfKey, matchSeq: ms };
       return;
     }
@@ -325,6 +334,7 @@ export function useOv2BoardPathSession(baseContext) {
     actionErrorAtRevisionRef.current = null;
     setActionPending(null);
     setRematchError(null);
+    setFinalizeError(null);
   }, [activeSid]);
 
   useEffect(() => {
@@ -498,15 +508,17 @@ export function useOv2BoardPathSession(baseContext) {
     return members;
   }, [liveMembersOverride, members]);
 
-  const mergedContext = useMemo(
-    () =>
-      mergeBoardPathBundleIntoContext(
-        { ...(baseContext || { room: null, members: [], self: null }), members: effectiveMembers },
-        bundle,
-        roomSessionPatch
-      ),
-    [baseContext, bundle, roomSessionPatch, effectiveMembers]
-  );
+  const mergedContext = useMemo(() => {
+    const m = mergeBoardPathBundleIntoContext(
+      { ...(baseContext || { room: null, members: [], self: null }), members: effectiveMembers },
+      bundle,
+      roomSessionPatch
+    );
+    return {
+      ...m,
+      settlementLines: settlementLines ?? [],
+    };
+  }, [baseContext, bundle, roomSessionPatch, effectiveMembers, settlementLines]);
 
   const liveDbBoardPath = useMemo(
     () =>
@@ -542,8 +554,15 @@ export function useOv2BoardPathSession(baseContext) {
   );
 
   const postFinishVmSlice = useMemo(
-    () => buildBoardPathPostFinishSlice(mergedContext, hostKey, { rematchBusy, rematchError }),
-    [mergedContext, hostKey, rematchBusy, rematchError]
+    () =>
+      buildBoardPathPostFinishSlice(mergedContext, hostKey, {
+        rematchBusy,
+        rematchError,
+        finalizeBusy,
+        finalizeError,
+        liveDbBoardPath,
+      }),
+    [mergedContext, hostKey, rematchBusy, rematchError, finalizeBusy, finalizeError, liveDbBoardPath]
   );
 
   const vm = useMemo(
@@ -671,6 +690,34 @@ export function useOv2BoardPathSession(baseContext) {
     }
   }, [liveDbBoardPath, roomId, selfKey, refreshBundleFromServer]);
 
+  const finalizeSession = useCallback(async () => {
+    if (!liveDbBoardPath || !roomId || !selfKey) return;
+    const hk = hostKeyRef.current;
+    if (!hk || !isHost) return;
+    const sid = bundleRef.current?.localSession?.id;
+    if (!sid) return;
+    setFinalizeBusy(true);
+    setFinalizeError(null);
+    try {
+      const raw = await rpcOv2BoardPathFinalizeSession(supabaseMP, roomId, String(sid), hk);
+      if (!raw || raw.ok !== true) {
+        const code = typeof raw?.code === "string" ? raw.code : "RPC_REJECTED";
+        const message =
+          typeof raw?.message === "string" ? raw.message : "Server rejected finalize.";
+        setFinalizeError({ code, message });
+        return;
+      }
+      await refreshBundleFromServer();
+    } catch (e) {
+      setFinalizeError({
+        code: "FINALIZE_EXCEPTION",
+        message: e?.message || String(e),
+      });
+    } finally {
+      setFinalizeBusy(false);
+    }
+  }, [liveDbBoardPath, roomId, selfKey, isHost, refreshBundleFromServer]);
+
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
     if (!liveSyncEnabled || !roomId) {
@@ -724,6 +771,32 @@ export function useOv2BoardPathSession(baseContext) {
         event: "*",
         schema: "public",
         table: "ov2_room_members",
+        filter: `room_id=eq.${roomId}`,
+      },
+      () => {
+        scheduleDebouncedRefreshRef.current();
+      }
+    );
+
+    ch.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "ov2_settlement_lines",
+        filter: `room_id=eq.${roomId}`,
+      },
+      () => {
+        scheduleDebouncedRefreshRef.current();
+      }
+    );
+
+    ch.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "ov2_economy_events",
         filter: `room_id=eq.${roomId}`,
       },
       () => {
@@ -954,5 +1027,8 @@ export function useOv2BoardPathSession(baseContext) {
     startNextMatch: liveDbBoardPath ? startNextMatch : undefined,
     rematchBusy,
     rematchError,
+    finalizeSession: liveDbBoardPath && isHost ? finalizeSession : undefined,
+    finalizeBusy,
+    finalizeError,
   };
 }
