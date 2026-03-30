@@ -2,6 +2,7 @@ import Ov2BoardPathScreen from "../components/online-v2/Ov2BoardPathScreen";
 import OnlineV2GamePageShell from "../components/online-v2/OnlineV2GamePageShell";
 
 export default function Ov2BoardPathPage() {
+  /* Later: pass `contextInput` into Ov2BoardPathScreen from loaded ov2 room + members + board_path session. */
   return (
     <OnlineV2GamePageShell
       title="Board Path"

@@ -300,7 +300,11 @@ export default function OnlineV2RoomsScreen() {
                         rooms.map(r => {
                           const n = memberCounts[r.id] ?? 0;
                           const isHost = participantId && r.host_participant_key === participantId;
-                          const canOpen = r.lifecycle_phase === "lobby" || r.lifecycle_phase === "pending_start";
+                          const canOpen =
+                            r.lifecycle_phase === "lobby" ||
+                            r.lifecycle_phase === "pending_start" ||
+                            r.lifecycle_phase === "pending_stakes" ||
+                            r.lifecycle_phase === "active";
                           return (
                             <div
                               key={r.id}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getOv2MinPlayersForProduct, ONLINE_V2_REGISTRY } from "../../lib/online-v2/onlineV2GameRegistry";
 import {
+  commitOv2RoomStake,
   fetchOv2RoomById,
   fetchOv2RoomMembers,
   joinOv2Room,
@@ -8,16 +9,19 @@ import {
   setOv2MemberReady,
   startOv2RoomIntent,
 } from "../../lib/online-v2/ov2RoomsApi";
-import { clampSuggestedOnlineV2Stake } from "../../lib/online-v2/ov2Economy";
-import { peekOnlineV2Vault, readOnlineV2Vault } from "../../lib/online-v2/onlineV2VaultBridge";
+import { buildOnlineV2EconomyEventKey, clampSuggestedOnlineV2Stake } from "../../lib/online-v2/ov2Economy";
+import { debitOnlineV2Vault, peekOnlineV2Vault, readOnlineV2Vault } from "../../lib/online-v2/onlineV2VaultBridge";
 
 function fmtStake(n) {
   return Math.floor(Number(n) || 0).toLocaleString();
 }
 
+function ov2StakeDebitLocalKey(roomId, matchSeq, participantKey) {
+  return `ov2_stake_debit_v1:${roomId}:${matchSeq}:${participantKey}`;
+}
+
 /**
- * Room lobby: members, ready, host start (pending_start only — no gameplay).
- * Vault debit remains deferred until explicit OV2 RPC/stake-commit step.
+ * Room lobby: members, ready, host start, then per-seat stake commit (RPC then vault debit).
  */
 export default function Ov2RoomLobby({ roomId, participantId, displayName, onBack, onRoomChanged }) {
   const [room, setRoom] = useState(null);
@@ -51,6 +55,17 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     if (members.length < minPlayers) return false;
     return allReady;
   }, [room, isHost, members.length, minPlayers, allReady]);
+
+  const canLeave = useMemo(
+    () => room && (room.lifecycle_phase === "lobby" || room.lifecycle_phase === "pending_start"),
+    [room]
+  );
+
+  const needsStakeCommit = useMemo(() => {
+    if (!room || !amMember || !myMember) return false;
+    if (myMember.wallet_state === "committed") return false;
+    return room.lifecycle_phase === "pending_start" || room.lifecycle_phase === "pending_stakes";
+  }, [room, amMember, myMember]);
 
   const load = useCallback(async () => {
     setMsg("");
@@ -150,6 +165,44 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     }
   }
 
+  async function onCommitStake() {
+    if (!room || !myMember) return;
+    if (!(await ensureBalance(room.stake_per_seat))) return;
+    const stake = clampSuggestedOnlineV2Stake(room.stake_per_seat);
+    const idem = buildOnlineV2EconomyEventKey("commit", roomId, participantId, room.match_seq, "v1");
+    setBusy(true);
+    setMsg("");
+    try {
+      await commitOv2RoomStake({
+        room_id: roomId,
+        participant_key: participantId,
+        idempotency_key: idem,
+      });
+      const debitKey =
+        typeof window !== "undefined" ? ov2StakeDebitLocalKey(roomId, room.match_seq, participantId) : null;
+      const debitAlreadyDone = debitKey && window.localStorage.getItem(debitKey) === "1";
+      if (!debitAlreadyDone) {
+        const debit = await debitOnlineV2Vault(stake, room.product_game_id);
+        if (!debit?.ok) {
+          setMsg(
+            debit?.error ||
+              "Vault debit failed after the server recorded your stake. Tap Commit again to retry the debit, or sync your balance."
+          );
+          await load();
+          onRoomChanged?.();
+          return;
+        }
+        if (debitKey) window.localStorage.setItem(debitKey, "1");
+      }
+      await load();
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!room) {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -204,7 +257,13 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
                     joined {m.created_at ? new Date(m.created_at).toLocaleString() : "—"}
                   </div>
                 </div>
-                <span className={m.is_ready ? "text-emerald-400" : "text-zinc-500"}>{m.is_ready ? "Ready" : "Not ready"}</span>
+                <span className="text-right text-[10px] leading-tight text-zinc-500">
+                  <span className={m.is_ready ? "text-emerald-400" : "text-zinc-500"}>{m.is_ready ? "Ready" : "Not ready"}</span>
+                  <span className="text-zinc-600"> · </span>
+                  <span className={m.wallet_state === "committed" ? "text-emerald-400" : "text-zinc-600"}>
+                    {m.wallet_state === "committed" ? "Staked" : "Not staked"}
+                  </span>
+                </span>
               </li>
             );
           })}
@@ -235,9 +294,10 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
             </button>
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || !canLeave}
+              title={!canLeave ? "Cannot leave after stakes are in progress." : undefined}
               onClick={() => void onLeave()}
-              className="rounded-lg border border-red-500/30 bg-red-950/30 px-3 py-2 text-xs text-red-200"
+              className="rounded-lg border border-red-500/30 bg-red-950/30 px-3 py-2 text-xs text-red-200 disabled:opacity-40"
             >
               Leave
             </button>
@@ -247,11 +307,23 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         {amMember && lobbyLocked ? (
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || !canLeave}
+            title={!canLeave ? "Cannot leave after stakes are in progress." : undefined}
             onClick={() => void onLeave()}
-            className="rounded-lg border border-red-500/30 bg-red-950/30 py-2 text-xs text-red-200"
+            className="rounded-lg border border-red-500/30 bg-red-950/30 py-2 text-xs text-red-200 disabled:opacity-40"
           >
             Leave
+          </button>
+        ) : null}
+
+        {needsStakeCommit ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onCommitStake()}
+            className="rounded-lg border border-emerald-500/40 bg-emerald-900/30 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-50"
+          >
+            Commit stake ({fmtStake(room.stake_per_seat)})
           </button>
         ) : null}
 
@@ -272,7 +344,13 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         ) : null}
 
         {room.lifecycle_phase === "pending_start" ? (
-          <p className="text-center text-[11px] text-amber-200/90">Match starting — gameplay not wired yet.</p>
+          <p className="text-center text-[11px] text-amber-200/90">Host started the match — each player must commit stake.</p>
+        ) : null}
+        {room.lifecycle_phase === "pending_stakes" ? (
+          <p className="text-center text-[11px] text-amber-200/90">Waiting for all players to commit their stake.</p>
+        ) : null}
+        {room.lifecycle_phase === "active" ? (
+          <p className="text-center text-[11px] text-emerald-200/85">All stakes locked — gameplay not wired yet.</p>
         ) : null}
 
         {msg ? (
