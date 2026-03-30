@@ -68,6 +68,16 @@ import { buildSoloLadderInitialActiveSummary } from "../../../../lib/solo-v2/ser
 import { buildPulseLockSessionSnapshot } from "../../../../lib/solo-v2/server/pulseLockSnapshot";
 import { buildEchoSequenceSessionSnapshot } from "../../../../lib/solo-v2/server/echoSequenceSnapshot";
 import { buildSafeZoneSessionSnapshot } from "../../../../lib/solo-v2/server/safeZoneSnapshot";
+import { buildSurgeCashoutSessionSnapshot } from "../../../../lib/solo-v2/server/surgeCashoutSnapshot";
+import { buildSurgeCashoutPreSummary } from "../../../../lib/solo-v2/server/surgeCashoutEngine";
+import { buildRailLogicSessionSnapshot } from "../../../../lib/solo-v2/server/railLogicSnapshot";
+import { buildRailLogicInitialSummary, pickPuzzleIndex } from "../../../../lib/solo-v2/server/railLogicEngine";
+import { buildShadowTellSessionSnapshot } from "../../../../lib/solo-v2/server/shadowTellSnapshot";
+import { buildShadowTellInitialSummary } from "../../../../lib/solo-v2/server/shadowTellEngine";
+import { buildCoreBalanceSessionSnapshot } from "../../../../lib/solo-v2/server/coreBalanceSnapshot";
+import { buildCoreBalanceInitialSummary } from "../../../../lib/solo-v2/server/coreBalanceEngine";
+import { buildRelicDraftSessionSnapshot } from "../../../../lib/solo-v2/server/relicDraftSnapshot";
+import { buildRelicDraftInitialSummary } from "../../../../lib/solo-v2/server/relicDraftEngine";
 
 function isMissingTable(error) {
   const code = String(error?.code || "");
@@ -759,6 +769,101 @@ async function seedSoloLadderSessionOrWarn(supabase, gameKey, sessionId, playerR
   }
 }
 
+async function seedSurgeCashoutSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "surge_cashout" || !sessionId) return;
+  const summary = buildSurgeCashoutPreSummary();
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "surge_cashout")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create surge_cashout] seed failed", { sessionId, error });
+  }
+}
+
+async function seedRailLogicSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "rail_logic" || !sessionId) return;
+  const summary = buildRailLogicInitialSummary(pickPuzzleIndex());
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "rail_logic")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create rail_logic] seed failed", { sessionId, error });
+  }
+}
+
+async function seedShadowTellSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "shadow_tell" || !sessionId) return;
+  const summary = buildShadowTellInitialSummary(sessionId);
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "shadow_tell")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create shadow_tell] seed failed", { sessionId, error });
+  }
+}
+
+async function seedCoreBalanceSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "core_balance" || !sessionId) return;
+  const summary = buildCoreBalanceInitialSummary(sessionId);
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "core_balance")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create core_balance] seed failed", { sessionId, error });
+  }
+}
+
+async function seedRelicDraftSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
+  if (gameKey !== "relic_draft" || !sessionId) return;
+  const summary = buildRelicDraftInitialSummary(sessionId);
+  const { error } = await supabase
+    .from("solo_v2_sessions")
+    .update({
+      server_outcome_summary: summary,
+      session_status: SOLO_V2_SESSION_STATUS.IN_PROGRESS,
+    })
+    .eq("id", sessionId)
+    .eq("player_ref", playerRef)
+    .eq("game_key", "relic_draft")
+    .in("session_status", [SOLO_V2_SESSION_STATUS.CREATED, SOLO_V2_SESSION_STATUS.IN_PROGRESS]);
+
+  if (error) {
+    console.error("[solo-v2/create relic_draft] seed failed", { sessionId, error });
+  }
+}
+
 async function seedMysteryChamberSessionOrWarn(supabase, gameKey, sessionId, playerRef) {
   if (gameKey !== "mystery_chamber" || !sessionId) return;
 
@@ -894,7 +999,12 @@ export default async function handler(req, res) {
       gameKey === "solo_ladder" ||
       gameKey === "pulse_lock" ||
       gameKey === "echo_sequence" ||
-      gameKey === "safe_zone") {
+      gameKey === "safe_zone" ||
+      gameKey === "surge_cashout" ||
+      gameKey === "rail_logic" ||
+      gameKey === "shadow_tell" ||
+      gameKey === "core_balance" ||
+      gameKey === "relic_draft") {
       const minWager = gameKey === "mystery_box" ? MYSTERY_BOX_MIN_WAGER : QUICK_FLIP_MIN_WAGER;
       const buildSnapshot =
         gameKey === "mystery_box"
@@ -937,6 +1047,16 @@ export default async function handler(req, res) {
                                               ? buildEchoSequenceSessionSnapshot
                                             : gameKey === "safe_zone"
                                               ? buildSafeZoneSessionSnapshot
+                                            : gameKey === "surge_cashout"
+                                              ? buildSurgeCashoutSessionSnapshot
+                                            : gameKey === "rail_logic"
+                                              ? buildRailLogicSessionSnapshot
+                                            : gameKey === "shadow_tell"
+                                              ? buildShadowTellSessionSnapshot
+                                            : gameKey === "core_balance"
+                                              ? buildCoreBalanceSessionSnapshot
+                                            : gameKey === "relic_draft"
+                                              ? buildRelicDraftSessionSnapshot
                                             : gameKey === "solo_ladder"
                                             ? buildSoloLadderSessionSnapshot
                                             : gameKey === "odd_even"
@@ -1070,7 +1190,12 @@ export default async function handler(req, res) {
       gameKey === "solo_ladder" ||
       gameKey === "pulse_lock" ||
       gameKey === "echo_sequence" ||
-      gameKey === "safe_zone") &&
+      gameKey === "safe_zone" ||
+      gameKey === "surge_cashout" ||
+      gameKey === "rail_logic" ||
+      gameKey === "shadow_tell" ||
+      gameKey === "core_balance" ||
+      gameKey === "relic_draft") &&
       isGameNotEnabled(error)
     ) {
       console.warn(`solo-v2 create: ${gameKey} missing/disabled in solo_v2_games, attempting catalog bootstrap`);
@@ -1129,7 +1254,12 @@ export default async function handler(req, res) {
       gameKey === "solo_ladder" ||
       gameKey === "pulse_lock" ||
       gameKey === "echo_sequence" ||
-      gameKey === "safe_zone") &&
+      gameKey === "safe_zone" ||
+      gameKey === "surge_cashout" ||
+      gameKey === "rail_logic" ||
+      gameKey === "shadow_tell" ||
+      gameKey === "core_balance" ||
+      gameKey === "relic_draft") &&
         isLegacyDeviceIdNotNullError(error)
       ) {
         console.warn("solo-v2 create: legacy device_id constraint detected, using compat insert path");
@@ -1167,6 +1297,11 @@ export default async function handler(req, res) {
         await seedMysteryChamberSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         await seedDiamondsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef, gameOptions);
         await seedSoloLadderSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedSurgeCashoutSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedRailLogicSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedShadowTellSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedCoreBalanceSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+        await seedRelicDraftSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
         return res.status(201).json({
           ok: true,
           category: "success",
@@ -1230,7 +1365,12 @@ export default async function handler(req, res) {
       gameKey === "solo_ladder" ||
       gameKey === "pulse_lock" ||
       gameKey === "echo_sequence" ||
-      gameKey === "safe_zone") &&
+      gameKey === "safe_zone" ||
+      gameKey === "surge_cashout" ||
+      gameKey === "rail_logic" ||
+      gameKey === "shadow_tell" ||
+      gameKey === "core_balance" ||
+      gameKey === "relic_draft") &&
         isUniqueConflict(error)
       ) {
         const buildSnapshot =
@@ -1274,6 +1414,16 @@ export default async function handler(req, res) {
                                               ? buildEchoSequenceSessionSnapshot
                                             : gameKey === "safe_zone"
                                               ? buildSafeZoneSessionSnapshot
+                                            : gameKey === "surge_cashout"
+                                              ? buildSurgeCashoutSessionSnapshot
+                                            : gameKey === "rail_logic"
+                                              ? buildRailLogicSessionSnapshot
+                                            : gameKey === "shadow_tell"
+                                              ? buildShadowTellSessionSnapshot
+                                            : gameKey === "core_balance"
+                                              ? buildCoreBalanceSessionSnapshot
+                                            : gameKey === "relic_draft"
+                                              ? buildRelicDraftSessionSnapshot
                                             : gameKey === "solo_ladder"
                                             ? buildSoloLadderSessionSnapshot
                                             : gameKey === "odd_even"
@@ -1354,6 +1504,11 @@ export default async function handler(req, res) {
               await seedMysteryChamberSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedDiamondsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef, gameOptions);
               await seedSoloLadderSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedSurgeCashoutSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedRailLogicSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedShadowTellSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedCoreBalanceSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedRelicDraftSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -1410,6 +1565,11 @@ export default async function handler(req, res) {
               await seedMysteryChamberSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               await seedDiamondsSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef, gameOptions);
               await seedSoloLadderSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedSurgeCashoutSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedRailLogicSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedShadowTellSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedCoreBalanceSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
+              await seedRelicDraftSessionOrWarn(supabase, gameKey, retryRow?.session_id, playerRef);
               return res.status(201).json({
                 ok: true,
                 category: "success",
@@ -1481,6 +1641,11 @@ export default async function handler(req, res) {
     await seedMysteryChamberSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     await seedDiamondsSessionOrWarn(supabase, gameKey, row?.session_id, playerRef, gameOptions);
     await seedSoloLadderSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedSurgeCashoutSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedRailLogicSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedShadowTellSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedCoreBalanceSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
+    await seedRelicDraftSessionOrWarn(supabase, gameKey, row?.session_id, playerRef);
     return res.status(201).json({
       ok: true,
       category: "success",

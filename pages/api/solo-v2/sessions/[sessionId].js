@@ -44,6 +44,18 @@ import { buildSoloLadderSessionSnapshot } from "../../../../lib/solo-v2/server/s
 import { buildPulseLockSessionSnapshot } from "../../../../lib/solo-v2/server/pulseLockSnapshot";
 import { buildEchoSequenceSessionSnapshot } from "../../../../lib/solo-v2/server/echoSequenceSnapshot";
 import { buildSafeZoneSessionSnapshot } from "../../../../lib/solo-v2/server/safeZoneSnapshot";
+import {
+  buildSurgeCashoutSessionSnapshot,
+  stripSurgeCashoutSecretsFromSummary,
+} from "../../../../lib/solo-v2/server/surgeCashoutSnapshot";
+import { surgeCashoutTryAutoCrash } from "../../../../lib/solo-v2/server/surgeCashoutResolveActions";
+import { buildRailLogicSessionSnapshot } from "../../../../lib/solo-v2/server/railLogicSnapshot";
+import {
+  buildShadowTellSessionSnapshot,
+  stripShadowTellSecretsFromSummary,
+} from "../../../../lib/solo-v2/server/shadowTellSnapshot";
+import { buildCoreBalanceSessionSnapshot } from "../../../../lib/solo-v2/server/coreBalanceSnapshot";
+import { buildRelicDraftSessionSnapshot } from "../../../../lib/solo-v2/server/relicDraftSnapshot";
 import { SOLO_V2_SESSION_STATUS } from "../../../../lib/solo-v2/server/sessionTypes";
 
 function isMissingTable(error) {
@@ -96,9 +108,14 @@ export default async function handler(req, res) {
       });
     }
 
-    const row = Array.isArray(data) ? data[0] : data;
+    let row = Array.isArray(data) ? data[0] : data;
     if (!row) {
       return res.status(404).json({ ok: false, category: "validation_error", status: "not_found", message: "Session not found" });
+    }
+
+    if (row.game_key === "surge_cashout" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED) {
+      const auto = await surgeCashoutTryAutoCrash(supabase, row, playerRef);
+      if (auto.updatedRow) row = auto.updatedRow;
     }
 
     let sessionReadState = "ready";
@@ -125,6 +142,11 @@ export default async function handler(req, res) {
     let pulseLockPayload = null;
     let echoSequencePayload = null;
     let safeZonePayload = null;
+    let surgeCashoutPayload = null;
+    let railLogicPayload = null;
+    let shadowTellPayload = null;
+    let coreBalancePayload = null;
+    let relicDraftPayload = null;
 
     if (row.game_key === "quick_flip") {
       const quickFlipSnapshotResult = await buildQuickFlipSessionSnapshot(supabase, row);
@@ -778,6 +800,138 @@ export default async function handler(req, res) {
         pendingState: szSnapshot.pendingState,
         resolvedResult: szSnapshot.resolvedResult,
       };
+    } else if (row.game_key === "surge_cashout") {
+      const scSnapshotResult = await buildSurgeCashoutSessionSnapshot(supabase, row);
+      if (!scSnapshotResult.ok) {
+        if (isMissingTable(scSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const scSnapshot = scSnapshotResult.snapshot;
+      sessionReadState = scSnapshot.readState;
+      surgeCashoutPayload = {
+        readState: scSnapshot.readState,
+        playing: scSnapshot.playing,
+        canCashOut: scSnapshot.canCashOut,
+        canLaunch: scSnapshot.canLaunch,
+        resolvedResult: scSnapshot.resolvedResult,
+      };
+    } else if (row.game_key === "rail_logic") {
+      const rlSnapshotResult = await buildRailLogicSessionSnapshot(supabase, row);
+      if (!rlSnapshotResult.ok) {
+        if (isMissingTable(rlSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const rlSnapshot = rlSnapshotResult.snapshot;
+      sessionReadState = rlSnapshot.readState;
+      railLogicPayload = {
+        readState: rlSnapshot.readState,
+        playing: rlSnapshot.playing,
+        canRotate: rlSnapshot.canRotate,
+        canSubmit: rlSnapshot.canSubmit,
+        resolvedResult: rlSnapshot.resolvedResult,
+      };
+    } else if (row.game_key === "shadow_tell") {
+      const stSnapshotResult = await buildShadowTellSessionSnapshot(supabase, row);
+      if (!stSnapshotResult.ok) {
+        if (isMissingTable(stSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const stSnapshot = stSnapshotResult.snapshot;
+      sessionReadState = stSnapshot.readState;
+      shadowTellPayload = {
+        readState: stSnapshot.readState,
+        playing: stSnapshot.playing,
+        canDecide: stSnapshot.canDecide,
+        resolvedResult: stSnapshot.resolvedResult,
+      };
+    } else if (row.game_key === "core_balance") {
+      const cbSnapshotResult = await buildCoreBalanceSessionSnapshot(supabase, row);
+      if (!cbSnapshotResult.ok) {
+        if (isMissingTable(cbSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const cbSnapshot = cbSnapshotResult.snapshot;
+      sessionReadState = cbSnapshot.readState;
+      coreBalancePayload = {
+        readState: cbSnapshot.readState,
+        playing: cbSnapshot.playing,
+        canAct: cbSnapshot.canAct,
+        resolvedResult: cbSnapshot.resolvedResult,
+      };
+    } else if (row.game_key === "relic_draft") {
+      const rdSnapshotResult = await buildRelicDraftSessionSnapshot(supabase, row);
+      if (!rdSnapshotResult.ok) {
+        if (isMissingTable(rdSnapshotResult.error)) {
+          return res.status(503).json({
+            ok: false,
+            category: "pending_migration",
+            status: "pending_migration",
+            message: "Solo V2 session persistence is not migrated yet.",
+          });
+        }
+        return res.status(503).json({
+          ok: false,
+          category: "unavailable",
+          status: "unavailable",
+          message: "Session read is temporarily unavailable.",
+        });
+      }
+      const rdSnapshot = rdSnapshotResult.snapshot;
+      sessionReadState = rdSnapshot.readState;
+      relicDraftPayload = {
+        readState: rdSnapshot.readState,
+        playing: rdSnapshot.playing,
+        canAdvance: rdSnapshot.canAdvance,
+        resolvedResult: rdSnapshot.resolvedResult,
+      };
     }
 
     const rawSummary = row.server_outcome_summary || {};
@@ -794,6 +948,10 @@ export default async function handler(req, res) {
             ? stripMysteryChamberSecretsFromSummary(rawSummary)
             : row.game_key === "diamonds" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
               ? stripDiamondsSecretsFromSummary(rawSummary)
+              : row.game_key === "surge_cashout" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
+                ? stripSurgeCashoutSecretsFromSummary(rawSummary)
+                : row.game_key === "shadow_tell" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
+                  ? stripShadowTellSecretsFromSummary(rawSummary)
               : row.game_key === "vault_doors" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
                 ? stripVaultDoorsSecretsFromSummary(rawSummary)
                 : row.game_key === "crystal_path" && row.session_status !== SOLO_V2_SESSION_STATUS.RESOLVED
@@ -842,6 +1000,11 @@ export default async function handler(req, res) {
         pulseLock: pulseLockPayload,
         echoSequence: echoSequencePayload,
         safeZone: safeZonePayload,
+        surgeCashout: surgeCashoutPayload,
+        railLogic: railLogicPayload,
+        shadowTell: shadowTellPayload,
+        coreBalance: coreBalancePayload,
+        relicDraft: relicDraftPayload,
       },
       authority: {
         sessionTruth: "server",
