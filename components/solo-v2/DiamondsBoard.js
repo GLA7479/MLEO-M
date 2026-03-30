@@ -1,5 +1,15 @@
+import { DIAMONDS_BOMB_COUNT_FOR_DIFFICULTY } from "../../lib/solo-v2/diamondsConfig";
+
+const DIFFICULTY_OPTIONS = [
+  { key: "easy", label: "Easy" },
+  { key: "medium", label: "Med" },
+  { key: "hard", label: "Hard" },
+  { key: "expert", label: "Expert" },
+];
+
 /**
  * 5×5 Diamonds grid — hidden / safe / bomb faces (bombs only when `revealBombs`).
+ * Optional idle risk row lives inside this single playfield root (matches one-child play-inner pattern).
  */
 export default function DiamondsBoard({
   gridSize = 5,
@@ -10,6 +20,9 @@ export default function DiamondsBoard({
   pulseIndex = null,
   shakeIndex = null,
   onRevealCell,
+  showRiskPicker = false,
+  difficulty = "medium",
+  onDifficultyChange,
 }) {
   const n = Math.max(2, Math.min(8, Math.floor(Number(gridSize)) || 5));
   const total = n * n;
@@ -66,6 +79,24 @@ export default function DiamondsBoard({
 
   return (
     <div className="flex w-full max-w-[min(100%,20rem)] flex-col gap-1 self-center sm:max-w-[22rem]" aria-label="Diamonds grid">
+      {showRiskPicker ? (
+        <div className="mb-1 flex flex-wrap items-center justify-center gap-1 px-0.5">
+          {DIFFICULTY_OPTIONS.map(opt => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => onDifficultyChange?.(opt.key)}
+              className={`rounded-md border px-2 py-0.5 text-[9px] font-bold sm:py-1 sm:text-[10px] ${
+                difficulty === opt.key
+                  ? "border-amber-400/50 bg-amber-950/50 text-amber-100"
+                  : "border-white/12 bg-zinc-900/40 text-zinc-400 hover:border-white/20"
+              }`}
+            >
+              {opt.label} ({DIAMONDS_BOMB_COUNT_FOR_DIFFICULTY[opt.key] ?? "?"}💣)
+            </button>
+          ))}
+        </div>
+      ) : null}
       {Array.from({ length: n }, (_, row) => (
         <div key={row} className="flex w-full min-w-0 justify-center gap-0.5 sm:gap-1">
           {cells.slice(row * n, row * n + n)}

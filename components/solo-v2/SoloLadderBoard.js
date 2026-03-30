@@ -1,5 +1,5 @@
 /**
- * Step ladder — passed / current / future rungs (native Solo V2 styling).
+ * Step ladder — passed / current / future rungs; climb CTA lives inside this playfield root.
  */
 export default function SoloLadderBoard({
   stepTotal = 6,
@@ -7,6 +7,10 @@ export default function SoloLadderBoard({
   terminal = false,
   terminalKind = null,
   failedAtStep = null,
+  showClimb = false,
+  climbDisabled = false,
+  climbLoading = false,
+  onClimb,
 }) {
   const total = Math.max(1, Math.floor(Number(stepTotal) || 6));
   const done = Math.max(0, Math.min(total, Math.floor(Number(successCount) || 0)));
@@ -53,6 +57,20 @@ export default function SoloLadderBoard({
           </div>
         );
       })}
+      {showClimb ? (
+        <button
+          type="button"
+          onClick={() => !climbDisabled && !climbLoading && onClimb?.()}
+          disabled={climbDisabled || climbLoading}
+          className={`mt-1 min-h-[48px] w-full shrink-0 rounded-lg border px-4 py-2.5 text-xs font-extrabold uppercase tracking-wide sm:mt-1.5 sm:text-sm ${
+            climbDisabled || climbLoading
+              ? "cursor-not-allowed border-white/15 bg-white/5 text-zinc-500"
+              : "border-amber-400/45 bg-amber-950/40 text-amber-100 active:bg-amber-900/45"
+          }`}
+        >
+          {climbLoading ? "CLIMBING…" : "CLIMB STEP"}
+        </button>
+      ) : null}
     </div>
   );
 }

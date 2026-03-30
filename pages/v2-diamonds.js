@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DiamondsBoard from "../components/solo-v2/DiamondsBoard";
 import SoloV2BoardCashOutControl from "../components/solo-v2/SoloV2BoardCashOutControl";
-import SoloV2ProgressStrip from "../components/solo-v2/SoloV2ProgressStrip";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
   SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
 } from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
+import SoloV2ProgressStrip from "../components/solo-v2/SoloV2ProgressStrip";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
 import {
@@ -46,13 +46,6 @@ const UI_STATE = {
   RESOLVING: "resolving",
   RESOLVED: "resolved",
 };
-
-const DIFFICULTY_OPTIONS = [
-  { key: "easy", label: "Easy" },
-  { key: "medium", label: "Med" },
-  { key: "hard", label: "Hard" },
-  { key: "expert", label: "Expert" },
-];
 
 const STATS_KEY = "solo_v2_diamonds_stats_v1";
 const BET_PRESETS = [25, 100, 1000, 10000];
@@ -128,8 +121,7 @@ function DiamondsGameplayPanel({
   popupLine2,
   popupLine3,
   resultVaultLabel,
-  difficultyLabel,
-  showDifficultyPicker,
+  showRiskPicker,
   difficulty,
   onDifficultyChange,
 }) {
@@ -172,37 +164,6 @@ function DiamondsGameplayPanel({
           </p>
         </div>
 
-        <div className="flex shrink-0 flex-col gap-1 px-2 pb-1 pt-0 sm:gap-1.5 lg:px-5">
-          <div className="flex items-center justify-center gap-1 sm:gap-1.5">
-            <span className="text-[9px] font-semibold text-zinc-500 sm:text-[10px]">Grid</span>
-            <span className="text-[10px] font-bold text-amber-100/90 sm:text-[11px]">5×5</span>
-            <span className="text-zinc-600">·</span>
-            <span className="text-[9px] font-semibold text-zinc-500 sm:text-[10px]">Mode</span>
-            <span className="text-[10px] font-bold capitalize text-amber-100/90 sm:text-[11px]">{difficultyLabel}</span>
-          </div>
-          {showDifficultyPicker ? (
-            <div className="flex flex-wrap items-center justify-center gap-1">
-              <span className="w-full text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">
-                Risk preset
-              </span>
-              {DIFFICULTY_OPTIONS.map(opt => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => onDifficultyChange?.(opt.key)}
-                  className={`rounded-md border px-2 py-0.5 text-[9px] font-bold sm:py-1 sm:text-[10px] ${
-                    difficulty === opt.key
-                      ? "border-amber-400/50 bg-amber-950/50 text-amber-100"
-                      : "border-white/12 bg-zinc-900/40 text-zinc-400 hover:border-white/20"
-                  }`}
-                >
-                  {opt.label} ({DIAMONDS_BOMB_COUNT_FOR_DIFFICULTY[opt.key] ?? "?"}💣)
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
         <SoloV2ProgressStrip
           keyPrefix="dm"
           rowLabel="Gems"
@@ -213,10 +174,13 @@ function DiamondsGameplayPanel({
           stepLabels={stepLabels}
         />
 
+        {/*
+         * Desktop: cash-out band under the playfield on lg+ (`lg:flex` below). Footer still carries desktop payout where configured. Mobile duplicate max-win/payout strip removed — shell header shows Play / Max win.
+         */}
         <div className="solo-v2-ladder-playfield-wrap flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
           <div
             className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(14rem,30vh)]"
-            aria-label="Diamonds playfield"
+            aria-label="Diamonds grid"
           >
             <div className="solo-v2-ladder-play-inner flex min-h-0 min-h-[11rem] flex-1 flex-col items-center justify-center px-0.5 py-1 sm:min-h-[12rem] sm:px-1 sm:py-1.5 lg:min-h-0 lg:px-1 lg:py-0.5">
               <DiamondsBoard
@@ -228,6 +192,9 @@ function DiamondsGameplayPanel({
                 pulseIndex={pulseIndex}
                 shakeIndex={shakeIndex}
                 onRevealCell={onRevealCell}
+                showRiskPicker={showRiskPicker}
+                difficulty={difficulty}
+                onDifficultyChange={onDifficultyChange}
               />
             </div>
             <div className="hidden shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:flex lg:min-h-[4.25rem] lg:gap-1.5 lg:px-2 lg:py-1.5">
@@ -468,7 +435,7 @@ export default function V2DiamondsPage() {
         settlementSummary: dm.resolvedResult.settlementSummary,
       });
       setUiState(UI_STATE.RESOLVED);
-      setSessionNotice(resumed ? "Round ended (restored)." : "");
+      setSessionNotice(resumed ? "Run ended (restored)." : "");
       setErrorMessage("");
       return;
     }
@@ -476,7 +443,7 @@ export default function V2DiamondsPage() {
     if (readState === "choice_required" || readState === "ready") {
       setResolvedResult(null);
       setUiState(UI_STATE.SESSION_ACTIVE);
-      setSessionNotice(resumed ? "Resumed run." : "Tap a cell to reveal.");
+      setSessionNotice(resumed ? "Resumed active run." : "Tap a cell to reveal.");
       setErrorMessage("");
       return;
     }
@@ -487,7 +454,7 @@ export default function V2DiamondsPage() {
       setUiState(UI_STATE.IDLE);
       setSessionNotice("");
       setErrorMessage(
-        st === "expired" ? "Session expired. Press START ROUND." : "Session ended. Press START ROUND.",
+        st === "expired" ? "Session expired. Press START RUN." : "Session ended. Press START RUN.",
       );
       return;
     }
@@ -775,7 +742,7 @@ export default function V2DiamondsPage() {
     }
   }
 
-  async function runStartRound() {
+  async function runStartRun() {
     if (createInFlightRef.current || submitInFlightRef.current || resolveInFlightRef.current) return;
     const isGiftRound = giftRoundRef.current;
     if (!vaultReady) {
@@ -838,7 +805,7 @@ export default function V2DiamondsPage() {
     setErrorMessage(prev => {
       const s = String(prev || "");
       if (
-        /Session expired\. Press START ROUND|Session ended\. Press START ROUND|no longer valid\. Press START ROUND/i.test(
+        /Session expired\. Press START RUN|Session ended\. Press START RUN|no longer valid\. Press START RUN/i.test(
           s,
         )
       ) {
@@ -903,7 +870,7 @@ export default function V2DiamondsPage() {
   const strip = diamondsStripModel(maxSafe, safeForStrip, uiState, stripTerminalKind);
   const stepLabels = Array.from({ length: strip.stepTotal }, (_, i) => `G${i + 1}`);
 
-  let payoutBandLabel = "Next gem win";
+  let payoutBandLabel = "Secured payout";
   let payoutBandValue = formatCompact(summaryWin);
 
   if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
@@ -914,9 +881,9 @@ export default function V2DiamondsPage() {
   }
 
   const terminalKind = resolvedResult?.terminalKind;
-  let resultTitle = "Round complete";
-  if (terminalKind === "bomb") resultTitle = "Bomb — round lost";
-  else if (terminalKind === "full_clear") resultTitle = "Board clear!";
+  let resultTitle = "Run complete";
+  if (terminalKind === "bomb") resultTitle = "Bomb — run lost";
+  else if (terminalKind === "full_clear") resultTitle = "Full clear — top win!";
   else if (terminalKind === "cashout") resultTitle = "Cashed out";
 
   const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.won);
@@ -930,10 +897,12 @@ export default function V2DiamondsPage() {
   let popupLine2 = formatCompact(prPopup);
   let popupLine3 = resultTitle;
   if (terminalKind === "bomb") {
-    popupLine2 = "Bomb hit";
+    const ci = resolvedResult?.cellIndex ?? resolvedResult?.lastCellIndex;
+    popupLine2 =
+      ci != null && Number.isFinite(Number(ci)) ? `Bomb · cell ${Math.floor(Number(ci)) + 1}` : "Bomb hit";
     popupLine3 = `${formatCompact(prPopup)} return`;
   } else if (terminalKind === "full_clear") {
-    popupLine2 = `Clear · ${formatCompact(prPopup)}`;
+    popupLine2 = `Crown · ${formatCompact(prPopup)}`;
     popupLine3 = "All safe gems found";
   } else if (terminalKind === "cashout") {
     popupLine2 = `Cashed ${formatCompact(prPopup)}`;
@@ -953,7 +922,7 @@ export default function V2DiamondsPage() {
       return;
     }
     giftRoundRef.current = true;
-    void runStartRound();
+    void runStartRun();
   }, [vaultReady, giftShell.giftCount, uiState]);
 
   function handlePresetClick(presetValue) {
@@ -980,13 +949,10 @@ export default function V2DiamondsPage() {
     uiState === UI_STATE.RESOLVING ||
     uiState === UI_STATE.LOADING;
 
-  const activeDifficultyLabel =
-    playing?.difficulty != null ? String(playing.difficulty) : difficulty;
-
   return (
     <SoloV2GameShell
       title="Diamonds"
-      subtitle="Reveal gems. Avoid bombs. Cash out before you hit one."
+      subtitle="Pick gems. Avoid bombs."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -1018,7 +984,7 @@ export default function V2DiamondsPage() {
         betPresets: BET_PRESETS,
         wagerInput,
         wagerNumeric: numericWager,
-        canEditPlay: !busyFooter && idleLike,
+        canEditPlay: !busyFooter,
         compactAmountDisplayWhenBlurred: true,
         formatPresetLabel: v => formatCompact(v),
         onPresetAmount: handlePresetClick,
@@ -1044,12 +1010,12 @@ export default function V2DiamondsPage() {
           clearPresetChain();
           setWagerInput(String(DIAMONDS_MIN_WAGER));
         },
-        primaryActionLabel: "START ROUND",
+        primaryActionLabel: "START RUN",
         primaryActionDisabled: !canStart,
         primaryActionLoading: isPrimaryLoading,
         primaryLoadingLabel: "STARTING…",
         onPrimaryAction: () => {
-          void runStartRound();
+          void runStartRun();
         },
         errorMessage: errorMessage || stakeHint,
         desktopPayout: {
@@ -1085,8 +1051,7 @@ export default function V2DiamondsPage() {
           popupLine2={popupLine2}
           popupLine3={popupLine3}
           resultVaultLabel={resultVaultLabel}
-          difficultyLabel={activeDifficultyLabel}
-          showDifficultyPicker={idleLike && !busyFooter}
+          showRiskPicker={idleLike && !busyFooter}
           difficulty={difficulty}
           onDifficultyChange={setDifficulty}
         />
@@ -1094,12 +1059,18 @@ export default function V2DiamondsPage() {
       helpContent={
         <div className="space-y-2">
           <p>
-            Five-by-five grid: the server seals bomb positions before play. Each safe reveal raises your secured payout
-            using combinatorial odds with the same 96% RTP family as Quick Flip. One bomb ends the round.
+            Diamonds is a five-by-five grid: the server seals bomb positions before you play. Each safe reveal raises your
+            secured payout; hitting a bomb ends the run immediately.
           </p>
           <p>
-            Choose difficulty (bomb count) before starting. After any safe gem you can cash out from the board band.
-            Gift rounds use freeplay settlement rules.
+            Pick a risk preset (bomb count) on the board before you start. After any safe gem you may cash out from the
+            lower band of the panel, under the grid and above the stake bar. On small screens secured payout also appears
+            in the summary strip above the grid; on large screens it appears beside the stake controls. Gift rounds use
+            freeplay — a loss does not debit your vault; a win credits the full payout.
+          </p>
+          <p>
+            After the result popup closes, the finished board recap stays visible — press START RUN explicitly for the next
+            round; there is no auto-start.
           </p>
         </div>
       }
@@ -1112,6 +1083,7 @@ export default function V2DiamondsPage() {
           <p>Total played: {formatCompact(stats.totalPlay)}</p>
           <p>Total returned: {formatCompact(stats.totalWon)}</p>
           <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
+          <p>Net flow (returned − played): {formatCompact(stats.totalWon - stats.totalPlay)}</p>
         </div>
       }
       resultState={null}

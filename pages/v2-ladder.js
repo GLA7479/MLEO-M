@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import SoloV2BoardCashOutControl from "../components/solo-v2/SoloV2BoardCashOutControl";
-import SoloV2ProgressStrip from "../components/solo-v2/SoloV2ProgressStrip";
 import SoloV2ResultPopup, {
   SoloV2ResultPopupVaultLine,
   SOLO_V2_RESULT_POPUP_AUTO_DISMISS_MS,
 } from "../components/solo-v2/SoloV2ResultPopup";
 import SoloV2GameShell from "../components/solo-v2/SoloV2GameShell";
+import SoloV2ProgressStrip from "../components/solo-v2/SoloV2ProgressStrip";
 import SoloLadderBoard from "../components/solo-v2/SoloLadderBoard";
 import { formatCompactNumber as formatCompact } from "../lib/solo-v2/formatCompactNumber";
 import { SOLO_V2_SESSION_MODE } from "../lib/solo-v2/server/sessionTypes";
@@ -102,6 +102,10 @@ function LadderGameplayPanel({
   boardCashOutLabel,
   boardCashOutLoadingLabel,
   onBoardCashOut,
+  showClimb,
+  climbDisabled,
+  climbLoading,
+  onClimb,
   resultPopupOpen,
   resolvedIsWin,
   popupLine2,
@@ -144,18 +148,25 @@ function LadderGameplayPanel({
           stepLabels={stepLabels}
         />
 
+        {/*
+         * Desktop: cash-out band under the playfield on lg+ (`lg:flex` below). Footer still carries desktop payout where configured. Mobile duplicate max-win/payout strip removed — shell header shows Play / Max win.
+         */}
         <div className="solo-v2-ladder-playfield-wrap flex min-h-0 flex-1 flex-col px-1 pb-1 sm:px-2 lg:min-h-0 lg:px-4 lg:pb-1.5">
           <div
             className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-700/55 bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:min-h-[min(14rem,30vh)]"
-            aria-label="Ladder playfield"
+            aria-label="Solo ladder board"
           >
-            <div className="solo-v2-ladder-play-inner flex min-h-0 min-h-[11rem] flex-1 flex-col justify-center px-0.5 py-1 sm:min-h-[12rem] sm:px-1 sm:py-1.5 lg:min-h-0 lg:px-1 lg:py-0.5">
+            <div className="solo-v2-ladder-play-inner flex min-h-0 min-h-[11rem] flex-1 flex-col items-center justify-center px-0.5 py-1 sm:min-h-[12rem] sm:px-1 sm:py-1.5 lg:min-h-0 lg:px-1 lg:py-0.5">
               <SoloLadderBoard
-                stepTotal={SOLO_LADDER_STEP_COUNT}
+                stepTotal={stepTotal}
                 successCount={successCount}
                 terminal={isTerminal}
                 terminalKind={rr?.terminalKind ?? null}
                 failedAtStep={rr?.failedAtStep ?? null}
+                showClimb={showClimb}
+                climbDisabled={climbDisabled}
+                climbLoading={climbLoading}
+                onClimb={onClimb}
               />
             </div>
             <div className="hidden shrink-0 flex-col items-center justify-center gap-2 border-t border-zinc-700/45 bg-zinc-900/30 px-2 py-2 sm:py-2.5 lg:flex lg:min-h-[4.25rem] lg:gap-1.5 lg:px-2 lg:py-1.5">
@@ -397,7 +408,7 @@ export default function V2LadderPage() {
     if (readState === "choice_required" || readState === "ready") {
       setResolvedResult(null);
       setUiState(UI_STATE.SESSION_ACTIVE);
-      setSessionNotice(resumed ? "Resumed climb." : "Climb or cash out secured steps.");
+      setSessionNotice(resumed ? "Resumed active run." : "Climb the next step or cash out.");
       setErrorMessage("");
       return;
     }
@@ -408,7 +419,7 @@ export default function V2LadderPage() {
       setUiState(UI_STATE.IDLE);
       setSessionNotice("");
       setErrorMessage(
-        st === "expired" ? "Session expired. Press START CLIMB." : "Session ended. Press START CLIMB.",
+        st === "expired" ? "Session expired. Press START RUN." : "Session ended. Press START RUN.",
       );
       return;
     }
@@ -666,7 +677,7 @@ export default function V2LadderPage() {
     }
   }
 
-  async function runStartClimb() {
+  async function runStartRun() {
     if (createInFlightRef.current || climbLoading || resolveInFlightRef.current) return;
     const isGiftRound = giftRoundRef.current;
     if (!vaultReady) {
@@ -728,7 +739,7 @@ export default function V2LadderPage() {
     setErrorMessage(prev => {
       const s = String(prev || "");
       if (
-        /Session expired\. Press START CLIMB|Session ended\. Press START CLIMB|no longer valid\. Press START CLIMB/i.test(
+        /Session expired\. Press START RUN|Session ended\. Press START RUN|no longer valid\. Press START RUN/i.test(
           s,
         )
       ) {
@@ -792,7 +803,7 @@ export default function V2LadderPage() {
   }
   const stepLabels = Array.from({ length: stepTotal }, (_, i) => `S${i + 1}`);
 
-  let payoutBandLabel = "Next step win";
+  let payoutBandLabel = "Secured payout";
   let payoutBandValue = formatCompact(summaryWin);
 
   if (uiState === UI_STATE.RESOLVED && resolvedResult?.settlementSummary) {
@@ -805,7 +816,7 @@ export default function V2LadderPage() {
   const terminalKind = resolvedResult?.terminalKind;
   let resultTitle = "Run complete";
   if (terminalKind === "bust") resultTitle = "Bust — run lost";
-  else if (terminalKind === "full_clear") resultTitle = "Top step cleared!";
+  else if (terminalKind === "full_clear") resultTitle = "Full clear — top win!";
   else if (terminalKind === "cashout") resultTitle = "Cashed out";
 
   const resolvedIsWin = Boolean(resolvedResult?.isWin ?? resolvedResult?.won);
@@ -819,10 +830,14 @@ export default function V2LadderPage() {
   let popupLine2 = formatCompact(prPopup);
   let popupLine3 = resultTitle;
   if (terminalKind === "bust") {
-    popupLine2 = "Ladder broke";
+    const fs = resolvedResult?.failedAtStep;
+    popupLine2 =
+      fs != null && Number.isFinite(Number(fs))
+        ? `Bust · step ${Math.floor(Number(fs))}`
+        : "Ladder broke";
     popupLine3 = `${formatCompact(prPopup)} return`;
   } else if (terminalKind === "full_clear") {
-    popupLine2 = `Top · ${formatCompact(prPopup)}`;
+    popupLine2 = `Crown · ${formatCompact(prPopup)}`;
     popupLine3 = "All steps cleared";
   } else if (terminalKind === "cashout") {
     popupLine2 = `Cashed ${formatCompact(prPopup)}`;
@@ -840,7 +855,7 @@ export default function V2LadderPage() {
       return;
     }
     giftRoundRef.current = true;
-    void runStartClimb();
+    void runStartRun();
   }, [vaultReady, giftShell.giftCount, uiState, climbLoading]);
 
   function handlePresetClick(presetValue) {
@@ -864,13 +879,17 @@ export default function V2LadderPage() {
 
   const busyFooter = uiState === UI_STATE.RESOLVING || uiState === UI_STATE.LOADING;
 
-  const canClimbFooter =
-    uiState === UI_STATE.SESSION_ACTIVE && !terminalSession && Boolean(sl?.canClimb) && !climbLoading && !cashOutLoading;
+  const showBoardClimb =
+    uiState === UI_STATE.SESSION_ACTIVE &&
+    !terminalSession &&
+    (Boolean(sl?.canClimb) || climbLoading);
+  const climbControlDisabled =
+    climbLoading || cashOutLoading || busyFooter || !sl?.canClimb;
 
   return (
     <SoloV2GameShell
       title="Ladder"
-      subtitle="Climb step by step. Cash out before the run breaks."
+      subtitle="Climb. Stop. Win."
       layoutMaxWidthClass="max-w-full sm:max-w-2xl lg:max-w-5xl"
       mobileHeaderBreathingRoom
       stableTripleTopSummary
@@ -902,7 +921,7 @@ export default function V2LadderPage() {
         betPresets: BET_PRESETS,
         wagerInput,
         wagerNumeric: numericWager,
-        canEditPlay: !busyFooter && idleLike,
+        canEditPlay: !busyFooter,
         compactAmountDisplayWhenBlurred: true,
         formatPresetLabel: v => formatCompact(v),
         onPresetAmount: handlePresetClick,
@@ -928,19 +947,12 @@ export default function V2LadderPage() {
           clearPresetChain();
           setWagerInput(String(SOLO_LADDER_MIN_WAGER));
         },
-        primaryActionLabel: "START CLIMB",
+        primaryActionLabel: "START RUN",
         primaryActionDisabled: !canStart,
         primaryActionLoading: isPrimaryLoading,
         primaryLoadingLabel: "STARTING…",
         onPrimaryAction: () => {
-          void runStartClimb();
-        },
-        secondaryActionLabel: canClimbFooter ? "CLIMB STEP" : null,
-        secondaryActionDisabled: !canClimbFooter || climbLoading,
-        secondaryActionLoading: climbLoading,
-        secondaryLoadingLabel: "CLIMBING…",
-        onSecondaryAction: () => {
-          void handleClimb();
+          void runStartRun();
         },
         errorMessage: errorMessage || stakeHint,
         desktopPayout: {
@@ -968,6 +980,12 @@ export default function V2LadderPage() {
           onBoardCashOut={() => {
             void handleCashOut();
           }}
+          showClimb={showBoardClimb}
+          climbDisabled={climbControlDisabled}
+          climbLoading={climbLoading}
+          onClimb={() => {
+            void handleClimb();
+          }}
           resultPopupOpen={resultPopupOpen}
           resolvedIsWin={resolvedIsWin}
           popupLine2={popupLine2}
@@ -978,10 +996,19 @@ export default function V2LadderPage() {
       helpContent={
         <div className="space-y-2">
           <p>
-            Six server-sealed steps: each climb is a fresh draw against fixed step odds. Successful steps raise your
-            secured multiplier; a miss ends the run. Clearing step six pays the top multiplier automatically.
+            Ladder is a six-step climb: each step is a server-sealed draw against fixed odds. A successful step raises
+            your secured payout; a miss ends the run. Clearing the top step pays the crown multiplier automatically.
           </p>
-          <p>Use CLIMB STEP in the footer during a run, or cash out from the board after at least one success.</p>
+          <p>
+            During a run, use CLIMB STEP on the board under the step list. After any successful step you may cash out
+            from the lower band of the panel, under the ladder and above the stake bar. Secured payout on small screens
+            appears in the summary strip above the ladder; on large screens it also appears beside the stake controls.
+            Gift rounds use freeplay — a loss does not debit your vault; a win credits the full payout.
+          </p>
+          <p>
+            After the result popup closes, the finished ladder recap stays visible — press START RUN explicitly for the
+            next round; there is no auto-start.
+          </p>
         </div>
       }
       statsContent={
@@ -993,6 +1020,7 @@ export default function V2LadderPage() {
           <p>Total played: {formatCompact(stats.totalPlay)}</p>
           <p>Total returned: {formatCompact(stats.totalWon)}</p>
           <p>Biggest win: {formatCompact(stats.biggestWin)}</p>
+          <p>Net flow (returned − played): {formatCompact(stats.totalWon - stats.totalPlay)}</p>
         </div>
       }
       resultState={null}
