@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getOv2MinPlayersForProduct, ONLINE_V2_REGISTRY } from "../../lib/online-v2/onlineV2GameRegistry";
+import { getOv2MinPlayersForProduct, ONLINE_V2_GAME_IDS, ONLINE_V2_REGISTRY } from "../../lib/online-v2/onlineV2GameRegistry";
 import {
   commitOv2RoomStake,
   fetchOv2RoomById,
@@ -155,7 +156,8 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     setBusy(true);
     setMsg("");
     try {
-      await startOv2RoomIntent({ room_id: roomId, host_participant_key: participantId });
+      const updatedRoom = await startOv2RoomIntent({ room_id: roomId, host_participant_key: participantId });
+      if (updatedRoom && typeof updatedRoom === "object") setRoom(updatedRoom);
       await load();
       onRoomChanged?.();
     } catch (e) {
@@ -173,11 +175,13 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     setBusy(true);
     setMsg("");
     try {
-      await commitOv2RoomStake({
+      const stakeOut = await commitOv2RoomStake({
         room_id: roomId,
         participant_key: participantId,
         idempotency_key: idem,
       });
+      if (stakeOut?.room) setRoom(stakeOut.room);
+      if (Array.isArray(stakeOut?.members)) setMembers(stakeOut.members);
       const debitKey =
         typeof window !== "undefined" ? ov2StakeDebitLocalKey(roomId, room.match_seq, participantId) : null;
       const debitAlreadyDone = debitKey && window.localStorage.getItem(debitKey) === "1";
@@ -351,6 +355,15 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         ) : null}
         {room.lifecycle_phase === "active" ? (
           <p className="text-center text-[11px] text-emerald-200/85">All stakes locked — gameplay not wired yet.</p>
+        ) : null}
+
+        {room.product_game_id === ONLINE_V2_GAME_IDS.BOARD_PATH && amMember ? (
+          <Link
+            href={`/ov2-board-path?room=${encodeURIComponent(roomId)}`}
+            className="block rounded-lg border border-teal-500/35 bg-teal-950/25 py-2 text-center text-xs font-semibold text-teal-100"
+          >
+            Open Board Path table
+          </Link>
         ) : null}
 
         {msg ? (

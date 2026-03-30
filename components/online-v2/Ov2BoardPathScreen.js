@@ -94,7 +94,11 @@ export default function Ov2BoardPathScreen({ contextInput = null }) {
       ? `Event: ${String(bp.lastEvent.type)}`
       : null;
 
-  const combinedStatus = [vm.turnLine, vm.statusLine, localTransientLine, eventStatusLine].filter(Boolean).join(" · ");
+  const faultLine = bp.sessionSyncFault?.message || null;
+  const activeMissingLine = bp.roomActiveMissingSessionHint || null;
+  const combinedStatus = [vm.turnLine, vm.statusLine, localTransientLine, eventStatusLine, faultLine, activeMissingLine]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="ov2-board-path-screen flex h-full min-h-0 w-full flex-col gap-0.5 overflow-hidden text-white sm:gap-1 md:gap-1 lg:gap-1.5">

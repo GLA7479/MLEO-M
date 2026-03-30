@@ -12,7 +12,7 @@ import {
   shouldHostOpenLocalBoardPathSession,
 } from "../lib/online-v2/board-path/ov2BoardPathOpenContract";
 import {
-  fetchBoardPathSession,
+  fetchBoardPathSessionDetailed,
   rpcOv2BoardPathOpenSession,
 } from "../lib/online-v2/board-path/ov2BoardPathSessionApi";
 import {
@@ -29,6 +29,7 @@ import {
   syntheticBoardPathBundleForFixtureGuest,
   syntheticBoardPathBundleForFixtureHost,
 } from "../lib/online-v2/board-path/ov2BoardPathSessionManager";
+import { ONLINE_V2_MEMBER_WALLET_STATE, ONLINE_V2_ROOM_PHASE } from "../lib/online-v2/ov2Economy";
 import { supabaseMP } from "../lib/supabaseClients";
 
 const BP_SEAT_TONES = /** @type {const} */ (["emerald", "sky", "amber", "violet"]);
@@ -52,6 +53,7 @@ function explicitLocalFixtureQuery() {
 export function useOv2BoardPathSession(baseContext) {
   const [bundle, setBundle] = useState(null);
   const [roomSessionPatch, setRoomSessionPatch] = useState(null);
+  const [sessionSyncFault, setSessionSyncFault] = useState(null);
   const bundleRef = useRef(null);
   bundleRef.current = bundle;
 
@@ -106,6 +108,7 @@ export function useOv2BoardPathSession(baseContext) {
     if (!roomId || !selfKey) {
       setBundle(null);
       setRoomSessionPatch(null);
+      setSessionSyncFault(null);
       identityPrevRef.current = { roomId, selfKey, matchSeq: ms };
       return;
     }
@@ -119,6 +122,7 @@ export function useOv2BoardPathSession(baseContext) {
     if (identityShift) {
       setBundle(null);
       setRoomSessionPatch(null);
+      setSessionSyncFault(null);
       identityPrevRef.current = { roomId, selfKey, matchSeq: ms };
       return;
     }
@@ -144,6 +148,26 @@ export function useOv2BoardPathSession(baseContext) {
       return prev;
     });
   }, [roomId, selfKey, matchSeq, activeSid]);
+
+  useEffect(() => {
+    if (!roomId || boardPathRoomIdIsOfflineFixture(roomId)) return;
+    const aid = activeSid;
+    const hasAid = aid != null && String(aid).trim() !== "";
+    if (hasAid) return;
+    setSessionSyncFault(prev => {
+      if (!prev) return null;
+      const openCodes = new Set([
+        "OPEN_SESSION_FAILED",
+        "RPC_ERROR",
+        "EMPTY",
+        "OPEN_SESSION_EMPTY",
+        "OPEN_SESSION_BUNDLE_INVALID",
+        "OPEN_SESSION_EXCEPTION",
+      ]);
+      if (openCodes.has(prev.code)) return prev;
+      return null;
+    });
+  }, [roomId, activeSid]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -173,13 +197,37 @@ export function useOv2BoardPathSession(baseContext) {
     (async () => {
       try {
         const raw = await rpcOv2BoardPathOpenSession(supabaseMP, roomId, selfKey);
-        if (cancelled || !raw || raw.ok !== true) return;
+        if (cancelled) return;
+        if (!raw || raw.ok !== true) {
+          const msg =
+            typeof raw?.message === "string"
+              ? raw.message
+              : "Could not open Board Path session (server rejected or RPC error).";
+          const code = typeof raw?.code === "string" ? raw.code : "OPEN_SESSION_FAILED";
+          setSessionSyncFault({ code, message: msg });
+          return;
+        }
         const session = raw.session;
         const seatsRaw = raw.seats;
         const seats = Array.isArray(seatsRaw) ? seatsRaw : [];
-        if (!session || typeof session !== "object") return;
+        if (!session || typeof session !== "object") {
+          setSessionSyncFault({
+            code: "OPEN_SESSION_EMPTY",
+            message: "Open session returned no session payload.",
+          });
+          return;
+        }
         const b = boardPathBundleFromDatabase(room, members, selfKey, session, seats, selfKey);
-        if (!b || cancelled) return;
+        if (!b || cancelled) {
+          if (!cancelled) {
+            setSessionSyncFault({
+              code: "OPEN_SESSION_BUNDLE_INVALID",
+              message: "Server session or seats could not be loaded into the client.",
+            });
+          }
+          return;
+        }
+        setSessionSyncFault(null);
         setRoomSessionPatch({ active_session_id: String(session.id) });
         setBundle(prev => {
           if (prev != null && isSameSession(prev.localSession, b.localSession)) return prev;
@@ -187,6 +235,12 @@ export function useOv2BoardPathSession(baseContext) {
         });
       } catch (e) {
         console.error("ov2_board_path_open_session", e);
+        if (!cancelled) {
+          setSessionSyncFault({
+            code: "OPEN_SESSION_EXCEPTION",
+            message: e?.message || String(e),
+          });
+        }
       }
     })();
 
@@ -205,18 +259,52 @@ export function useOv2BoardPathSession(baseContext) {
     let cancelled = false;
     (async () => {
       try {
-        const fetched = await fetchBoardPathSession(supabaseMP, String(room.id));
-        if (cancelled || !fetched?.session) return;
-        if (String(fetched.session.id) !== String(room.active_session_id)) return;
+        const detailed = await fetchBoardPathSessionDetailed(supabaseMP, String(room.id));
+        if (cancelled) return;
+        if (!detailed.ok) {
+          if (detailed.code !== "NO_ACTIVE_SESSION_ID") {
+            setSessionSyncFault({ code: detailed.code, message: detailed.message });
+          }
+          return;
+        }
+        if (String(detailed.session.id) !== String(room.active_session_id)) {
+          setSessionSyncFault({
+            code: "SESSION_ID_MISMATCH",
+            message: "Loaded session does not match room.active_session_id.",
+          });
+          return;
+        }
+        if (members.length > 0 && detailed.seats.length === 0) {
+          setSessionSyncFault({
+            code: "MISSING_SEATS",
+            message: "Session has no seat rows; check the server or refresh.",
+          });
+          return;
+        }
         const hk = hostKey || selfKey;
-        const b = boardPathBundleFromDatabase(room, members, selfKey, fetched.session, fetched.seats, hk);
-        if (!b || cancelled) return;
+        const b = boardPathBundleFromDatabase(room, members, selfKey, detailed.session, detailed.seats, hk);
+        if (!b || cancelled) {
+          if (!cancelled) {
+            setSessionSyncFault({
+              code: "HYDRATE_BUNDLE_INVALID",
+              message: "Session row loaded but seats are missing or invalid.",
+            });
+          }
+          return;
+        }
+        setSessionSyncFault(null);
         setBundle(prev => {
           if (prev != null && isSameSession(prev.localSession, b.localSession)) return prev;
           return b;
         });
       } catch (e) {
-        console.error("fetchBoardPathSession", e);
+        console.error("fetchBoardPathSessionDetailed", e);
+        if (!cancelled) {
+          setSessionSyncFault({
+            code: "HYDRATE_EXCEPTION",
+            message: e?.message || String(e),
+          });
+        }
       }
     })();
 
@@ -286,6 +374,18 @@ export function useOv2BoardPathSession(baseContext) {
     roomForPhase && selfKey && hostKey && !isHost && roomForPhase.active_session_id && bundle == null
   );
 
+  const roomActiveMissingSessionHint = useMemo(() => {
+    if (!room || !roomId || boardPathRoomIdIsOfflineFixture(roomId)) return null;
+    if (room.lifecycle_phase !== ONLINE_V2_ROOM_PHASE.ACTIVE) return null;
+    const allCommitted =
+      members.length > 0 && members.every(m => m.wallet_state === ONLINE_V2_MEMBER_WALLET_STATE.COMMITTED);
+    if (!allCommitted) return null;
+    const aid = room.active_session_id;
+    if (aid != null && String(aid).trim() !== "") return null;
+    if (isHost && shouldHostOpenLocalBoardPathSession(room, members, selfKey || "")) return null;
+    return "Table is active and stakes are locked, but the room has no active session yet. If you are the host, stay on this page while the session opens. Otherwise wait, refresh the lobby, and return.";
+  }, [room, roomId, members, selfKey, isHost]);
+
   const [isStuckWaitingForHost, setStuckWaitingForHost] = useState(false);
 
   useEffect(() => {
@@ -310,17 +410,21 @@ export function useOv2BoardPathSession(baseContext) {
     if (bundle?.localSession) return bundle.localSession;
     const s = mergedContext?.session;
     if (!s?.id) return null;
+    const aid = room?.active_session_id;
+    if (aid != null && String(aid).trim() !== "" && String(s.id) !== String(aid)) return null;
     return {
       ...s,
       phase: s.phase ?? s.engine_phase,
     };
-  }, [bundle?.localSession, mergedContext?.session]);
+  }, [bundle?.localSession, mergedContext?.session, room?.active_session_id]);
 
   const seats = useMemo(() => {
     if (bundle?.localSeats?.length) return bundle.localSeats;
     const s = mergedContext?.session;
     const rows = mergedContext?.seats;
+    const aid = room?.active_session_id;
     if (!s?.id || !Array.isArray(rows) || rows.length === 0 || !selfKey) return null;
+    if (aid != null && String(aid).trim() !== "" && String(s.id) !== String(aid)) return null;
     return rows.map((row, i) => ({
       id: row.id,
       sessionId: row.session_id,
@@ -335,7 +439,7 @@ export function useOv2BoardPathSession(baseContext) {
       finished: false,
       connected: true,
     }));
-  }, [bundle?.localSeats, mergedContext?.session, mergedContext?.seats, selfKey]);
+  }, [bundle?.localSeats, mergedContext?.session, mergedContext?.seats, selfKey, room?.active_session_id]);
 
   const selfSeat = useMemo(() => (seats?.length && selfKey ? seats.find(x => x.isSelf) ?? null : null), [seats, selfKey]);
 
@@ -413,5 +517,7 @@ export function useOv2BoardPathSession(baseContext) {
     debugAdvanceTurn,
     debugEmitEvent,
     lastEvent,
+    sessionSyncFault,
+    roomActiveMissingSessionHint,
   };
 }
