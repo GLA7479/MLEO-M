@@ -10,7 +10,7 @@ import Ov2LudoBoardView from "../../../lib/online-v2/ludo/ov2LudoBoardView";
 import Ov2SeatStrip from "../shared/Ov2SeatStrip";
 
 /**
- * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null, onSessionRefresh?: () => void }} props
+ * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null, onSessionRefresh?: () => void | Promise<void> }} props
  */
 export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh }) {
   const session = useOv2LudoSession(contextInput ?? undefined);
@@ -164,6 +164,8 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
   const canRematch = isFinished && isHost && seatedCount >= 2 && seatedCount <= 4 && !rematchBusy;
   const prizeTotal = result?.prize != null && Number.isFinite(Number(result.prize)) ? Math.floor(Number(result.prize)) : null;
   const lossPerSeat = result?.lossPerSeat != null && Number.isFinite(Number(result.lossPerSeat)) ? Math.floor(Number(result.lossPerSeat)) : null;
+  const winnerNet =
+    prizeTotal != null && lossPerSeat != null ? Math.max(0, Math.floor(prizeTotal - lossPerSeat)) : null;
   const desktopStateSurface = isLiveMatch ? (
     <div className="pointer-events-auto flex w-[14.75rem] flex-col gap-1.5 rounded-lg border border-white/10 bg-black/35 p-2 backdrop-blur-[1px]">
       <button
@@ -322,17 +324,25 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
         {isFinished ? (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/45 p-3">
             <div className="w-full max-w-xs rounded-xl border border-white/20 bg-zinc-900/95 p-4 text-center shadow-2xl">
-              <p className="text-lg font-semibold text-white">
+              <p
+                className={`text-lg font-semibold ${
+                  didIWin ? "text-emerald-200" : mySeat != null && winnerFromResult != null ? "text-red-300" : "text-white"
+                }`}
+              >
                 {didIWin ? "You won" : mySeat != null && winnerFromResult != null ? "You lost" : "Finished match"}
               </p>
               <p className="mt-1 text-xs text-zinc-300">
                 {winnerFromResult != null ? `Winner Seat ${winnerFromResult + 1}` : "Match complete"}
               </p>
               {didIWin && prizeTotal != null ? (
-                <p className="mt-2 text-sm font-semibold text-emerald-200/95">Pot won: {prizeTotal.toLocaleString()}</p>
+                <p className="mt-2 text-sm font-semibold text-emerald-300/95">
+                  {winnerNet != null
+                    ? `You won ${winnerNet.toLocaleString()} (Pot ${prizeTotal.toLocaleString()})`
+                    : `You won (Pot ${prizeTotal.toLocaleString()})`}
+                </p>
               ) : null}
               {!didIWin && mySeat != null && winnerFromResult != null && lossPerSeat != null ? (
-                <p className="mt-2 text-sm font-semibold text-amber-200/90">You lost: {lossPerSeat.toLocaleString()}</p>
+                <p className="mt-2 text-sm font-semibold text-red-400/95">You lost {lossPerSeat.toLocaleString()}</p>
               ) : null}
               {mySeat == null && prizeTotal != null && winnerFromResult != null ? (
                 <p className="mt-2 text-xs text-zinc-400">
@@ -343,14 +353,15 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
                 <button
                   type="button"
                   disabled={!canRematch}
-                  onClick={() => {
+                  onClick={async () => {
                     if (!canRematch) return;
                     setRematchBusy(true);
-                    void rematch()
-                      .then(r => {
-                        if (r && r.ok) onSessionRefresh?.();
-                      })
-                      .finally(() => setRematchBusy(false));
+                    try {
+                      const r = await rematch();
+                      if (r?.ok && onSessionRefresh) await onSessionRefresh();
+                    } finally {
+                      setRematchBusy(false);
+                    }
                   }}
                   className="w-full rounded-md border border-emerald-500/40 bg-emerald-900/30 px-3 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-45"
                 >

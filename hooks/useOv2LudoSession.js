@@ -23,9 +23,22 @@ import {
   subscribeOv2LudoAuthoritativeSnapshot,
 } from "../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import { supabaseMP } from "../lib/supabaseClients";
+import { debitOnlineV2Vault, readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 
-/** Minimum visible rolling time for live authoritative dice (RPC is authoritative; this is display-only). */
-const OV2_LUDO_LIVE_ROLL_MIN_MS = 420;
+/** Total target time for live roll + reveal (RPC is authoritative; pacing is display-only). */
+const OV2_LUDO_LIVE_ROLL_MIN_MS = 2000;
+/** After a fast server pass, keep showing the rolled face briefly if the board no longer has `dice`. */
+const OV2_LUDO_DICE_FACE_HOLD_MS = 1200;
+
+const OV2_LUDO_VAULT_DOUBLE_LS = "ov2_ludo_vault_double_applied_v1:";
+
+/** @param {import("../lib/online-v2/ludo/ov2LudoSessionAdapter").Ov2LudoAuthoritativeSnapshot|null|undefined} snap */
+function snapshotResolvedRollFace(snap) {
+  if (!snap) return null;
+  const raw = snap.board?.dice ?? snap.dice ?? snap.board?.lastDice ?? snap.lastDice;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 1 && n <= 6 ? n : null;
+}
 
 function sleepMs(ms) {
   return new Promise(resolve => {
@@ -87,7 +100,18 @@ export function useOv2LudoSession(baseContext) {
     processedDoubleExpiryKeysRef.current.clear();
     liveAutoRollCompletedKeyRef.current = null;
     liveAutoRollPendingKeyRef.current = null;
+    setLiveDiceRevealHold(null);
   }, [roomId]);
+
+  useEffect(() => {
+    if (!roomId || activeSessionKey === "") return;
+    setAuthoritativeSnapshot(null);
+    processedExpiredTurnKeysRef.current.clear();
+    processedDoubleExpiryKeysRef.current.clear();
+    liveAutoRollCompletedKeyRef.current = null;
+    liveAutoRollPendingKeyRef.current = null;
+    setLiveDiceRevealHold(null);
+  }, [roomId, activeSessionKey]);
 
   useEffect(() => {
     if (!roomId || roomProductId !== OV2_LUDO_PRODUCT_GAME_ID) {
@@ -188,6 +212,10 @@ export function useOv2LudoSession(baseContext) {
   const [diceRolling, setDiceRolling] = useState(false);
   /** Live-only: random face while diceRolling (never replaces server outcome). */
   const [liveSpinTick, setLiveSpinTick] = useState(1);
+  /** After roll, keep showing the resolved face if the next snapshot dropped `dice` (e.g. auto-pass). */
+  const [liveDiceRevealHold, setLiveDiceRevealHold] = useState(
+    /** @type {{ face: number, until: number } | null} */ (null)
+  );
   const rollTimerRef = useRef(/** @type {ReturnType<typeof setTimeout>|null} */ (null));
 
   const resetPreviewBoard = useCallback(() => {
@@ -224,10 +252,20 @@ export function useOv2LudoSession(baseContext) {
     return () => window.clearInterval(id);
   }, [playMode, diceRolling]);
 
+  useEffect(() => {
+    if (!liveDiceRevealHold) return;
+    if (nowMs < liveDiceRevealHold.until) return;
+    setLiveDiceRevealHold(null);
+  }, [nowMs, liveDiceRevealHold]);
+
   const liveDiceDisplayValue = useMemo(() => {
-    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !diceRolling) return undefined;
-    return liveSpinTick;
-  }, [playMode, diceRolling, liveSpinTick]);
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE) return undefined;
+    if (diceRolling) return liveSpinTick;
+    if (liveDiceRevealHold != null && nowMs < liveDiceRevealHold.until) {
+      return liveDiceRevealHold.face;
+    }
+    return undefined;
+  }, [playMode, diceRolling, liveSpinTick, liveDiceRevealHold, nowMs]);
 
   const displayBoard = useMemo(() => {
     if (playMode === OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE && authoritativeSnapshot?.board) {
@@ -286,9 +324,19 @@ export function useOv2LudoSession(baseContext) {
           revision: authoritativeSnapshot.revision,
           participantKey: selfKey,
         });
+        const face = res.ok && res.snapshot ? snapshotResolvedRollFace(res.snapshot) : null;
+        if (face != null) setLiveSpinTick(face);
         const wait = Math.max(0, OV2_LUDO_LIVE_ROLL_MIN_MS - (Date.now() - t0));
         await sleepMs(wait);
-        if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+        if (res.ok && res.snapshot) {
+          setAuthoritativeSnapshot(res.snapshot);
+          const snap = res.snapshot;
+          const bd = snap.board?.dice;
+          const hasDice = bd != null && bd !== "" && !Number.isNaN(Number(bd));
+          if (!hasDice && face != null) {
+            setLiveDiceRevealHold({ face, until: Date.now() + OV2_LUDO_DICE_FACE_HOLD_MS });
+          }
+        }
       } finally {
         setDiceRolling(false);
       }
@@ -416,11 +464,21 @@ export function useOv2LudoSession(baseContext) {
             participantKey: selfKey,
           });
           if (cancelled) return;
+          const face = res.ok && res.snapshot ? snapshotResolvedRollFace(res.snapshot) : null;
+          if (face != null) setLiveSpinTick(face);
           const wait = Math.max(0, OV2_LUDO_LIVE_ROLL_MIN_MS - (Date.now() - t0));
           await sleepMs(wait);
           if (res.ok) {
             liveAutoRollCompletedKeyRef.current = autoKey;
-            if (res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+            if (res.snapshot) {
+              setAuthoritativeSnapshot(res.snapshot);
+              const ns = res.snapshot;
+              const bd = ns.board?.dice;
+              const hasDice = bd != null && bd !== "" && !Number.isNaN(Number(bd));
+              if (!hasDice && face != null) {
+                setLiveDiceRevealHold({ face, until: Date.now() + OV2_LUDO_DICE_FACE_HOLD_MS });
+              }
+            }
           }
         } finally {
           if (rollStateStarted) setDiceRolling(false);
@@ -734,11 +792,34 @@ export function useOv2LudoSession(baseContext) {
     },
     respondDouble: async answer => {
       if (!roomId || !selfKey || !authoritativeSnapshot?.sessionId) return;
+      const prevMult = Math.max(1, Number(authoritativeSnapshot.doubleState?.value ?? 1) || 1);
       const res = await requestOv2LudoRespondDouble(roomId, authoritativeSnapshot.sessionId, answer, {
         revision: authoritativeSnapshot.revision,
         participantKey: selfKey,
       });
-      if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+      if (res.ok && res.snapshot) {
+        const nextMult = Math.max(1, Number(res.snapshot.doubleState?.value ?? 1) || 1);
+        setAuthoritativeSnapshot(res.snapshot);
+        const doubled =
+          String(answer).toLowerCase() === "accept" && prevMult > 0 && nextMult === prevMult * 2;
+        if (doubled && room?.stake_per_seat && roomProductId === OV2_LUDO_PRODUCT_GAME_ID) {
+          const idem = `${OV2_LUDO_VAULT_DOUBLE_LS}${res.snapshot.sessionId}:${res.snapshot.revision}:${selfKey}`;
+          if (typeof window !== "undefined") {
+            try {
+              if (window.localStorage.getItem(idem) !== "1") {
+                const amt = Math.floor(Number(room.stake_per_seat) || 0);
+                if (amt > 0) {
+                  const out = await debitOnlineV2Vault(amt, roomProductId);
+                  if (out?.ok !== false) window.localStorage.setItem(idem, "1");
+                }
+              }
+            } catch {
+              /* ignore storage/debit */
+            }
+            await readOnlineV2Vault({ fresh: true }).catch(() => {});
+          }
+        }
+      }
     },
     rematch: async () => {
       if (!roomId || !selfKey) return { ok: false, error: "missing" };
