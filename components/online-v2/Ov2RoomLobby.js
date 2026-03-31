@@ -313,7 +313,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   async function onOpenLudoSession() {
     if (!canHostOpenLudoSession || hostOpenLudoDisabledReason) return;
     setBusy(true);
-    setMsg("");
+    setMsg("Opening Ludo session...");
     try {
       const res = await requestOv2LudoOpenSession(roomId, participantId, {
         presenceLeaderKey: participantId,
@@ -322,6 +322,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         setMsg(res.error || "Could not open Ludo session.");
         return;
       }
+      setMsg("Open session RPC succeeded");
       await load();
       onRoomChanged?.();
     } catch (e) {
@@ -421,6 +422,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     (typeof window !== "undefined" && String(window.location.search || "").includes("dev=1"));
   const lobbyRtLastLabel =
     lobbyRtLastEventAt != null ? new Date(lobbyRtLastEventAt).toLocaleTimeString(undefined, { hour12: false }) : "—";
+  const openLudoDisabled = busy || Boolean(hostOpenLudoDisabledReason);
   const seatToneClasses = [
     "border-red-400 bg-red-700/35 text-red-50",
     "border-sky-400 bg-sky-700/35 text-sky-50",
@@ -497,6 +499,10 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
       </div>
 
       <div className="flex shrink-0 flex-col gap-2">
+        {msg ? (
+          <div className="rounded border border-red-500/30 bg-red-950/30 px-2 py-1 text-[11px] text-red-200">{msg}</div>
+        ) : null}
+
         {!amMember && !lobbyLocked ? (
           <button
             type="button"
@@ -621,15 +627,29 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         ) : null}
 
         {canHostOpenLudoSession ? (
-          <button
-            type="button"
-            disabled={busy || Boolean(hostOpenLudoDisabledReason)}
-            title={hostOpenLudoDisabledReason || "Creates the live Ludo session (2–4 seated players)."}
-            onClick={() => void onOpenLudoSession()}
-            className="rounded-lg border border-emerald-500/45 bg-emerald-950/35 py-2 text-xs font-bold text-emerald-100 disabled:opacity-40"
-          >
-            Open Ludo match (host)
-          </button>
+          <>
+            <button
+              type="button"
+              disabled={openLudoDisabled}
+              title={hostOpenLudoDisabledReason || "Creates the live Ludo session (2–4 seated players)."}
+              onClick={() => void onOpenLudoSession()}
+              className="rounded-lg border border-emerald-500/45 bg-emerald-950/35 py-2 text-xs font-bold text-emerald-100 disabled:opacity-40"
+            >
+              Open Ludo match (host)
+            </button>
+            {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && !room.active_session_id ? (
+              <div className="rounded border border-amber-500/25 bg-amber-950/20 px-2 py-1 font-mono text-[10px] leading-tight text-amber-100/90">
+                <div>busy: {busy ? "yes" : "no"}</div>
+                <div>amMember: {amMember ? "yes" : "no"}</div>
+                <div>isHost: {isHost ? "yes" : "no"}</div>
+                <div>seatedCount: {seatedCount}</div>
+                <div>activeSession: {room.active_session_id ? "yes" : "no"}</div>
+                <div>hostOpenLudoDisabledReason: {hostOpenLudoDisabledReason || ""}</div>
+                <div>participantId: {String(participantId || "").slice(0, 8)}</div>
+                <div>host_participant_key: {String(room.host_participant_key || "").slice(0, 8)}</div>
+              </div>
+            ) : null}
+          </>
         ) : null}
 
         {room.product_game_id === ONLINE_V2_GAME_IDS.BOARD_PATH && amMember ? (
@@ -661,9 +681,6 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           </Link>
         ) : null}
 
-        {msg ? (
-          <div className="rounded border border-red-500/30 bg-red-950/30 px-2 py-1 text-[11px] text-red-200">{msg}</div>
-        ) : null}
       </div>
     </div>
   );
