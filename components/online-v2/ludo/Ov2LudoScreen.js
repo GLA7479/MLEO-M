@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { OV2_LUDO_PLAY_MODE } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
+import {
+  OV2_LUDO_PLAY_MODE,
+  OV2_LUDO_PRODUCT_GAME_ID,
+} from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import { useOv2LudoSession } from "../../../hooks/useOv2LudoSession";
 import Ov2LudoBoardView from "../../../lib/online-v2/ludo/ov2LudoBoardView";
 import Ov2GameStatusStrip from "../shared/Ov2GameStatusStrip";
@@ -13,6 +16,10 @@ import Ov2SeatStrip from "../shared/Ov2SeatStrip";
 export default function Ov2LudoScreen({ contextInput = null }) {
   const session = useOv2LudoSession(contextInput ?? undefined);
   const { vm, rollDicePreview, onPieceClick, canRoll, resetPreviewBoard } = session;
+  const roomProductId =
+    contextInput?.room && typeof contextInput.room === "object" && contextInput.room.product_game_id != null
+      ? String(contextInput.room.product_game_id)
+      : null;
   const {
     board,
     diceRolling,
@@ -23,23 +30,31 @@ export default function Ov2LudoScreen({ contextInput = null }) {
     liveMySeat,
     previewWaitingOtherSeat,
     winnerSeat,
+    boardViewReadOnly,
+    liveLegalMovablePieceIndices,
   } = vm;
 
   const isReadOnlyRoom = playMode === OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
+  const isLiveMatch = playMode === OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE;
 
   const stripTone = isReadOnlyRoom ? "amber" : "neutral";
-  const title = isReadOnlyRoom ? "Ludo · read-only (no match yet)" : "Ludo · local preview";
+  const title = isReadOnlyRoom
+    ? "Ludo · read-only (no match yet)"
+    : isLiveMatch
+      ? "Ludo · live match"
+      : "Ludo · local preview";
 
   const seatLabels = useMemo(
     () =>
       playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL
         ? ["Seat 1 · you (preview)", "Seat 2", "Seat 3", "Seat 4"]
-        : ["Seat 1 · —", "Seat 2 · —", "Seat 3 · —", "Seat 4 · —"],
-    [playMode]
+        : isLiveMatch && boardSeatForUi != null
+          ? ["Seat 1", "Seat 2", "Seat 3", "Seat 4"].map((l, i) => (i === boardSeatForUi ? `${l} · you` : l))
+          : ["Seat 1 · —", "Seat 2 · —", "Seat 3 · —", "Seat 4 · —"],
+    [playMode, isLiveMatch, boardSeatForUi]
   );
 
-  const selfHighlightIndex =
-    playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL && boardSeatForUi != null ? boardSeatForUi : null;
+  const selfHighlightIndex = boardSeatForUi != null ? boardSeatForUi : null;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-0.5 overflow-hidden px-0.5 sm:gap-1 sm:px-1">
@@ -49,7 +64,9 @@ export default function Ov2LudoScreen({ contextInput = null }) {
           className="shrink-0 rounded-md border border-amber-500/40 bg-amber-950/30 px-2 py-1 text-center text-[9px] font-semibold text-amber-100 sm:text-[10px]"
           role="status"
         >
-          Read-only — no live seat, dice, or moves until OV2 Ludo session + RPC exist.
+          {roomProductId === OV2_LUDO_PRODUCT_GAME_ID
+            ? "Read-only — no active Ludo session yet. After DB migrations, host runs ov2_ludo_open_session (e.g. via RPC) to start."
+            : "Read-only — no authoritative match snapshot yet."}
         </div>
       ) : null}
       {liveMySeat == null && isReadOnlyRoom ? (
@@ -93,9 +110,12 @@ export default function Ov2LudoScreen({ contextInput = null }) {
           diceSeat={board.turnSeat}
           diceClickable={canRoll}
           onDiceClick={rollDicePreview}
-          onPieceClick={interactionTier === "local_preview" ? onPieceClick : undefined}
-          disableHighlights={interactionTier !== "local_preview"}
-          readOnlyPresentation={isReadOnlyRoom}
+          onPieceClick={
+            interactionTier === "local_preview" || interactionTier === "live_authoritative" ? onPieceClick : undefined
+          }
+          disableHighlights={interactionTier === "none" || boardViewReadOnly}
+          readOnlyPresentation={boardViewReadOnly}
+          legalMovablePieceIndices={liveLegalMovablePieceIndices}
         />
       </div>
     </div>

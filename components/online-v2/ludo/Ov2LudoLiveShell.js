@@ -18,8 +18,9 @@ function parseRoomQueryParam(q) {
 
 /**
  * Route shell: loads OV2 room row when `?room=` is present (product_game_id must match).
- * **Live Ludo match session / RPC is not implemented** — with a room, the board stays read-only.
- * Without `?room=`, the screen is **local preview sandbox** only.
+ * **Live Ludo match session / RPC is not implemented** — with a room, the board stays read-only until an
+ * `Ov2LudoAuthoritativeSnapshot` is supplied via fetch/subscribe (see `lib/online-v2/ludo/ov2LudoSessionAdapter.js`).
+ * Without `?room=`, the screen is local preview only.
  */
 export default function Ov2LudoLiveShell() {
   const router = useRouter();
