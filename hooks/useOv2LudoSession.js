@@ -9,6 +9,7 @@ import {
   OV2_LUDO_PLAY_MODE,
   OV2_LUDO_PREVIEW_CONTROLLED_SEAT_INDEX,
   OV2_LUDO_PRODUCT_GAME_ID,
+  buildLudoLobbySeatStripFromMembers,
   fetchOv2LudoAuthoritativeSnapshot,
   requestOv2LudoMovePiece,
   requestOv2LudoRollDice,
@@ -30,6 +31,11 @@ export function useOv2LudoSession(baseContext) {
   const room = baseContext?.room && typeof baseContext.room === "object" ? baseContext.room : null;
   const roomId = room?.id != null ? String(room.id) : null;
   const roomProductId = room?.product_game_id != null ? String(room.product_game_id) : null;
+  const roomLifecycle = room?.lifecycle_phase != null ? String(room.lifecycle_phase) : null;
+  const activeSessionKey =
+    room?.active_session_id != null && String(room.active_session_id).trim() !== ""
+      ? String(room.active_session_id)
+      : "";
   const members = Array.isArray(baseContext?.members) ? baseContext.members : [];
   const selfKey = baseContext?.self?.participant_key?.trim() || null;
 
@@ -62,12 +68,19 @@ export function useOv2LudoSession(baseContext) {
       cancelled = true;
       unsub();
     };
-  }, [roomId, roomProductId, selfKey]);
+  }, [roomId, roomProductId, selfKey, activeSessionKey]);
 
   const playMode = useMemo(() => {
     const ctx = roomId ? { room: { id: roomId } } : null;
     return resolveOv2LudoPlayMode(ctx, authoritativeSnapshot);
   }, [roomId, authoritativeSnapshot]);
+
+  const lobbySeatStrip = useMemo(() => {
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET || roomProductId !== OV2_LUDO_PRODUCT_GAME_ID) {
+      return { labels: ["Seat 1 · —", "Seat 2 · —", "Seat 3 · —", "Seat 4 · —"], selfRingIndex: null };
+    }
+    return buildLudoLobbySeatStripFromMembers(members, selfKey);
+  }, [playMode, roomProductId, members, selfKey]);
 
   const liveMySeat = useMemo(() => {
     if (authoritativeSnapshot?.mySeat != null) return authoritativeSnapshot.mySeat;
@@ -133,7 +146,13 @@ export function useOv2LudoSession(baseContext) {
     }
     if (playMode === OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET) {
       if (roomProductId === OV2_LUDO_PRODUCT_GAME_ID) {
-        return "Ludo room — no live session loaded yet (host must open a session after SQL is applied, or migrations missing).";
+        if (roomLifecycle === "active" && !activeSessionKey) {
+          return "Match stakes are locked — waiting for the host to open the Ludo session from the lobby or here.";
+        }
+        if (roomLifecycle && roomLifecycle !== "active") {
+          return `Room is ${roomLifecycle} — open a live Ludo match once the room reaches active and the host starts the game.`;
+        }
+        return "Ludo room — no live session yet (host opens the match when the room is active and 2–4 players have committed stakes).";
       }
       return "Room open — authoritative Ludo match is not enabled yet. Board below is read-only.";
     }
@@ -141,7 +160,7 @@ export function useOv2LudoSession(baseContext) {
       return "Match finished — authoritative result from server.";
     }
     return "Live match — server-owned dice and moves.";
-  }, [playMode, authoritativeSnapshot, roomProductId]);
+  }, [playMode, authoritativeSnapshot, roomProductId, roomLifecycle, activeSessionKey]);
 
   const rollDicePreview = useCallback(async () => {
     if (interactionTier === "live_authoritative") {
@@ -265,6 +284,8 @@ export function useOv2LudoSession(baseContext) {
       previewWaitingOtherSeat,
       winnerSeat,
       liveLegalMovablePieceIndices,
+      lobbySeatLabels: lobbySeatStrip.labels,
+      lobbySelfRingIndex: lobbySeatStrip.selfRingIndex,
     },
     rollDicePreview,
     onPieceClick,

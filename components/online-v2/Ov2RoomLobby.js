@@ -14,6 +14,7 @@ import {
 import { buildOnlineV2EconomyEventKey, clampSuggestedOnlineV2Stake } from "../../lib/online-v2/ov2Economy";
 import { debitOnlineV2Vault, peekOnlineV2Vault, readOnlineV2Vault } from "../../lib/online-v2/onlineV2VaultBridge";
 import { supabaseMP } from "../../lib/supabaseClients";
+import { requestOv2LudoOpenSession } from "../../lib/online-v2/ludo/ov2LudoSessionAdapter";
 
 function fmtStake(n) {
   return Math.floor(Number(n) || 0).toLocaleString();
@@ -59,6 +60,25 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     () => Boolean(room && participantId && room.host_participant_key === participantId),
     [room, participantId]
   );
+
+  const committedCount = useMemo(() => members.filter(m => m.wallet_state === "committed").length, [members]);
+
+  const canHostOpenLudoSession = useMemo(
+    () =>
+      Boolean(
+        isHost &&
+          room?.product_game_id === ONLINE_V2_GAME_IDS.LUDO &&
+          room?.lifecycle_phase === "active" &&
+          !room?.active_session_id
+      ),
+    [isHost, room?.product_game_id, room?.lifecycle_phase, room?.active_session_id]
+  );
+
+  const hostOpenLudoDisabledReason = useMemo(() => {
+    if (committedCount < 2) return "Need at least two committed players.";
+    if (committedCount > 4) return "Ludo allows at most four committed players.";
+    return "";
+  }, [committedCount]);
 
   const myMember = useMemo(() => members.find(m => m.participant_key === participantId) || null, [members, participantId]);
 
@@ -215,6 +235,25 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     try {
       const updatedRoom = await startOv2RoomIntent({ room_id: roomId, host_participant_key: participantId });
       if (updatedRoom && typeof updatedRoom === "object") setRoom(updatedRoom);
+      await load();
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onOpenLudoSession() {
+    if (!canHostOpenLudoSession || hostOpenLudoDisabledReason) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await requestOv2LudoOpenSession(roomId, participantId);
+      if (!res.ok) {
+        setMsg(res.error || "Could not open Ludo session.");
+        return;
+      }
       await load();
       onRoomChanged?.();
     } catch (e) {
@@ -430,8 +469,24 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         {room.lifecycle_phase === "pending_stakes" ? (
           <p className="text-center text-[11px] text-amber-200/90">Waiting for all players to commit their stake.</p>
         ) : null}
-        {room.lifecycle_phase === "active" ? (
-          <p className="text-center text-[11px] text-emerald-200/85">All stakes locked — gameplay not wired yet.</p>
+        {room.lifecycle_phase === "active" && room.product_game_id !== ONLINE_V2_GAME_IDS.LUDO ? (
+          <p className="text-center text-[11px] text-emerald-200/85">All stakes locked — open your game table when available.</p>
+        ) : null}
+
+        {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && room.lifecycle_phase === "active" && !room.active_session_id && !isHost ? (
+          <p className="text-center text-[11px] text-amber-200/85">Waiting for the host to open the Ludo match.</p>
+        ) : null}
+
+        {canHostOpenLudoSession ? (
+          <button
+            type="button"
+            disabled={busy || Boolean(hostOpenLudoDisabledReason)}
+            title={hostOpenLudoDisabledReason || "Creates the live Ludo session (2–4 committed players)."}
+            onClick={() => void onOpenLudoSession()}
+            className="rounded-lg border border-emerald-500/45 bg-emerald-950/35 py-2 text-xs font-bold text-emerald-100 disabled:opacity-40"
+          >
+            Open Ludo match (host)
+          </button>
         ) : null}
 
         {room.product_game_id === ONLINE_V2_GAME_IDS.BOARD_PATH && amMember ? (
@@ -446,10 +501,18 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && amMember ? (
           <Link
             href={`/ov2-ludo?room=${encodeURIComponent(roomId)}`}
-            title="Ludo OV2 match session is not live yet — read-only room context + board placeholder"
-            className="block rounded-lg border border-amber-500/35 bg-amber-950/25 py-2 text-center text-xs font-semibold text-amber-100"
+            title={
+              room.active_session_id
+                ? "Live Ludo match — authoritative board"
+                : "Board is read-only until the host opens the match"
+            }
+            className={
+              room.active_session_id
+                ? "block rounded-lg border border-teal-500/35 bg-teal-950/25 py-2 text-center text-xs font-semibold text-teal-100"
+                : "block rounded-lg border border-amber-500/35 bg-amber-950/25 py-2 text-center text-xs font-semibold text-amber-100"
+            }
           >
-            Ludo · preview / not live match
+            {room.active_session_id ? "Enter Ludo table" : "View Ludo board (read-only until match opens)"}
           </Link>
         ) : null}
 

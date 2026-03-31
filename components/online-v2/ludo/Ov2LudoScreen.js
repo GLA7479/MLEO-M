@@ -27,11 +27,12 @@ export default function Ov2LudoScreen({ contextInput = null }) {
     playMode,
     interactionTier,
     boardSeatForUi,
-    liveMySeat,
     previewWaitingOtherSeat,
     winnerSeat,
     boardViewReadOnly,
     liveLegalMovablePieceIndices,
+    lobbySeatLabels,
+    lobbySelfRingIndex,
   } = vm;
 
   const isReadOnlyRoom = playMode === OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
@@ -44,17 +45,25 @@ export default function Ov2LudoScreen({ contextInput = null }) {
       ? "Ludo · live match"
       : "Ludo · local preview";
 
-  const seatLabels = useMemo(
-    () =>
-      playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL
-        ? ["Seat 1 · you (preview)", "Seat 2", "Seat 3", "Seat 4"]
-        : isLiveMatch && boardSeatForUi != null
-          ? ["Seat 1", "Seat 2", "Seat 3", "Seat 4"].map((l, i) => (i === boardSeatForUi ? `${l} · you` : l))
-          : ["Seat 1 · —", "Seat 2 · —", "Seat 3 · —", "Seat 4 · —"],
-    [playMode, isLiveMatch, boardSeatForUi]
-  );
+  const seatLabels = useMemo(() => {
+    if (playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL) {
+      return ["Seat 1 · you (preview)", "Seat 2", "Seat 3", "Seat 4"];
+    }
+    if (isLiveMatch && boardSeatForUi != null) {
+      return ["Seat 1", "Seat 2", "Seat 3", "Seat 4"].map((l, i) => (i === boardSeatForUi ? `${l} · you` : l));
+    }
+    if (isReadOnlyRoom && Array.isArray(lobbySeatLabels) && lobbySeatLabels.length >= 4) {
+      return lobbySeatLabels;
+    }
+    return ["Seat 1 · —", "Seat 2 · —", "Seat 3 · —", "Seat 4 · —"];
+  }, [playMode, isLiveMatch, boardSeatForUi, isReadOnlyRoom, lobbySeatLabels]);
 
-  const selfHighlightIndex = boardSeatForUi != null ? boardSeatForUi : null;
+  const selfHighlightIndex =
+    isLiveMatch && boardSeatForUi != null
+      ? boardSeatForUi
+      : isReadOnlyRoom && lobbySelfRingIndex != null
+        ? lobbySelfRingIndex
+        : null;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-0.5 overflow-hidden px-0.5 sm:gap-1 sm:px-1">
@@ -65,14 +74,9 @@ export default function Ov2LudoScreen({ contextInput = null }) {
           role="status"
         >
           {roomProductId === OV2_LUDO_PRODUCT_GAME_ID
-            ? "Read-only — no active Ludo session yet. After DB migrations, host runs ov2_ludo_open_session (e.g. via RPC) to start."
+            ? "Read-only — no live Ludo session yet. The host can open the match when the room is active with 2–4 committed players."
             : "Read-only — no authoritative match snapshot yet."}
         </div>
-      ) : null}
-      {liveMySeat == null && isReadOnlyRoom ? (
-        <p className="shrink-0 text-[9px] leading-tight text-amber-200/80 sm:text-[10px]">
-          Live seat mapping is not implemented (`resolveOv2LudoMySeatFromRoomMembers` returns null).
-        </p>
       ) : null}
       {playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL ? (
         <div className="flex shrink-0 flex-wrap items-center gap-1">

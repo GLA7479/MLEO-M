@@ -101,7 +101,7 @@ DECLARE
   v_room public.ov2_rooms%ROWTYPE;
 BEGIN
   v_game := trim(COALESCE(p_product_game_id, ''));
-  IF v_game NOT IN ('ov2_board_path', 'ov2_mark_grid') THEN
+  IF v_game NOT IN ('ov2_board_path', 'ov2_mark_grid', 'ov2_ludo') THEN
     RETURN jsonb_build_object(
       'ok', false,
       'code', 'INVALID_GAME_ID',
@@ -614,7 +614,7 @@ CREATE POLICY ov2_room_members_delete_deny ON public.ov2_room_members
   FOR DELETE TO anon, authenticated
   USING (false);
 
-COMMENT ON FUNCTION public.ov2_create_room IS 'OV2: create lobby room + host member; allowlisted game id; stake >= 100; max_seats 2–16.';
+COMMENT ON FUNCTION public.ov2_create_room IS 'OV2: create lobby room + host member; allowlisted game ids (ov2_board_path, ov2_mark_grid, ov2_ludo); stake >= 100; max_seats 2–16.';
 COMMENT ON FUNCTION public.ov2_join_room IS 'OV2: join lobby if not full; passcode when set; idempotent re-join for same participant.';
 COMMENT ON FUNCTION public.ov2_leave_room IS 'OV2: leave in lobby or pending_start; host transfer; close room when empty.';
 COMMENT ON FUNCTION public.ov2_set_ready IS 'OV2: toggle ready in lobby only.';
