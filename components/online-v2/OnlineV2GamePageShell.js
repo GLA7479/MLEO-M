@@ -44,7 +44,7 @@ export default function OnlineV2GamePageShell({
         }}
       >
         <div className="mx-auto flex h-full w-full min-h-0 max-w-2xl flex-col gap-2 px-2 md:max-w-4xl md:gap-2 md:px-3 lg:max-w-5xl lg:gap-2.5 lg:px-5 xl:max-w-6xl xl:px-7 2xl:max-w-7xl">
-          <header className="shrink-0 border-b border-white/[0.06] pb-2 pt-1.5 md:pb-2.5">
+          <header className="shrink-0 border-b border-white/[0.06] pb-1.5 pt-1.5 md:pb-2">
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 md:gap-x-2.5">
               <div className="flex items-center gap-1.5">
                 <Link href="/online-v2" className={OV2_HUD_CHROME_BTN}>
@@ -62,7 +62,7 @@ export default function OnlineV2GamePageShell({
                 </button>
               </div>
             </div>
-            <div className="mt-1.5 flex justify-center">
+            <div className="mt-1 flex justify-center">
               <h1 className="truncate text-center text-2xl font-black leading-tight tracking-tight text-white sm:text-2xl lg:text-2xl">
                 {title}
               </h1>

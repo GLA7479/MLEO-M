@@ -4,6 +4,7 @@ import {
   readOnlineV2Vault,
   subscribeOnlineV2Vault,
 } from "../../lib/online-v2/onlineV2VaultBridge";
+import { formatCompactNumber } from "../../lib/solo-v2/formatCompactNumber";
 
 /**
  * Compact vault readout using the Online V2 bridge (no direct rush key access).
@@ -28,7 +29,14 @@ export default function OnlineV2VaultStrip({ compact = false }) {
       }
       title="Product vault via OV2 bridge"
     >
-      Vault: {balance.toLocaleString()}
+      {compact ? (
+        <>
+          <span aria-hidden>🪙</span>
+          <span className="ml-1">{formatCompactNumber(balance)}</span>
+        </>
+      ) : (
+        <>Vault: {balance.toLocaleString()}</>
+      )}
     </div>
   );
 }
