@@ -330,34 +330,31 @@ BEGIN
     );
   END IF;
 
-  SELECT x.j, x.t
+  WITH u AS (
+    UPDATE public.ov2_settlement_lines sl
+    SET vault_delivered_at = now()
+    WHERE sl.room_id = p_room_id
+      AND trim(sl.recipient_participant_key) = v_pk
+      AND sl.vault_delivered_at IS NULL
+    RETURNING sl.id, sl.amount, sl.line_kind, sl.idempotency_key, sl.match_seq
+  )
+  SELECT
+    COALESCE(
+      jsonb_agg(
+        jsonb_build_object(
+          'id', u.id,
+          'amount', u.amount,
+          'line_kind', u.line_kind,
+          'idempotency_key', u.idempotency_key,
+          'match_seq', u.match_seq
+        )
+        ORDER BY u.match_seq, u.id
+      ),
+      '[]'::jsonb
+    ),
+    COALESCE(sum(u.amount), 0)::bigint
   INTO v_lines, v_total
-  FROM (
-    WITH u AS (
-      UPDATE public.ov2_settlement_lines sl
-      SET vault_delivered_at = now()
-      WHERE sl.room_id = p_room_id
-        AND trim(sl.recipient_participant_key) = v_pk
-        AND sl.vault_delivered_at IS NULL
-      RETURNING sl.id, sl.amount, sl.line_kind, sl.idempotency_key, sl.match_seq
-    )
-    SELECT
-      COALESCE(
-        jsonb_agg(
-          jsonb_build_object(
-            'id', u.id,
-            'amount', u.amount,
-            'line_kind', u.line_kind,
-            'idempotency_key', u.idempotency_key,
-            'match_seq', u.match_seq
-          )
-          ORDER BY u.match_seq, u.id
-        ),
-        '[]'::jsonb
-      ) AS j,
-      COALESCE(sum(u.amount), 0)::bigint AS t
-    FROM u
-  ) x;
+  FROM u;
 
   RETURN jsonb_build_object(
     'ok', true,
