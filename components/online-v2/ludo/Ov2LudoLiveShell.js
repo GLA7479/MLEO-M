@@ -85,6 +85,51 @@ export default function Ov2LudoLiveShell() {
     }
   }, [roomId]);
 
+  const reloadContextUntilSessionChanges = useCallback(
+    async (previousSessionId, timeoutMs = 20000) => {
+      if (!roomId) return { ok: false, error: "no room" };
+      const prev =
+        previousSessionId != null && String(previousSessionId).trim() !== "" ? String(previousSessionId).trim() : "";
+      const start = Date.now();
+      setLoadError("");
+      try {
+        while (Date.now() - start < timeoutMs) {
+          const r = await fetchOv2RoomById(roomId);
+          if (!r) {
+            setRoom(null);
+            setMembers([]);
+            setLoadError("Room not found.");
+            return { ok: false, error: "Room not found" };
+          }
+          if (r.product_game_id !== ONLINE_V2_GAME_IDS.LUDO) {
+            setRoom(null);
+            setMembers([]);
+            setLoadError("This room is not a Ludo table.");
+            return { ok: false, error: "wrong game" };
+          }
+          const nextId = r.active_session_id != null ? String(r.active_session_id).trim() : "";
+          setRoom(r);
+          const m = await fetchOv2RoomMembers(roomId);
+          setMembers(m);
+          loadedOnceForRoomRef.current = roomId;
+          if (nextId && nextId !== prev) {
+            return { ok: true };
+          }
+          await new Promise(res => setTimeout(res, 150));
+        }
+        setLoadError("Timed out waiting for the new match to start.");
+        return { ok: false, error: "timeout" };
+      } catch (e) {
+        const msg = e?.message || String(e);
+        setLoadError(msg);
+        setRoom(null);
+        setMembers([]);
+        return { ok: false, error: msg };
+      }
+    },
+    [roomId]
+  );
+
   useEffect(() => {
     loadedOnceForRoomRef.current = null;
   }, [roomId]);
@@ -268,7 +313,7 @@ export default function Ov2LudoLiveShell() {
             <Ov2LudoScreen
               key={room?.active_session_id ? String(room.active_session_id) : "ov2-ludo-no-session"}
               contextInput={contextInput}
-              onSessionRefresh={reloadContext}
+              onSessionRefresh={reloadContextUntilSessionChanges}
             />
           </div>
         </div>

@@ -23,14 +23,12 @@ import {
   subscribeOv2LudoAuthoritativeSnapshot,
 } from "../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import { supabaseMP } from "../lib/supabaseClients";
-import { debitOnlineV2Vault, readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
+import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 
 /** Total target time for live roll + reveal (RPC is authoritative; pacing is display-only). */
 const OV2_LUDO_LIVE_ROLL_MIN_MS = 2000;
 /** After a fast server pass, keep showing the rolled face briefly if the board no longer has `dice`. */
 const OV2_LUDO_DICE_FACE_HOLD_MS = 1200;
-
-const OV2_LUDO_VAULT_DOUBLE_LS = "ov2_ludo_vault_double_applied_v1:";
 
 /** @param {import("../lib/online-v2/ludo/ov2LudoSessionAdapter").Ov2LudoAuthoritativeSnapshot|null|undefined} snap */
 function snapshotResolvedRollFace(snap) {
@@ -89,6 +87,8 @@ export function useOv2LudoSession(baseContext) {
   const liveAutoRollCompletedKeyRef = useRef(/** @type {string|null} */ (null));
   const liveAutoRollPendingKeyRef = useRef(/** @type {string|null} */ (null));
   const rollDicePreviewRef = useRef(/** @type {(() => Promise<void>)|null} */ (null));
+  /** Per session: last seen double multiplier — when snapshot shows an increase, refresh server-backed vault display (all clients via Realtime snapshot). */
+  const vaultDoubleMultRef = useRef(/** @type {{ sessionId: string, mult: number } | null} */ (null));
 
   useEffect(() => {
     authoritativeSnapshotRef.current = authoritativeSnapshot;
@@ -102,6 +102,7 @@ export function useOv2LudoSession(baseContext) {
     liveAutoRollPendingKeyRef.current = null;
     setLiveDiceRevealHold(null);
     setLiveRollServerFace(null);
+    vaultDoubleMultRef.current = null;
   }, [roomId]);
 
   useEffect(() => {
@@ -113,6 +114,7 @@ export function useOv2LudoSession(baseContext) {
     liveAutoRollPendingKeyRef.current = null;
     setLiveDiceRevealHold(null);
     setLiveRollServerFace(null);
+    vaultDoubleMultRef.current = null;
   }, [roomId, activeSessionKey]);
 
   useEffect(() => {
@@ -174,6 +176,19 @@ export function useOv2LudoSession(baseContext) {
     const ctx = roomId ? { room: { id: roomId } } : null;
     return resolveOv2LudoPlayMode(ctx, authoritativeSnapshot);
   }, [roomId, authoritativeSnapshot]);
+
+  useEffect(() => {
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !authoritativeSnapshot) return;
+    if (roomProductId !== OV2_LUDO_PRODUCT_GAME_ID) return;
+    const sid = String(authoritativeSnapshot.sessionId || "").trim();
+    if (!sid) return;
+    const mult = Math.max(1, Number(authoritativeSnapshot.doubleState?.value ?? 1) || 1);
+    const prev = vaultDoubleMultRef.current;
+    if (prev && prev.sessionId === sid && mult > prev.mult) {
+      void readOnlineV2Vault({ fresh: true }).catch(() => {});
+    }
+    vaultDoubleMultRef.current = { sessionId: sid, mult };
+  }, [playMode, authoritativeSnapshot, roomProductId]);
 
   const lobbySeatStrip = useMemo(() => {
     if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET || roomProductId !== OV2_LUDO_PRODUCT_GAME_ID) {
@@ -809,34 +824,11 @@ export function useOv2LudoSession(baseContext) {
     },
     respondDouble: async answer => {
       if (!roomId || !selfKey || !authoritativeSnapshot?.sessionId) return;
-      const prevMult = Math.max(1, Number(authoritativeSnapshot.doubleState?.value ?? 1) || 1);
       const res = await requestOv2LudoRespondDouble(roomId, authoritativeSnapshot.sessionId, answer, {
         revision: authoritativeSnapshot.revision,
         participantKey: selfKey,
       });
-      if (res.ok && res.snapshot) {
-        const nextMult = Math.max(1, Number(res.snapshot.doubleState?.value ?? 1) || 1);
-        setAuthoritativeSnapshot(res.snapshot);
-        const doubled =
-          String(answer).toLowerCase() === "accept" && prevMult > 0 && nextMult === prevMult * 2;
-        if (doubled && room?.stake_per_seat && roomProductId === OV2_LUDO_PRODUCT_GAME_ID) {
-          const idem = `${OV2_LUDO_VAULT_DOUBLE_LS}${res.snapshot.sessionId}:${res.snapshot.revision}:${selfKey}`;
-          if (typeof window !== "undefined") {
-            try {
-              if (window.localStorage.getItem(idem) !== "1") {
-                const amt = Math.floor(Number(room.stake_per_seat) || 0);
-                if (amt > 0) {
-                  const out = await debitOnlineV2Vault(amt, roomProductId);
-                  if (out?.ok === true) window.localStorage.setItem(idem, "1");
-                }
-              }
-            } catch {
-              /* ignore storage/debit */
-            }
-            await readOnlineV2Vault({ fresh: true }).catch(() => {});
-          }
-        }
-      }
+      if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
     },
     rematch: async () => {
       if (!roomId || !selfKey) return { ok: false, error: "missing" };
