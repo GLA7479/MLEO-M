@@ -197,6 +197,21 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     return room.lifecycle_phase === "pending_start" || room.lifecycle_phase === "pending_stakes";
   }, [room, amMember, myMember]);
 
+  /** Must run before any early return — Rules of Hooks. */
+  const bingoSeatStatusLines = useMemo(() => {
+    if (room?.product_game_id !== ONLINE_V2_GAME_IDS.BINGO) return /** @type {string[]} */ ([]);
+    /** @type {string[]} */
+    const lines = [];
+    lines.push(`Seats taken: ${seatedCount} / 8`);
+    if (seatedCount < 2) {
+      lines.push("Need at least 2 seated players to open Bingo.");
+    }
+    if (seatedCount >= 2 && !allSeatedHaveCommittedStakes) {
+      lines.push("All seated players must commit stakes before the host can open the round.");
+    }
+    return lines;
+  }, [room?.product_game_id, seatedCount, allSeatedHaveCommittedStakes]);
+
   const load = useCallback(async () => {
     setMsg("");
     try {
@@ -620,6 +635,8 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     lobbyRtLastEventAt != null ? new Date(lobbyRtLastEventAt).toLocaleTimeString(undefined, { hour12: false }) : "—";
   const openLudoDisabled = busy || Boolean(hostOpenLudoDisabledReason);
   const openBingoDisabled = busy || Boolean(hostOpenBingoDisabledReason);
+  const isBingoRoom = room.product_game_id === ONLINE_V2_GAME_IDS.BINGO;
+
   const seatToneClasses = [
     "border-red-400 bg-red-700/35 text-red-50",
     "border-sky-400 bg-sky-700/35 text-sky-50",
@@ -660,42 +677,289 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         {isHost ? <p className="mt-1 text-[10px] text-emerald-400">You are the host</p> : null}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-2">
-        <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Members ({members.length})</div>
-        <ul className="mt-2 space-y-2">
-          {members.map(m => {
-            const host = room.host_participant_key === m.participant_key;
-            const me = m.participant_key === participantId;
-            return (
-              <li
-                key={m.id || `${m.participant_key}`}
-                className="flex items-start justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px]"
-              >
-                <div>
-                  <span className="font-medium text-white">{m.display_name || "Player"}</span>
-                  {host ? <span className="ml-1 text-[10px] text-amber-300">host</span> : null}
-                  {me ? <span className="ml-1 text-[10px] text-sky-300">you</span> : null}
-                  <div className="mt-0.5 font-mono text-[9px] text-zinc-600">
-                    {(m.participant_key || "").slice(0, 8)}…
-                  </div>
-                  <div className="text-[10px] text-zinc-500">
-                    joined {m.created_at ? new Date(m.created_at).toLocaleString() : "—"}
-                  </div>
-                </div>
-                <span className="text-right text-[10px] leading-tight text-zinc-500">
-                  <span className={m.is_ready ? "text-emerald-400" : "text-zinc-500"}>{m.is_ready ? "Ready" : "Not ready"}</span>
-                  <span className="text-zinc-600"> · </span>
-                  <span className={m.wallet_state === "committed" ? "text-emerald-400" : "text-zinc-600"}>
-                    {m.wallet_state === "committed" ? "Staked" : "Not staked"}
-                  </span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      {isBingoRoom ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden md:flex-row md:items-start">
+          {/* Mobile: order 1 = seats & actions first; desktop: column 2 (right) */}
+          <div className="order-1 flex min-w-0 shrink-0 flex-col gap-2 md:order-2 md:w-[min(100%,24rem)] md:shrink-0">
+            {msg ? (
+              <div className="rounded border border-red-500/30 bg-red-950/30 px-2 py-1 text-[11px] text-red-200">{msg}</div>
+            ) : null}
 
-      <div className="flex shrink-0 flex-col gap-2">
+            {!amMember && !lobbyLocked ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onJoin()}
+                className="min-h-[44px] rounded-lg border border-emerald-500/40 bg-emerald-900/30 py-2.5 text-xs font-semibold text-emerald-100 disabled:opacity-50"
+              >
+                Join room
+              </button>
+            ) : null}
+
+            {amMember && !lobbyLocked ? (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={busy || !myMember}
+                  onClick={() => void onToggleReady(!myMember?.is_ready)}
+                  className="min-h-[44px] flex-1 rounded-lg border border-white/20 bg-white/10 py-2.5 text-xs font-semibold disabled:opacity-50"
+                >
+                  {myMember?.is_ready ? "Unready" : "Ready"}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || !canLeave}
+                  title={!canLeave ? "Cannot leave after stakes are in progress." : undefined}
+                  onClick={() => void onLeave()}
+                  className="min-h-[44px] rounded-lg border border-red-500/30 bg-red-950/30 px-3 py-2.5 text-xs text-red-200 disabled:opacity-40"
+                >
+                  Leave
+                </button>
+              </div>
+            ) : null}
+
+            {amMember && lobbyLocked ? (
+              <button
+                type="button"
+                disabled={busy || !canLeave}
+                title={!canLeave ? "Cannot leave after stakes are in progress." : undefined}
+                onClick={() => void onLeave()}
+                className="min-h-[44px] rounded-lg border border-red-500/30 bg-red-950/30 py-2.5 text-xs text-red-200 disabled:opacity-40"
+              >
+                Leave
+              </button>
+            ) : null}
+
+            {needsStakeCommit ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onCommitStake()}
+                className="min-h-[44px] rounded-lg border border-emerald-500/40 bg-emerald-900/30 py-2.5 text-xs font-semibold text-emerald-100 disabled:opacity-50"
+              >
+                Commit stake ({fmtStake(room.stake_per_seat)})
+              </button>
+            ) : null}
+
+            {isHost && room.lifecycle_phase === "lobby" ? (
+              <button
+                type="button"
+                disabled={busy || !canStart}
+                onClick={() => void onStart()}
+                className="min-h-[44px] rounded-lg border border-amber-500/50 bg-amber-900/40 py-2.5 text-xs font-bold text-amber-100 disabled:opacity-40"
+                title={
+                  !canStart
+                    ? `Need ≥${minPlayers} players, all ready (have ${members.length})`
+                    : "Move room to pending_start"
+                }
+              >
+                Start match
+              </button>
+            ) : null}
+
+            {room.lifecycle_phase === "pending_start" ? (
+              <p className="text-center text-[11px] text-amber-200/90">Host started the match — each player must commit stake.</p>
+            ) : null}
+            {room.lifecycle_phase === "pending_stakes" ? (
+              <p className="text-center text-[11px] text-amber-200/90">Waiting for all players to commit their stake.</p>
+            ) : null}
+            {room.lifecycle_phase === "active" && room.product_game_id !== ONLINE_V2_GAME_IDS.LUDO ? (
+              <p className="text-center text-[11px] text-emerald-200/85">All stakes locked — pick a seat, then the host can open Bingo.</p>
+            ) : null}
+
+            {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO && !room.active_session_id && !isHost ? (
+              <p className="text-center text-[11px] font-medium text-amber-200/90">Waiting for the room host to open Bingo.</p>
+            ) : null}
+
+            <div className="rounded-lg border border-cyan-500/35 bg-cyan-950/30 px-2.5 py-2">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-cyan-200/95">Bingo table</p>
+              <ul className="mt-1.5 space-y-1 text-[11px] leading-snug text-cyan-50/95">
+                {bingoSeatStatusLines.map((line, i) => (
+                  <li key={`bingo-status-${i}`}>• {line}</li>
+                ))}
+              </ul>
+            </div>
+
+            {amMember ? (
+              <p className="text-[10px] leading-snug text-cyan-100/85">
+                Eight seats (1–8). The <span className="font-semibold text-cyan-200">lowest occupied seat</span> is the caller
+                when the host opens. Choose a seat before the round starts.
+              </p>
+            ) : null}
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[0, 1, 2, 3, 4, 5, 6, 7].map(seat => {
+                const holder = members.find(m => parseBingoSeatIndex(m?.seat_index) === seat);
+                const mine = holder?.participant_key === participantId;
+                return (
+                  <button
+                    key={seat}
+                    type="button"
+                    disabled={busy || (holder && !mine)}
+                    onClick={() => void onClaimBingoSeat(seat)}
+                    className={[
+                      "min-h-[48px] rounded-lg border-2 py-2 text-[11px] font-semibold shadow-sm disabled:opacity-55 sm:text-xs",
+                      seatToneClasses[seat % 4] || "border-white/20 bg-white/10 text-white",
+                      mine ? "ring-2 ring-white/80" : "",
+                      holder && !mine ? "brightness-[0.9]" : "hover:brightness-110",
+                    ].join(" ")}
+                    title={holder && !mine ? "Seat taken" : `Seat ${seat + 1}`}
+                  >
+                    Seat {seat + 1}
+                    {holder ? (mine ? " · you" : " · taken") : ""}
+                  </button>
+                );
+              })}
+            </div>
+
+            {mySeatIndex != null ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onLeaveBingoSeat()}
+                className="min-h-[44px] rounded-lg border border-red-500/30 bg-red-950/30 py-2.5 text-xs text-red-200 disabled:opacity-40"
+              >
+                Leave seat
+              </button>
+            ) : null}
+
+            {canHostOpenBingoSession ? (
+              <>
+                <button
+                  type="button"
+                  disabled={openBingoDisabled}
+                  onClick={() => void onOpenBingoSession()}
+                  className="min-h-[48px] w-full rounded-lg border border-cyan-500/45 bg-cyan-950/35 py-3 text-sm font-bold text-cyan-100 disabled:opacity-40"
+                >
+                  Open Bingo match (host)
+                </button>
+                {hostOpenBingoDisabledReason ? (
+                  <p className="rounded-md border border-amber-500/40 bg-amber-950/30 px-2 py-2 text-center text-[11px] font-medium leading-snug text-amber-100/95">
+                    {hostOpenBingoDisabledReason}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
+
+            {amMember &&
+            room.active_session_id &&
+            room.lifecycle_phase === "active" &&
+            allSeatedHaveCommittedStakes ? (
+              <Link
+                href={`/ov2-bingo?room=${encodeURIComponent(roomId)}`}
+                className="block min-h-[48px] rounded-lg border border-cyan-500/35 bg-cyan-950/25 py-3 text-center text-sm font-semibold text-cyan-100"
+              >
+                Enter Bingo hall
+              </Link>
+            ) : null}
+
+            {bingoSnap && bingoSnap.sessionPhase === "finished" && room.active_session_id ? (
+              <div className="rounded-lg border border-cyan-500/30 bg-cyan-950/20 p-2 text-[11px] text-cyan-100/95">
+                <p className="font-semibold text-cyan-200">Round finished</p>
+                <p className="mt-1 text-[10px] text-cyan-100/80">Rematch or start the next match when everyone is ready.</p>
+                <div className="mt-2 flex flex-col gap-1">
+                  <button
+                    type="button"
+                    disabled={busy || !bingoSnap.canRequestRematch}
+                    onClick={() => void onBingoRequestRematch()}
+                    className="min-h-[44px] rounded-md border border-amber-500/40 bg-amber-950/35 py-2 text-xs font-semibold text-amber-100 disabled:opacity-40"
+                  >
+                    Request rematch
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || !bingoSnap.canCancelRematch}
+                    onClick={() => void onBingoCancelRematch()}
+                    className="min-h-[44px] rounded-md border border-white/20 bg-white/10 py-2 text-xs font-semibold text-zinc-200 disabled:opacity-40"
+                  >
+                    Cancel rematch
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || !bingoSnap.canStartNextMatch}
+                    onClick={() => void onBingoStartNextMatch()}
+                    className="min-h-[44px] rounded-md border border-emerald-500/40 bg-emerald-950/35 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-40"
+                  >
+                    Start next match (host)
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="order-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-black/20 md:order-1 md:max-h-[min(70vh,560px)]">
+            <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-500 px-2 pt-2">Members ({members.length})</div>
+            <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2 pt-2 [scrollbar-width:thin] max-h-[min(38vh,280px)] md:max-h-none">
+              {members.map(m => {
+                const host = room.host_participant_key === m.participant_key;
+                const me = m.participant_key === participantId;
+                return (
+                  <li
+                    key={m.id || `${m.participant_key}`}
+                    className="flex items-start justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px]"
+                  >
+                    <div>
+                      <span className="font-medium text-white">{m.display_name || "Player"}</span>
+                      {host ? <span className="ml-1 text-[10px] text-amber-300">host</span> : null}
+                      {me ? <span className="ml-1 text-[10px] text-sky-300">you</span> : null}
+                      <div className="mt-0.5 font-mono text-[9px] text-zinc-600">
+                        {(m.participant_key || "").slice(0, 8)}…
+                      </div>
+                      <div className="text-[10px] text-zinc-500">
+                        joined {m.created_at ? new Date(m.created_at).toLocaleString() : "—"}
+                      </div>
+                    </div>
+                    <span className="text-right text-[10px] leading-tight text-zinc-500">
+                      <span className={m.is_ready ? "text-emerald-400" : "text-zinc-500"}>{m.is_ready ? "Ready" : "Not ready"}</span>
+                      <span className="text-zinc-600"> · </span>
+                      <span className={m.wallet_state === "committed" ? "text-emerald-400" : "text-zinc-600"}>
+                        {m.wallet_state === "committed" ? "Staked" : "Not staked"}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-2">
+            <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">Members ({members.length})</div>
+            <ul className="mt-2 space-y-2">
+              {members.map(m => {
+                const host = room.host_participant_key === m.participant_key;
+                const me = m.participant_key === participantId;
+                return (
+                  <li
+                    key={m.id || `${m.participant_key}`}
+                    className="flex items-start justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px]"
+                  >
+                    <div>
+                      <span className="font-medium text-white">{m.display_name || "Player"}</span>
+                      {host ? <span className="ml-1 text-[10px] text-amber-300">host</span> : null}
+                      {me ? <span className="ml-1 text-[10px] text-sky-300">you</span> : null}
+                      <div className="mt-0.5 font-mono text-[9px] text-zinc-600">
+                        {(m.participant_key || "").slice(0, 8)}…
+                      </div>
+                      <div className="text-[10px] text-zinc-500">
+                        joined {m.created_at ? new Date(m.created_at).toLocaleString() : "—"}
+                      </div>
+                    </div>
+                    <span className="text-right text-[10px] leading-tight text-zinc-500">
+                      <span className={m.is_ready ? "text-emerald-400" : "text-zinc-500"}>{m.is_ready ? "Ready" : "Not ready"}</span>
+                      <span className="text-zinc-600"> · </span>
+                      <span className={m.wallet_state === "committed" ? "text-emerald-400" : "text-zinc-600"}>
+                        {m.wallet_state === "committed" ? "Staked" : "Not staked"}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-2">
         {msg ? (
           <div className="rounded border border-red-500/30 bg-red-950/30 px-2 py-1 text-[11px] text-red-200">{msg}</div>
         ) : null}
@@ -786,18 +1050,6 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           <p className="text-center text-[11px] text-amber-200/85">Waiting for the room host to open the Ludo match.</p>
         ) : null}
 
-        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO && !room.active_session_id && !isHost ? (
-          <p className="text-center text-[11px] text-amber-200/85">Waiting for the room host to open Bingo.</p>
-        ) : null}
-
-        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO && amMember ? (
-          <p className="text-[10px] leading-snug text-cyan-100/85">
-            Bingo uses eight seats (shown as 1–8). Seat numbers are stored as 0–7; the caller is whoever holds the{" "}
-            <span className="font-semibold text-cyan-200">lowest occupied seat</span> when the host opens the round. Pick a
-            seat before stakes lock; you can leave a seat if you need to switch.
-          </p>
-        ) : null}
-
         {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO ? (
           <div className="grid grid-cols-4 gap-2">
             {[0, 1, 2, 3].map(seat => {
@@ -832,55 +1084,6 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
             className="rounded-lg border border-red-500/30 bg-red-950/30 py-2 text-xs text-red-200 disabled:opacity-40"
           >
             Leave seat
-          </button>
-        ) : null}
-
-        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO ? (
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-4">
-            {[0, 1, 2, 3, 4, 5, 6, 7].map(seat => {
-              const holder = members.find(m => parseBingoSeatIndex(m?.seat_index) === seat);
-              const mine = holder?.participant_key === participantId;
-              return (
-                <button
-                  key={seat}
-                  type="button"
-                  disabled={busy || (holder && !mine)}
-                  onClick={() => void onClaimBingoSeat(seat)}
-                  className={[
-                    "rounded-lg border-2 py-2 text-[10px] font-semibold shadow-sm disabled:opacity-55 sm:text-xs",
-                    seatToneClasses[seat % 4] || "border-white/20 bg-white/10 text-white",
-                    mine ? "ring-2 ring-white/80" : "",
-                    holder && !mine ? "brightness-[0.9]" : "hover:brightness-110",
-                  ].join(" ")}
-                  title={holder && !mine ? "Seat taken" : `Bingo seat ${seat} (card slot ${seat + 1})`}
-                >
-                  Seat {seat + 1}
-                  {holder ? mine ? " · you" : " · taken" : ""}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO && mySeatIndex != null ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void onLeaveBingoSeat()}
-            className="rounded-lg border border-red-500/30 bg-red-950/30 py-2 text-xs text-red-200 disabled:opacity-40"
-          >
-            Leave seat
-          </button>
-        ) : null}
-
-        {canHostOpenBingoSession ? (
-          <button
-            type="button"
-            disabled={openBingoDisabled}
-            title={hostOpenBingoDisabledReason || "Creates the live Bingo round (2–8 seated, committed players)."}
-            onClick={() => void onOpenBingoSession()}
-            className="rounded-lg border border-cyan-500/45 bg-cyan-950/35 py-2 text-xs font-bold text-cyan-100 disabled:opacity-40"
-          >
-            Open Bingo match (host)
           </button>
         ) : null}
 
@@ -934,60 +1137,9 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           </Link>
         ) : null}
 
-        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO &&
-        amMember &&
-        room.active_session_id &&
-        room.lifecycle_phase === "active" &&
-        allSeatedHaveCommittedStakes ? (
-          <Link
-            href={`/ov2-bingo?room=${encodeURIComponent(roomId)}`}
-            title="Live Bingo — server calls and claims"
-            className="block rounded-lg border border-cyan-500/35 bg-cyan-950/25 py-2 text-center text-xs font-semibold text-cyan-100"
-          >
-            Enter Bingo hall
-          </Link>
-        ) : null}
-
-        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO &&
-        bingoSnap &&
-        bingoSnap.sessionPhase === "finished" &&
-        room.active_session_id ? (
-          <div className="rounded-lg border border-cyan-500/30 bg-cyan-950/20 p-2 text-[11px] text-cyan-100/95">
-            <p className="font-semibold text-cyan-200">Round finished</p>
-            <p className="mt-1 text-[10px] text-cyan-100/80">Rematch or start the next match when everyone is ready.</p>
-            <div className="mt-2 flex flex-col gap-1">
-              <button
-                type="button"
-                disabled={busy || !bingoSnap.canRequestRematch}
-                title={!bingoSnap.canRequestRematch ? "Rematch not available right now" : undefined}
-                onClick={() => void onBingoRequestRematch()}
-                className="rounded-md border border-amber-500/40 bg-amber-950/35 py-1.5 text-xs font-semibold text-amber-100 disabled:opacity-40"
-              >
-                Request rematch
-              </button>
-              <button
-                type="button"
-                disabled={busy || !bingoSnap.canCancelRematch}
-                title={!bingoSnap.canCancelRematch ? "Nothing to cancel" : undefined}
-                onClick={() => void onBingoCancelRematch()}
-                className="rounded-md border border-white/20 bg-white/10 py-1.5 text-xs font-semibold text-zinc-200 disabled:opacity-40"
-              >
-                Cancel rematch
-              </button>
-              <button
-                type="button"
-                disabled={busy || !bingoSnap.canStartNextMatch}
-                title={!bingoSnap.canStartNextMatch ? "Host only — all seated players must request rematch first" : undefined}
-                onClick={() => void onBingoStartNextMatch()}
-                className="rounded-md border border-emerald-500/40 bg-emerald-950/35 py-1.5 text-xs font-semibold text-emerald-100 disabled:opacity-40"
-              >
-                Start next match (host)
-              </button>
-            </div>
           </div>
-        ) : null}
-
-      </div>
+        </>
+      )}
     </div>
   );
 }
