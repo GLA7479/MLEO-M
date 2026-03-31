@@ -99,11 +99,11 @@ export default function Ov2BingoLiveShell() {
 
   const subtitle = roomId
     ? room?.title
-      ? `${room.title} · preview only`
+      ? `${room.title} · preview demo (not live)`
       : loading
         ? "Loading…"
-        : "Bingo · preview"
-    : "Bingo · preview only";
+        : "Bingo · preview demo (not live)"
+    : "Bingo · local preview";
 
   return (
     <OnlineV2GamePageShell
@@ -112,9 +112,10 @@ export default function Ov2BingoLiveShell() {
       infoPanel={
         <>
           <p>
-            <strong className="text-amber-200">Preview only — not a live match.</strong> Card, calls, and marks are
-            client-local. Room context (if any) does not enable authoritative multiplayer. Future RPC/realtime wiring
-            starts in <code className="text-zinc-400">ov2BingoSessionAdapter.js</code>.
+            <strong className="text-amber-200">Preview / demo only — not a live Bingo match.</strong> Card, deck order,
+            calls, and marks are client-local. There is no server caller, no validated claims, and no payouts. Opening
+            from a room link only adds navigation context until a real match exists — same local preview underneath. Wire
+            snapshot + RPC in <code className="text-zinc-400">ov2BingoSessionAdapter.js</code>.
           </p>
           {roomId ? (
             <p className="mt-2 text-[11px] text-zinc-500">

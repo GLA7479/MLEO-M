@@ -1,18 +1,38 @@
 "use client";
 
 /**
- * Bingo card grid (from `games-online/BingoMP.js` BingoCard — OV2-only).
+ * OV2 Bingo card — presentation-first, parent-driven (from `games-online/BingoMP.js` patterns).
+ * Does not own session authority: parent supplies marks, called set, and optional click handler.
  */
 
-/** @param {{ title?: string, card: number[][], marks: boolean[], calledSet: Set<number>, onCellClick: (n: number) => void, lastNumber?: number|null }} props */
-export default function Ov2BingoCard({ title = "Card", card, marks, calledSet, onCellClick, lastNumber = null }) {
+/**
+ * @param {{
+ *   title?: string,
+ *   card: number[][],
+ *   marks: boolean[],
+ *   calledSet: Set<number>|ReadonlySet<number>,
+ *   onCellClick?: ((n: number) => void) | null,
+ *   lastNumber?: number|null,
+ *   footerHint?: string|null,
+ * }} props
+ */
+export default function Ov2BingoCard({
+  title = "Card",
+  card,
+  marks,
+  calledSet,
+  onCellClick = null,
+  lastNumber = null,
+  footerHint = null,
+}) {
   const headers = ["B", "I", "N", "G", "O"];
+  const canInteract = typeof onCellClick === "function";
 
   return (
-    <div className="mx-auto w-full max-w-sm">
-      <div className="mb-0.5 text-center text-xs font-semibold">{title}</div>
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-sm flex-col">
+      <div className="shrink-0 text-center text-[11px] font-semibold leading-tight sm:text-xs">{title}</div>
 
-      <div className="mb-0.5 grid grid-cols-5 gap-0.5">
+      <div className="mt-0.5 grid shrink-0 grid-cols-5 gap-0.5">
         {headers.map(h => (
           <div key={h} className="h-5 rounded bg-white/10 py-0.5 text-center text-[10px] font-bold">
             {h}
@@ -20,7 +40,7 @@ export default function Ov2BingoCard({ title = "Card", card, marks, calledSet, o
         ))}
       </div>
 
-      <div className="grid grid-cols-5 gap-0.5">
+      <div className={`mt-0.5 grid min-h-0 flex-1 grid-cols-5 gap-0.5 ${!canInteract ? "pointer-events-none opacity-90" : ""}`}>
         {card.flat().map((n, idx) => {
           const isFree = n === 0 && idx === 12;
           const isMarked = marks[idx];
@@ -32,9 +52,12 @@ export default function Ov2BingoCard({ title = "Card", card, marks, calledSet, o
             <button
               key={idx}
               type="button"
-              onClick={() => (isFree ? null : onCellClick(n))}
-              disabled={!isCalled && !isFree}
-              className={`grid h-8 place-items-center rounded-lg border text-sm font-semibold transition sm:h-9
+              onClick={() => {
+                if (!canInteract || isFree) return;
+                onCellClick(n);
+              }}
+              disabled={!canInteract || (!isCalled && !isFree)}
+              className={`grid min-h-[1.75rem] place-items-center rounded-lg border text-xs font-semibold transition sm:min-h-[2rem] sm:text-sm
                 ${shouldShowYellow ? "border-yellow-400 bg-yellow-500 shadow-lg shadow-yellow-500/60" : ""}
                 ${isMarked && !shouldShowYellow ? "border-emerald-400 bg-emerald-500/60 shadow-lg shadow-emerald-500/50" : ""}
                 ${!isMarked ? "border-white/15 bg-white/5" : ""}
@@ -47,7 +70,9 @@ export default function Ov2BingoCard({ title = "Card", card, marks, calledSet, o
         })}
       </div>
 
-      <p className="mt-1 text-center text-[10px] text-zinc-500">Called numbers only — server will validate claims in OV2 RPC phase.</p>
+      {footerHint ? (
+        <p className="mt-0.5 shrink-0 text-center text-[9px] leading-tight text-zinc-500 sm:text-[10px]">{footerHint}</p>
+      ) : null}
     </div>
   );
 }

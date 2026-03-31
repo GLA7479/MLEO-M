@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createOv2LudoLocalPreviewBoard,
   applyOv2LudoLocalPreviewMove,
   setOv2LudoLocalPreviewDice,
+  passPreviewTurnIfNoLegalMoves,
 } from "../lib/online-v2/ludo/ov2LudoLocalPreview";
 import {
   OV2_LUDO_PLAY_MODE,
@@ -12,10 +13,10 @@ import {
 } from "../lib/online-v2/ludo/ov2LudoSessionAdapter";
 
 /**
- * OV2 Ludo UI/session hook.
- * - **Preview local:** sandbox only (`ov2LudoLocalPreview` + engine); not authoritative.
- * - **Room without match session:** room context for shell only; board is non-interactive until
- *   `ov2LudoSessionAdapter` supplies a live snapshot (future RPC/realtime).
+ * OV2 Ludo — React session layer above `ov2LudoSessionAdapter` + `ov2LudoLocalPreview`.
+ *
+ * - **PREVIEW_LOCAL:** full sandbox (reset, roll, move; pass turn when roll has no legal moves).
+ * - **LIVE_ROOM_NO_MATCH_YET:** read-only board; no interactive play until adapter supplies live snapshot + RPC.
  *
  * @param {null|undefined|{ room?: object, members?: unknown[], self?: { participant_key?: string } }} baseContext
  */
@@ -33,17 +34,32 @@ export function useOv2LudoSession(baseContext) {
 
   const [board, setBoard] = useState(() => createOv2LudoLocalPreviewBoard());
   const [diceRolling, setDiceRolling] = useState(false);
+  const rollTimerRef = useRef(/** @type {ReturnType<typeof setTimeout>|null} */ (null));
+
+  const resetPreviewBoard = useCallback(() => {
+    if (rollTimerRef.current != null) {
+      clearTimeout(rollTimerRef.current);
+      rollTimerRef.current = null;
+    }
+    setDiceRolling(false);
+    setBoard(createOv2LudoLocalPreviewBoard());
+  }, []);
 
   useEffect(() => {
-    setBoard(createOv2LudoLocalPreviewBoard());
-    setDiceRolling(false);
-  }, [playMode, roomId]);
+    resetPreviewBoard();
+  }, [playMode, roomId, resetPreviewBoard]);
+
+  useEffect(() => {
+    return () => {
+      if (rollTimerRef.current != null) clearTimeout(rollTimerRef.current);
+    };
+  }, []);
 
   const phaseLine = useMemo(() => {
     if (playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL) {
-      return "Local preview — not connected to an OV2 room. Dice/moves are client-only sandbox (not authoritative).";
+      return "Local preview — not an OV2 room match. Rules run in-browser for UI/testing only.";
     }
-    return "Room loaded — Ludo match session / RPC not available yet. Board is read-only; no live play.";
+    return "Room open — authoritative Ludo match is not enabled yet. Board below is read-only.";
   }, [playMode]);
 
   const interactionTier = playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL ? "local_preview" : "none";
@@ -54,9 +70,15 @@ export function useOv2LudoSession(baseContext) {
     if (previewControlledSeatIndex == null) return;
     if (board.turnSeat !== previewControlledSeatIndex || board.dice != null || board.winner != null) return;
     setDiceRolling(true);
-    window.setTimeout(() => {
+    if (rollTimerRef.current != null) clearTimeout(rollTimerRef.current);
+    rollTimerRef.current = window.setTimeout(() => {
+      rollTimerRef.current = null;
       const v = 1 + Math.floor(Math.random() * 6);
-      setBoard(b => setOv2LudoLocalPreviewDice(b, v));
+      setBoard(prev => {
+        const withDice = setOv2LudoLocalPreviewDice(prev, v);
+        const pass = passPreviewTurnIfNoLegalMoves(withDice, previewControlledSeatIndex);
+        return pass.changed ? pass.board : withDice;
+      });
       setDiceRolling(false);
     }, 450);
   }, [interactionTier, previewControlledSeatIndex, board.turnSeat, board.dice, board.winner]);
@@ -82,6 +104,12 @@ export function useOv2LudoSession(baseContext) {
     board.winner == null &&
     !diceRolling;
 
+  const previewWaitingOtherSeat =
+    playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL &&
+    previewControlledSeatIndex != null &&
+    board.turnSeat !== previewControlledSeatIndex &&
+    board.winner == null;
+
   return {
     vm: {
       playMode,
@@ -91,11 +119,13 @@ export function useOv2LudoSession(baseContext) {
       board,
       diceRolling,
       phaseLine,
-      /** Pass to `Ov2LudoBoardView` as `mySeat` only for movable-piece highlight in preview mode. */
       boardSeatForUi,
+      previewWaitingOtherSeat,
+      winnerSeat: board.winner != null ? board.winner : null,
     },
     rollDicePreview,
     onPieceClick,
     canRoll,
+    resetPreviewBoard,
   };
 }
