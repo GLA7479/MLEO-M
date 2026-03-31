@@ -168,20 +168,10 @@ export default function Ov2LudoLiveShell() {
     };
   }, [roomId, room, members, participantId]);
 
-  const subtitle = useMemo(() => {
-    if (!roomId) return "Ludo · local preview only";
-    if (loading && !room) return "Loading…";
-    if (!room) return "Ludo · room";
-    const t = room.title ? String(room.title) : "";
-    if (room.active_session_id) return t ? `${t} · live table` : "Live table";
-    if (room.lifecycle_phase === "active") return t ? `${t} · open match from host` : "Waiting for host to open match";
-    return t ? `${t} · ${room.lifecycle_phase}` : "Ludo · room";
-  }, [roomId, loading, room]);
-
   return (
     <OnlineV2GamePageShell
       title="Ludo"
-      subtitle={subtitle}
+      showSubtitle={false}
       infoPanel={
         <>
           <p>
@@ -189,6 +179,11 @@ export default function Ov2LudoLiveShell() {
             With a Ludo room, the host opens the live match after the room is <strong className="text-zinc-200">active</strong> and 2–4 players have{" "}
             <strong className="text-zinc-200">committed</strong> stakes; turns and dice are enforced by the server.
           </p>
+          <ul className="mt-2 space-y-1 text-[11px] text-zinc-400">
+            <li>In-room with no active session: board is read-only and the host opens the match.</li>
+            <li>After session opens: board becomes live-authoritative with server-owned turn/dice/moves.</li>
+            <li>Without a room query: board stays local preview.</li>
+          </ul>
           {roomId ? (
             <p className="mt-2 text-[11px] text-zinc-500">
               <Link href="/online-v2/rooms" className="text-sky-300 underline">

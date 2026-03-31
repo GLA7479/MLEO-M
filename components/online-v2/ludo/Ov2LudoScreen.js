@@ -7,7 +7,6 @@ import {
 } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import { useOv2LudoSession } from "../../../hooks/useOv2LudoSession";
 import Ov2LudoBoardView from "../../../lib/online-v2/ludo/ov2LudoBoardView";
-import Ov2GameStatusStrip from "../shared/Ov2GameStatusStrip";
 import Ov2SeatStrip from "../shared/Ov2SeatStrip";
 
 /**
@@ -23,7 +22,6 @@ export default function Ov2LudoScreen({ contextInput = null }) {
   const {
     board,
     diceRolling,
-    phaseLine,
     playMode,
     interactionTier,
     boardSeatForUi,
@@ -37,13 +35,6 @@ export default function Ov2LudoScreen({ contextInput = null }) {
 
   const isReadOnlyRoom = playMode === OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
   const isLiveMatch = playMode === OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE;
-
-  const stripTone = isReadOnlyRoom ? "amber" : "neutral";
-  const title = isReadOnlyRoom
-    ? "Ludo · read-only (no match yet)"
-    : isLiveMatch
-      ? "Ludo · live match"
-      : "Ludo · local preview";
 
   const seatLabels = useMemo(() => {
     if (playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL) {
@@ -67,7 +58,6 @@ export default function Ov2LudoScreen({ contextInput = null }) {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-0.5 overflow-hidden px-0.5 sm:gap-1 sm:px-1">
-      <Ov2GameStatusStrip title={title} subtitle={phaseLine} tone={stripTone} />
       {isReadOnlyRoom ? (
         <div
           className="shrink-0 rounded-md border border-amber-500/40 bg-amber-950/30 px-2 py-1 text-center text-[9px] font-semibold text-amber-100 sm:text-[10px]"
