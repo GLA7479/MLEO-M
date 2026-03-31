@@ -24,6 +24,19 @@ import {
 } from "../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import { supabaseMP } from "../lib/supabaseClients";
 
+/** Minimum visible rolling time for live authoritative dice (RPC is authoritative; this is display-only). */
+const OV2_LUDO_LIVE_ROLL_MIN_MS = 420;
+
+function sleepMs(ms) {
+  return new Promise(resolve => {
+    if (typeof window === "undefined") {
+      resolve();
+      return;
+    }
+    window.setTimeout(resolve, ms);
+  });
+}
+
 function parseSeatIndex(value) {
   if (value == null || value === "") return null;
   const n = Number(value);
@@ -173,6 +186,8 @@ export function useOv2LudoSession(baseContext) {
 
   const [previewBoard, setPreviewBoard] = useState(() => createOv2LudoLocalPreviewBoard());
   const [diceRolling, setDiceRolling] = useState(false);
+  /** Live-only: random face while diceRolling (never replaces server outcome). */
+  const [liveSpinTick, setLiveSpinTick] = useState(1);
   const rollTimerRef = useRef(/** @type {ReturnType<typeof setTimeout>|null} */ (null));
 
   const resetPreviewBoard = useCallback(() => {
@@ -193,6 +208,26 @@ export function useOv2LudoSession(baseContext) {
       if (rollTimerRef.current != null) clearTimeout(rollTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !diceRolling) return undefined;
+    const id = window.setInterval(() => {
+      setLiveSpinTick(prev => {
+        let n = prev;
+        for (let i = 0; i < 8 && n === prev; i++) {
+          n = 1 + Math.floor(Math.random() * 6);
+        }
+        return n;
+      });
+    }, 85);
+    return () => window.clearInterval(id);
+  }, [playMode, diceRolling]);
+
+  const liveDiceDisplayValue = useMemo(() => {
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !diceRolling) return undefined;
+    return liveSpinTick;
+  }, [playMode, diceRolling, liveSpinTick]);
 
   const displayBoard = useMemo(() => {
     if (playMode === OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE && authoritativeSnapshot?.board) {
@@ -244,12 +279,15 @@ export function useOv2LudoSession(baseContext) {
   const rollDicePreview = useCallback(async () => {
     if (interactionTier === "live_authoritative") {
       if (!roomId || !selfKey || !authoritativeSnapshot?.sessionId) return;
+      const t0 = typeof Date.now === "function" ? Date.now() : 0;
       setDiceRolling(true);
       try {
         const res = await requestOv2LudoRollDice(roomId, authoritativeSnapshot.sessionId, {
           revision: authoritativeSnapshot.revision,
           participantKey: selfKey,
         });
+        const wait = Math.max(0, OV2_LUDO_LIVE_ROLL_MIN_MS - (Date.now() - t0));
+        await sleepMs(wait);
         if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
       } finally {
         setDiceRolling(false);
@@ -302,7 +340,9 @@ export function useOv2LudoSession(baseContext) {
     const sessionId = String(authoritativeSnapshot.sessionId || "").trim();
     if (!sessionId || liveTurnSeat == null || !Number.isFinite(deadline)) return;
     if (liveMySeat == null || liveTurnSeat !== liveMySeat) return;
-    const autoKey = `${sessionId}|${liveTurnSeat}|${deadline}|autoroll`;
+    const rev = Number(authoritativeSnapshot.revision);
+    if (!Number.isFinite(rev)) return;
+    const autoKey = `${sessionId}|${liveTurnSeat}|${deadline}|${rev}|autoroll`;
     const stillRollable =
       authoritativeSnapshot.canClientRoll === true && authoritativeSnapshot.board?.dice == null;
     if (stillRollable) return;
@@ -328,7 +368,9 @@ export function useOv2LudoSession(baseContext) {
       return;
     }
     if (liveMySeat == null || liveTurnSeat !== liveMySeat) return;
-    const autoKey = `${sessionId}|${liveTurnSeat}|${deadline}|autoroll`;
+    const rev = Number(authoritativeSnapshot.revision);
+    if (!Number.isFinite(rev)) return;
+    const autoKey = `${sessionId}|${liveTurnSeat}|${deadline}|${rev}|autoroll`;
     if (liveAutoRollCompletedKeyRef.current === autoKey) return;
     if (liveAutoRollPendingKeyRef.current === autoKey) return;
     liveAutoRollPendingKeyRef.current = autoKey;
@@ -359,10 +401,12 @@ export function useOv2LudoSession(baseContext) {
         const d = Number(snap.turnDeadline);
         const seat = parseSeatIndex(snap.board?.turnSeat);
         const sid = String(snap.sessionId || "").trim();
-        if (sid !== sessionId || seat !== liveTurnSeat || d !== deadline) {
+        const snapRev = Number(snap.revision);
+        if (sid !== sessionId || seat !== liveTurnSeat || d !== deadline || snapRev !== rev) {
           clearPendingIfMatch();
           return;
         }
+        const t0 = Date.now();
         let rollStateStarted = false;
         setDiceRolling(true);
         rollStateStarted = true;
@@ -372,6 +416,8 @@ export function useOv2LudoSession(baseContext) {
             participantKey: selfKey,
           });
           if (cancelled) return;
+          const wait = Math.max(0, OV2_LUDO_LIVE_ROLL_MIN_MS - (Date.now() - t0));
+          await sleepMs(wait);
           if (res.ok) {
             liveAutoRollCompletedKeyRef.current = autoKey;
             if (res.snapshot) setAuthoritativeSnapshot(res.snapshot);
@@ -641,6 +687,8 @@ export function useOv2LudoSession(baseContext) {
       liveMySeat,
       board: displayBoard,
       diceRolling,
+      liveDiceDisplayValue,
+      doubleCycleUsedSeats: authoritativeSnapshot?.doubleCycleUsedSeats ?? [],
       phaseLine,
       boardSeatForUi,
       boardViewReadOnly,
@@ -693,7 +741,7 @@ export function useOv2LudoSession(baseContext) {
       if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
     },
     rematch: async () => {
-      if (!roomId || !selfKey) return;
+      if (!roomId || !selfKey) return { ok: false, error: "missing" };
       const res = await requestOv2LudoRematch(roomId, selfKey, {
         presenceLeaderKey: selfKey,
       });
@@ -702,6 +750,7 @@ export function useOv2LudoSession(baseContext) {
       } else {
         await refreshAuthoritativeSnapshot();
       }
+      return res;
     },
   };
 }

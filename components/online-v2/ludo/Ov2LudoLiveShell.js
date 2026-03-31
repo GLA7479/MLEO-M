@@ -265,7 +265,7 @@ export default function Ov2LudoLiveShell() {
             </div>
           ) : null}
           <div className="min-h-0 flex-1 overflow-hidden">
-            <Ov2LudoScreen contextInput={contextInput} />
+            <Ov2LudoScreen contextInput={contextInput} onSessionRefresh={() => void reloadContext()} />
           </div>
         </div>
       )}
