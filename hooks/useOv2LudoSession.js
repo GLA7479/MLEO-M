@@ -23,6 +23,13 @@ import {
 } from "../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import { supabaseMP } from "../lib/supabaseClients";
 
+function parseSeatIndex(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0 || n > 3) return null;
+  return n;
+}
+
 /**
  * OV2 Ludo — React session layer above `ov2LudoSessionAdapter` + `ov2LudoLocalPreview`.
  *
@@ -47,6 +54,7 @@ export function useOv2LudoSession(baseContext) {
   /** @type {import("../lib/online-v2/ludo/ov2LudoSessionAdapter").Ov2LudoAuthoritativeSnapshot|null} */
   const [authoritativeSnapshot, setAuthoritativeSnapshot] = useState(null);
   const [presentKeys, setPresentKeys] = useState([]);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
     setAuthoritativeSnapshot(null);
@@ -98,6 +106,14 @@ export function useOv2LudoSession(baseContext) {
       setPresentKeys([]);
     };
   }, [roomId, selfKey, roomProductId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const t = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 250);
+    return () => window.clearInterval(t);
+  }, []);
 
   const playMode = useMemo(() => {
     const ctx = roomId ? { room: { id: roomId } } : null;
@@ -192,7 +208,7 @@ export function useOv2LudoSession(baseContext) {
         if (roomLifecycle && roomLifecycle !== "active") {
           return `Room is ${roomLifecycle} — open a live Ludo match once the room reaches active and the host starts the game.`;
         }
-        return "Ludo room — no live session yet (host opens the match when the room is active and 2–4 players have committed stakes).";
+        return "Ludo room — no live session yet (room host opens when 2–4 players are seated).";
       }
       return "Room open — authoritative Ludo match is not enabled yet. Board below is read-only.";
     }
@@ -368,6 +384,90 @@ export function useOv2LudoSession(baseContext) {
   const liveLegalMovablePieceIndices =
     playMode === OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE ? authoritativeSnapshot?.legalMovablePieceIndices ?? null : null;
 
+  const activeSeatsLive = useMemo(() => {
+    if (!Array.isArray(authoritativeSnapshot?.board?.activeSeats)) return [];
+    return authoritativeSnapshot.board.activeSeats
+      .map(s => parseSeatIndex(s))
+      .filter(s => s != null);
+  }, [authoritativeSnapshot?.board?.activeSeats]);
+  const turnSeatRaw = authoritativeSnapshot?.board?.turnSeat ?? null;
+  const turnSeatParsed = parseSeatIndex(turnSeatRaw);
+  const turnSeat = turnSeatParsed != null && activeSeatsLive.includes(turnSeatParsed) ? turnSeatParsed : null;
+  const turnDeadline = authoritativeSnapshot?.turnDeadline ?? null;
+  const turnTimeLeftMs =
+    turnDeadline != null && Number.isFinite(Number(turnDeadline)) ? Math.max(0, Number(turnDeadline) - nowMs) : null;
+  const turnTimeLeftSec = turnTimeLeftMs != null ? Math.ceil(turnTimeLeftMs / 1000) : null;
+  const isTurnTimerActive = playMode === OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE && turnTimeLeftMs != null && turnTimeLeftMs > 0;
+  const isMyTurnLive = playMode === OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE && liveMySeat != null && turnSeat === liveMySeat;
+
+  const doubleState = authoritativeSnapshot?.doubleState ?? null;
+  const currentMultiplier = Math.max(1, Number(doubleState?.value || 1) || 1);
+  const doubleProposedBySeat = parseSeatIndex(doubleState?.proposed_by);
+  const doubleAwaitingRaw = parseSeatIndex(doubleState?.awaiting);
+  const doubleAwaitingSeat =
+    doubleAwaitingRaw != null && activeSeatsLive.includes(doubleAwaitingRaw) ? doubleAwaitingRaw : null;
+  const doublePendingSeats = Array.isArray(doubleState?.pending)
+    ? doubleState.pending.map(s => parseSeatIndex(s)).filter(s => s != null)
+    : [];
+  const isDoublePending = playMode === OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE && authoritativeSnapshot?.phase === "playing" && doubleAwaitingSeat != null;
+  const doubleExpiresAt =
+    doubleState?.expires_at != null && Number.isFinite(Number(doubleState.expires_at))
+      ? Number(doubleState.expires_at)
+      : null;
+  const doubleTimeLeftMs =
+    isDoublePending && doubleExpiresAt != null ? Math.max(0, doubleExpiresAt - nowMs) : null;
+  const doubleTimeLeftSec = doubleTimeLeftMs != null ? Math.ceil(doubleTimeLeftMs / 1000) : null;
+  const isDoubleTimerActive = doubleTimeLeftMs != null && doubleTimeLeftMs > 0;
+
+  const seatStrikeCountMap = useMemo(() => {
+    const out = { 0: 0, 1: 0, 2: 0, 3: 0 };
+    const raw = authoritativeSnapshot?.missedTurns;
+    if (!raw || typeof raw !== "object") return out;
+    const byParticipant = new Map(
+      members.map(m => [String(m?.participant_key || ""), parseSeatIndex(m?.seat_index)]).filter(([k]) => k)
+    );
+    for (const [k, v] of Object.entries(raw)) {
+      const strikes = Math.max(0, Number(v) || 0);
+      if (!strikes) continue;
+      const seatFromKey = parseSeatIndex(k);
+      if (seatFromKey != null) {
+        out[seatFromKey] = Math.max(out[seatFromKey], strikes);
+        continue;
+      }
+      const seat = byParticipant.get(String(k));
+      if (seat != null) {
+        out[seat] = Math.max(out[seat], strikes);
+      }
+    }
+    return out;
+  }, [authoritativeSnapshot?.missedTurns, members]);
+
+  const eliminatedSeats = useMemo(() => {
+    return [0, 1, 2, 3].filter(seat => Number(seatStrikeCountMap[seat] || 0) >= 3 && !activeSeatsLive.includes(seat));
+  }, [activeSeatsLive, seatStrikeCountMap]);
+
+  const strikeDisplayMap = useMemo(() => {
+    const out = { 0: 0, 1: 0, 2: 0, 3: 0 };
+    for (const seat of [0, 1, 2, 3]) {
+      const strikes = Number(seatStrikeCountMap?.[seat] || 0);
+      out[seat] = Math.max(0, Math.min(3, strikes));
+    }
+    return out;
+  }, [seatStrikeCountMap]);
+
+  const statusLine = useMemo(() => {
+    if (authoritativeSnapshot?.phase === "finished" && authoritativeSnapshot?.result?.winner != null) {
+      return `Match finished — winner Seat ${Number(authoritativeSnapshot.result.winner) + 1}.`;
+    }
+    if (eliminatedSeats.length > 0) {
+      return `Seat ${eliminatedSeats.map(s => Number(s) + 1).join(", ")} eliminated after 3 missed turns.`;
+    }
+    if (doubleExpiresAt != null && !isDoublePending && doubleExpiresAt <= nowMs) {
+      return "Double response timed out — resolving.";
+    }
+    return "";
+  }, [authoritativeSnapshot?.phase, authoritativeSnapshot?.result, eliminatedSeats, isDoublePending, doubleExpiresAt, nowMs]);
+
   return {
     vm: {
       playMode,
@@ -384,10 +484,27 @@ export function useOv2LudoSession(baseContext) {
       liveLegalMovablePieceIndices,
       lobbySeatLabels: lobbySeatStrip.labels,
       lobbySelfRingIndex: lobbySeatStrip.selfRingIndex,
-      turnDeadline: authoritativeSnapshot?.turnDeadline ?? null,
-      doubleState: authoritativeSnapshot?.doubleState ?? null,
+      turnSeat,
+      turnDeadline,
+      turnTimeLeftMs,
+      turnTimeLeftSec,
+      isTurnTimerActive,
+      isMyTurnLive,
+      doubleState,
+      currentMultiplier,
+      doubleProposedBySeat,
+      doubleAwaitingSeat,
+      doublePendingSeats,
+      isDoublePending,
+      doubleTimeLeftMs,
+      doubleTimeLeftSec,
+      isDoubleTimerActive,
       result: authoritativeSnapshot?.result ?? null,
       missedTurns: authoritativeSnapshot?.missedTurns ?? null,
+      seatStrikeCountMap,
+      strikeDisplayMap,
+      eliminatedSeats,
+      statusLine,
     },
     rollDicePreview,
     onPieceClick,
