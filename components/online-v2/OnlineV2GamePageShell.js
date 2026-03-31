@@ -8,7 +8,7 @@ import OnlineV2ReservedAdSlot from "./OnlineV2ReservedAdSlot";
 import OnlineV2VaultStrip from "./OnlineV2VaultStrip";
 
 /**
- * Shared OV2 game frame: compact HUD (Hub · title/vault · Info/Menu) + flex game body + reserved ad slot.
+ * Shared OV2 game frame: compact HUD controls + centered title/subtitle + flex game body + reserved ad slot.
  * Info/Menu overlays are scoped to the game body so the shell chrome stays reachable.
  */
 export default function OnlineV2GamePageShell({
@@ -34,6 +34,9 @@ export default function OnlineV2GamePageShell({
     setMenuOpen(true);
   }
 
+  const subtitleText = typeof subtitle === "string" ? subtitle.trim() : "";
+  const shouldRenderSubtitle = showSubtitle && Boolean(subtitleText);
+
   return (
     <Layout title={title}>
       <main
@@ -45,14 +48,13 @@ export default function OnlineV2GamePageShell({
       >
         <div className="mx-auto flex h-full w-full min-h-0 max-w-2xl flex-col gap-2 px-2 md:max-w-4xl md:gap-2 md:px-3 lg:max-w-5xl lg:gap-2.5 lg:px-5 xl:max-w-6xl xl:px-7 2xl:max-w-7xl">
           <header className="shrink-0 border-b border-white/[0.06] pb-1 pt-1.5 md:pb-1.5">
-            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 md:gap-x-2.5">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2">
               <div className="flex items-center gap-1.5">
                 <Link href="/online-v2" className={OV2_HUD_CHROME_BTN}>
                   Hub
                 </Link>
                 <OnlineV2VaultStrip compact />
               </div>
-              <div />
               <div className="flex items-center justify-end gap-1.5 sm:gap-1.5">
                 <button type="button" onClick={openInfo} className={OV2_HUD_CHROME_BTN} aria-label="Game info and rules">
                   Info
@@ -63,9 +65,16 @@ export default function OnlineV2GamePageShell({
               </div>
             </div>
             <div className="-mt-3 flex justify-center">
-              <h1 className="truncate text-center text-2xl font-black leading-tight tracking-tight text-white sm:text-2xl lg:text-2xl">
-                {title}
-              </h1>
+              <div className="mx-auto flex min-w-0 max-w-full flex-col items-center">
+                <h1 className="max-w-full truncate text-center text-2xl font-black leading-tight tracking-tight text-white sm:text-2xl lg:text-2xl">
+                  {title}
+                </h1>
+                {shouldRenderSubtitle ? (
+                  <p className="mt-0.5 max-w-full truncate text-center text-[10px] font-medium leading-tight text-zinc-400 sm:text-[11px]">
+                    {subtitleText}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </header>
 
