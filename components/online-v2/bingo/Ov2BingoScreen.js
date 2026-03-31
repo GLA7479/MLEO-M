@@ -99,27 +99,20 @@ export default function Ov2BingoScreen({ contextInput = null }) {
               <div
                 key={seatIndex}
                 className={[
-                  "w-[5.25rem] shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] leading-tight sm:w-[6rem] sm:py-1 sm:text-[10px]",
+                  "flex min-h-[2.5rem] w-[5.25rem] shrink-0 flex-col justify-center rounded-md border px-1.5 py-1 text-[9px] leading-tight sm:min-h-[2.8125rem] sm:w-[6rem] sm:py-1.5 sm:text-[10px]",
                   member ? "border-white/20 bg-white/10" : "border-white/10 bg-black/20 text-zinc-500",
                   you ? "ring-1 ring-sky-400/80" : "",
                   isCaller ? "border-amber-400/50 bg-amber-950/35" : "",
                   isWinner ? "border-emerald-400/50 bg-emerald-950/30" : "",
                 ].join(" ")}
-                title={`Seat ${seatIndex + 1}`}
+                title={member ? `${label}${member.isReady ? " · Ready" : ""}` : `Seat ${seatIndex + 1} · Open`}
               >
-                <div className="font-mono text-[8px] text-zinc-500">#{seatIndex + 1}</div>
                 <div className="truncate font-semibold text-zinc-100">{label}</div>
-                <div className="mt-0.5 flex flex-wrap gap-0.5 text-[8px]">
+                <div className="mt-1 text-[8px]">
                   {member ? (
-                    <>
-                      <span className={member.isReady ? "text-emerald-300" : "text-zinc-500"}>
-                        {member.isReady ? "Ready" : "Idle"}
-                      </span>
-                      {member.walletState === "committed" ? <span className="text-emerald-400/90">· Staked</span> : null}
-                      {isCaller ? <span className="text-amber-200">· Caller</span> : null}
-                      {isWinner ? <span className="text-emerald-200">· Won</span> : null}
-                      {you ? <span className="text-sky-300">· You</span> : null}
-                    </>
+                    <span className={member.isReady ? "text-emerald-300" : "text-zinc-500"}>
+                      {member.isReady ? "Ready" : "Idle"}
+                    </span>
                   ) : (
                     <span className="text-zinc-600">Open</span>
                   )}
@@ -132,18 +125,18 @@ export default function Ov2BingoScreen({ contextInput = null }) {
 
       {playingLive ? (
         <div
-          className="flex shrink-0 flex-wrap items-center gap-1.5 rounded-lg border border-white/10 bg-black/30 px-1.5 py-1 sm:gap-2 sm:px-2"
+          className="flex shrink-0 flex-nowrap items-stretch gap-2 overflow-x-auto rounded-lg border border-white/10 bg-black/30 px-2 py-2 [scrollbar-width:thin] sm:gap-3 sm:px-4 sm:py-3"
           aria-label="Live match stats"
         >
-          <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/40 px-1.5 py-0.5 text-[9px] text-zinc-400 sm:text-[10px]">
+          <span className="flex h-[2.25rem] max-h-[2.25rem] min-w-[5.5rem] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-white/10 bg-black/40 px-3 py-0 text-xs leading-tight text-zinc-400 sm:h-[2.5rem] sm:max-h-[2.5rem] sm:min-w-0 sm:px-4 sm:text-sm">
             <span className="font-semibold text-zinc-500">Last</span>
             <span className="font-mono font-semibold text-amber-100">{vm.lastCalled ?? "—"}</span>
           </span>
-          <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/40 px-1.5 py-0.5 text-[9px] text-zinc-400 sm:text-[10px]">
+          <span className="flex h-[2.25rem] max-h-[2.25rem] min-w-[5.5rem] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-white/10 bg-black/40 px-3 py-0 text-xs leading-tight text-zinc-400 sm:h-[2.5rem] sm:max-h-[2.5rem] sm:min-w-0 sm:px-4 sm:text-sm">
             <span className="font-semibold text-zinc-500">Next</span>
             <span className="font-mono font-semibold text-zinc-100">{fmtCountdown(vm.msUntilNextCall)}</span>
           </span>
-          <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/40 px-1.5 py-0.5 text-[9px] text-zinc-400 sm:text-[10px]">
+          <span className="flex h-[2.25rem] max-h-[2.25rem] min-w-[5.5rem] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-white/10 bg-black/40 px-3 py-0 text-xs leading-tight text-zinc-400 sm:h-[2.5rem] sm:max-h-[2.5rem] sm:min-w-0 sm:px-4 sm:text-sm">
             <span className="font-semibold text-zinc-500">Deck</span>
             <span className="font-mono font-semibold text-zinc-200">
               {vm.deckRemaining}/{vm.deckTotal}
@@ -220,10 +213,10 @@ export default function Ov2BingoScreen({ contextInput = null }) {
         </div>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-0.5 overflow-hidden sm:gap-1 lg:grid-cols-5 lg:grid-rows-none lg:gap-1.5">
-        <div className="flex min-h-[38vh] flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 p-1 sm:min-h-0 lg:col-span-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden sm:gap-1 lg:grid lg:h-full lg:min-h-0 lg:grid-cols-5 lg:grid-rows-1 lg:auto-rows-[minmax(0,1fr)] lg:gap-1.5">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 p-1 lg:col-span-3 lg:min-h-0 lg:h-full">
           <div className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">Your card</div>
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-0.5 sm:py-1">
+          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-hidden py-0.5 sm:overflow-y-auto sm:py-1">
             <Ov2BingoCard
               card={vm.card}
               called={vm.called}
@@ -238,18 +231,18 @@ export default function Ov2BingoScreen({ contextInput = null }) {
           ) : null}
         </div>
 
-        <div className="flex min-h-0 min-w-0 flex-col gap-0.5 overflow-hidden sm:gap-1 lg:col-span-2 lg:h-auto">
-          <div className="flex min-h-[3.25rem] max-h-[10.5rem] flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 px-1.5 py-1 sm:max-h-[11.5rem] sm:px-2 sm:py-1.5 lg:max-h-none lg:min-h-0 lg:flex-1">
+        <div className="flex min-h-0 min-w-0 shrink-0 flex-col gap-0.5 sm:gap-1 lg:col-span-2 lg:flex lg:min-h-0 lg:h-full lg:flex-col lg:overflow-hidden">
+          <div className="flex h-[7.875rem] max-h-[7.875rem] shrink-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 px-1.5 py-1 sm:h-[11.5rem] sm:max-h-[11.5rem] sm:px-2 sm:py-1.5 lg:h-auto lg:max-h-none lg:min-h-0 lg:flex-1">
             <div className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">
               Called numbers
             </div>
             <div className="mt-0.5 min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden pr-0.5 [scrollbar-width:thin]">
               {vm.called.length ? (
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(2.5rem,1fr))] gap-1.5 sm:gap-2">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(1.5625rem,1fr))] gap-[3px] sm:grid-cols-[repeat(auto-fill,minmax(2.5rem,1fr))] sm:gap-2">
                   {vm.called.map((n, i) => (
                     <span
                       key={`${n}-${i}`}
-                      className={`flex min-h-[1.75rem] items-center justify-center rounded border px-1 text-center text-xs font-semibold sm:min-h-0 sm:px-1.5 sm:py-1 sm:text-sm ${
+                      className={`rounded border px-1 py-0.5 text-center text-[10px] font-semibold leading-tight sm:flex sm:min-h-0 sm:items-center sm:justify-center sm:px-1.5 sm:py-1 sm:text-sm sm:leading-normal ${
                         i === vm.called.length - 1
                           ? "border-amber-400 bg-amber-700/85 text-white"
                           : "border-white/10 bg-white/10 text-zinc-200"
@@ -267,7 +260,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
             </div>
           </div>
 
-          <div className="shrink-0 rounded-lg border border-white/10 bg-black/25 px-1.5 py-1 sm:px-2 sm:py-1.5">
+          <div className="shrink-0 rounded-lg border border-white/10 bg-black/25 px-1.5 py-1 sm:px-2 sm:py-1.5 lg:shrink-0">
             <div className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">Claim a prize</div>
             <div className="mt-0.5 grid grid-cols-3 gap-0.5 sm:grid-cols-6 sm:gap-1">
               {BINGO_PRIZE_KEYS.map(pk => {
