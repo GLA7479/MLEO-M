@@ -89,22 +89,21 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   const canHostOpenLudoSession = useMemo(
     () =>
       Boolean(
-        presenceLeaderKey &&
-          participantId &&
-          presenceLeaderKey === participantId &&
+        amMember &&
           room?.product_game_id === ONLINE_V2_GAME_IDS.LUDO &&
           !room?.active_session_id
       ),
-    [presenceLeaderKey, participantId, room?.product_game_id, room?.active_session_id]
+    [amMember, room?.product_game_id, room?.active_session_id]
   );
 
   const hostOpenLudoDisabledReason = useMemo(() => {
+    if (room?.product_game_id !== ONLINE_V2_GAME_IDS.LUDO) return "";
     if (seatedCount < 2) return "Need at least two seated players.";
     if (seatedCount > 4) return "Ludo allows at most four seated players.";
-    if (room?.product_game_id === ONLINE_V2_GAME_IDS.LUDO && presenceLeaderKey !== participantId)
-      return "Only current leader can open session.";
+    if (!presenceLeaderKey) return "Waiting for leader presence sync.";
+    if (presenceLeaderKey !== participantId) return "Only current leader can open session.";
     return "";
-  }, [seatedCount, room?.product_game_id, presenceLeaderKey, participantId]);
+  }, [room?.product_game_id, seatedCount, presenceLeaderKey, participantId]);
 
   const myMember = useMemo(() => members.find(m => m.participant_key === participantId) || null, [members, participantId]);
   const mySeatIndex =
@@ -436,6 +435,12 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     (typeof window !== "undefined" && String(window.location.search || "").includes("dev=1"));
   const lobbyRtLastLabel =
     lobbyRtLastEventAt != null ? new Date(lobbyRtLastEventAt).toLocaleTimeString(undefined, { hour12: false }) : "—";
+  const seatToneClasses = [
+    "border-red-500/45 bg-red-950/35 text-red-100",
+    "border-sky-500/45 bg-sky-950/35 text-sky-100",
+    "border-emerald-500/45 bg-emerald-950/35 text-emerald-100",
+    "border-amber-500/45 bg-amber-950/35 text-amber-100",
+  ];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
@@ -603,7 +608,11 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
                   type="button"
                   disabled={busy || (holder && !mine)}
                   onClick={() => void onClaimLudoSeat(seat)}
-                  className="rounded-lg border border-white/20 bg-white/10 py-2 text-xs font-semibold disabled:opacity-40"
+                  className={[
+                    "rounded-lg py-2 text-xs font-semibold disabled:opacity-40",
+                    seatToneClasses[seat] || "border-white/20 bg-white/10 text-white",
+                    mine ? "ring-2 ring-white/70" : "",
+                  ].join(" ")}
                   title={holder && !mine ? "Seat taken" : undefined}
                 >
                   Seat {seat + 1}
