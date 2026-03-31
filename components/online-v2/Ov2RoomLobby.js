@@ -446,18 +446,20 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && amMember ? (
           <Link
             href={`/ov2-ludo?room=${encodeURIComponent(roomId)}`}
+            title="Ludo OV2 match session is not live yet — read-only room context + board placeholder"
             className="block rounded-lg border border-amber-500/35 bg-amber-950/25 py-2 text-center text-xs font-semibold text-amber-100"
           >
-            Open Ludo table
+            Ludo · preview / not live match
           </Link>
         ) : null}
 
         {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO && amMember ? (
           <Link
             href={`/ov2-bingo?room=${encodeURIComponent(roomId)}`}
+            title="Bingo is preview-only — no live caller or validated claims"
             className="block rounded-lg border border-cyan-500/35 bg-cyan-950/25 py-2 text-center text-xs font-semibold text-cyan-100"
           >
-            Open Bingo table
+            Bingo · preview only
           </Link>
         ) : null}
 

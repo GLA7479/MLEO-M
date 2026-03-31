@@ -17,8 +17,9 @@ function parseRoomQueryParam(q) {
 }
 
 /**
- * `?room=<uuid>` loads OV2 room + members for Ludo (product_game_id must match).
- * Without `room`, the screen runs in offline preview mode.
+ * Route shell: loads OV2 room row when `?room=` is present (product_game_id must match).
+ * **Live Ludo match session / RPC is not implemented** — with a room, the board stays read-only.
+ * Without `?room=`, the screen is **local preview sandbox** only.
  */
 export default function Ov2LudoLiveShell() {
   const router = useRouter();
@@ -97,7 +98,13 @@ export default function Ov2LudoLiveShell() {
     };
   }, [roomId, room, members, participantId]);
 
-  const subtitle = roomId ? (room?.title ? `${room.title}` : loading ? "Loading…" : "OV2") : "Ludo · OV2 preview";
+  const subtitle = roomId
+    ? room?.title
+      ? `${room.title} · match not live yet`
+      : loading
+        ? "Loading…"
+        : "Ludo · room"
+    : "Ludo · local preview only";
 
   return (
     <OnlineV2GamePageShell
@@ -105,7 +112,11 @@ export default function Ov2LudoLiveShell() {
       subtitle={subtitle}
       infoPanel={
         <>
-          <p>OV2 Ludo uses the shared room shell. Match session, RPC turns, and vault settlement are not wired yet.</p>
+          <p>
+            <strong className="text-amber-200">Not live-authoritative yet.</strong> Without a room, you get a local board
+            preview only. With a room, the lobby row loads for navigation — Ludo match state, RPC turns, and vault flows
+            still require backend work (see <code className="text-zinc-400">ov2LudoSessionAdapter.js</code>).
+          </p>
           {roomId ? (
             <p className="mt-2 text-[11px] text-zinc-500">
               <Link href="/online-v2/rooms" className="text-sky-300 underline">

@@ -15,7 +15,12 @@ function isOv2HubEnabled() {
 
 function gameStatusCopy(g) {
   if (g.phase === "scaffold") return "Early build — rooms & lobby live";
+  if (g.phase === "planned") return "Preview only — not live-authoritative";
   return "Planned";
+}
+
+function gamePrimaryCtaLabel(g) {
+  return g.phase === "planned" ? "Preview" : "Open";
 }
 
 function gameEmoji(id) {
@@ -103,7 +108,7 @@ export default function OnlineV2Hub() {
                           background: `linear-gradient(135deg, ${gameAccent(g.id)} 0%, ${gameAccent(g.id)}cc 100%)`,
                         }}
                       >
-                        Open
+                        {gamePrimaryCtaLabel(g)}
                       </Link>
                     </div>
                   </article>

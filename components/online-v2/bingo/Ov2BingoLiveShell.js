@@ -17,8 +17,8 @@ function parseRoomQueryParam(q) {
 }
 
 /**
- * `?room=<uuid>` loads OV2 room + members for Bingo (product_game_id must match).
- * Without `room`, the screen runs in offline preview mode.
+ * Route shell: optional `?room=` loads the OV2 room row for context/navigation.
+ * **Entire Bingo surface is preview-only** — no server caller, deck, or claim validation yet.
  */
 export default function Ov2BingoLiveShell() {
   const router = useRouter();
@@ -97,7 +97,13 @@ export default function Ov2BingoLiveShell() {
     };
   }, [roomId, room, members, participantId]);
 
-  const subtitle = roomId ? (room?.title ? `${room.title}` : loading ? "Loading…" : "OV2") : "Bingo · OV2 preview";
+  const subtitle = roomId
+    ? room?.title
+      ? `${room.title} · preview only`
+      : loading
+        ? "Loading…"
+        : "Bingo · preview"
+    : "Bingo · preview only";
 
   return (
     <OnlineV2GamePageShell
@@ -105,7 +111,11 @@ export default function Ov2BingoLiveShell() {
       subtitle={subtitle}
       infoPanel={
         <>
-          <p>OV2 Bingo uses the shared room shell. Caller/deck authority and claim validation will be server-side.</p>
+          <p>
+            <strong className="text-amber-200">Preview only — not a live match.</strong> Card, calls, and marks are
+            client-local. Room context (if any) does not enable authoritative multiplayer. Future RPC/realtime wiring
+            starts in <code className="text-zinc-400">ov2BingoSessionAdapter.js</code>.
+          </p>
           {roomId ? (
             <p className="mt-2 text-[11px] text-zinc-500">
               <Link href="/online-v2/rooms" className="text-sky-300 underline">
