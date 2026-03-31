@@ -123,78 +123,117 @@ export default function Ov2LudoScreen({ contextInput = null }) {
     : isAwaitingMyDouble
       ? `Your response is required (${responderLabel})`
       : `Waiting for ${responderLabel}`;
-  const stateSurface = isLiveMatch ? (
-    <div className="flex w-full max-w-[28rem] flex-col gap-1">
-      <div className="flex flex-wrap items-stretch justify-end gap-1">
-        <div className={`min-w-[9rem] rounded-md border px-2 py-1 text-[10px] font-semibold sm:text-[11px] ${turnTimerTone}`}>
-          <div className="flex items-center justify-between gap-2">
-            <span>{isMyTurnLive ? "Your turn" : `Turn: ${turnSeat != null ? `Seat ${Number(turnSeat) + 1}` : "—"}`}</span>
-            {isTurnTimerActive && turnTimeLeftSec != null ? <span>{turnTimeLeftSec}s</span> : <span>—</span>}
-          </div>
-        </div>
-        <div className={`min-w-[11rem] rounded-md border px-2 py-1 text-[10px] font-semibold sm:text-[11px] ${doubleTimerTone}`}>
-          <div className="flex items-center justify-between gap-2">
-            <span>Double x{Number(currentMultiplier || 1)}</span>
-            {isDoublePending && isDoubleTimerActive && doubleTimeLeftSec != null ? <span>{doubleTimeLeftSec}s</span> : <span>—</span>}
-          </div>
-          <div className="mt-0.5 text-[9px] font-normal text-zinc-200/90 sm:text-[10px]">
-            {doubleStateLine}
-          </div>
+  const turnToken = isMyTurnLive ? "Turn You" : turnSeat != null ? `Turn S${Number(turnSeat) + 1}` : "Turn —";
+  const turnTimeToken = isTurnTimerActive && turnTimeLeftSec != null ? `${turnTimeLeftSec}s` : "—";
+  const doubleToken = `Dx${Number(currentMultiplier || 1)}`;
+  const doubleTimeToken = isDoublePending && isDoubleTimerActive && doubleTimeLeftSec != null ? `${doubleTimeLeftSec}s` : "—";
+  const pendingToken = isDoublePending && doubleAwaitingSeat != null ? `Wait S${Number(doubleAwaitingSeat) + 1}` : null;
+  const statusShort = statusLine
+    ? statusLine
+        .replace("Match finished — winner Seat ", "Winner S")
+        .replace("Seat ", "S")
+        .replace(" eliminated after 3 missed turns.", "")
+        .replace("Double response timed out — resolving.", "Double timeout")
+    : null;
+  const strikeSeats = [0, 1, 2, 3]
+    .map(seat => ({ seat, v: Number(strikeDisplayMap?.[seat] || 0) }))
+    .filter(x => x.v > 0);
+  const strikeToken = eliminatedSeats?.length
+    ? `Out ${eliminatedSeats.map(s => `S${Number(s) + 1}`).join(",")}`
+    : strikeSeats.length
+      ? `St ${strikeSeats.map(x => `S${x.seat + 1}:${x.v}`).join(",")}`
+      : null;
+  const desktopStateSurface = isLiveMatch ? (
+    <div className="flex w-[16.75rem] flex-col gap-1.5">
+      <button
+        type="button"
+        disabled={!canOfferDouble}
+        onClick={() => void offerDouble()}
+        className="rounded-md border border-white/20 bg-white/10 px-2.5 py-1.5 text-[10px] font-semibold text-white disabled:opacity-40"
+      >
+        Offer Double
+      </button>
+      <div className={`rounded-md border px-2.5 py-1.5 text-[10px] font-semibold ${turnTimerTone}`}>
+        <div className="flex items-center justify-between gap-2">
+          <span>{turnToken}</span>
+          <span>{turnTimeToken}</span>
         </div>
       </div>
-      <div className="text-right text-[9px] text-zinc-300 sm:text-[10px]">
-        {doubleAwaitingSeat != null ? `Pending: proposer ${proposerLabel} · awaiting ${responderLabel} · queue ${pendingSeatsLabel}` : "Pending: none"}
+      <div className={`rounded-md border px-2.5 py-1.5 text-[10px] font-semibold ${doubleTimerTone}`}>
+        <div className="flex items-center justify-between gap-2">
+          <span>{doubleToken}</span>
+          <span>{doubleTimeToken}</span>
+        </div>
       </div>
-      {statusLine ? (
-        <div className="rounded-md border border-amber-500/35 bg-amber-950/25 px-2 py-1 text-[9px] font-semibold text-amber-100 sm:text-[10px]">
-          {statusLine}
+      {isAwaitingMyDouble ? (
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => void respondDouble("accept")}
+            className="flex-1 rounded-md border border-emerald-500/40 bg-emerald-900/30 px-2 py-1 text-[10px] font-semibold text-emerald-100"
+          >
+            Accept
+          </button>
+          <button
+            type="button"
+            onClick={() => void respondDouble("decline")}
+            className="flex-1 rounded-md border border-red-500/40 bg-red-900/30 px-2 py-1 text-[10px] font-semibold text-red-100"
+          >
+            Decline
+          </button>
         </div>
       ) : null}
-      <div className="text-right text-[9px] text-zinc-300 sm:text-[10px]">
-        {eliminatedSeats?.length
-          ? `Eliminated: ${eliminatedSeats.map(s => `Seat ${Number(s) + 1}`).join(", ")}`
-          : `Strikes: ${[0, 1, 2, 3].map(seat => `S${seat + 1}:${Number(strikeDisplayMap?.[seat] || 0)}`).join(" · ")}`}
+      <div className="flex flex-wrap justify-end gap-1 text-[9px]">
+        {pendingToken ? <span className="rounded border border-fuchsia-400/30 bg-fuchsia-950/20 px-1.5 py-0.5 text-fuchsia-100">{pendingToken}</span> : null}
+        {statusShort ? <span className="rounded border border-amber-500/35 bg-amber-950/25 px-1.5 py-0.5 text-amber-100">{statusShort}</span> : null}
+        {strikeToken ? <span className="rounded border border-zinc-500/35 bg-zinc-900/35 px-1.5 py-0.5 text-zinc-200">{strikeToken}</span> : null}
       </div>
+    </div>
+  ) : null;
+  const mobileStateRow = isLiveMatch ? (
+    <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+      <button
+        type="button"
+        disabled={!canOfferDouble}
+        onClick={() => void offerDouble()}
+        className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-40"
+      >
+        Offer
+      </button>
+      {isAwaitingMyDouble ? (
+        <>
+          <button
+            type="button"
+            onClick={() => void respondDouble("accept")}
+            className="rounded-md border border-emerald-500/40 bg-emerald-900/30 px-2 py-1 text-[10px] font-semibold text-emerald-100"
+          >
+            Accept
+          </button>
+          <button
+            type="button"
+            onClick={() => void respondDouble("decline")}
+            className="rounded-md border border-red-500/40 bg-red-900/30 px-2 py-1 text-[10px] font-semibold text-red-100"
+          >
+            Decline
+          </button>
+        </>
+      ) : null}
+      <span className={`rounded border px-2 py-1 font-semibold ${turnTimerTone}`}>{turnToken} {turnTimeToken}</span>
+      <span className={`rounded border px-2 py-1 font-semibold ${doubleTimerTone}`}>{doubleToken} {doubleTimeToken}</span>
+      {pendingToken ? (
+        <span className="rounded border border-fuchsia-400/30 bg-fuchsia-950/20 px-2 py-1 font-semibold text-fuchsia-100">{pendingToken}</span>
+      ) : null}
+      {statusShort ? (
+        <span className="rounded border border-amber-500/35 bg-amber-950/25 px-2 py-1 font-semibold text-amber-100">{statusShort}</span>
+      ) : null}
+      {strikeToken ? (
+        <span className="rounded border border-zinc-500/35 bg-zinc-900/35 px-2 py-1 font-semibold text-zinc-200">{strikeToken}</span>
+      ) : null}
     </div>
   ) : null;
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-0.5 overflow-hidden px-0.5 sm:gap-1 sm:px-1">
-      {isLiveMatch ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-1">
-          <button
-            type="button"
-            disabled={!canOfferDouble}
-            onClick={() => void offerDouble()}
-            className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-40"
-          >
-            Offer Double
-          </button>
-          {doubleAwaitingSeat != null ? (
-            <span className="text-[9px] text-zinc-300 sm:text-[10px]">
-              Pending: proposer {proposerLabel} · awaiting {responderLabel} · queue {pendingSeatsLabel}
-            </span>
-          ) : null}
-          {isAwaitingMyDouble ? (
-            <>
-              <button
-                type="button"
-                onClick={() => void respondDouble("accept")}
-                className="rounded-md border border-emerald-500/40 bg-emerald-900/30 px-2 py-1 text-[10px] font-semibold text-emerald-100"
-              >
-                Accept
-              </button>
-              <button
-                type="button"
-                onClick={() => void respondDouble("decline")}
-                className="rounded-md border border-red-500/40 bg-red-900/30 px-2 py-1 text-[10px] font-semibold text-red-100"
-              >
-                Decline
-              </button>
-            </>
-          ) : null}
-        </div>
-      ) : null}
       {isReadOnlyRoom ? (
         <div
           className="shrink-0 rounded-md border border-amber-500/40 bg-amber-950/30 px-2 py-1 text-center text-[9px] font-semibold text-amber-100 sm:text-[10px]"
@@ -234,8 +273,8 @@ export default function Ov2LudoScreen({ contextInput = null }) {
         awaitedIndex={isDoublePending ? doubleAwaitingSeat : null}
         eliminatedIndices={eliminatedSeats}
       />
-      {isLiveMatch ? <div className="hidden shrink-0 justify-end md:flex">{stateSurface}</div> : null}
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        {isLiveMatch ? <div className="absolute right-1 top-1 z-30 hidden md:block">{desktopStateSurface}</div> : null}
         <Ov2LudoBoardView
           board={board}
           mySeat={mySeat}
@@ -252,7 +291,7 @@ export default function Ov2LudoScreen({ contextInput = null }) {
           legalMovablePieceIndices={liveLegalMovablePieceIndices}
         />
       </div>
-      {isLiveMatch ? <div className="shrink-0 md:hidden">{stateSurface}</div> : null}
+      {isLiveMatch ? <div className="shrink-0 md:hidden">{mobileStateRow}</div> : null}
     </div>
   );
 }
