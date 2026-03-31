@@ -86,13 +86,18 @@ export default function Ov2LudoLiveShell() {
   }, [roomId]);
 
   const reloadContextUntilSessionChanges = useCallback(
-    async (previousSessionId, timeoutMs = 20000) => {
+    async (previousSessionId, rpcNewSessionId, timeoutMs = 20000) => {
       if (!roomId) return { ok: false, error: "no room" };
       const prev =
         previousSessionId != null && String(previousSessionId).trim() !== "" ? String(previousSessionId).trim() : "";
+      const rpcSid =
+        rpcNewSessionId != null && String(rpcNewSessionId).trim() !== "" ? String(rpcNewSessionId).trim() : "";
       const start = Date.now();
       setLoadError("");
       try {
+        if (rpcSid && rpcSid !== prev) {
+          setRoom(row => (row && typeof row === "object" ? { ...row, active_session_id: rpcSid } : row));
+        }
         while (Date.now() - start < timeoutMs) {
           const r = await fetchOv2RoomById(roomId);
           if (!r) {
@@ -112,8 +117,9 @@ export default function Ov2LudoLiveShell() {
           const m = await fetchOv2RoomMembers(roomId);
           setMembers(m);
           loadedOnceForRoomRef.current = roomId;
-          if (nextId && nextId !== prev) {
-            return { ok: true };
+          if (nextId) {
+            if (rpcSid && nextId === rpcSid) return { ok: true };
+            if (!rpcSid && prev && nextId !== prev) return { ok: true };
           }
           await new Promise(res => setTimeout(res, 150));
         }

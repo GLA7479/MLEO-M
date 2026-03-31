@@ -10,7 +10,7 @@ import Ov2LudoBoardView from "../../../lib/online-v2/ludo/ov2LudoBoardView";
 import Ov2SeatStrip from "../shared/Ov2SeatStrip";
 
 /**
- * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null, onSessionRefresh?: (previousActiveSessionId: string) => void | Promise<unknown> }} props
+ * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null, onSessionRefresh?: (previousActiveSessionId: string, rpcNewSessionId?: string) => void | Promise<unknown> }} props
  */
 export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh }) {
   const session = useOv2LudoSession(contextInput ?? undefined);
@@ -362,7 +362,13 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
                     setRematchBusy(true);
                     try {
                       const r = await rematch();
-                      if (r?.ok && onSessionRefresh) await onSessionRefresh(prevSessionId);
+                      if (r?.ok && onSessionRefresh) {
+                        const rpcSid =
+                          r.snapshot && typeof r.snapshot === "object" && r.snapshot.sessionId != null
+                            ? String(r.snapshot.sessionId).trim()
+                            : "";
+                        await onSessionRefresh(prevSessionId, rpcSid || undefined);
+                      }
                     } finally {
                       setRematchBusy(false);
                     }
