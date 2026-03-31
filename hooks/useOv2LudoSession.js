@@ -24,6 +24,8 @@ import {
 } from "../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import { supabaseMP } from "../lib/supabaseClients";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
+import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
+import { requestOv2LudoClaimSettlement } from "../lib/online-v2/ludo/ov2LudoSettlement";
 
 /** Total target time for live roll + reveal (RPC is authoritative; pacing is display-only). */
 const OV2_LUDO_LIVE_ROLL_MIN_MS = 2000;
@@ -199,11 +201,23 @@ export function useOv2LudoSession(baseContext) {
     if (roomProductId !== OV2_LUDO_PRODUCT_GAME_ID) return;
     if (String(authoritativeSnapshot.phase || "").trim().toLowerCase() !== "finished") return;
     const sid = String(authoritativeSnapshot.sessionId || "").trim();
-    if (!sid) return;
+    if (!sid || !roomId || !selfKey) return;
     if (vaultFinishedRefreshForSessionRef.current === sid) return;
     vaultFinishedRefreshForSessionRef.current = sid;
-    void readOnlineV2Vault({ fresh: true }).catch(() => {});
-  }, [playMode, authoritativeSnapshot, roomProductId]);
+    void (async () => {
+      try {
+        const claim = await requestOv2LudoClaimSettlement(roomId, selfKey);
+        if (claim.ok && Array.isArray(claim.lines) && claim.lines.length > 0) {
+          await applyBoardPathSettlementClaimLinesToVault(claim.lines, OV2_LUDO_PRODUCT_GAME_ID);
+        } else if (!claim.ok) {
+          vaultFinishedRefreshForSessionRef.current = null;
+        }
+      } catch {
+        vaultFinishedRefreshForSessionRef.current = null;
+      }
+      await readOnlineV2Vault({ fresh: true }).catch(() => {});
+    })();
+  }, [playMode, authoritativeSnapshot, roomProductId, roomId, selfKey]);
 
   const lobbySeatStrip = useMemo(() => {
     if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET || roomProductId !== OV2_LUDO_PRODUCT_GAME_ID) {
