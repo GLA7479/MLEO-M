@@ -1,6 +1,6 @@
 /** Chrome control style aligned with Solo V2 `SoloV2TopHud` pills. */
 export const OV2_HUD_CHROME_BTN =
-  "inline-flex h-8 shrink-0 touch-manipulation select-none items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.06] px-2.5 text-[10px] font-medium text-white/90 shadow-sm shadow-black/15 transition-colors hover:border-white/18 hover:bg-white/[0.1] active:bg-white/[0.14] sm:px-3 sm:text-[11px] lg:h-7 lg:min-h-[28px] lg:px-2.5 lg:text-[10px]";
+  "inline-flex h-9 shrink-0 touch-manipulation select-none items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.06] px-3 text-[11px] font-semibold text-white/90 shadow-sm shadow-black/15 transition-colors hover:border-white/18 hover:bg-white/[0.1] active:bg-white/[0.14] sm:h-9 sm:px-3 sm:text-[11px] lg:h-8 lg:min-h-[32px] lg:px-3 lg:text-[11px]";
 
 /**
  * In-place overlay for OV2 game Info / Menu (short content; keeps main column no-scroll).

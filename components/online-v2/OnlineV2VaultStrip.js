@@ -23,7 +23,7 @@ export default function OnlineV2VaultStrip({ compact = false }) {
     <div
       className={
         compact
-          ? "inline-flex rounded-md border border-emerald-500/35 bg-emerald-950/35 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-100 sm:text-[10px]"
+          ? "inline-flex h-9 items-center rounded-full border border-emerald-500/35 bg-emerald-950/35 px-2.5 text-[11px] font-semibold tabular-nums text-emerald-100 sm:h-9 sm:px-3 sm:text-[11px] lg:h-8 lg:min-h-[32px] lg:px-3 lg:text-[11px]"
           : "rounded-lg border border-emerald-500/30 bg-emerald-950/40 px-2 py-1 text-[11px] font-semibold tabular-nums text-emerald-100 lg:text-[10px]"
       }
       title="Product vault via OV2 bridge"

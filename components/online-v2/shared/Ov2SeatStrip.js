@@ -18,7 +18,7 @@ export default function Ov2SeatStrip({ count, labels = [], activeIndex = null, s
   ];
 
   return (
-    <div className="flex min-h-0 w-full shrink-0 gap-1 overflow-x-auto pb-0.5">
+    <div className="flex min-h-0 w-full shrink-0 gap-2 overflow-x-auto pb-1.5 pt-1">
       {Array.from({ length: count }).map((_, idx) => {
         const label = labels[idx] ?? `Seat ${idx + 1}`;
         const isSelf = selfIndex === idx;
@@ -27,12 +27,12 @@ export default function Ov2SeatStrip({ count, labels = [], activeIndex = null, s
         return (
           <div
             key={idx}
-            className={`flex min-w-[4.5rem] flex-1 flex-col rounded-md border px-1.5 py-1 text-center text-[9px] font-semibold sm:min-w-[5.5rem] sm:text-[10px] ${tone} ${
+            className={`flex min-w-[5rem] flex-1 flex-col rounded-md border px-2 py-2 text-center text-[11px] font-semibold sm:min-w-[5.75rem] sm:text-[11px] ${tone} ${
               isSelf ? "ring-1 ring-white ring-offset-1 ring-offset-zinc-950" : ""
             } ${isActive ? "brightness-110" : "opacity-90"}`}
           >
             <span className="text-white/90">{label}</span>
-            {isSelf ? <span className="text-[8px] font-normal text-sky-200">you</span> : null}
+            {isSelf ? <span className="text-[10px] font-normal text-sky-200">you</span> : null}
           </div>
         );
       })}
