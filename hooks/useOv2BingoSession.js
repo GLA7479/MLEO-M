@@ -1,12 +1,36 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   applyPreviewMark,
+  BINGO_PRIZE_KEYS,
   buildDeck,
   computePreviewLineCompletion,
   generateCard,
+  getAvailablePrizeKeys,
+  getCardForSeat,
+  getWonRowKeys,
+  isFullWonByCalls,
   makeEmptyMarks,
 } from "../lib/online-v2/bingo/ov2BingoEngine";
-import { OV2_BINGO_PLAY_MODE, resolveOv2BingoPlayMode } from "../lib/online-v2/bingo/ov2BingoSessionAdapter";
+import {
+  callOv2BingoNext,
+  cancelOv2BingoRematch,
+  claimOv2BingoPrize,
+  fetchOv2BingoLiveRoundSnapshot,
+  normalizeOv2BingoAuthoritativeSnapshot,
+  normalizeMemberRow,
+  openOv2BingoSession,
+  resolveOv2BingoSeatCard,
+  OV2_BINGO_PLAY_MODE,
+  OV2_BINGO_PRODUCT_GAME_ID,
+  requestOv2BingoRematch,
+  resolveOv2BingoPlayMode,
+  startOv2BingoNextMatch,
+  subscribeOv2BingoAuthoritativeSnapshot,
+} from "../lib/online-v2/bingo/ov2BingoSessionAdapter";
+
+/** @typedef {import("../lib/online-v2/bingo/ov2BingoSessionAdapter").Ov2BingoAuthoritativeSnapshot} Ov2BingoAuthoritativeSnapshot */
+
+const OV2_BINGO_POLL_MS = 2500;
 
 function initialRoundState() {
   return {
@@ -16,93 +40,525 @@ function initialRoundState() {
   };
 }
 
+function previewDisabledReason(vm) {
+  if (vm.deckRemaining <= 0) return "Deck empty";
+  return null;
+}
+
 /**
- * OV2 Bingo — React layer above `ov2BingoSessionAdapter` + `ov2BingoEngine`.
- *
- * - **PREVIEW_ONLY** / **ROOM_CONTEXT_NO_MATCH_YET:** same local preview round; marks and calls are
- *   not authoritative. Room mode is shell/context only until live snapshot + RPC exist.
- *
- * @param {null|undefined|{ room?: object, members?: unknown[], self?: { participant_key?: string } }} baseContext
+ * @param {null|undefined|{
+ *   room?: object,
+ *   members?: unknown[],
+ *   self?: { participant_key?: string, display_name?: string },
+ *   reloadRoomContext?: () => void | Promise<void>,
+ * }} baseContext
  */
 export function useOv2BingoSession(baseContext) {
   const room = baseContext?.room && typeof baseContext.room === "object" ? baseContext.room : null;
   const roomId = room?.id != null ? String(room.id) : null;
+  const roomProductId = room?.product_game_id != null ? String(room.product_game_id) : null;
+  const members = Array.isArray(baseContext?.members) ? baseContext.members : [];
+  const selfKey = baseContext?.self?.participant_key?.trim() || null;
+  const reloadRoomContext = baseContext?.reloadRoomContext;
 
-  const playMode = useMemo(
-    () => resolveOv2BingoPlayMode(baseContext ?? null),
-    // Resolver only depends on `room.id`; avoid resetting when parent passes a fresh context object.
-    [roomId]
-  );
-
-  const seed = `${roomId ?? "no-room"}:ov2-bingo-preview:v1`;
-  const card = useMemo(() => generateCard(seed), [seed]);
-  const deck = useMemo(() => buildDeck(seed), [seed]);
-
-  const [round, setRound] = useState(initialRoundState);
+  /** @type {Ov2BingoAuthoritativeSnapshot|null} */
+  const [liveSnapshot, setLiveSnapshot] = useState(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const liveSnapshotRef = useRef(/** @type {Ov2BingoAuthoritativeSnapshot|null} */ (null));
+  const callInFlightRef = useRef(false);
+  const lastAutoCallKeyRef = useRef(/** @type {string|null} */ (null));
 
   useEffect(() => {
-    setRound(initialRoundState());
-  }, [seed]);
+    liveSnapshotRef.current = liveSnapshot;
+  }, [liveSnapshot]);
 
-  const { marks, called, deckPos } = round;
-  const calledSet = useMemo(() => new Set(called), [called]);
+  const playMode = useMemo(() => {
+    return resolveOv2BingoPlayMode(
+      roomId ? { room: { id: roomId } } : null,
+      liveSnapshot
+    );
+  }, [roomId, liveSnapshot]);
 
-  const linePreview = useMemo(() => computePreviewLineCompletion(marks), [marks]);
+  const previewSeed = `${roomId ?? "no-room"}:ov2-bingo-preview:v1`;
+  const previewCard = useMemo(() => generateCard(previewSeed), [previewSeed]);
+  const previewDeck = useMemo(() => buildDeck(previewSeed), [previewSeed]);
 
-  const phaseLine = useMemo(() => {
-    const core =
-      "Local preview — not authoritative. Marks are UI-only; server will own calls & claims in a later phase.";
-    if (playMode === OV2_BINGO_PLAY_MODE.ROOM_CONTEXT_NO_MATCH_YET) {
-      return `Room context (no live Bingo match yet). ${core}`;
+  const [previewRound, setPreviewRound] = useState(initialRoundState);
+  const [liveMarks, setLiveMarks] = useState(() => makeEmptyMarks());
+
+  useEffect(() => {
+    setPreviewRound(initialRoundState());
+  }, [previewSeed]);
+
+  const liveIdentity = useMemo(() => {
+    if (!liveSnapshot?.sessionId || !liveSnapshot.roundId || liveSnapshot.seed == null) return "";
+    const m = liveSnapshot.members.find(mm => selfKey && mm.participantKey === selfKey);
+    const seat = m?.seatIndex;
+    if (seat == null) return "";
+    return `${liveSnapshot.sessionId}:${liveSnapshot.roundId}:${liveSnapshot.matchSeq}:${seat}`;
+  }, [liveSnapshot, selfKey]);
+
+  useEffect(() => {
+    if (!liveIdentity) {
+      setLiveMarks(makeEmptyMarks());
+      return;
     }
-    return core;
-  }, [playMode]);
+    setLiveMarks(makeEmptyMarks());
+  }, [liveIdentity]);
+
+  useEffect(() => {
+    if (!roomId || roomProductId !== OV2_BINGO_PRODUCT_GAME_ID) {
+      setLiveSnapshot(null);
+      lastAutoCallKeyRef.current = null;
+      return undefined;
+    }
+    let cancelled = false;
+    void (async () => {
+      const snap = await fetchOv2BingoLiveRoundSnapshot(roomId, { viewerParticipantKey: selfKey ?? "" });
+      if (!cancelled) setLiveSnapshot(snap ?? null);
+    })();
+
+    const unsub = subscribeOv2BingoAuthoritativeSnapshot(roomId, {
+      viewerParticipantKey: selfKey ?? "",
+      onSnapshot: s => {
+        if (!cancelled) setLiveSnapshot(s);
+      },
+    });
+
+    const poll =
+      typeof window !== "undefined"
+        ? window.setInterval(() => {
+            void (async () => {
+              const snap = await fetchOv2BingoLiveRoundSnapshot(roomId, { viewerParticipantKey: selfKey ?? "" });
+              if (!cancelled && snap) setLiveSnapshot(snap);
+            })();
+          }, OV2_BINGO_POLL_MS)
+        : 0;
+
+    return () => {
+      cancelled = true;
+      unsub();
+      if (typeof window !== "undefined" && poll) window.clearInterval(poll);
+    };
+  }, [roomId, roomProductId, selfKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const t = window.setInterval(() => setNowMs(Date.now()), 250);
+    return () => window.clearInterval(t);
+  }, []);
+
+  const myLiveSeatIndex = useMemo(() => {
+    if (!liveSnapshot || !selfKey) return null;
+    const m = liveSnapshot.members.find(mm => mm.participantKey === selfKey);
+    return m?.seatIndex ?? null;
+  }, [liveSnapshot, selfKey]);
+
+  const liveCard = useMemo(() => {
+    if (!liveSnapshot || myLiveSeatIndex == null) return null;
+    return resolveOv2BingoSeatCard(
+      liveSnapshot.deckCardsBySeat,
+      liveSnapshot.seed,
+      liveSnapshot.roundId,
+      myLiveSeatIndex
+    );
+  }, [liveSnapshot, myLiveSeatIndex]);
+
+  const liveCalledSet = useMemo(() => {
+    const arr = liveSnapshot?.calledNumbers ?? [];
+    return new Set(arr);
+  }, [liveSnapshot]);
+
+  const previewLineLive = useMemo(() => {
+    if (!liveCard || !liveSnapshot) return { completedRowIndexes: [], hasAnyRow: false, isFull: false };
+    const mask = liveMarks;
+    return computePreviewLineCompletion(mask);
+  }, [liveCard, liveSnapshot, liveMarks]);
+
+  const availablePrizeKeysLive = useMemo(() => {
+    if (!liveSnapshot || !liveCard || liveSnapshot.sessionPhase !== "playing") return [];
+    return getAvailablePrizeKeys({
+      card: liveCard,
+      called: liveSnapshot.calledNumbers,
+      existingClaims: liveSnapshot.claims.map(c => ({ prize_key: c.prizeKey, amount: c.amount })),
+    });
+  }, [liveSnapshot, liveCard]);
+
+  const nextCallDue = useMemo(() => {
+    if (!liveSnapshot?.nextCallAtIso) return true;
+    const t = Date.parse(liveSnapshot.nextCallAtIso);
+    if (!Number.isFinite(t)) return true;
+    return nowMs >= t;
+  }, [liveSnapshot, nowMs]);
+
+  const canCallNextNow = useMemo(() => {
+    if (!liveSnapshot || !nextCallDue) return false;
+    return Boolean(liveSnapshot.canCallNext);
+  }, [liveSnapshot, nextCallDue]);
+
+  useEffect(() => {
+    if (playMode !== OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE || !liveSnapshot || !selfKey) return;
+    if (liveSnapshot.sessionPhase !== "playing") return;
+    if (!canCallNextNow || callInFlightRef.current) return;
+
+    const key = `${liveSnapshot.sessionId}:${liveSnapshot.revision}:${liveSnapshot.deckPosition}`;
+    if (lastAutoCallKeyRef.current === key) return;
+
+    callInFlightRef.current = true;
+    lastAutoCallKeyRef.current = key;
+    void (async () => {
+      try {
+        const r = await callOv2BingoNext(roomId, selfKey, liveSnapshot.revision);
+        if (r.ok && "snapshot" in r && r.snapshot) {
+          setLiveSnapshot(r.snapshot);
+        } else {
+          lastAutoCallKeyRef.current = null;
+        }
+      } catch {
+        lastAutoCallKeyRef.current = null;
+      } finally {
+        callInFlightRef.current = false;
+      }
+    })();
+  }, [playMode, liveSnapshot, selfKey, roomId, canCallNextNow]);
 
   const callNextPreviewNumber = useCallback(() => {
-    setRound(prev => {
-      if (prev.deckPos >= deck.length) return prev;
-      const n = deck[prev.deckPos];
+    setPreviewRound(prev => {
+      if (prev.deckPos >= previewDeck.length) return prev;
+      const n = previewDeck[prev.deckPos];
       return {
         marks: prev.marks,
         called: [...prev.called, n],
         deckPos: prev.deckPos + 1,
       };
     });
-  }, [deck]);
+  }, [previewDeck]);
 
   const resetPreviewRound = useCallback(() => {
-    setRound(initialRoundState());
+    setPreviewRound(initialRoundState());
   }, []);
 
   const onCellClick = useCallback(
     n => {
-      setRound(prev => {
-        const { marks: next, changed } = applyPreviewMark(card, prev.marks, n, new Set(prev.called));
-        if (!changed) return prev;
-        return { ...prev, marks: next };
-      });
+      if (playMode === OV2_BINGO_PLAY_MODE.PREVIEW_LOCAL || playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET) {
+        setPreviewRound(prev => {
+          const { marks: next, changed } = applyPreviewMark(previewCard, prev.marks, n, new Set(prev.called));
+          if (!changed) return prev;
+          return { ...prev, marks: next };
+        });
+        return;
+      }
+      if (playMode === OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE && liveCard) {
+        setLiveMarks(prev => {
+          const { marks: next, changed } = applyPreviewMark(liveCard, prev, n, liveCalledSet);
+          if (!changed) return prev;
+          return next;
+        });
+      }
     },
-    [card]
+    [playMode, previewCard, liveCard, liveCalledSet]
   );
 
-  const lastCalled = called.length ? called[called.length - 1] : null;
+  const refreshLiveSnapshot = useCallback(async () => {
+    if (!roomId) return;
+    const snap = await fetchOv2BingoLiveRoundSnapshot(roomId, { viewerParticipantKey: selfKey ?? "" });
+    if (snap) setLiveSnapshot(snap);
+  }, [roomId, selfKey]);
+
+  const openSession = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false, error: "Not ready" };
+    const r = await openOv2BingoSession(roomId, selfKey);
+    if (r.ok && r.snapshot) setLiveSnapshot(r.snapshot);
+    await refreshLiveSnapshot();
+    if (typeof reloadRoomContext === "function") void Promise.resolve(reloadRoomContext());
+    return r;
+  }, [roomId, selfKey, refreshLiveSnapshot, reloadRoomContext]);
+
+  const callNextManual = useCallback(async () => {
+    if (!roomId || !selfKey || !liveSnapshot) return { ok: false, error: "Not ready" };
+    const r = await callOv2BingoNext(roomId, selfKey, liveSnapshot.revision);
+    if (r.ok && "snapshot" in r && r.snapshot) setLiveSnapshot(r.snapshot);
+    return r;
+  }, [roomId, selfKey, liveSnapshot]);
+
+  const claimPrize = useCallback(
+    async prizeKey => {
+      if (!roomId || !selfKey || !liveSnapshot) return { ok: false, error: "Not ready" };
+      const r = await claimOv2BingoPrize(roomId, prizeKey, selfKey, liveSnapshot.revision);
+      if (r.ok && "snapshot" in r && r.snapshot) setLiveSnapshot(r.snapshot);
+      await refreshLiveSnapshot();
+      return r;
+    },
+    [roomId, selfKey, liveSnapshot, refreshLiveSnapshot]
+  );
+
+  const requestRematch = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false, error: "Not ready" };
+    const r = await requestOv2BingoRematch(roomId, selfKey);
+    await refreshLiveSnapshot();
+    if (typeof reloadRoomContext === "function") void Promise.resolve(reloadRoomContext());
+    return r;
+  }, [roomId, selfKey, refreshLiveSnapshot, reloadRoomContext]);
+
+  const cancelRematch = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false, error: "Not ready" };
+    const r = await cancelOv2BingoRematch(roomId, selfKey);
+    await refreshLiveSnapshot();
+    if (typeof reloadRoomContext === "function") void Promise.resolve(reloadRoomContext());
+    return r;
+  }, [roomId, selfKey, refreshLiveSnapshot, reloadRoomContext]);
+
+  const startNextMatch = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false, error: "Not ready" };
+    const seq = liveSnapshot?.roomMatchSeq ?? null;
+    const r = await startOv2BingoNextMatch(roomId, selfKey, seq);
+    setLiveSnapshot(null);
+    await refreshLiveSnapshot();
+    if (typeof reloadRoomContext === "function") void Promise.resolve(reloadRoomContext());
+    return r;
+  }, [roomId, selfKey, liveSnapshot?.roomMatchSeq, refreshLiveSnapshot, reloadRoomContext]);
+
+  const rebindSnapshotFromServerPayload = useCallback(
+    raw => {
+      const s = normalizeOv2BingoAuthoritativeSnapshot(raw, { viewerParticipantKey: selfKey ?? "" });
+      if (s) setLiveSnapshot(s);
+    },
+    [selfKey]
+  );
+
+  const membersVm = useMemo(() => {
+    if (liveSnapshot && Array.isArray(liveSnapshot.members)) return liveSnapshot.members;
+    return members.map(normalizeMemberRow);
+  }, [liveSnapshot, members]);
+
+  const vm = useMemo(() => {
+    const previewCalledSet = new Set(previewRound.called);
+    const previewLast = previewRound.called.length ? previewRound.called[previewRound.called.length - 1] : null;
+
+    /** @type {Record<string, string|null>} */
+    const previewPrizeDisabled = {};
+    for (const pk of BINGO_PRIZE_KEYS) {
+      previewPrizeDisabled[pk] = "Claims are validated in live matches only";
+    }
+
+    if (playMode === OV2_BINGO_PLAY_MODE.PREVIEW_LOCAL || playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET) {
+      const linePreview = computePreviewLineCompletion(previewRound.marks);
+      const life = room?.lifecycle_phase != null ? String(room.lifecycle_phase) : "";
+      let phaseLine =
+        playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET
+          ? "Waiting for the host to open a Bingo match."
+          : "Local preview — practice board and calls only (not authoritative).";
+      if (playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET) {
+        if (life === "lobby") phaseLine = "Waiting for players — the host must start the match from the lobby.";
+        else if (life === "pending_start" || life === "pending_stakes") phaseLine = "Waiting for stake commits from all players.";
+        else if (life === "active")
+          phaseLine = liveSnapshot?.canOpenSession
+            ? "Room is ready — the host can open Bingo when at least two players are seated and staked."
+            : "Waiting for the host to open Bingo.";
+      }
+      const previewAvail = getAvailablePrizeKeys({
+        card: previewCard,
+        called: previewRound.called,
+        existingClaims: [],
+      });
+      /** @type {Record<string, string|null>} */
+      const roomNoMatchPrizeDisabled = {};
+      for (const pk of BINGO_PRIZE_KEYS) {
+        roomNoMatchPrizeDisabled[pk] = "No active Bingo round yet";
+      }
+      const wonPreview = new Set(getWonRowKeys(previewCard, previewRound.called));
+      if (isFullWonByCalls(previewCard, previewRound.called)) wonPreview.add("full");
+
+      return {
+        playMode,
+        isLive: false,
+        card: previewCard,
+        marks: previewRound.marks,
+        called: previewRound.called,
+        calledSet: previewCalledSet,
+        lastCalled: previewLast,
+        phaseLine,
+        deckRemaining: Math.max(0, previewDeck.length - previewRound.deckPos),
+        deckTotal: previewDeck.length,
+        previewLine: linePreview,
+        authoritativeSnapshot: liveSnapshot,
+        revision: liveSnapshot?.revision ?? 0,
+        nextCallAtIso: liveSnapshot?.nextCallAtIso ?? null,
+        msUntilNextCall: null,
+        announcement: null,
+        winner: null,
+        availablePrizeKeys: playMode === OV2_BINGO_PLAY_MODE.PREVIEW_LOCAL ? previewAvail : [],
+        claims: [],
+        membersVm,
+        wonPrizeKeys: [...wonPreview],
+        selfClaimedPrizeKeys: [],
+        prizeDisabledByKey: playMode === OV2_BINGO_PLAY_MODE.PREVIEW_LOCAL ? previewPrizeDisabled : roomNoMatchPrizeDisabled,
+        roomLifecyclePhase: life || null,
+        roomActiveSessionId: room?.active_session_id != null ? String(room.active_session_id) : null,
+        callerSeatIndex: liveSnapshot?.callerSeatIndex ?? null,
+        callerParticipantKey: liveSnapshot?.callerParticipantKey ?? null,
+        sessionPhase: liveSnapshot?.sessionPhase ?? null,
+        canOpenSession: liveSnapshot?.canOpenSession ?? false,
+        canCallNext: false,
+        canCallNextNow: false,
+        canClaimAnyPrize: false,
+        canRequestRematch: false,
+        canCancelRematch: false,
+        canStartNextMatch: false,
+        cardIsAuthoritative: false,
+        disabledReasons: {
+          openSession: !selfKey ? "No participant id" : liveSnapshot && !liveSnapshot.canOpenSession ? "Cannot open now" : null,
+          callNext: "Use preview Call next in this mode",
+          claim: "No live match",
+          rematch: "No finished match",
+          startNextMatch: "Not host or not ready",
+        },
+      };
+    }
+
+    const snap = liveSnapshot;
+    const called = snap?.calledNumbers ?? [];
+    const lastCalledLive = snap?.lastNumber ?? (called.length ? called[called.length - 1] : null);
+    const deckTotal = snap?.deckTotal ?? 75;
+    const deckRem = Math.max(0, deckTotal - (snap?.deckPosition ?? 0));
+    let msUntilNextCall = null;
+    if (snap?.nextCallAtIso) {
+      const t = Date.parse(snap.nextCallAtIso);
+      if (Number.isFinite(t)) msUntilNextCall = Math.max(0, t - nowMs);
+    }
+
+    let announcement = null;
+    if (snap?.sessionPhase === "finished") {
+      if (snap.winner?.participantKey) {
+        announcement = `Match finished — winner: ${snap.winner.name || snap.winner.participantKey}`;
+      } else {
+        announcement = "Match finished.";
+      }
+    }
+
+    const dr = {
+      openSession: snap?.canOpenSession ? null : snap?.roomLifecyclePhase !== "active" ? "Room not active" : "Session already active or not eligible",
+      callNext: snap?.canCallNext ? (nextCallDue ? null : "Waiting for call timer") : "Only the caller can draw",
+      claim:
+        snap?.sessionPhase === "playing" && availablePrizeKeysLive.length === 0
+          ? "No claimable prizes yet"
+          : !liveCard
+            ? "No card (seat required)"
+            : null,
+      rematch: snap?.canRequestRematch ? null : "Rematch not available",
+      cancelRematch: snap?.canCancelRematch ? null : "Nothing to cancel",
+      startNextMatch: snap?.canStartNextMatch ? null : "Host only — all players must rematch first",
+    };
+
+    const selfClaimedPrizeKeys =
+      selfKey && snap?.claims?.length
+        ? snap.claims.filter(c => c.claimedByParticipantKey === selfKey).map(c => c.prizeKey)
+        : [];
+
+    /** @type {Record<string, string|null>} */
+    const prizeDisabledByKey = {};
+    for (const pk of BINGO_PRIZE_KEYS) {
+      if (snap?.sessionPhase === "finished") prizeDisabledByKey[pk] = "Match finished";
+      else if (dr.claim) prizeDisabledByKey[pk] = dr.claim;
+      else if (!availablePrizeKeysLive.includes(pk)) prizeDisabledByKey[pk] = "Not yet claimable";
+      else prizeDisabledByKey[pk] = null;
+    }
+
+    const cardForEmphasis = liveCard || previewCard;
+    const wonEmphasis = new Set(selfClaimedPrizeKeys);
+    for (const k of getWonRowKeys(cardForEmphasis, called)) wonEmphasis.add(k);
+    if (isFullWonByCalls(cardForEmphasis, called)) wonEmphasis.add("full");
+
+    let phaseLine = "Playing — numbers are called on the server.";
+    if (snap?.sessionPhase === "playing") phaseLine = "Playing";
+    else if (snap?.sessionPhase === "finished") phaseLine = announcement || "Finished";
+
+    return {
+      playMode,
+      isLive: true,
+      card: liveCard || previewCard,
+      marks: liveMarks,
+      called,
+      calledSet: liveCalledSet,
+      lastCalled: lastCalledLive,
+      phaseLine,
+      deckRemaining: deckRem,
+      deckTotal,
+      previewLine: previewLineLive,
+      authoritativeSnapshot: snap,
+      revision: snap?.revision ?? 0,
+      nextCallAtIso: snap?.nextCallAtIso ?? null,
+      msUntilNextCall,
+      announcement,
+      winner: snap?.winner ?? null,
+      availablePrizeKeys: availablePrizeKeysLive,
+      claims: snap?.claims ?? [],
+      membersVm,
+      wonPrizeKeys: [...wonEmphasis],
+      selfClaimedPrizeKeys,
+      prizeDisabledByKey,
+      roomLifecyclePhase: snap?.roomLifecyclePhase ?? null,
+      roomActiveSessionId: snap?.roomActiveSessionId ?? null,
+      callerSeatIndex: snap?.callerSeatIndex ?? null,
+      callerParticipantKey: snap?.callerParticipantKey ?? null,
+      sessionPhase: snap?.sessionPhase ?? null,
+      canOpenSession: snap?.canOpenSession ?? false,
+      canCallNext: snap?.canCallNext ?? false,
+      canCallNextNow,
+      canClaimAnyPrize: availablePrizeKeysLive.length > 0 && snap?.sessionPhase === "playing",
+      canRequestRematch: snap?.canRequestRematch ?? false,
+      canCancelRematch: snap?.canCancelRematch ?? false,
+      canStartNextMatch: snap?.canStartNextMatch ?? false,
+      cardIsAuthoritative: Boolean(liveCard),
+      disabledReasons: dr,
+    };
+  }, [
+    playMode,
+    previewCard,
+    previewRound.marks,
+    previewRound.called,
+    previewRound.deckPos,
+    previewDeck.length,
+    liveSnapshot,
+    liveCard,
+    liveMarks,
+    liveCalledSet,
+    previewLineLive,
+    availablePrizeKeysLive,
+    canCallNextNow,
+    nextCallDue,
+    nowMs,
+    selfKey,
+    room,
+    membersVm,
+  ]);
+
+  const previewDisableCall = previewDisabledReason({
+    deckRemaining: Math.max(0, previewDeck.length - previewRound.deckPos),
+  });
 
   return {
-    vm: {
-      playMode,
-      card,
-      marks,
-      called,
-      calledSet,
-      lastCalled,
-      phaseLine,
-      deckRemaining: Math.max(0, deck.length - deckPos),
-      deckTotal: deck.length,
-      /** UI-only row/full detection for preview testing */
-      previewLine: linePreview,
-    },
+    /** @type {(typeof OV2_BINGO_PLAY_MODE)[keyof typeof OV2_BINGO_PLAY_MODE]} */
+    playMode,
+    vm,
+    liveSnapshot,
+    members,
+    room,
+    selfKey,
     callNextPreviewNumber,
     resetPreviewRound,
     onCellClick,
+    onToggleMark: onCellClick,
+    previewDisabledReasonCallNext: previewDisableCall,
+    actions: {
+      refreshLiveSnapshot,
+      openSession,
+      callNextManual,
+      claimPrize,
+      requestRematch,
+      cancelRematch,
+      startNextMatch,
+    },
+    rebindSnapshotFromServerPayload,
   };
 }

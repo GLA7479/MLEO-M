@@ -17,8 +17,7 @@ function parseRoomQueryParam(q) {
 }
 
 /**
- * Route shell: optional `?room=` loads the OV2 room row for context/navigation.
- * **Entire Bingo surface is preview-only** — no server caller, deck, or claim validation yet.
+ * Route shell: `?room=` loads OV2 room context for live Bingo; without it, local preview only.
  */
 export default function Ov2BingoLiveShell() {
   const router = useRouter();
@@ -94,41 +93,45 @@ export default function Ov2BingoLiveShell() {
         participant_key: participantId,
         display_name: "",
       },
+      reloadRoomContext: reloadContext,
     };
-  }, [roomId, room, members, participantId]);
+  }, [roomId, room, members, participantId, reloadContext]);
 
-  const subtitle = roomId
-    ? room?.title
-      ? `${room.title} · preview demo (not live)`
-      : loading
-        ? "Loading…"
-        : "Bingo · preview demo (not live)"
-    : "Bingo · local preview";
+  const subtitle = !roomId
+    ? "Bingo · local preview"
+    : loading && !room
+      ? "Loading…"
+      : room?.title
+        ? room.title
+        : "Bingo";
 
   return (
     <OnlineV2GamePageShell
       title="Bingo"
       subtitle={subtitle}
       infoPanel={
-        <>
+        !roomId ? (
           <p>
-            <strong className="text-amber-200">Preview / demo only — not a live Bingo match.</strong> Card, deck order,
-            calls, and marks are client-local. There is no server caller, no validated claims, and no payouts. Opening
-            from a room link only adds navigation context until a real match exists — same local preview underneath. Wire
-            snapshot + RPC in <code className="text-zinc-400">ov2BingoSessionAdapter.js</code>.
+            <strong className="text-zinc-200">Local preview</strong> — practice board and calls on this device only. Open a
+            room from the lobby for live rounds, server calls, and validated claims.
           </p>
-          {roomId ? (
+        ) : (
+          <>
+            <p>
+              <strong className="text-emerald-200/90">Live room</strong> — calls and claims sync through OV2 Bingo. Use the
+              lobby to choose seats (0–8); the lowest occupied seat is the caller when the host opens the round.
+            </p>
             <p className="mt-2 text-[11px] text-zinc-500">
               <Link href="/online-v2/rooms" className="text-sky-300 underline">
                 Lobby
               </Link>
               {" · "}
               <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
-                Refresh
+                Refresh room
               </button>
             </p>
-          ) : null}
-        </>
+          </>
+        )
       }
     >
       {roomId && loadError && !room ? (

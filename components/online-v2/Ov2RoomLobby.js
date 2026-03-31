@@ -3,11 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getOv2MinPlayersForProduct, ONLINE_V2_GAME_IDS, ONLINE_V2_REGISTRY } from "../../lib/online-v2/onlineV2GameRegistry";
 import { OV2_BP_LIVE_SYNC_DEBOUNCE_MS } from "../../lib/online-v2/board-path/ov2BoardPathLiveSync";
 import {
+  claimOv2BingoSeat,
   commitOv2RoomStake,
   fetchOv2RoomById,
   fetchOv2RoomMembers,
   claimOv2LudoSeat,
   joinOv2Room,
+  leaveOv2BingoSeat,
   leaveOv2LudoSeat,
   leaveOv2Room,
   setOv2MemberReady,
@@ -17,6 +19,13 @@ import { buildOnlineV2EconomyEventKey, clampSuggestedOnlineV2Stake } from "../..
 import { debitOnlineV2Vault, peekOnlineV2Vault, readOnlineV2Vault } from "../../lib/online-v2/onlineV2VaultBridge";
 import { supabaseMP } from "../../lib/supabaseClients";
 import { requestOv2LudoOpenSession } from "../../lib/online-v2/ludo/ov2LudoSessionAdapter";
+import {
+  cancelOv2BingoRematch,
+  fetchOv2BingoLiveRoundSnapshot,
+  openOv2BingoSession,
+  requestOv2BingoRematch,
+  startOv2BingoNextMatch,
+} from "../../lib/online-v2/bingo/ov2BingoSessionAdapter";
 
 function fmtStake(n) {
   return Math.floor(Number(n) || 0).toLocaleString();
@@ -35,6 +44,20 @@ function parseLudoSeatIndex(value) {
   const n = Number(value);
   if (!Number.isInteger(n) || n < 0 || n > 3) return null;
   return n;
+}
+
+function parseBingoSeatIndex(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0 || n > 7) return null;
+  return n;
+}
+
+/** @param {string|null|undefined} productId */
+function parseSeatForProduct(productId, value) {
+  if (productId === ONLINE_V2_GAME_IDS.LUDO) return parseLudoSeatIndex(value);
+  if (productId === ONLINE_V2_GAME_IDS.BINGO) return parseBingoSeatIndex(value);
+  return null;
 }
 
 function ov2LobbyRtDevLog(payload) {
@@ -57,6 +80,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   const [, setPresenceMembers] = useState([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [bingoSnap, setBingoSnap] = useState(/** @type {object|null} */ (null));
 
   const gameTitle = useMemo(() => {
     if (!room?.product_game_id) return "";
@@ -76,15 +100,15 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   );
 
   const seatedCount = useMemo(
-    () => members.filter(m => parseLudoSeatIndex(m?.seat_index) != null).length,
-    [members]
+    () => members.filter(m => parseSeatForProduct(room?.product_game_id, m?.seat_index) != null).length,
+    [members, room?.product_game_id]
   );
 
-  /** Every seated member must have server-committed stake before opening or entering live Ludo. */
+  /** Every seated member must have server-committed stake before opening or entering live tables. */
   const allSeatedHaveCommittedStakes = useMemo(() => {
-    const seated = members.filter(m => parseLudoSeatIndex(m?.seat_index) != null);
+    const seated = members.filter(m => parseSeatForProduct(room?.product_game_id, m?.seat_index) != null);
     return seated.length > 0 && seated.every(m => m.wallet_state === "committed");
-  }, [members]);
+  }, [members, room?.product_game_id]);
 
   const canHostOpenLudoSession = useMemo(
     () =>
@@ -95,6 +119,37 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
       ),
     [amMember, room?.product_game_id, room?.active_session_id]
   );
+
+  const canHostOpenBingoSession = useMemo(
+    () =>
+      Boolean(
+        amMember && room?.product_game_id === ONLINE_V2_GAME_IDS.BINGO && !room?.active_session_id
+      ),
+    [amMember, room?.product_game_id, room?.active_session_id]
+  );
+
+  const hostOpenBingoDisabledReason = useMemo(() => {
+    if (room?.product_game_id !== ONLINE_V2_GAME_IDS.BINGO) return "";
+    if (room?.active_session_id) return "Match already opened.";
+    if (!amMember) return "Join the room first.";
+    if (!isHost) return "Only room host can open session.";
+    if (room?.lifecycle_phase !== "active") {
+      return "Room must be active (all stakes committed) before opening Bingo.";
+    }
+    if (!allSeatedHaveCommittedStakes) {
+      return "All seated players must commit stakes before opening Bingo.";
+    }
+    if (seatedCount < 2) return "Need at least two seated players.";
+    return "";
+  }, [
+    room?.product_game_id,
+    room?.active_session_id,
+    room?.lifecycle_phase,
+    amMember,
+    isHost,
+    seatedCount,
+    allSeatedHaveCommittedStakes,
+  ]);
 
   const hostOpenLudoDisabledReason = useMemo(() => {
     if (room?.product_game_id !== ONLINE_V2_GAME_IDS.LUDO) return "";
@@ -121,7 +176,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   ]);
 
   const myMember = useMemo(() => members.find(m => m.participant_key === participantId) || null, [members, participantId]);
-  const mySeatIndex = parseLudoSeatIndex(myMember?.seat_index);
+  const mySeatIndex = parseSeatForProduct(room?.product_game_id, myMember?.seat_index);
 
   const allReady = useMemo(() => members.length > 0 && members.every(m => m.is_ready), [members]);
 
@@ -149,12 +204,19 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
       setRoom(r);
       const m = await fetchOv2RoomMembers(roomId);
       setMembers(m);
+      if (r?.product_game_id === ONLINE_V2_GAME_IDS.BINGO) {
+        const snap = await fetchOv2BingoLiveRoundSnapshot(roomId, { viewerParticipantKey: participantId });
+        setBingoSnap(snap);
+      } else {
+        setBingoSnap(null);
+      }
     } catch (e) {
       setMsg(e?.message || String(e));
       setRoom(null);
       setMembers([]);
+      setBingoSnap(null);
     }
-  }, [roomId]);
+  }, [roomId, participantId]);
 
   useEffect(() => {
     void load();
@@ -364,6 +426,104 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     }
   }
 
+  async function onOpenBingoSession() {
+    if (!canHostOpenBingoSession || hostOpenBingoDisabledReason) return;
+    setBusy(true);
+    setMsg("Opening Bingo session...");
+    try {
+      const res = await openOv2BingoSession(roomId, participantId);
+      if (!res.ok) {
+        setMsg(res.error || "Could not open Bingo session.");
+        return;
+      }
+      setMsg("Bingo session opened");
+      await load();
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onClaimBingoSeat(seatIndex) {
+    if (!room || room.product_game_id !== ONLINE_V2_GAME_IDS.BINGO) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const out = await claimOv2BingoSeat({ room_id: roomId, participant_key: participantId, seat_index: seatIndex });
+      if (out?.room) setRoom(out.room);
+      if (Array.isArray(out?.members)) setMembers(out.members);
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onLeaveBingoSeat() {
+    if (!room || room.product_game_id !== ONLINE_V2_GAME_IDS.BINGO) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const out = await leaveOv2BingoSeat({ room_id: roomId, participant_key: participantId });
+      if (out?.room) setRoom(out.room);
+      if (Array.isArray(out?.members)) setMembers(out.members);
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onBingoRequestRematch() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await requestOv2BingoRematch(roomId, participantId);
+      if (!r.ok) setMsg(r.error || "Rematch request failed");
+      await load();
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onBingoCancelRematch() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await cancelOv2BingoRematch(roomId, participantId);
+      if (!r.ok) setMsg(r.error || "Cancel rematch failed");
+      await load();
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onBingoStartNextMatch() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const seq = room?.match_seq != null ? Number(room.match_seq) : null;
+      const r = await startOv2BingoNextMatch(roomId, participantId, seq);
+      if (!r.ok) setMsg(r.error || "Could not start next match");
+      await load();
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onClaimLudoSeat(seatIndex) {
     if (!room || room.product_game_id !== ONLINE_V2_GAME_IDS.LUDO) return;
     setBusy(true);
@@ -459,6 +619,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   const lobbyRtLastLabel =
     lobbyRtLastEventAt != null ? new Date(lobbyRtLastEventAt).toLocaleTimeString(undefined, { hour12: false }) : "—";
   const openLudoDisabled = busy || Boolean(hostOpenLudoDisabledReason);
+  const openBingoDisabled = busy || Boolean(hostOpenBingoDisabledReason);
   const seatToneClasses = [
     "border-red-400 bg-red-700/35 text-red-50",
     "border-sky-400 bg-sky-700/35 text-sky-50",
@@ -625,6 +786,18 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           <p className="text-center text-[11px] text-amber-200/85">Waiting for the room host to open the Ludo match.</p>
         ) : null}
 
+        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO && !room.active_session_id && !isHost ? (
+          <p className="text-center text-[11px] text-amber-200/85">Waiting for the room host to open Bingo.</p>
+        ) : null}
+
+        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO && amMember ? (
+          <p className="text-[10px] leading-snug text-cyan-100/85">
+            Bingo uses eight seats (shown as 1–8). Seat numbers are stored as 0–7; the caller is whoever holds the{" "}
+            <span className="font-semibold text-cyan-200">lowest occupied seat</span> when the host opens the round. Pick a
+            seat before stakes lock; you can leave a seat if you need to switch.
+          </p>
+        ) : null}
+
         {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO ? (
           <div className="grid grid-cols-4 gap-2">
             {[0, 1, 2, 3].map(seat => {
@@ -659,6 +832,55 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
             className="rounded-lg border border-red-500/30 bg-red-950/30 py-2 text-xs text-red-200 disabled:opacity-40"
           >
             Leave seat
+          </button>
+        ) : null}
+
+        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO ? (
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-4">
+            {[0, 1, 2, 3, 4, 5, 6, 7].map(seat => {
+              const holder = members.find(m => parseBingoSeatIndex(m?.seat_index) === seat);
+              const mine = holder?.participant_key === participantId;
+              return (
+                <button
+                  key={seat}
+                  type="button"
+                  disabled={busy || (holder && !mine)}
+                  onClick={() => void onClaimBingoSeat(seat)}
+                  className={[
+                    "rounded-lg border-2 py-2 text-[10px] font-semibold shadow-sm disabled:opacity-55 sm:text-xs",
+                    seatToneClasses[seat % 4] || "border-white/20 bg-white/10 text-white",
+                    mine ? "ring-2 ring-white/80" : "",
+                    holder && !mine ? "brightness-[0.9]" : "hover:brightness-110",
+                  ].join(" ")}
+                  title={holder && !mine ? "Seat taken" : `Bingo seat ${seat} (card slot ${seat + 1})`}
+                >
+                  Seat {seat + 1}
+                  {holder ? mine ? " · you" : " · taken" : ""}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO && mySeatIndex != null ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onLeaveBingoSeat()}
+            className="rounded-lg border border-red-500/30 bg-red-950/30 py-2 text-xs text-red-200 disabled:opacity-40"
+          >
+            Leave seat
+          </button>
+        ) : null}
+
+        {canHostOpenBingoSession ? (
+          <button
+            type="button"
+            disabled={openBingoDisabled}
+            title={hostOpenBingoDisabledReason || "Creates the live Bingo round (2–8 seated, committed players)."}
+            onClick={() => void onOpenBingoSession()}
+            className="rounded-lg border border-cyan-500/45 bg-cyan-950/35 py-2 text-xs font-bold text-cyan-100 disabled:opacity-40"
+          >
+            Open Bingo match (host)
           </button>
         ) : null}
 
@@ -712,14 +934,57 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           </Link>
         ) : null}
 
-        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO && amMember ? (
+        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO &&
+        amMember &&
+        room.active_session_id &&
+        room.lifecycle_phase === "active" &&
+        allSeatedHaveCommittedStakes ? (
           <Link
             href={`/ov2-bingo?room=${encodeURIComponent(roomId)}`}
-            title="Bingo is preview-only — no live caller or validated claims"
+            title="Live Bingo — server calls and claims"
             className="block rounded-lg border border-cyan-500/35 bg-cyan-950/25 py-2 text-center text-xs font-semibold text-cyan-100"
           >
-            Bingo · preview only
+            Enter Bingo hall
           </Link>
+        ) : null}
+
+        {room.product_game_id === ONLINE_V2_GAME_IDS.BINGO &&
+        bingoSnap &&
+        bingoSnap.sessionPhase === "finished" &&
+        room.active_session_id ? (
+          <div className="rounded-lg border border-cyan-500/30 bg-cyan-950/20 p-2 text-[11px] text-cyan-100/95">
+            <p className="font-semibold text-cyan-200">Round finished</p>
+            <p className="mt-1 text-[10px] text-cyan-100/80">Rematch or start the next match when everyone is ready.</p>
+            <div className="mt-2 flex flex-col gap-1">
+              <button
+                type="button"
+                disabled={busy || !bingoSnap.canRequestRematch}
+                title={!bingoSnap.canRequestRematch ? "Rematch not available right now" : undefined}
+                onClick={() => void onBingoRequestRematch()}
+                className="rounded-md border border-amber-500/40 bg-amber-950/35 py-1.5 text-xs font-semibold text-amber-100 disabled:opacity-40"
+              >
+                Request rematch
+              </button>
+              <button
+                type="button"
+                disabled={busy || !bingoSnap.canCancelRematch}
+                title={!bingoSnap.canCancelRematch ? "Nothing to cancel" : undefined}
+                onClick={() => void onBingoCancelRematch()}
+                className="rounded-md border border-white/20 bg-white/10 py-1.5 text-xs font-semibold text-zinc-200 disabled:opacity-40"
+              >
+                Cancel rematch
+              </button>
+              <button
+                type="button"
+                disabled={busy || !bingoSnap.canStartNextMatch}
+                title={!bingoSnap.canStartNextMatch ? "Host only — all seated players must request rematch first" : undefined}
+                onClick={() => void onBingoStartNextMatch()}
+                className="rounded-md border border-emerald-500/40 bg-emerald-950/35 py-1.5 text-xs font-semibold text-emerald-100 disabled:opacity-40"
+              >
+                Start next match (host)
+              </button>
+            </div>
+          </div>
         ) : null}
 
       </div>
