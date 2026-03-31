@@ -21,12 +21,16 @@ function gameStatusCopy(g) {
 function gameEmoji(id) {
   if (id === "ov2_board_path") return "🛤️";
   if (id === "ov2_mark_grid") return "🔲";
+  if (id === "ov2_ludo") return "🎲";
+  if (id === "ov2_bingo") return "🎯";
   return "🎮";
 }
 
 function gameAccent(id) {
   if (id === "ov2_board_path") return "#0d9488";
   if (id === "ov2_mark_grid") return "#7c3aed";
+  if (id === "ov2_ludo") return "#b45309";
+  if (id === "ov2_bingo") return "#0e7490";
   return "#6366f1";
 }
 
@@ -78,7 +82,7 @@ export default function OnlineV2Hub() {
           <section className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-black/20 p-2 md:p-3 lg:p-4 xl:p-5">
             {enabled ? (
               <div
-                className="grid h-full min-h-0 grid-cols-2 grid-rows-2 gap-2 md:gap-3 lg:gap-4 xl:grid-cols-3 xl:grid-rows-1 xl:gap-5"
+                className="grid h-full min-h-0 auto-rows-fr grid-cols-2 gap-2 md:gap-3 lg:gap-4 xl:grid-cols-3 xl:gap-5"
                 aria-label="Online V2 destinations"
               >
                 {games.map(g => (
