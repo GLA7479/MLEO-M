@@ -162,9 +162,7 @@ DECLARE
   c2 int[];
   c3 int[];
   c4 int[];
-  r int;
-  row_js jsonb;
-  grid jsonb := '[]'::jsonb;
+  grid jsonb;
 BEGIN
   c0 := public._ov2_bingo_pick_column_values(p_seed || '::' || p_round || '::' || p_seat::text || ':col:0', 1, 15);
   c1 := public._ov2_bingo_pick_column_values(p_seed || '::' || p_round || '::' || p_seat::text || ':col:1', 16, 30);
@@ -172,14 +170,16 @@ BEGIN
   c3 := public._ov2_bingo_pick_column_values(p_seed || '::' || p_round || '::' || p_seat::text || ':col:3', 46, 60);
   c4 := public._ov2_bingo_pick_column_values(p_seed || '::' || p_round || '::' || p_seat::text || ':col:4', 61, 75);
 
-  FOR r IN 0..4 LOOP
-    row_js := jsonb_build_array(c0[r + 1], c1[r + 1], c2[r + 1], c3[r + 1], c4[r + 1]);
-    grid := grid || row_js;
-  END LOOP;
+  grid := jsonb_build_array(
+    jsonb_build_array(c0[1], c1[1], c2[1], c3[1], c4[1]),
+    jsonb_build_array(c0[2], c1[2], c2[2], c3[2], c4[2]),
+    jsonb_build_array(c0[3], c1[3], c2[3], c3[3], c4[3]),
+    jsonb_build_array(c0[4], c1[4], c2[4], c3[4], c4[4]),
+    jsonb_build_array(c0[5], c1[5], c2[5], c3[5], c4[5])
+  );
 
-  row_js := grid->2;
-  row_js := jsonb_set(row_js, '{2}', '0'::jsonb, true);
-  grid := jsonb_set(grid, '{2}', row_js, true);
+  grid := jsonb_set(grid, '{2,2}', '0'::jsonb, true);
+
   RETURN grid;
 END;
 $$;
@@ -944,10 +944,14 @@ BEGIN
   UPDATE public.ov2_room_members
   SET
     meta = jsonb_set(
-      COALESCE(meta, '{}'::jsonb),
+      CASE WHEN jsonb_typeof(meta) = 'object' THEN meta ELSE '{}'::jsonb END,
       '{bingo}',
-      COALESCE(meta->'bingo', '{}'::jsonb)
-        || jsonb_build_object('rematch_requested', true, 'rematch_at', to_jsonb(now()::text)),
+      COALESCE(
+        CASE WHEN jsonb_typeof((CASE WHEN jsonb_typeof(meta) = 'object' THEN meta ELSE '{}'::jsonb END)->'bingo') = 'object'
+          THEN (CASE WHEN jsonb_typeof(meta) = 'object' THEN meta ELSE '{}'::jsonb END)->'bingo'
+        END,
+        '{}'::jsonb
+      ) || jsonb_build_object('rematch_requested', true, 'rematch_at', to_jsonb(now()::text)),
       true
     ),
     updated_at = now()
@@ -1018,9 +1022,15 @@ BEGIN
   UPDATE public.ov2_room_members
   SET
     meta = CASE
-      WHEN meta ? 'bingo' THEN
-        jsonb_set(meta, '{bingo}', (meta->'bingo') - 'rematch_requested' - 'rematch_at', true)
-      ELSE meta
+      WHEN (CASE WHEN jsonb_typeof(meta) = 'object' THEN meta ELSE '{}'::jsonb END) ? 'bingo'
+        AND jsonb_typeof((CASE WHEN jsonb_typeof(meta) = 'object' THEN meta ELSE '{}'::jsonb END)->'bingo') = 'object' THEN
+        jsonb_set(
+          CASE WHEN jsonb_typeof(meta) = 'object' THEN meta ELSE '{}'::jsonb END,
+          '{bingo}',
+          ((CASE WHEN jsonb_typeof(meta) = 'object' THEN meta ELSE '{}'::jsonb END)->'bingo') - 'rematch_requested' - 'rematch_at',
+          true
+        )
+      ELSE CASE WHEN jsonb_typeof(meta) = 'object' THEN meta ELSE '{}'::jsonb END
     END,
     updated_at = now()
   WHERE room_id = p_room_id AND participant_key = v_pk;
@@ -1122,9 +1132,15 @@ BEGIN
   UPDATE public.ov2_room_members m
   SET
     meta = CASE
-      WHEN m.meta ? 'bingo' THEN
-        jsonb_set(m.meta, '{bingo}', (m.meta->'bingo') - 'rematch_requested' - 'rematch_at', true)
-      ELSE m.meta
+      WHEN (CASE WHEN jsonb_typeof(m.meta) = 'object' THEN m.meta ELSE '{}'::jsonb END) ? 'bingo'
+        AND jsonb_typeof((CASE WHEN jsonb_typeof(m.meta) = 'object' THEN m.meta ELSE '{}'::jsonb END)->'bingo') = 'object' THEN
+        jsonb_set(
+          CASE WHEN jsonb_typeof(m.meta) = 'object' THEN m.meta ELSE '{}'::jsonb END,
+          '{bingo}',
+          ((CASE WHEN jsonb_typeof(m.meta) = 'object' THEN m.meta ELSE '{}'::jsonb END)->'bingo') - 'rematch_requested' - 'rematch_at',
+          true
+        )
+      ELSE CASE WHEN jsonb_typeof(m.meta) = 'object' THEN m.meta ELSE '{}'::jsonb END
     END,
     wallet_state = CASE WHEN m.seat_index IS NOT NULL THEN 'none' ELSE m.wallet_state END,
     amount_locked = CASE WHEN m.seat_index IS NOT NULL THEN 0 ELSE m.amount_locked END,

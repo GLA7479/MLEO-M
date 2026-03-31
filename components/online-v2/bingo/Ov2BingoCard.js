@@ -49,16 +49,16 @@ export default function Ov2BingoCard({
   }, [wonPrizeKeys]);
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-md flex-col">
-      <div className="mt-0.5 grid shrink-0 grid-cols-5 gap-0.5">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-none flex-col sm:max-w-2xl lg:max-w-3xl">
+      <div className="mt-0.5 grid shrink-0 grid-cols-5 gap-0.5 sm:gap-1">
         {headers.map(h => (
-          <div key={h} className="h-5 rounded bg-white/10 py-0.5 text-center text-[10px] font-bold text-zinc-200">
+          <div key={h} className="h-5 rounded bg-white/10 py-0.5 text-center text-[10px] font-bold text-zinc-200 sm:h-6 sm:text-[11px]">
             {h}
           </div>
         ))}
       </div>
 
-      <div className={`mt-0.5 grid min-h-0 flex-1 grid-cols-5 gap-0.5 ${!canInteract ? "pointer-events-none opacity-85" : ""}`}>
+      <div className={`mt-0.5 grid min-h-0 flex-1 grid-cols-5 gap-0.5 sm:gap-1 ${!canInteract ? "pointer-events-none opacity-85" : ""}`}>
         {card.flat().map((n, idx) => {
           const row = Math.floor(idx / 5);
           const isFree = n === 0 && idx === 12;
@@ -78,7 +78,7 @@ export default function Ov2BingoCard({
               }}
               disabled={!canInteract || isFree || !calledSet.has(n)}
               className={[
-                "grid min-h-[1.65rem] place-items-center rounded-lg border text-[11px] font-semibold transition sm:min-h-[2.1rem] sm:text-sm",
+                "grid min-h-[1.85rem] place-items-center rounded-lg border text-xs font-semibold transition sm:min-h-[2.25rem] sm:text-sm",
                 isFree
                   ? "border-cyan-400/80 bg-gradient-to-br from-cyan-700/50 to-sky-900/40 text-cyan-50 shadow-inner shadow-cyan-900/40"
                   : shouldShowYellow

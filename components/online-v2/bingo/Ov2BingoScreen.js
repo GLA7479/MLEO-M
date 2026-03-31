@@ -77,12 +77,15 @@ export default function Ov2BingoScreen({ contextInput = null }) {
     return sp || life || "—";
   }, [isLiveMatch, vm.roomLifecyclePhase, vm.sessionPhase, vm.roomActiveSessionId]);
 
+  const playingLive = Boolean(vm.isLive && isLiveMatch && vm.sessionPhase === "playing");
+  const liveExceptionUi = Boolean(vm.isLive && !playingLive);
+
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-1 overflow-hidden px-0.5 sm:gap-1.5 sm:px-1">
-      <Ov2GameStatusStrip title={stripTitle} subtitle={vm.phaseLine} tone={stripTone} />
+    <div className="flex h-full min-h-0 w-full flex-col gap-0.5 overflow-hidden px-0.5 sm:gap-1 sm:px-1">
+      <Ov2GameStatusStrip title={stripTitle} subtitle={vm.phaseLine} tone={stripTone} compact={Boolean(vm.isLive)} />
 
       <div
-        className="shrink-0 overflow-x-auto rounded-lg border border-white/10 bg-black/35 py-1 [scrollbar-width:thin]"
+        className="shrink-0 overflow-x-auto rounded-lg border border-white/10 bg-black/35 py-0.5 [scrollbar-width:thin] sm:py-1"
         aria-label="Seats"
       >
         <div className="flex min-w-max gap-1 px-1">
@@ -96,7 +99,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
               <div
                 key={seatIndex}
                 className={[
-                  "w-[5.25rem] shrink-0 rounded-md border px-1.5 py-1 text-[9px] leading-tight sm:w-[6rem] sm:text-[10px]",
+                  "w-[5.25rem] shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] leading-tight sm:w-[6rem] sm:py-1 sm:text-[10px]",
                   member ? "border-white/20 bg-white/10" : "border-white/10 bg-black/20 text-zinc-500",
                   you ? "ring-1 ring-sky-400/80" : "",
                   isCaller ? "border-amber-400/50 bg-amber-950/35" : "",
@@ -127,22 +130,66 @@ export default function Ov2BingoScreen({ contextInput = null }) {
         </div>
       </div>
 
-      <div className="grid shrink-0 gap-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 sm:grid-cols-3">
-        <div className="text-[10px] text-zinc-300">
-          <div className="font-semibold text-zinc-400">Phase</div>
-          <div className="mt-0.5 text-zinc-100">{phaseHeader}</div>
+      {playingLive ? (
+        <div
+          className="flex shrink-0 flex-wrap items-center gap-1.5 rounded-lg border border-white/10 bg-black/30 px-1.5 py-1 sm:gap-2 sm:px-2"
+          aria-label="Live match stats"
+        >
+          <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/40 px-1.5 py-0.5 text-[9px] text-zinc-400 sm:text-[10px]">
+            <span className="font-semibold text-zinc-500">Last</span>
+            <span className="font-mono font-semibold text-amber-100">{vm.lastCalled ?? "—"}</span>
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/40 px-1.5 py-0.5 text-[9px] text-zinc-400 sm:text-[10px]">
+            <span className="font-semibold text-zinc-500">Next</span>
+            <span className="font-mono font-semibold text-zinc-100">{fmtCountdown(vm.msUntilNextCall)}</span>
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/40 px-1.5 py-0.5 text-[9px] text-zinc-400 sm:text-[10px]">
+            <span className="font-semibold text-zinc-500">Deck</span>
+            <span className="font-mono font-semibold text-zinc-200">
+              {vm.deckRemaining}/{vm.deckTotal}
+            </span>
+          </span>
         </div>
-        <div className="text-[10px] text-zinc-300">
-          <div className="font-semibold text-zinc-400">Last called</div>
-          <div className="mt-0.5 font-mono text-sm text-amber-100">{vm.lastCalled ?? "—"}</div>
+      ) : null}
+
+      {vm.isLive && liveExceptionUi ? (
+        <div className="shrink-0 rounded-lg border border-white/10 bg-black/35 px-2 py-1.5 sm:flex sm:items-start sm:gap-4 sm:py-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">Status</div>
+            <div className="mt-0.5 text-[11px] font-semibold leading-snug text-zinc-100 sm:text-xs">{phaseHeader}</div>
+            {vm.phaseLine ? <p className="mt-0.5 text-[9px] leading-snug text-zinc-400 sm:text-[10px]">{vm.phaseLine}</p> : null}
+          </div>
+          {!playingLive && isLiveMatch && vm.sessionPhase !== "playing" ? (
+            <div className="mt-2 grid grid-cols-2 gap-2 border-t border-white/10 pt-2 sm:mt-0 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+              <div>
+                <div className="text-[9px] font-semibold text-zinc-500">Last called</div>
+                <div className="font-mono text-sm text-amber-100">{vm.lastCalled ?? "—"}</div>
+              </div>
+              <div>
+                <div className="text-[9px] font-semibold text-zinc-500">Next</div>
+                <div className="font-mono text-sm text-zinc-100">{fmtCountdown(vm.msUntilNextCall)}</div>
+              </div>
+            </div>
+          ) : null}
         </div>
-        <div className="text-[10px] text-zinc-300">
-          <div className="font-semibold text-zinc-400">Next call in</div>
-          <div className="mt-0.5 font-mono text-sm text-zinc-100">
-            {!vm.isLive ? "—" : fmtCountdown(vm.msUntilNextCall)}
+      ) : null}
+
+      {!vm.isLive ? (
+        <div className="grid shrink-0 gap-1 rounded-lg border border-white/10 bg-black/30 px-1.5 py-1 sm:grid-cols-3 sm:px-2 sm:py-1.5">
+          <div className="text-[9px] text-zinc-300 sm:text-[10px]">
+            <div className="font-semibold text-zinc-500">Phase</div>
+            <div className="mt-0.5 text-zinc-100">{phaseHeader}</div>
+          </div>
+          <div className="text-[9px] text-zinc-300 sm:text-[10px]">
+            <div className="font-semibold text-zinc-500">Last</div>
+            <div className="mt-0.5 font-mono text-xs text-amber-100 sm:text-sm">{vm.lastCalled ?? "—"}</div>
+          </div>
+          <div className="text-[9px] text-zinc-300 sm:text-[10px]">
+            <div className="font-semibold text-zinc-500">Next</div>
+            <div className="mt-0.5 font-mono text-xs text-zinc-100 sm:text-sm">—</div>
           </div>
         </div>
-      </div>
+      ) : null}
 
       {!vm.isLive ? (
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 rounded-lg border border-white/10 bg-black/30 px-1.5 py-1">
@@ -171,16 +218,12 @@ export default function Ov2BingoScreen({ contextInput = null }) {
             Call next
           </button>
         </div>
-      ) : (
-        <div className="shrink-0 rounded-md border border-white/10 bg-black/25 px-2 py-1 text-[10px] text-zinc-400">
-          Deck remaining: <span className="font-mono text-zinc-200">{vm.deckRemaining}</span> / {vm.deckTotal}
-        </div>
-      )}
+      ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-1 overflow-hidden lg:grid-cols-5 lg:gap-1.5">
-        <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 p-1 lg:col-span-3">
-          <div className="shrink-0 text-[10px] font-semibold text-zinc-400">Your card</div>
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-1">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-0.5 overflow-hidden sm:gap-1 lg:grid-cols-5 lg:grid-rows-none lg:gap-1.5">
+        <div className="flex min-h-[38vh] flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 p-1 sm:min-h-0 lg:col-span-3">
+          <div className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">Your card</div>
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-0.5 sm:py-1">
             <Ov2BingoCard
               card={vm.card}
               called={vm.called}
@@ -195,16 +238,18 @@ export default function Ov2BingoScreen({ contextInput = null }) {
           ) : null}
         </div>
 
-        <div className="flex min-h-0 flex-col gap-1 overflow-hidden lg:col-span-2">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 px-2 py-1.5">
-            <div className="shrink-0 text-[10px] font-semibold text-zinc-400">Called numbers</div>
-            <div className="mt-1 min-h-0 flex-1 overflow-y-auto pr-0.5 [scrollbar-width:thin]">
+        <div className="flex min-h-0 min-w-0 flex-col gap-0.5 overflow-hidden sm:gap-1 lg:col-span-2 lg:h-auto">
+          <div className="flex min-h-[3.25rem] max-h-[10.5rem] flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 px-1.5 py-1 sm:max-h-[11.5rem] sm:px-2 sm:py-1.5 lg:max-h-none lg:min-h-0 lg:flex-1">
+            <div className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">
+              Called numbers
+            </div>
+            <div className="mt-0.5 min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden pr-0.5 [scrollbar-width:thin]">
               {vm.called.length ? (
-                <div className="flex flex-wrap gap-1">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(2.5rem,1fr))] gap-1.5 sm:gap-2">
                   {vm.called.map((n, i) => (
                     <span
                       key={`${n}-${i}`}
-                      className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
+                      className={`flex min-h-[1.75rem] items-center justify-center rounded border px-1 text-center text-xs font-semibold sm:min-h-0 sm:px-1.5 sm:py-1 sm:text-sm ${
                         i === vm.called.length - 1
                           ? "border-amber-400 bg-amber-700/85 text-white"
                           : "border-white/10 bg-white/10 text-zinc-200"
@@ -215,16 +260,16 @@ export default function Ov2BingoScreen({ contextInput = null }) {
                   ))}
                 </div>
               ) : (
-                <p className="text-[10px] text-zinc-500">
+                <p className="text-[9px] text-zinc-500 sm:text-[10px]">
                   {vm.isLive ? "Waiting for the caller to draw." : "Use “Call next” in preview to draw numbers."}
                 </p>
               )}
             </div>
           </div>
 
-          <div className="shrink-0 rounded-lg border border-white/10 bg-black/25 px-2 py-1.5">
-            <div className="text-[10px] font-semibold text-zinc-400">Claim a prize</div>
-            <div className="mt-1 grid grid-cols-3 gap-1 sm:grid-cols-6">
+          <div className="shrink-0 rounded-lg border border-white/10 bg-black/25 px-1.5 py-1 sm:px-2 sm:py-1.5">
+            <div className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">Claim a prize</div>
+            <div className="mt-0.5 grid grid-cols-3 gap-0.5 sm:grid-cols-6 sm:gap-1">
               {BINGO_PRIZE_KEYS.map(pk => {
                 const reason = vm.prizeDisabledByKey[pk] ?? "Unavailable";
                 const blocked = Boolean(reason);
@@ -235,7 +280,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
                     disabled={blocked || !isLiveMatch || vm.sessionPhase !== "playing"}
                     title={blocked ? reason : `Claim ${prizeLabels[pk]}`}
                     onClick={() => void onClaim(pk)}
-                    className={`rounded-md border px-1 py-1.5 text-[9px] font-semibold sm:text-[10px] ${
+                    className={`rounded-md border px-1 py-1 text-[9px] font-semibold sm:py-1.5 sm:text-[10px] ${
                       !blocked && isLiveMatch && vm.sessionPhase === "playing"
                         ? "border-emerald-500/40 bg-emerald-950/35 text-emerald-100 hover:bg-emerald-900/40"
                         : "cursor-not-allowed border-white/10 bg-white/5 text-zinc-500 opacity-80"
