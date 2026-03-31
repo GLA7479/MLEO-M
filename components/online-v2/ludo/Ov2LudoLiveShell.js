@@ -42,7 +42,7 @@ export default function Ov2LudoLiveShell() {
   const [loading, setLoading] = useState(false);
   const [openBusy, setOpenBusy] = useState(false);
   const [openErr, setOpenErr] = useState("");
-  const [presenceMembers, setPresenceMembers] = useState([]);
+  const [, setPresenceMembers] = useState([]);
   const loadedOnceForRoomRef = useRef(null);
   const selfDisplayName = useMemo(() => {
     const mine = members.find(m => String(m?.participant_key || "") === String(participantId || ""));
@@ -148,22 +148,10 @@ export default function Ov2LudoLiveShell() {
   );
 
   const seatedCount = useMemo(() => members.filter(m => m.seat_index != null).length, [members]);
-  const presenceLeaderKey = useMemo(() => {
-    const roster = (Array.isArray(presenceMembers) ? presenceMembers : [])
-      .slice()
-      .sort((a, b) => {
-        const an = String(a.display_name || "").trim();
-        const bn = String(b.display_name || "").trim();
-        if (an && bn) {
-          if (an !== bn) return an.localeCompare(bn);
-          return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
-        }
-        if (an && !bn) return -1;
-        if (!an && bn) return 1;
-        return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
-      });
-    return roster[0]?.participant_key || null;
-  }, [presenceMembers]);
+  const isHost = useMemo(
+    () => Boolean(room && participantId && room.host_participant_key === participantId),
+    [room, participantId]
+  );
 
   const canShellHostOpenLudo = useMemo(
     () =>
@@ -172,18 +160,21 @@ export default function Ov2LudoLiveShell() {
           room.product_game_id === ONLINE_V2_GAME_IDS.LUDO &&
           !room.active_session_id &&
           participantId &&
-          presenceLeaderKey === participantId &&
+          isHost &&
           isRoomMember
       ),
-    [room, participantId, presenceLeaderKey, isRoomMember]
+    [room, participantId, isHost, isRoomMember]
   );
 
   const shellOpenDisabledReason = useMemo(() => {
+    if (!room || room.product_game_id !== ONLINE_V2_GAME_IDS.LUDO) return "";
+    if (room.active_session_id) return "Match already opened.";
+    if (!isRoomMember) return "Join the room first.";
+    if (!isHost) return "Only room host can open session.";
     if (seatedCount < 2) return "Need at least two seated players.";
     if (seatedCount > 4) return "At most four seated players.";
-    if (presenceLeaderKey !== participantId) return "Only current leader can open.";
     return "";
-  }, [seatedCount, presenceLeaderKey, participantId]);
+  }, [room, isRoomMember, isHost, seatedCount]);
 
   const onShellOpenLudo = useCallback(async () => {
     if (!roomId || !participantId || !canShellHostOpenLudo || shellOpenDisabledReason) return;
@@ -191,7 +182,7 @@ export default function Ov2LudoLiveShell() {
     setOpenErr("");
     try {
       const res = await requestOv2LudoOpenSession(roomId, participantId, {
-        presenceLeaderKey: presenceLeaderKey || "",
+        presenceLeaderKey: participantId,
       });
       if (!res.ok) {
         setOpenErr(res.error || "Could not open Ludo session.");
@@ -203,7 +194,7 @@ export default function Ov2LudoLiveShell() {
     } finally {
       setOpenBusy(false);
     }
-  }, [roomId, participantId, canShellHostOpenLudo, shellOpenDisabledReason, reloadContext, presenceLeaderKey]);
+  }, [roomId, participantId, canShellHostOpenLudo, shellOpenDisabledReason, reloadContext]);
 
   const contextInput = useMemo(() => {
     if (!roomId) return null;
@@ -226,11 +217,11 @@ export default function Ov2LudoLiveShell() {
         <>
           <p>
             Without <code className="text-zinc-400">?room=</code> this page is a <strong className="text-amber-200">local preview</strong> only.
-            With a Ludo room, the current <strong className="text-zinc-200">presence leader</strong> opens the live match once 2–4 seats are claimed;
+            With a Ludo room, the <strong className="text-zinc-200">room host</strong> opens the live match once 2–4 seats are claimed;
             turns and dice are enforced by the server.
           </p>
           <ul className="mt-2 space-y-1 text-[11px] text-zinc-400">
-            <li>In-room with no active session: board is read-only and the presence leader opens the match.</li>
+            <li>In-room with no active session: board is read-only and the room host opens the match.</li>
             <li>After session opens: board becomes live-authoritative with server-owned turn/dice/moves.</li>
             <li>Without a room query: board stays local preview.</li>
           </ul>

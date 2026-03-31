@@ -196,7 +196,6 @@ AS $$
 DECLARE
   v_room public.ov2_rooms%ROWTYPE;
   v_pk text;
-  v_presence_leader text;
   v_sess public.ov2_ludo_sessions%ROWTYPE;
   v_existing public.ov2_ludo_sessions%ROWTYPE;
   v_committed int;
@@ -210,13 +209,7 @@ BEGIN
   IF length(v_pk) = 0 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'participant_key required');
   END IF;
-  v_presence_leader := trim(COALESCE(p_presence_leader_key, ''));
-  IF length(v_presence_leader) = 0 THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'presence_leader_key required');
-  END IF;
-  IF v_presence_leader IS DISTINCT FROM v_pk THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'NOT_LEADER', 'message', 'Only presence leader can start');
-  END IF;
+  -- compatibility-only arg: p_presence_leader_key is accepted but no longer used for authority
 
   SELECT * INTO v_room FROM public.ov2_rooms WHERE id = p_room_id FOR UPDATE;
   IF NOT FOUND THEN
@@ -235,6 +228,13 @@ BEGIN
       'ok', false,
       'code', 'NOT_MEMBER',
       'message', 'Only room members can open a Ludo session'
+    );
+  END IF;
+  IF v_room.host_participant_key IS DISTINCT FROM v_pk THEN
+    RETURN jsonb_build_object(
+      'ok', false,
+      'code', 'NOT_HOST',
+      'message', 'Only room host can open a Ludo session'
     );
   END IF;
 

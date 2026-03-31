@@ -47,7 +47,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   const [members, setMembers] = useState([]);
   const [lobbyRtStatus, setLobbyRtStatus] = useState(/** @type {string|null} */ (null));
   const [lobbyRtLastEventAt, setLobbyRtLastEventAt] = useState(/** @type {number|null} */ (null));
-  const [presenceMembers, setPresenceMembers] = useState([]);
+  const [, setPresenceMembers] = useState([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -69,23 +69,6 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   );
 
   const seatedCount = useMemo(() => members.filter(m => m.seat_index != null).length, [members]);
-  const presenceLeaderKey = useMemo(() => {
-    const roster = (Array.isArray(presenceMembers) ? presenceMembers : [])
-      .slice()
-      .sort((a, b) => {
-        const an = String(a.display_name || "").trim();
-        const bn = String(b.display_name || "").trim();
-        if (an && bn) {
-          if (an !== bn) return an.localeCompare(bn);
-          return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
-        }
-        if (an && !bn) return -1;
-        if (!an && bn) return 1;
-        return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
-      });
-    return roster[0]?.participant_key || null;
-  }, [presenceMembers]);
-
   const canHostOpenLudoSession = useMemo(
     () =>
       Boolean(
@@ -100,28 +83,11 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     if (room?.product_game_id !== ONLINE_V2_GAME_IDS.LUDO) return "";
     if (room?.active_session_id) return "Match already opened.";
     if (!amMember) return "Join the room first.";
+    if (!isHost) return "Only room host can open session.";
     if (seatedCount < 2) return "Need at least two seated players.";
     if (seatedCount > 4) return "Ludo allows at most four seated players.";
-
-    const roster = (Array.isArray(presenceMembers) ? presenceMembers : [])
-      .slice()
-      .sort((a, b) => {
-        const an = String(a.display_name || "").trim();
-        const bn = String(b.display_name || "").trim();
-        if (an && bn) {
-          if (an !== bn) return an.localeCompare(bn);
-          return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
-        }
-        if (an && !bn) return -1;
-        if (!an && bn) return 1;
-        return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
-      });
-
-    const resolvedLeaderKey = roster[0]?.participant_key || null;
-    if (!resolvedLeaderKey) return "Waiting for leader presence sync.";
-    if (resolvedLeaderKey !== participantId) return "Only current leader can open session.";
     return "";
-  }, [room?.product_game_id, room?.active_session_id, amMember, seatedCount, presenceMembers, participantId]);
+  }, [room?.product_game_id, room?.active_session_id, amMember, isHost, seatedCount]);
 
   const myMember = useMemo(() => members.find(m => m.participant_key === participantId) || null, [members, participantId]);
   const mySeatIndex =
@@ -349,23 +315,8 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     setBusy(true);
     setMsg("");
     try {
-      const roster = (Array.isArray(presenceMembers) ? presenceMembers : [])
-        .slice()
-        .sort((a, b) => {
-          const an = String(a.display_name || "").trim();
-          const bn = String(b.display_name || "").trim();
-          if (an && bn) {
-            if (an !== bn) return an.localeCompare(bn);
-            return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
-          }
-          if (an && !bn) return -1;
-          if (!an && bn) return 1;
-          return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
-        });
-
-      const resolvedLeaderKey = roster[0]?.participant_key || "";
       const res = await requestOv2LudoOpenSession(roomId, participantId, {
-        presenceLeaderKey: resolvedLeaderKey,
+        presenceLeaderKey: participantId,
       });
       if (!res.ok) {
         setMsg(res.error || "Could not open Ludo session.");
@@ -628,8 +579,8 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           <p className="text-center text-[11px] text-emerald-200/85">All stakes locked — open your game table when available.</p>
         ) : null}
 
-        {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && !room.active_session_id && presenceLeaderKey !== participantId ? (
-          <p className="text-center text-[11px] text-amber-200/85">Waiting for the current leader to open the Ludo match.</p>
+        {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && !room.active_session_id && !isHost ? (
+          <p className="text-center text-[11px] text-amber-200/85">Waiting for the room host to open the Ludo match.</p>
         ) : null}
 
         {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO ? (
