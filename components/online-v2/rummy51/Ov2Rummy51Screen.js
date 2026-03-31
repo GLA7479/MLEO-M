@@ -230,8 +230,8 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const prevTurnPkRef = useRef(/** @type {string|null} */ (null));
   useEffect(() => {
     const pk = snapshot?.turnParticipantKey != null ? String(snapshot.turnParticipantKey) : null;
-    const pending = snapshot?.pendingDrawSource != null ? String(snapshot.pendingDrawSource) : "";
-    if (selfKey && pk === selfKey && !pending && prevTurnPkRef.current !== pk) {
+    const pend = snapshot?.pendingDrawSource != null ? String(snapshot.pendingDrawSource) : "";
+    if (selfKey && pk === selfKey && !pend && prevTurnPkRef.current !== pk) {
       resetTurnUi();
     }
     prevTurnPkRef.current = pk;
@@ -451,8 +451,15 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     );
   }
 
+  const hasComposerDraft = draftNewMelds.length > 0 || draftTableAdds.length > 0;
+
+  const hasBottomActionBlock =
+    Boolean(actionError) ||
+    (!pendingDraw && isMyTurn && isPlaying) ||
+    (pendingDraw && isMyTurn && isPlaying);
+
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
       <Ov2SeatStrip
         count={4}
         labels={seatLabels}
@@ -462,192 +469,208 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
         eliminatedIndices={eliminatedSeatIndices}
       />
 
-      <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-[10px] text-zinc-200">
-        <span>
-          Turn:{" "}
-          <strong className="text-white">
-            {snapshot.turnParticipantKey === selfKey ? "You" : snapshot.turnParticipantKey?.slice(0, 8) ?? "—"}
+      <div className="flex h-5 shrink-0 flex-nowrap items-center gap-x-1 overflow-hidden whitespace-nowrap rounded border border-white/10 bg-black/50 px-1 text-[7px] text-zinc-400 sm:h-6 sm:text-[8px]">
+        <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-white/10 px-1 py-px">
+          <span className="text-zinc-500">T</span>
+          <strong className="font-semibold text-white">
+            {snapshot.turnParticipantKey === selfKey ? "You" : snapshot.turnParticipantKey?.slice(0, 6) ?? "—"}
           </strong>
         </span>
-        <span className="text-zinc-600">·</span>
-        <span>Stock {snapshot.stockCount ?? 0}</span>
-        <span className="text-zinc-600">·</span>
-        <span>Discard {discardTopLabel}</span>
-        <span className="text-zinc-600">·</span>
-        <span>Rnd {snapshot.roundNumber ?? 1}</span>
+        <span className="shrink-0 text-zinc-600">|</span>
+        <span className="shrink-0 font-mono" title="Stock">
+          S{snapshot.stockCount ?? 0}
+        </span>
+        <span className="shrink-0 text-zinc-600">|</span>
+        <span className="min-w-0 max-w-[7rem] shrink truncate font-mono sm:max-w-[9rem]" title={`Discard ${discardTopLabel}`}>
+          D{discardTopLabel}
+        </span>
+        <span className="shrink-0 text-zinc-600">|</span>
+        <span className="shrink-0 font-mono">R{snapshot.roundNumber ?? 1}</span>
         {pendingDraw ? (
           <>
-            <span className="text-zinc-600">·</span>
-            <span className="text-emerald-300">Drew {pendingDraw}</span>
+            <span className="shrink-0 text-zinc-600">|</span>
+            <span className="shrink-0 rounded bg-emerald-500/15 px-1 py-px font-semibold text-emerald-300">+{pendingDraw}</span>
           </>
         ) : null}
       </div>
 
-      {roundBanner ? (
-        <div className="shrink-0 rounded-lg border border-cyan-500/35 bg-cyan-950/30 px-2 py-2 text-[11px] text-cyan-50">
-          <p className="font-bold text-cyan-200">{roundBanner.title}</p>
-          <ul className="mt-1 space-y-0.5 text-[10px] text-cyan-100/90">
-            {roundBanner.lines.map((l, i) => (
-              <li key={`rb-${i}`}>{l}</li>
-            ))}
-          </ul>
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
+        <div className="flex shrink-0 gap-0.5 overflow-x-auto overflow-y-hidden border-b border-white/5 pb-px [scrollbar-width:thin]">
+          {scoreboardRows.map(row => {
+            if (!row) return null;
+            return (
+              <div
+                key={row.pk}
+                className={`w-[4rem] shrink-0 rounded border px-0.5 py-px text-[7px] leading-tight sm:w-[4.5rem] sm:text-[8px] ${
+                  row.out
+                    ? "border-zinc-700 bg-zinc-900/50 text-zinc-500 line-through decoration-zinc-500"
+                    : row.near
+                      ? "border-amber-500/45 bg-amber-950/30 text-amber-100"
+                      : "border-white/10 bg-white/5 text-zinc-200"
+                }`}
+              >
+                <div className="truncate font-semibold text-white">
+                  {row.name}
+                  {row.you ? " · you" : ""}
+                </div>
+                <div className="font-mono text-[8px] text-zinc-300 sm:text-[9px]">
+                  {row.total}/{RUMMY51_ELIMINATION_SCORE}
+                </div>
+                <div className="flex flex-wrap gap-px">
+                  {row.opened ? (
+                    <span className="rounded bg-emerald-900/55 px-0.5 text-[6px] font-semibold leading-none text-emerald-100">opened</span>
+                  ) : null}
+                  {row.out ? (
+                    <span className="rounded bg-zinc-800 px-0.5 text-[6px] font-semibold text-zinc-400">out</span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      ) : null}
 
-      <div className="grid max-h-[88px] shrink-0 grid-cols-2 gap-1 overflow-y-auto rounded-md border border-white/10 bg-zinc-950/40 p-1.5 sm:max-h-[100px] sm:grid-cols-4">
-        {scoreboardRows.map(row => {
-          if (!row) return null;
-          return (
-            <div
-              key={row.pk}
-              className={`rounded border px-1.5 py-1 text-[9px] leading-tight ${
-                row.out
-                  ? "border-zinc-700 bg-zinc-900/50 text-zinc-500 line-through decoration-zinc-500"
-                  : row.near
-                    ? "border-amber-500/50 bg-amber-950/35 text-amber-100"
-                    : "border-white/10 bg-white/5 text-zinc-200"
-              }`}
-            >
-              <div className="truncate font-semibold text-white">
-                {row.name}
-                {row.you ? " · you" : ""}
-              </div>
-              <div className="mt-0.5 font-mono text-[10px]">
-                {row.total} / {RUMMY51_ELIMINATION_SCORE}
-              </div>
-              <div className="mt-0.5 flex flex-wrap gap-0.5">
-                {row.opened ? <span className="rounded bg-emerald-900/60 px-1 text-[8px] text-emerald-100">opened</span> : null}
-                {row.out ? <span className="rounded bg-zinc-800 px-1 text-[8px] text-zinc-300">out</span> : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
         <Ov2Rummy51TableMelds
           tableMeldsRaw={snapshot.tableMelds || []}
           selectedTargetMeldId={targetMeldId}
           onSelectTargetMeld={setTargetMeldId}
           disabled={busy || !isMyTurn || !isPlaying}
         />
-      </div>
 
-      <Ov2Rummy51Hand
-        handRaw={myHandRaw}
-        selectedIds={selectedIds}
-        discardCardId={discardCardId}
-        discardPickMode={discardPickMode}
-        sortMode={sortMode}
-        disabled={busy || !isMyTurn || !isPlaying}
-        onToggleCardId={onToggleCardId}
-        onSortModeChange={setSortMode}
-        onEnterDiscardPickMode={() => {
-          setDiscardPickMode(true);
-          setSelectedIds(new Set());
-        }}
-      />
-
-      {isMyTurn && isPlaying ? (
-        <Ov2Rummy51MeldComposer
-          hasEverOpened={hasEverOpened}
-          draftNewMelds={draftNewMelds}
-          draftTableAdds={draftTableAdds}
-          selectedIds={selectedIds}
-          targetMeldId={targetMeldId}
-          onNewMeldFromSelection={onNewMeldFromSelection}
-          onAddSelectionToTarget={onAddSelectionToTarget}
-          onRemoveDraftMeld={i => setDraftNewMelds(prev => prev.filter((_, j) => j !== i))}
-          onRemoveTableAdd={i => setDraftTableAdds(prev => prev.filter((_, j) => j !== i))}
-          onClearDraft={() => {
-            setDraftNewMelds([]);
-            setDraftTableAdds([]);
-          }}
-          disabled={busy}
-        />
-      ) : null}
-
-      <div className="flex shrink-0 flex-col gap-2 border-t border-white/10 pt-2">
-        {actionError ? <p className="text-center text-[11px] text-red-300">{actionError}</p> : null}
-        {!pendingDraw && isMyTurn && isPlaying ? (
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy || (snapshot.stockCount ?? 0) <= 0}
-              onClick={() => void drawStock()}
-              className="min-h-[44px] flex-1 rounded-lg border border-emerald-500/40 bg-emerald-950/35 py-2 text-xs font-bold text-emerald-100 disabled:opacity-40"
-            >
-              Draw stock
-            </button>
-            <button
-              type="button"
-              disabled={busy || (snapshot.discardCount ?? 0) <= 0}
-              onClick={() => void drawDiscard()}
-              className="min-h-[44px] flex-1 rounded-lg border border-sky-500/40 bg-sky-950/35 py-2 text-xs font-bold text-sky-100 disabled:opacity-40"
-            >
-              Take discard
-            </button>
+        {roundBanner ? (
+          <div className="shrink-0 rounded border border-cyan-500/30 bg-cyan-950/25 px-1.5 py-0.5 text-[8px] text-cyan-50">
+            <p className="font-semibold text-cyan-200">{roundBanner.title}</p>
+            <ul className="mt-0.5 max-h-12 space-y-0 overflow-y-auto text-[7px] leading-tight text-cyan-100/85 [scrollbar-width:thin]">
+              {roundBanner.lines.map((l, i) => (
+                <li key={`rb-${i}`}>{l}</li>
+              ))}
+            </ul>
           </div>
         ) : null}
 
-        {pendingDraw && isMyTurn && isPlaying ? (
-          <>
-            {validationMessage ? <p className="text-center text-[10px] text-amber-200/90">{validationMessage}</p> : null}
-            <button
-              type="button"
-              disabled={busy || !canSubmitTurn}
-              onClick={() => void onSubmitTurn()}
-              className="min-h-[48px] w-full rounded-lg border border-violet-500/45 bg-violet-950/40 py-2.5 text-sm font-bold text-violet-100 disabled:opacity-40"
-            >
-              Submit turn
-            </button>
-          </>
-        ) : null}
-      </div>
-
-      {isFinished ? (
-        <div className="shrink-0 rounded-lg border border-amber-500/35 bg-amber-950/25 p-2 text-[11px] text-amber-50">
-          <p className="font-bold text-amber-200">Match finished</p>
-          <p className="mt-1 text-[10px] text-amber-100/85">
-            Winner: {snapshot.winnerName || snapshot.winnerParticipantKey?.slice(0, 10) || "—"}
-          </p>
-          <div className="mt-2 flex flex-col gap-1">
-            <button
-              type="button"
-              disabled={busy || !selfKey}
-              onClick={() => void requestRematch()}
-              className="min-h-[44px] rounded-md border border-amber-500/40 bg-amber-950/35 py-2 text-xs font-semibold text-amber-100 disabled:opacity-40"
-            >
-              Request rematch ({rematchCounts.ready}/{rematchCounts.eligible})
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void cancelRematch()}
-              className="min-h-[44px] rounded-md border border-white/20 bg-white/10 py-2 text-xs font-semibold text-zinc-200 disabled:opacity-40"
-            >
-              Cancel rematch
-            </button>
-            <button
-              type="button"
-              disabled={busy || !isHost}
-              onClick={() => void startNextMatch()}
-              className="min-h-[44px] rounded-md border border-emerald-500/40 bg-emerald-950/35 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-40"
-            >
-              Start next match (host)
-            </button>
+        {isFinished ? (
+          <div className="shrink-0 rounded-md border border-amber-500/35 bg-amber-950/25 p-1.5 text-[9px] text-amber-50">
+            <p className="font-bold text-amber-200">Match finished</p>
+            <p className="mt-0.5 text-[8px] text-amber-100/85">
+              Winner: {snapshot.winnerName || snapshot.winnerParticipantKey?.slice(0, 10) || "—"}
+            </p>
+            <div className="mt-1 flex flex-col gap-0.5">
+              <button
+                type="button"
+                disabled={busy || !selfKey}
+                onClick={() => void requestRematch()}
+                className="min-h-[38px] rounded-md border border-amber-500/40 bg-amber-950/35 py-1 text-[10px] font-semibold text-amber-100 disabled:opacity-40"
+              >
+                Request rematch ({rematchCounts.ready}/{rematchCounts.eligible})
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void cancelRematch()}
+                className="min-h-[38px] rounded-md border border-white/20 bg-white/10 py-1 text-[10px] font-semibold text-zinc-200 disabled:opacity-40"
+              >
+                Cancel rematch
+              </button>
+              <button
+                type="button"
+                disabled={busy || !isHost}
+                onClick={() => void startNextMatch()}
+                className="min-h-[38px] rounded-md border border-emerald-500/40 bg-emerald-950/35 py-1 text-[10px] font-semibold text-emerald-100 disabled:opacity-40"
+              >
+                Start next match (host)
+              </button>
+            </div>
+            <p className="mt-1 text-[7px] text-zinc-500">Next match returns the room to stake commit in the lobby.</p>
           </div>
-          <p className="mt-2 text-[9px] text-zinc-500">Next match returns the room to stake commit in the lobby.</p>
+        ) : null}
+
+        <div className="shrink-0 truncate pb-0.5 text-[7px] text-zinc-600 sm:text-[8px]">
+          {hasOpenedThisHand ? <span className="text-emerald-600/90">Opened · </span> : null}
+          Opp:{" "}
+          {Object.entries(snapshot.hands || {})
+            .filter(([pk]) => pk !== selfKey)
+            .map(([pk, h]) => `${(snapshot.playerState?.[pk]?.displayName || pk).toString().slice(0, 6)} (${Array.isArray(h) ? h.length : 0})`)
+            .join(" · ") || "—"}
         </div>
-      ) : null}
+      </div>
 
-      <div className="shrink-0 text-[9px] text-zinc-600">
-        {hasOpenedThisHand ? <span className="text-emerald-600/90">Opened this hand · </span> : null}
-        Opponents:{" "}
-        {Object.entries(snapshot.hands || {})
-          .filter(([pk]) => pk !== selfKey)
-          .map(([pk, h]) => `${(snapshot.playerState?.[pk]?.displayName || pk).toString().slice(0, 6)} (${Array.isArray(h) ? h.length : 0})`)
-          .join(" · ") || "—"}
+      <div className="shrink-0 overflow-hidden rounded-md border border-violet-500/35 bg-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        {hasBottomActionBlock ? (
+          <div className="shrink-0 space-y-0.5 border-b border-violet-500/20 bg-black/50 px-1.5 py-0.5 sm:px-2">
+            {actionError ? <p className="text-center text-[9px] leading-tight text-red-300">{actionError}</p> : null}
+            {!pendingDraw && isMyTurn && isPlaying ? (
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  disabled={busy || (snapshot.stockCount ?? 0) <= 0}
+                  onClick={() => void drawStock()}
+                  className="min-h-[38px] flex-1 rounded-md border border-emerald-500/40 bg-emerald-950/40 py-1 text-[11px] font-bold text-emerald-100 disabled:opacity-40 sm:min-h-[40px] sm:text-xs"
+                >
+                  Draw stock
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || (snapshot.discardCount ?? 0) <= 0}
+                  onClick={() => void drawDiscard()}
+                  className="min-h-[38px] flex-1 rounded-md border border-sky-500/40 bg-sky-950/40 py-1 text-[11px] font-bold text-sky-100 disabled:opacity-40 sm:min-h-[40px] sm:text-xs"
+                >
+                  Take discard
+                </button>
+              </div>
+            ) : null}
+
+            {pendingDraw && isMyTurn && isPlaying ? (
+              <div className="flex flex-col gap-0">
+                {validationMessage ? (
+                  <p className="px-0.5 pb-0.5 text-[8px] leading-snug text-amber-200/95 sm:text-[9px]">{validationMessage}</p>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={busy || !canSubmitTurn}
+                  onClick={() => void onSubmitTurn()}
+                  className="min-h-[38px] w-full rounded-md border border-violet-500/50 bg-violet-950/45 py-1 text-xs font-bold text-violet-100 disabled:opacity-40 sm:min-h-[40px] sm:text-sm"
+                >
+                  Submit turn
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {isMyTurn && isPlaying ? (
+          <Ov2Rummy51MeldComposer
+            compact={!hasComposerDraft}
+            hasEverOpened={hasEverOpened}
+            draftNewMelds={draftNewMelds}
+            draftTableAdds={draftTableAdds}
+            selectedIds={selectedIds}
+            targetMeldId={targetMeldId}
+            onNewMeldFromSelection={onNewMeldFromSelection}
+            onAddSelectionToTarget={onAddSelectionToTarget}
+            onRemoveDraftMeld={i => setDraftNewMelds(prev => prev.filter((_, j) => j !== i))}
+            onRemoveTableAdd={i => setDraftTableAdds(prev => prev.filter((_, j) => j !== i))}
+            onClearDraft={() => {
+              setDraftNewMelds([]);
+              setDraftTableAdds([]);
+            }}
+            disabled={busy}
+          />
+        ) : null}
+
+        <Ov2Rummy51Hand
+          embedded
+          handRaw={myHandRaw}
+          selectedIds={selectedIds}
+          discardCardId={discardCardId}
+          discardPickMode={discardPickMode}
+          sortMode={sortMode}
+          disabled={busy || !isMyTurn || !isPlaying}
+          onToggleCardId={onToggleCardId}
+          onSortModeChange={setSortMode}
+          onEnterDiscardPickMode={() => {
+            setDiscardPickMode(true);
+            setSelectedIds(new Set());
+          }}
+        />
       </div>
     </div>
   );

@@ -1,11 +1,26 @@
 "use client";
 
-import { useMemo } from "react";
-import { deserializeCard, getCardDisplayLabel, sortCardsForHand } from "../../../lib/online-v2/rummy51/ov2Rummy51Engine";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { deserializeCard, sortCardsForHand } from "../../../lib/online-v2/rummy51/ov2Rummy51Engine";
 
 /**
  * @typedef {import("../../../lib/online-v2/rummy51/ov2Rummy51Engine").Rummy51Card} Rummy51Card
  */
+
+const SUIT_SYM = /** @type {const} */ ({ S: "♠", H: "♥", D: "♦", C: "♣" });
+const RANK_CORNER = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+
+/** @param {Rummy51Card} card */
+function cornerRank(card) {
+  if (card.isJoker) return "J";
+  return RANK_CORNER[card.rank] ?? "?";
+}
+
+/** @param {Rummy51Card} card */
+function cornerSuit(card) {
+  if (card.isJoker) return "★";
+  return card.suit ? SUIT_SYM[card.suit] ?? "" : "";
+}
 
 /**
  * @param {{
@@ -15,6 +30,7 @@ import { deserializeCard, getCardDisplayLabel, sortCardsForHand } from "../../..
  *   discardPickMode: boolean,
  *   sortMode: "rank"|"suit",
  *   disabled?: boolean,
+ *   embedded?: boolean,
  *   onToggleCardId: (id: string) => void,
  *   onSortModeChange: (m: "rank"|"suit") => void,
  *   onEnterDiscardPickMode: () => void,
@@ -27,6 +43,7 @@ export default function Ov2Rummy51Hand({
   discardPickMode,
   sortMode,
   disabled = false,
+  embedded = false,
   onToggleCardId,
   onSortModeChange,
   onEnterDiscardPickMode,
@@ -59,70 +76,142 @@ export default function Ov2Rummy51Hand({
     return sorted;
   }, [handRaw, sortMode]);
 
+  const rowRef = useRef(/** @type {HTMLDivElement|null} */ (null));
+  const [overlapPx, setOverlapPx] = useState(0);
+
+  const n = cards.length;
+
+  useLayoutEffect(() => {
+    const el = rowRef.current;
+    if (!el) return undefined;
+
+    const mq = window.matchMedia("(min-width: 640px)");
+
+    const measure = () => {
+      const cardW = mq.matches ? 44 : 38;
+      const count = cards.length;
+      if (count <= 1) {
+        setOverlapPx(0);
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      const pad = 10;
+      const avail = Math.max(0, rect.width - pad);
+      const minStep = 9;
+      const rawStep = (avail - cardW) / (count - 1);
+      const step = Math.max(minStep, rawStep);
+      setOverlapPx(Math.max(0, cardW - step));
+    };
+
+    measure();
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    mq.addEventListener("change", measure);
+    return () => {
+      ro.disconnect();
+      mq.removeEventListener("change", measure);
+    };
+  }, [n, cards.length]);
+
+  const shell = embedded
+    ? "flex w-full shrink-0 flex-col gap-0.5 px-1 pb-0.5 pt-0.5 sm:px-1.5"
+    : "flex w-full shrink-0 flex-col gap-1 rounded-lg border border-violet-500/25 bg-violet-950/20 p-2";
+
   return (
-    <div className="flex min-h-0 w-full flex-col gap-2 rounded-lg border border-violet-500/25 bg-violet-950/20 p-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-violet-200/90">Your hand</p>
-        <div className="flex flex-wrap items-center gap-1">
+    <div className={shell}>
+      <div className="flex shrink-0 flex-nowrap items-center justify-between gap-1">
+        <p className="shrink-0 text-[8px] font-semibold uppercase tracking-wide text-violet-200/80 sm:text-[9px]">Hand</p>
+        <div className="flex shrink-0 flex-nowrap items-center gap-0.5">
           <button
             type="button"
             disabled={disabled}
             onClick={() => onSortModeChange("rank")}
-            className={`rounded px-2 py-1 text-[10px] font-semibold ${
+            className={`shrink-0 rounded px-1.5 py-0.5 text-[8px] font-semibold sm:text-[9px] ${
               sortMode === "rank" ? "bg-violet-600/50 text-white" : "bg-white/10 text-zinc-300"
             } disabled:opacity-40`}
           >
-            By rank
+            Rank
           </button>
           <button
             type="button"
             disabled={disabled}
             onClick={() => onSortModeChange("suit")}
-            className={`rounded px-2 py-1 text-[10px] font-semibold ${
+            className={`shrink-0 rounded px-1.5 py-0.5 text-[8px] font-semibold sm:text-[9px] ${
               sortMode === "suit" ? "bg-violet-600/50 text-white" : "bg-white/10 text-zinc-300"
             } disabled:opacity-40`}
           >
-            By suit
+            Suit
           </button>
           <button
             type="button"
             disabled={disabled}
             onClick={() => onEnterDiscardPickMode()}
-            className={`rounded px-2 py-1 text-[10px] font-semibold ${
+            className={`shrink-0 rounded px-1.5 py-0.5 text-[8px] font-semibold sm:text-[9px] ${
               discardPickMode ? "bg-amber-600/60 text-amber-50" : "border border-amber-500/40 bg-amber-950/30 text-amber-100"
             } disabled:opacity-40`}
           >
-            Discard pick
+            Discard
           </button>
         </div>
       </div>
       {discardPickMode ? (
-        <p className="text-[10px] text-amber-200/90">Tap the card you will discard after melds.</p>
+        <p className="shrink-0 px-0.5 text-[8px] leading-tight text-amber-200/90">Tap card to discard.</p>
       ) : null}
 
-      <div className="flex min-h-[5.5rem] flex-wrap content-start gap-1.5 overflow-y-auto [scrollbar-width:thin] sm:min-h-[6rem]">
-        {cards.map(c => {
+      <div
+        ref={rowRef}
+        className={`relative flex w-full shrink-0 flex-row flex-nowrap items-end justify-center overflow-x-hidden overflow-y-visible ${cards.length ? "min-h-[4.25rem] pt-3" : "min-h-0 py-0.5"}`}
+        role="list"
+        aria-label="Your cards"
+      >
+        {cards.map((c, idx) => {
           const id = c.id;
           const isSel = selected.has(id);
           const isDisc = discardCardId === id;
           const red = c.suit === "H" || c.suit === "D";
+          const mid = (cards.length - 1) / 2;
+          const fanDeg = cards.length > 1 ? (idx - mid) * 1.15 : 0;
+          const marginLeft = idx === 0 ? 0 : -overlapPx;
+          const zBase = 10 + idx;
+          const z = isSel ? 60 : isDisc ? 50 : zBase;
+
           return (
             <button
               key={id}
               type="button"
+              role="listitem"
               disabled={disabled}
               onClick={() => onToggleCardId(id)}
+              style={{
+                marginLeft: idx === 0 ? 0 : marginLeft,
+                zIndex: z,
+                transformOrigin: "50% 100%",
+                transform: isSel
+                  ? `translateY(-12px) scale(1.08) rotate(${fanDeg}deg)`
+                  : `translateY(0) rotate(${fanDeg}deg)`,
+              }}
               className={[
-                "flex min-h-[48px] min-w-[2.75rem] flex-col items-center justify-center rounded-md border-2 px-1 py-1.5 text-sm font-bold shadow-md transition sm:min-h-[52px] sm:min-w-[3rem] sm:text-base",
-                isSel ? "border-sky-400 bg-sky-900/50 ring-2 ring-sky-300/80" : "border-white/20 bg-zinc-900/90",
+                "relative box-border h-[3.35rem] w-[2.375rem] shrink-0 rounded-md border-2 bg-gradient-to-b from-zinc-700 to-zinc-900 text-left shadow-md transition-[transform,box-shadow,border-color] duration-150 sm:h-[3.6rem] sm:w-[2.75rem]",
+                isSel ? "border-sky-400 shadow-[0_0_0_2px_rgba(56,189,248,0.45),0_8px_20px_rgba(0,0,0,0.45)]" : "border-white/20",
                 isDisc ? "ring-2 ring-amber-400 ring-offset-1 ring-offset-zinc-950" : "",
-                red && !c.isJoker ? "text-rose-200" : "text-zinc-100",
-                c.isJoker ? "text-amber-200" : "",
-                disabled ? "opacity-45" : "active:scale-[0.98]",
+                disabled ? "opacity-45" : "active:scale-[1.02]",
               ].join(" ")}
             >
-              <span className="leading-none">{getCardDisplayLabel(c)}</span>
-              {isDisc ? <span className="mt-0.5 text-[7px] font-bold uppercase text-amber-300">discard</span> : null}
+              <span
+                className={[
+                  "absolute left-0.5 top-0.5 flex flex-col leading-none whitespace-nowrap",
+                  red && !c.isJoker ? "text-rose-300" : "text-zinc-100",
+                  c.isJoker ? "text-amber-200" : "",
+                ].join(" ")}
+              >
+                <span className="text-[9px] font-extrabold tracking-tight sm:text-[10px]">{cornerRank(c)}</span>
+                <span className="text-[11px] font-bold leading-none sm:text-xs">{cornerSuit(c)}</span>
+              </span>
+              {isDisc ? (
+                <span className="absolute bottom-0.5 right-0.5 rounded bg-amber-600/90 px-0.5 text-[5px] font-bold uppercase leading-none text-amber-950">
+                  out
+                </span>
+              ) : null}
             </button>
           );
         })}

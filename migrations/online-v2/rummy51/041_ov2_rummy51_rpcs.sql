@@ -578,7 +578,7 @@ BEGIN
   END LOOP;
   FOR r IN 1..p_per LOOP
     FOR ki IN 1..nk LOOP
-      SELECT e, rr INTO elem, rest FROM public._ov2_r51_jsonb_pop_last(st);
+      SELECT pl.elem, pl.rest INTO elem, rest FROM public._ov2_r51_jsonb_pop_last(st) AS pl;
       IF elem IS NULL THEN
         stock_out := st;
         RETURN;
@@ -785,9 +785,9 @@ BEGIN
   v_seed := 'ov2r51:' || p_room_id::text || ':' || coalesce(v_room.match_seq, 0)::text || ':' || extract(epoch from now())::bigint::text;
   v_deck := public._ov2_r51_build_deck();
   v_shuf := public._ov2_r51_shuffle_deck(v_seed, v_deck);
-  SELECT h, s INTO v_hands, v_stock FROM public._ov2_r51_deal_hands(v_shuf, v_keys, 14);
+  SELECT d.hands, d.stock_out INTO v_hands, v_stock FROM public._ov2_r51_deal_hands(v_shuf, v_keys, 14) AS d;
 
-  SELECT e, r INTO v_top, v_rest FROM public._ov2_r51_jsonb_pop_last(v_stock);
+  SELECT pl.elem, pl.rest INTO v_top, v_rest FROM public._ov2_r51_jsonb_pop_last(v_stock) AS pl;
   v_disc := public._ov2_r51_jsonb_push('[]'::jsonb, v_top);
   v_stock := v_rest;
 
@@ -909,7 +909,7 @@ BEGIN
   IF v_sess.pending_draw_source IS NOT NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'ALREADY_DREW', 'message', 'Already drew this turn');
   END IF;
-  SELECT e, r INTO v_top, v_rest FROM public._ov2_r51_jsonb_pop_last(v_sess.stock);
+  SELECT pl.elem, pl.rest INTO v_top, v_rest FROM public._ov2_r51_jsonb_pop_last(v_sess.stock) AS pl;
   IF v_top IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'STOCK_EMPTY', 'message', 'Stock empty');
   END IF;
@@ -970,7 +970,7 @@ BEGIN
   IF v_sess.pending_draw_source IS NOT NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'ALREADY_DREW', 'message', 'Already drew this turn');
   END IF;
-  SELECT e, r INTO v_top, v_rest FROM public._ov2_r51_jsonb_pop_last(v_sess.discard);
+  SELECT pl.elem, pl.rest INTO v_top, v_rest FROM public._ov2_r51_jsonb_pop_last(v_sess.discard) AS pl;
   IF v_top IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'DISCARD_EMPTY', 'message', 'Discard empty');
   END IF;
@@ -1325,8 +1325,8 @@ BEGIN
       v_rn := v_sess.round_number + 1;
       v_deck := public._ov2_r51_build_deck();
       v_shuf := public._ov2_r51_shuffle_deck(v_sess.seed || ':r' || v_rn::text, v_deck);
-      SELECT h, s INTO v_hands, v_stock FROM public._ov2_r51_deal_hands(v_shuf, v_keys, 14);
-      SELECT e, r INTO v_top, v_rest FROM public._ov2_r51_jsonb_pop_last(v_stock);
+      SELECT d.hands, d.stock_out INTO v_hands, v_stock FROM public._ov2_r51_deal_hands(v_shuf, v_keys, 14) AS d;
+      SELECT pl.elem, pl.rest INTO v_top, v_rest FROM public._ov2_r51_jsonb_pop_last(v_stock) AS pl;
       v_disc := public._ov2_r51_jsonb_push('[]'::jsonb, v_top);
       v_stock := v_rest;
 

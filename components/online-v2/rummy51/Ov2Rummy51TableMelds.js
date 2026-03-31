@@ -39,16 +39,16 @@ export default function Ov2Rummy51TableMelds({
 
   if (!melds.length) {
     return (
-      <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-3 text-center text-[11px] text-zinc-500">
-        No melds on table yet.
+      <div className="shrink-0 border-b border-white/5 py-px text-center text-[8px] leading-none text-zinc-500">
+        Table · no melds yet
       </div>
     );
   }
 
   return (
-    <div className="flex max-h-[min(28vh,220px)] min-h-0 flex-col gap-1.5 overflow-y-auto rounded-lg border border-teal-500/20 bg-teal-950/15 p-2 [scrollbar-width:thin]">
-      <p className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-teal-200/85">Table melds</p>
-      <div className="flex flex-col gap-2">
+    <div className="flex min-h-0 max-h-[min(30vh,200px)] shrink-0 flex-col gap-1 overflow-y-auto rounded-md border border-teal-500/20 bg-teal-950/10 px-1 py-1 [scrollbar-width:thin] sm:max-h-[min(34vh,260px)]">
+      <p className="shrink-0 text-[8px] font-semibold uppercase tracking-wide text-teal-200/75">Table</p>
+      <div className="flex flex-col gap-1">
         {melds.map(m => {
           if (!m) return null;
           const isRun = m.kind === "run";
@@ -60,23 +60,23 @@ export default function Ov2Rummy51TableMelds({
               disabled={disabled}
               onClick={() => onSelectTargetMeld(isTarget ? null : m.meldId)}
               className={[
-                "flex w-full flex-col gap-1 rounded-md border px-2 py-1.5 text-left transition",
+                "flex w-full flex-col gap-0.5 rounded border px-1 py-0.5 text-left transition",
                 isRun ? "border-sky-500/35 bg-sky-950/25" : "border-amber-500/35 bg-amber-950/20",
-                isTarget ? "ring-2 ring-fuchsia-400/70" : "",
+                isTarget ? "ring-1 ring-fuchsia-400/80" : "",
                 disabled ? "opacity-50" : "hover:brightness-110",
               ].join(" ")}
             >
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[9px] font-bold uppercase text-zinc-400">{isRun ? "Run" : m.kind === "set" ? "Set" : "Meld"}</span>
-                {isTarget ? <span className="text-[8px] font-bold text-fuchsia-200">add target</span> : null}
+                <span className="text-[7px] font-bold uppercase text-zinc-400">{isRun ? "Run" : m.kind === "set" ? "Set" : "Meld"}</span>
+                {isTarget ? <span className="text-[7px] font-bold text-fuchsia-200">target</span> : null}
               </div>
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-0.5">
                 {m.cards.map(c => {
                   const red = c.suit === "H" || c.suit === "D";
                   return (
                     <span
                       key={c.id}
-                      className={`rounded border border-white/15 bg-black/35 px-1.5 py-0.5 font-mono text-[11px] font-semibold ${
+                      className={`rounded border border-white/15 bg-black/35 px-1 py-px font-mono text-[9px] font-semibold ${
                         red && !c.isJoker ? "text-rose-200" : "text-zinc-100"
                       } ${c.isJoker ? "text-amber-200" : ""}`}
                     >

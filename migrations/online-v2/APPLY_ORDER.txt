@@ -41,3 +41,4 @@ bingo/039_ov2_bingo_hotfix.sql
 rummy51/040_ov2_rummy51_schema.sql
 rummy51/041_ov2_rummy51_rpcs.sql
 rummy51/042_ov2_rummy51_realtime.sql
+rummy51/043_ov2_rummy51_open_session_hotfix.sql

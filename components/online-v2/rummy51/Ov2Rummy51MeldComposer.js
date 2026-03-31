@@ -27,6 +27,7 @@ import {
  *   onRemoveTableAdd: (index: number) => void,
  *   onClearDraft: () => void,
  *   disabled?: boolean,
+ *   compact?: boolean,
  * }} props
  */
 export default function Ov2Rummy51MeldComposer({
@@ -41,7 +42,10 @@ export default function Ov2Rummy51MeldComposer({
   onRemoveTableAdd,
   onClearDraft,
   disabled = false,
+  compact = false,
 }) {
+  const hasDraft = draftNewMelds.length > 0 || draftTableAdds.length > 0;
+
   const openingPreview = useMemo(() => {
     if (hasEverOpened || !draftNewMelds.length) {
       return { label: "—", sub: "", ok: true, openingPts: 0, hasRun: false, legalOpen: true };
@@ -72,68 +76,110 @@ export default function Ov2Rummy51MeldComposer({
 
   const selCount = selectedIds.size;
 
+  const emptyCompact = compact && !hasDraft;
+
+  if (emptyCompact) {
+    return (
+      <div className="shrink-0 border-t border-fuchsia-500/15 bg-fuchsia-950/10 px-1 py-0.5">
+        <div className="flex flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:thin]">
+          <span className="shrink-0 text-[8px] font-semibold text-fuchsia-200/65">Tray</span>
+          <button
+            type="button"
+            disabled={disabled || selCount < 3}
+            onClick={() => onNewMeldFromSelection()}
+            className="shrink-0 rounded border border-white/15 bg-white/5 px-1 py-px text-[8px] font-semibold text-zinc-200 disabled:opacity-40"
+          >
+            +Meld({selCount})
+          </button>
+          <button
+            type="button"
+            disabled={disabled || selCount < 1 || !targetMeldId}
+            onClick={() => onAddSelectionToTarget()}
+            className="shrink-0 rounded border border-fuchsia-500/30 bg-fuchsia-950/20 px-1 py-px text-[8px] font-semibold text-fuchsia-100 disabled:opacity-40"
+          >
+            +Tbl
+          </button>
+          <button
+            type="button"
+            disabled={disabled || (!draftNewMelds.length && !draftTableAdds.length)}
+            onClick={() => onClearDraft()}
+            className="shrink-0 rounded border border-red-500/20 px-1 py-px text-[8px] text-red-300/90 disabled:opacity-40"
+          >
+            Clr
+          </button>
+          {!hasEverOpened ? (
+            <span className="min-w-0 truncate text-[7px] text-zinc-500">
+              · Open ≥{RUMMY51_OPEN_TARGET}+run · 3+ cards
+            </span>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-fuchsia-500/25 bg-fuchsia-950/15 p-2">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-fuchsia-200/90">Meld composer</p>
+    <div className="flex flex-col gap-1.5 border-t border-fuchsia-500/20 bg-fuchsia-950/15 px-1.5 py-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[9px] font-semibold uppercase tracking-wide text-fuchsia-200/85">Meld tray</p>
+        <div className="flex flex-wrap gap-0.5">
+          <button
+            type="button"
+            disabled={disabled || selCount < 3}
+            onClick={() => onNewMeldFromSelection()}
+            className="rounded border border-white/20 bg-white/10 px-2 py-1 text-[9px] font-semibold text-zinc-100 disabled:opacity-40"
+          >
+            New meld ({selCount})
+          </button>
+          <button
+            type="button"
+            disabled={disabled || selCount < 1 || !targetMeldId}
+            onClick={() => onAddSelectionToTarget()}
+            className="rounded border border-fuchsia-500/40 bg-fuchsia-950/30 px-2 py-1 text-[9px] font-semibold text-fuchsia-100 disabled:opacity-40"
+          >
+            Add to table
+          </button>
+          <button
+            type="button"
+            disabled={disabled || (!draftNewMelds.length && !draftTableAdds.length)}
+            onClick={() => onClearDraft()}
+            className="rounded border border-red-500/30 bg-red-950/25 px-2 py-1 text-[9px] text-red-200 disabled:opacity-40"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
 
       {!hasEverOpened ? (
         <div
-          className={`rounded border px-2 py-1.5 text-[10px] leading-snug ${
-            openingPreview.ok ? "border-emerald-500/40 bg-emerald-950/25 text-emerald-100" : "border-amber-500/40 bg-amber-950/25 text-amber-100"
+          className={`rounded border px-1.5 py-1 text-[9px] leading-snug ${
+            openingPreview.ok ? "border-emerald-500/35 bg-emerald-950/20 text-emerald-100" : "border-amber-500/35 bg-amber-950/20 text-amber-100"
           }`}
         >
           <div className="font-semibold">{openingPreview.label}</div>
-          <div className="mt-0.5 text-zinc-300">{openingPreview.sub}</div>
+          {openingPreview.sub ? <div className="mt-0.5 text-[8px] text-zinc-400">{openingPreview.sub}</div> : null}
         </div>
       ) : postOpenPreview ? (
         <div
-          className={`rounded border px-2 py-1.5 text-[10px] ${
-            postOpenPreview.ok ? "border-emerald-500/35 text-emerald-100" : "border-red-500/35 text-red-200"
+          className={`rounded border px-1.5 py-1 text-[9px] ${
+            postOpenPreview.ok ? "border-emerald-500/30 text-emerald-100" : "border-red-500/35 text-red-200"
           }`}
         >
           {postOpenPreview.label}
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-1">
-        <button
-          type="button"
-          disabled={disabled || selCount < 3}
-          onClick={() => onNewMeldFromSelection()}
-          className="rounded border border-white/20 bg-white/10 px-2 py-1.5 text-[10px] font-semibold text-zinc-100 disabled:opacity-40"
-        >
-          New meld ({selCount} sel)
-        </button>
-        <button
-          type="button"
-          disabled={disabled || selCount < 1 || !targetMeldId}
-          onClick={() => onAddSelectionToTarget()}
-          className="rounded border border-fuchsia-500/40 bg-fuchsia-950/30 px-2 py-1.5 text-[10px] font-semibold text-fuchsia-100 disabled:opacity-40"
-        >
-          Add to table meld
-        </button>
-        <button
-          type="button"
-          disabled={disabled || (!draftNewMelds.length && !draftTableAdds.length)}
-          onClick={() => onClearDraft()}
-          className="rounded border border-red-500/30 bg-red-950/25 px-2 py-1.5 text-[10px] text-red-200 disabled:opacity-40"
-        >
-          Clear draft
-        </button>
-      </div>
-
       {draftNewMelds.length ? (
         <div className="space-y-1">
-          <p className="text-[9px] font-bold uppercase text-zinc-500">New melds (this turn)</p>
+          <p className="text-[8px] font-bold uppercase text-zinc-500">New melds</p>
           {draftNewMelds.map((meld, i) => {
             const k = classifyMeld(meld);
             return (
-              <div key={`dm-${i}`} className="flex items-start justify-between gap-1 rounded border border-white/10 bg-black/30 px-2 py-1">
+              <div key={`dm-${i}`} className="flex items-start justify-between gap-1 rounded border border-white/10 bg-black/30 px-1.5 py-1">
                 <div className="min-w-0 flex-1">
-                  <span className="text-[9px] text-zinc-500">{k === "invalid" ? "invalid" : k}</span>
+                  <span className="text-[8px] text-zinc-500">{k === "invalid" ? "invalid" : k}</span>
                   <div className="flex flex-wrap gap-0.5">
                     {meld.map(c => (
-                      <span key={c.id} className="font-mono text-[10px] text-zinc-200">
+                      <span key={c.id} className="font-mono text-[9px] text-zinc-200">
                         {getCardDisplayLabel(c)}
                       </span>
                     ))}
@@ -143,7 +189,7 @@ export default function Ov2Rummy51MeldComposer({
                   type="button"
                   disabled={disabled}
                   onClick={() => onRemoveDraftMeld(i)}
-                  className="shrink-0 text-[10px] text-red-300 disabled:opacity-40"
+                  className="shrink-0 text-[9px] text-red-300 disabled:opacity-40"
                 >
                   ✕
                 </button>
@@ -155,10 +201,10 @@ export default function Ov2Rummy51MeldComposer({
 
       {draftTableAdds.length ? (
         <div className="space-y-1">
-          <p className="text-[9px] font-bold uppercase text-zinc-500">Table additions</p>
+          <p className="text-[8px] font-bold uppercase text-zinc-500">Table adds</p>
           {draftTableAdds.map((row, i) => (
-            <div key={`ta-${i}-${row.meldId}`} className="flex items-start justify-between gap-1 rounded border border-fuchsia-500/20 bg-black/30 px-2 py-1">
-              <div className="min-w-0 text-[10px] text-fuchsia-100">
+            <div key={`ta-${i}-${row.meldId}`} className="flex items-start justify-between gap-1 rounded border border-fuchsia-500/20 bg-black/30 px-1.5 py-1">
+              <div className="min-w-0 text-[9px] text-fuchsia-100">
                 → {String(row.meldId).slice(0, 8)}…
                 <div className="flex flex-wrap gap-0.5 text-zinc-200">
                   {row.cards.map(c => (
@@ -172,7 +218,7 @@ export default function Ov2Rummy51MeldComposer({
                 type="button"
                 disabled={disabled}
                 onClick={() => onRemoveTableAdd(i)}
-                className="text-[10px] text-red-300 disabled:opacity-40"
+                className="text-[9px] text-red-300 disabled:opacity-40"
               >
                 ✕
               </button>
