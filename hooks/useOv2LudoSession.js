@@ -101,6 +101,7 @@ export function useOv2LudoSession(baseContext) {
     liveAutoRollCompletedKeyRef.current = null;
     liveAutoRollPendingKeyRef.current = null;
     setLiveDiceRevealHold(null);
+    setLiveRollServerFace(null);
   }, [roomId]);
 
   useEffect(() => {
@@ -111,6 +112,7 @@ export function useOv2LudoSession(baseContext) {
     liveAutoRollCompletedKeyRef.current = null;
     liveAutoRollPendingKeyRef.current = null;
     setLiveDiceRevealHold(null);
+    setLiveRollServerFace(null);
   }, [roomId, activeSessionKey]);
 
   useEffect(() => {
@@ -212,6 +214,8 @@ export function useOv2LudoSession(baseContext) {
   const [diceRolling, setDiceRolling] = useState(false);
   /** Live-only: random face while diceRolling (never replaces server outcome). */
   const [liveSpinTick, setLiveSpinTick] = useState(1);
+  /** Once roll RPC returns, lock display to resolved face until reveal window ends (interval must not randomize over it). */
+  const [liveRollServerFace, setLiveRollServerFace] = useState(/** @type {number|null} */ (null));
   /** After roll, keep showing the resolved face if the next snapshot dropped `dice` (e.g. auto-pass). */
   const [liveDiceRevealHold, setLiveDiceRevealHold] = useState(
     /** @type {{ face: number, until: number } | null} */ (null)
@@ -240,6 +244,7 @@ export function useOv2LudoSession(baseContext) {
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
     if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !diceRolling) return undefined;
+    if (liveRollServerFace != null) return undefined;
     const id = window.setInterval(() => {
       setLiveSpinTick(prev => {
         let n = prev;
@@ -250,7 +255,7 @@ export function useOv2LudoSession(baseContext) {
       });
     }, 85);
     return () => window.clearInterval(id);
-  }, [playMode, diceRolling]);
+  }, [playMode, diceRolling, liveRollServerFace]);
 
   useEffect(() => {
     if (!liveDiceRevealHold) return;
@@ -318,6 +323,7 @@ export function useOv2LudoSession(baseContext) {
     if (interactionTier === "live_authoritative") {
       if (!roomId || !selfKey || !authoritativeSnapshot?.sessionId) return;
       const t0 = typeof Date.now === "function" ? Date.now() : 0;
+      setLiveRollServerFace(null);
       setDiceRolling(true);
       try {
         const res = await requestOv2LudoRollDice(roomId, authoritativeSnapshot.sessionId, {
@@ -325,7 +331,10 @@ export function useOv2LudoSession(baseContext) {
           participantKey: selfKey,
         });
         const face = res.ok && res.snapshot ? snapshotResolvedRollFace(res.snapshot) : null;
-        if (face != null) setLiveSpinTick(face);
+        if (face != null) {
+          setLiveRollServerFace(face);
+          setLiveSpinTick(face);
+        }
         const wait = Math.max(0, OV2_LUDO_LIVE_ROLL_MIN_MS - (Date.now() - t0));
         await sleepMs(wait);
         if (res.ok && res.snapshot) {
@@ -338,6 +347,7 @@ export function useOv2LudoSession(baseContext) {
           }
         }
       } finally {
+        setLiveRollServerFace(null);
         setDiceRolling(false);
       }
       return;
@@ -456,6 +466,7 @@ export function useOv2LudoSession(baseContext) {
         }
         const t0 = Date.now();
         let rollStateStarted = false;
+        setLiveRollServerFace(null);
         setDiceRolling(true);
         rollStateStarted = true;
         try {
@@ -465,7 +476,10 @@ export function useOv2LudoSession(baseContext) {
           });
           if (cancelled) return;
           const face = res.ok && res.snapshot ? snapshotResolvedRollFace(res.snapshot) : null;
-          if (face != null) setLiveSpinTick(face);
+          if (face != null) {
+            setLiveRollServerFace(face);
+            setLiveSpinTick(face);
+          }
           const wait = Math.max(0, OV2_LUDO_LIVE_ROLL_MIN_MS - (Date.now() - t0));
           await sleepMs(wait);
           if (res.ok) {
@@ -481,7 +495,10 @@ export function useOv2LudoSession(baseContext) {
             }
           }
         } finally {
-          if (rollStateStarted) setDiceRolling(false);
+          if (rollStateStarted) {
+            setLiveRollServerFace(null);
+            setDiceRolling(false);
+          }
           clearPendingIfMatch();
         }
       })();
@@ -810,7 +827,7 @@ export function useOv2LudoSession(baseContext) {
                 const amt = Math.floor(Number(room.stake_per_seat) || 0);
                 if (amt > 0) {
                   const out = await debitOnlineV2Vault(amt, roomProductId);
-                  if (out?.ok !== false) window.localStorage.setItem(idem, "1");
+                  if (out?.ok === true) window.localStorage.setItem(idem, "1");
                 }
               }
             } catch {
