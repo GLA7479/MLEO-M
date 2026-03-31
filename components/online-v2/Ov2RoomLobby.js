@@ -79,6 +79,13 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     () => members.filter(m => parseLudoSeatIndex(m?.seat_index) != null).length,
     [members]
   );
+
+  /** Every seated member must have server-committed stake before opening or entering live Ludo. */
+  const allSeatedHaveCommittedStakes = useMemo(() => {
+    const seated = members.filter(m => parseLudoSeatIndex(m?.seat_index) != null);
+    return seated.length > 0 && seated.every(m => m.wallet_state === "committed");
+  }, [members]);
+
   const canHostOpenLudoSession = useMemo(
     () =>
       Boolean(
@@ -94,10 +101,24 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     if (room?.active_session_id) return "Match already opened.";
     if (!amMember) return "Join the room first.";
     if (!isHost) return "Only room host can open session.";
+    if (room?.lifecycle_phase !== "active") {
+      return "Room must be active (all stakes committed) before opening the Ludo match.";
+    }
+    if (!allSeatedHaveCommittedStakes) {
+      return "All seated players must commit stakes before opening the Ludo match.";
+    }
     if (seatedCount < 2) return "Need at least two seated players.";
     if (seatedCount > 4) return "Ludo allows at most four seated players.";
     return "";
-  }, [room?.product_game_id, room?.active_session_id, amMember, isHost, seatedCount]);
+  }, [
+    room?.product_game_id,
+    room?.active_session_id,
+    room?.lifecycle_phase,
+    amMember,
+    isHost,
+    seatedCount,
+    allSeatedHaveCommittedStakes,
+  ]);
 
   const myMember = useMemo(() => members.find(m => m.participant_key === participantId) || null, [members, participantId]);
   const mySeatIndex = parseLudoSeatIndex(myMember?.seat_index);
@@ -673,7 +694,11 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           </Link>
         ) : null}
 
-        {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && amMember && room.active_session_id ? (
+        {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO &&
+        amMember &&
+        room.active_session_id &&
+        room.lifecycle_phase === "active" &&
+        allSeatedHaveCommittedStakes ? (
           <Link
             href={`/ov2-ludo?room=${encodeURIComponent(roomId)}`}
             title="Live Ludo match — authoritative board"

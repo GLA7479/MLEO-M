@@ -59,6 +59,10 @@ export function useOv2LudoSession(baseContext) {
   const authoritativeSnapshotRef = useRef(/** @type {import("../lib/online-v2/ludo/ov2LudoSessionAdapter").Ov2LudoAuthoritativeSnapshot|null} */ (null));
   const processedExpiredTurnKeysRef = useRef(new Set());
   const processedDoubleExpiryKeysRef = useRef(new Set());
+  /** Dedupe: one client-side auto-roll per authoritative turn window (session + turn seat + deadline). */
+  const liveAutoRollCompletedKeyRef = useRef(/** @type {string|null} */ (null));
+  const liveAutoRollPendingKeyRef = useRef(/** @type {string|null} */ (null));
+  const rollDicePreviewRef = useRef(/** @type {(() => Promise<void>)|null} */ (null));
 
   useEffect(() => {
     authoritativeSnapshotRef.current = authoritativeSnapshot;
@@ -68,6 +72,8 @@ export function useOv2LudoSession(baseContext) {
     setAuthoritativeSnapshot(null);
     processedExpiredTurnKeysRef.current.clear();
     processedDoubleExpiryKeysRef.current.clear();
+    liveAutoRollCompletedKeyRef.current = null;
+    liveAutoRollPendingKeyRef.current = null;
   }, [roomId]);
 
   useEffect(() => {
@@ -281,6 +287,116 @@ export function useOv2LudoSession(baseContext) {
     roomId,
     selfKey,
     authoritativeSnapshot,
+  ]);
+
+  rollDicePreviewRef.current = rollDicePreview;
+
+  /** When the server snapshot moves out of "my turn, dice null, may roll", stop retrying auto-roll for this turn key. */
+  useEffect(() => {
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !authoritativeSnapshot || !roomId || !selfKey) return;
+    if (interactionTier !== "live_authoritative") return;
+    if (authoritativeSnapshot.phase !== "playing") return;
+    if (authoritativeSnapshot.boardViewReadOnly === true) return;
+    const deadline = Number(authoritativeSnapshot.turnDeadline);
+    const liveTurnSeat = parseSeatIndex(authoritativeSnapshot.board?.turnSeat);
+    const sessionId = String(authoritativeSnapshot.sessionId || "").trim();
+    if (!sessionId || liveTurnSeat == null || !Number.isFinite(deadline)) return;
+    if (liveMySeat == null || liveTurnSeat !== liveMySeat) return;
+    const autoKey = `${sessionId}|${liveTurnSeat}|${deadline}|autoroll`;
+    const stillRollable =
+      authoritativeSnapshot.canClientRoll === true && authoritativeSnapshot.board?.dice == null;
+    if (stillRollable) return;
+    liveAutoRollCompletedKeyRef.current = autoKey;
+    if (liveAutoRollPendingKeyRef.current === autoKey) {
+      liveAutoRollPendingKeyRef.current = null;
+    }
+  }, [playMode, interactionTier, authoritativeSnapshot, roomId, selfKey, liveMySeat]);
+
+  useEffect(() => {
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !authoritativeSnapshot || !roomId || !selfKey) return;
+    if (interactionTier !== "live_authoritative") return;
+    if (authoritativeSnapshot.phase !== "playing") return;
+    if (authoritativeSnapshot.boardViewReadOnly === true) return;
+    if (!authoritativeSnapshot.canClientRoll) return;
+    if (authoritativeSnapshot.board?.dice != null) return;
+    if (diceRolling) return;
+    const deadline = Number(authoritativeSnapshot.turnDeadline);
+    const liveTurnSeat = parseSeatIndex(authoritativeSnapshot.board?.turnSeat);
+    const sessionId = String(authoritativeSnapshot.sessionId || "").trim();
+    if (!sessionId || liveTurnSeat == null || !Number.isFinite(deadline)) return;
+    if (!Array.isArray(authoritativeSnapshot.board?.activeSeats) || !authoritativeSnapshot.board.activeSeats.includes(liveTurnSeat)) {
+      return;
+    }
+    if (liveMySeat == null || liveTurnSeat !== liveMySeat) return;
+    const autoKey = `${sessionId}|${liveTurnSeat}|${deadline}|autoroll`;
+    if (liveAutoRollCompletedKeyRef.current === autoKey) return;
+    if (liveAutoRollPendingKeyRef.current === autoKey) return;
+    liveAutoRollPendingKeyRef.current = autoKey;
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        const clearPendingIfMatch = () => {
+          if (liveAutoRollPendingKeyRef.current === autoKey) {
+            liveAutoRollPendingKeyRef.current = null;
+          }
+        };
+        if (cancelled) {
+          clearPendingIfMatch();
+          return;
+        }
+        const snap = authoritativeSnapshotRef.current;
+        if (
+          !snap ||
+          snap.phase !== "playing" ||
+          snap.boardViewReadOnly === true ||
+          !snap.canClientRoll ||
+          snap.board?.dice != null
+        ) {
+          liveAutoRollCompletedKeyRef.current = autoKey;
+          clearPendingIfMatch();
+          return;
+        }
+        const d = Number(snap.turnDeadline);
+        const seat = parseSeatIndex(snap.board?.turnSeat);
+        const sid = String(snap.sessionId || "").trim();
+        if (sid !== sessionId || seat !== liveTurnSeat || d !== deadline) {
+          clearPendingIfMatch();
+          return;
+        }
+        let rollStateStarted = false;
+        setDiceRolling(true);
+        rollStateStarted = true;
+        try {
+          const res = await requestOv2LudoRollDice(roomId, sid, {
+            revision: snap.revision,
+            participantKey: selfKey,
+          });
+          if (cancelled) return;
+          if (res.ok) {
+            liveAutoRollCompletedKeyRef.current = autoKey;
+            if (res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+          }
+        } finally {
+          if (rollStateStarted) setDiceRolling(false);
+          clearPendingIfMatch();
+        }
+      })();
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+      if (liveAutoRollPendingKeyRef.current === autoKey) {
+        liveAutoRollPendingKeyRef.current = null;
+      }
+    };
+  }, [
+    playMode,
+    interactionTier,
+    authoritativeSnapshot,
+    roomId,
+    selfKey,
+    diceRolling,
+    liveMySeat,
   ]);
 
   useEffect(() => {
