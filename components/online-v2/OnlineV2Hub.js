@@ -28,6 +28,7 @@ function gameEmoji(id) {
   if (id === "ov2_mark_grid") return "🔲";
   if (id === "ov2_ludo") return "🎲";
   if (id === "ov2_bingo") return "🎯";
+  if (id === "ov2_rummy51") return "🃏";
   return "🎮";
 }
 

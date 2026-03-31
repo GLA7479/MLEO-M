@@ -4,6 +4,7 @@ import { getOv2MinPlayersForProduct, ONLINE_V2_GAME_IDS, ONLINE_V2_REGISTRY } fr
 import { OV2_BP_LIVE_SYNC_DEBOUNCE_MS } from "../../lib/online-v2/board-path/ov2BoardPathLiveSync";
 import {
   claimOv2BingoSeat,
+  claimOv2Rummy51Seat,
   commitOv2RoomStake,
   fetchOv2RoomById,
   fetchOv2RoomMembers,
@@ -11,6 +12,7 @@ import {
   joinOv2Room,
   leaveOv2BingoSeat,
   leaveOv2LudoSeat,
+  leaveOv2Rummy51Seat,
   leaveOv2Room,
   setOv2MemberReady,
   startOv2RoomIntent,
@@ -26,6 +28,13 @@ import {
   requestOv2BingoRematch,
   startOv2BingoNextMatch,
 } from "../../lib/online-v2/bingo/ov2BingoSessionAdapter";
+import {
+  cancelOv2Rummy51Rematch,
+  fetchOv2Rummy51Snapshot,
+  openOv2Rummy51Session,
+  requestOv2Rummy51Rematch,
+  startOv2Rummy51NextMatch,
+} from "../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
 
 function fmtStake(n) {
   return Math.floor(Number(n) || 0).toLocaleString();
@@ -56,6 +65,7 @@ function parseBingoSeatIndex(value) {
 /** @param {string|null|undefined} productId */
 function parseSeatForProduct(productId, value) {
   if (productId === ONLINE_V2_GAME_IDS.LUDO) return parseLudoSeatIndex(value);
+  if (productId === ONLINE_V2_GAME_IDS.RUMMY51) return parseLudoSeatIndex(value);
   if (productId === ONLINE_V2_GAME_IDS.BINGO) return parseBingoSeatIndex(value);
   return null;
 }
@@ -81,6 +91,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [bingoSnap, setBingoSnap] = useState(/** @type {object|null} */ (null));
+  const [rummy51Snap, setRummy51Snap] = useState(/** @type {object|null} */ (null));
 
   const gameTitle = useMemo(() => {
     if (!room?.product_game_id) return "";
@@ -128,6 +139,12 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     [amMember, room?.product_game_id, room?.active_session_id]
   );
 
+  const canHostOpenRummy51Session = useMemo(
+    () =>
+      Boolean(amMember && room?.product_game_id === ONLINE_V2_GAME_IDS.RUMMY51 && !room?.active_session_id),
+    [amMember, room?.product_game_id, room?.active_session_id]
+  );
+
   const hostOpenBingoDisabledReason = useMemo(() => {
     if (room?.product_game_id !== ONLINE_V2_GAME_IDS.BINGO) return "";
     if (room?.active_session_id) return "Match already opened.";
@@ -140,6 +157,30 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
       return "All seated players must commit stakes before opening Bingo.";
     }
     if (seatedCount < 2) return "Need at least two seated players.";
+    return "";
+  }, [
+    room?.product_game_id,
+    room?.active_session_id,
+    room?.lifecycle_phase,
+    amMember,
+    isHost,
+    seatedCount,
+    allSeatedHaveCommittedStakes,
+  ]);
+
+  const hostOpenRummy51DisabledReason = useMemo(() => {
+    if (room?.product_game_id !== ONLINE_V2_GAME_IDS.RUMMY51) return "";
+    if (room?.active_session_id) return "Match already opened.";
+    if (!amMember) return "Join the room first.";
+    if (!isHost) return "Only room host can open session.";
+    if (room?.lifecycle_phase !== "active") {
+      return "Room must be active (all stakes committed) before opening Rummy 51.";
+    }
+    if (!allSeatedHaveCommittedStakes) {
+      return "All seated players must commit stakes before opening.";
+    }
+    if (seatedCount < 2) return "Need at least two seated players.";
+    if (seatedCount > 4) return "Rummy 51 allows at most four seated players.";
     return "";
   }, [
     room?.product_game_id,
@@ -224,6 +265,12 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         setBingoSnap(snap);
       } else {
         setBingoSnap(null);
+      }
+      if (r?.product_game_id === ONLINE_V2_GAME_IDS.RUMMY51) {
+        const fr = await fetchOv2Rummy51Snapshot(roomId);
+        setRummy51Snap(fr.ok ? fr.snapshot ?? null : null);
+      } else {
+        setRummy51Snap(null);
       }
     } catch (e) {
       setMsg(e?.message || String(e));
@@ -441,6 +488,26 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     }
   }
 
+  async function onOpenRummy51Session() {
+    if (!canHostOpenRummy51Session || hostOpenRummy51DisabledReason) return;
+    setBusy(true);
+    setMsg("Opening Rummy 51 session...");
+    try {
+      const res = await openOv2Rummy51Session(roomId, participantId);
+      if (!res.ok) {
+        setMsg(res.error || "Could not open Rummy 51 session.");
+        return;
+      }
+      setMsg("Rummy 51 session opened");
+      await load();
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onOpenBingoSession() {
     if (!canHostOpenBingoSession || hostOpenBingoDisabledReason) return;
     setBusy(true);
@@ -571,6 +638,84 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     }
   }
 
+  async function onClaimRummy51Seat(seatIndex) {
+    if (!room || room.product_game_id !== ONLINE_V2_GAME_IDS.RUMMY51) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const out = await claimOv2Rummy51Seat({ room_id: roomId, participant_key: participantId, seat_index: seatIndex });
+      if (out?.room) setRoom(out.room);
+      if (Array.isArray(out?.members)) setMembers(out.members);
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onLeaveRummy51Seat() {
+    if (!room || room.product_game_id !== ONLINE_V2_GAME_IDS.RUMMY51) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const out = await leaveOv2Rummy51Seat({ room_id: roomId, participant_key: participantId });
+      if (out?.room) setRoom(out.room);
+      if (Array.isArray(out?.members)) setMembers(out.members);
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRummy51RequestRematch() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await requestOv2Rummy51Rematch(roomId, participantId);
+      if (!r.ok) setMsg(r.error || "Rematch request failed");
+      await load();
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRummy51CancelRematch() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await cancelOv2Rummy51Rematch(roomId, participantId);
+      if (!r.ok) setMsg(r.error || "Cancel rematch failed");
+      await load();
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRummy51StartNextMatch() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const seq = room?.match_seq != null ? Number(room.match_seq) : null;
+      const r = await startOv2Rummy51NextMatch(roomId, participantId, seq);
+      if (!r.ok) setMsg(r.error || "Could not start next match");
+      await load();
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onCommitStake() {
     if (!room || !myMember) return;
     if (!(await ensureBalance(room.stake_per_seat))) return;
@@ -635,6 +780,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     lobbyRtLastEventAt != null ? new Date(lobbyRtLastEventAt).toLocaleTimeString(undefined, { hour12: false }) : "—";
   const openLudoDisabled = busy || Boolean(hostOpenLudoDisabledReason);
   const openBingoDisabled = busy || Boolean(hostOpenBingoDisabledReason);
+  const openRummy51Disabled = busy || Boolean(hostOpenRummy51DisabledReason);
   const isBingoRoom = room.product_game_id === ONLINE_V2_GAME_IDS.BINGO;
 
   const seatToneClasses = [
@@ -1042,12 +1188,18 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         {room.lifecycle_phase === "pending_stakes" ? (
           <p className="text-center text-[11px] text-amber-200/90">Waiting for all players to commit their stake.</p>
         ) : null}
-        {room.lifecycle_phase === "active" && room.product_game_id !== ONLINE_V2_GAME_IDS.LUDO ? (
+        {room.lifecycle_phase === "active" &&
+        room.product_game_id !== ONLINE_V2_GAME_IDS.LUDO &&
+        room.product_game_id !== ONLINE_V2_GAME_IDS.RUMMY51 ? (
           <p className="text-center text-[11px] text-emerald-200/85">All stakes locked — open your game table when available.</p>
         ) : null}
 
         {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && !room.active_session_id && !isHost ? (
           <p className="text-center text-[11px] text-amber-200/85">Waiting for the room host to open the Ludo match.</p>
+        ) : null}
+
+        {room.product_game_id === ONLINE_V2_GAME_IDS.RUMMY51 && !room.active_session_id && !isHost ? (
+          <p className="text-center text-[11px] text-amber-200/85">Waiting for the room host to open Rummy 51.</p>
         ) : null}
 
         {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO ? (
@@ -1085,6 +1237,62 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           >
             Leave seat
           </button>
+        ) : null}
+
+        {room.product_game_id === ONLINE_V2_GAME_IDS.RUMMY51 ? (
+          <div className="grid grid-cols-4 gap-2">
+            {[0, 1, 2, 3].map(seat => {
+              const holder = members.find(m => parseLudoSeatIndex(m?.seat_index) === seat);
+              const mine = holder?.participant_key === participantId;
+              return (
+                <button
+                  key={`r51-seat-${seat}`}
+                  type="button"
+                  disabled={busy || (holder && !mine)}
+                  onClick={() => void onClaimRummy51Seat(seat)}
+                  className={[
+                    "rounded-lg border-2 py-2 text-xs font-semibold shadow-sm disabled:opacity-55",
+                    seatToneClasses[seat] || "border-white/20 bg-white/10 text-white",
+                    mine ? "ring-2 ring-white/80" : "",
+                    holder && !mine ? "brightness-[0.9]" : "hover:brightness-110",
+                  ].join(" ")}
+                  title={holder && !mine ? "Seat taken" : undefined}
+                >
+                  Seat {seat + 1}
+                  {holder ? (mine ? " · you" : " · taken") : ""}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+        {room.product_game_id === ONLINE_V2_GAME_IDS.RUMMY51 && mySeatIndex != null ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onLeaveRummy51Seat()}
+            className="rounded-lg border border-red-500/30 bg-red-950/30 py-2 text-xs text-red-200 disabled:opacity-40"
+          >
+            Leave seat
+          </button>
+        ) : null}
+
+        {canHostOpenRummy51Session ? (
+          <>
+            <button
+              type="button"
+              disabled={openRummy51Disabled}
+              title={hostOpenRummy51DisabledReason || "Open live Rummy 51 (2–4 seated, stakes committed)."}
+              onClick={() => void onOpenRummy51Session()}
+              className="rounded-lg border border-violet-500/45 bg-violet-950/35 py-2 text-xs font-bold text-violet-100 disabled:opacity-40"
+            >
+              Open Rummy 51 match (host)
+            </button>
+            {hostOpenRummy51DisabledReason ? (
+              <p className="rounded border border-amber-500/25 bg-amber-950/20 px-2 py-1 text-center text-[11px] text-amber-100/95">
+                {hostOpenRummy51DisabledReason}
+              </p>
+            ) : null}
+          </>
         ) : null}
 
         {canHostOpenLudoSession ? (
@@ -1135,6 +1343,53 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           >
             Enter Ludo table
           </Link>
+        ) : null}
+
+        {room.product_game_id === ONLINE_V2_GAME_IDS.RUMMY51 &&
+        amMember &&
+        room.active_session_id &&
+        room.lifecycle_phase === "active" &&
+        allSeatedHaveCommittedStakes ? (
+          <Link
+            href={`/ov2-rummy51?room=${encodeURIComponent(roomId)}`}
+            title="Live Rummy 51 — authoritative session"
+            className="block min-h-[48px] rounded-lg border border-violet-500/40 bg-violet-950/30 py-3 text-center text-sm font-bold text-violet-100"
+          >
+            Enter Rummy 51 table
+          </Link>
+        ) : null}
+
+        {rummy51Snap && rummy51Snap.phase === "finished" && room.active_session_id ? (
+          <div className="rounded-lg border border-violet-500/30 bg-violet-950/20 p-2 text-[11px] text-violet-100/95">
+            <p className="font-semibold text-violet-200">Match finished</p>
+            <p className="mt-1 text-[10px] text-violet-100/80">Rematch or start the next match when everyone is ready.</p>
+            <div className="mt-2 flex flex-col gap-1">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onRummy51RequestRematch()}
+                className="min-h-[44px] rounded-md border border-amber-500/40 bg-amber-950/35 py-2 text-xs font-semibold text-amber-100 disabled:opacity-40"
+              >
+                Request rematch
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onRummy51CancelRematch()}
+                className="min-h-[44px] rounded-md border border-white/20 bg-white/10 py-2 text-xs font-semibold text-zinc-200 disabled:opacity-40"
+              >
+                Cancel rematch
+              </button>
+              <button
+                type="button"
+                disabled={busy || !isHost}
+                onClick={() => void onRummy51StartNextMatch()}
+                className="min-h-[44px] rounded-md border border-emerald-500/40 bg-emerald-950/35 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-40"
+              >
+                Start next match (host)
+              </button>
+            </div>
+          </div>
         ) : null}
 
           </div>

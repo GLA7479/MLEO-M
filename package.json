@@ -9,7 +9,8 @@
     "start": "next start -p 3000",
     "encoding:check": "node scripts/check-encoding.js",
     "debug:mystery-chamber-rng": "node scripts/mystery-chamber-rng-sanity.js",
-    "test:ov2-bingo-engine": "node --test lib/online-v2/bingo/ov2BingoEngine.test.mjs"
+    "test:ov2-bingo-engine": "node --test lib/online-v2/bingo/ov2BingoEngine.test.mjs",
+    "test:ov2-rummy51-engine": "node --test lib/online-v2/rummy51/ov2Rummy51Engine.test.mjs"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.0.7",
