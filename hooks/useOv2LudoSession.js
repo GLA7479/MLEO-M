@@ -17,6 +17,7 @@ import {
   requestOv2LudoRollDice,
   requestOv2LudoMarkMissedTurn,
   requestOv2LudoHandleDoubleTimeout,
+  requestOv2LudoRematch,
   resolveOv2LudoPlayMode,
   resolveOv2LudoMySeatFromRoomMembers,
   subscribeOv2LudoAuthoritativeSnapshot,
@@ -55,9 +56,18 @@ export function useOv2LudoSession(baseContext) {
   const [authoritativeSnapshot, setAuthoritativeSnapshot] = useState(null);
   const [presentKeys, setPresentKeys] = useState([]);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const authoritativeSnapshotRef = useRef(/** @type {import("../lib/online-v2/ludo/ov2LudoSessionAdapter").Ov2LudoAuthoritativeSnapshot|null} */ (null));
+  const processedExpiredTurnKeysRef = useRef(new Set());
+  const processedDoubleExpiryKeysRef = useRef(new Set());
+
+  useEffect(() => {
+    authoritativeSnapshotRef.current = authoritativeSnapshot;
+  }, [authoritativeSnapshot]);
 
   useEffect(() => {
     setAuthoritativeSnapshot(null);
+    processedExpiredTurnKeysRef.current.clear();
+    processedDoubleExpiryKeysRef.current.clear();
   }, [roomId]);
 
   useEffect(() => {
@@ -185,6 +195,13 @@ export function useOv2LudoSession(baseContext) {
     return previewBoard;
   }, [playMode, authoritativeSnapshot, previewBoard]);
 
+  const refreshAuthoritativeSnapshot = useCallback(async () => {
+    if (!roomId || roomProductId !== OV2_LUDO_PRODUCT_GAME_ID) return null;
+    const snap = await fetchOv2LudoAuthoritativeSnapshot(roomId, { participantKey: selfKey ?? "" });
+    if (snap) setAuthoritativeSnapshot(snap);
+    return snap ?? null;
+  }, [roomId, roomProductId, selfKey]);
+
   useEffect(() => {
     if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !authoritativeSnapshot) return;
     const poll = window.setInterval(() => {
@@ -267,45 +284,55 @@ export function useOv2LudoSession(baseContext) {
   ]);
 
   useEffect(() => {
-    if (interactionTier !== "live_authoritative" || !authoritativeSnapshot || !roomId || !selfKey) return;
-    const turnSeat = authoritativeSnapshot.board?.turnSeat;
-    const mySeat = authoritativeSnapshot.mySeat;
-    if (mySeat == null || turnSeat !== mySeat) return;
-    if (authoritativeSnapshot.board?.dice != null) return;
-    const t = window.setTimeout(() => {
-      void rollDicePreview();
-    }, 500);
-    return () => window.clearTimeout(t);
-  }, [interactionTier, authoritativeSnapshot, roomId, selfKey, rollDicePreview]);
-
-  useEffect(() => {
     if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !authoritativeSnapshot || !roomId) return;
-    const deadline = authoritativeSnapshot.turnDeadline;
-    const turnSeat = authoritativeSnapshot.board?.turnSeat;
-    if (deadline == null || turnSeat == null) return;
-    const turnMember = members.find(m => Number(m?.seat_index) === Number(turnSeat)) || null;
-    const turnParticipantKey = turnMember?.participant_key ? String(turnMember.participant_key).trim() : "";
-    if (!turnParticipantKey) return;
-    const turnIsGone = !presentKeys.includes(turnParticipantKey);
-    if (!turnIsGone) return;
-    const ms = deadline - Date.now();
-    if (ms <= 0) {
-      void requestOv2LudoMarkMissedTurn(roomId, turnSeat, {
-        revision: authoritativeSnapshot.revision,
-        participantKey: turnParticipantKey,
-        isGone: true,
-      });
+    if (authoritativeSnapshot.phase !== "playing") return;
+    const deadline = Number(authoritativeSnapshot.turnDeadline);
+    const liveTurnSeat = parseSeatIndex(authoritativeSnapshot.board?.turnSeat);
+    const sessionId = String(authoritativeSnapshot.sessionId || "").trim();
+    if (!sessionId || liveTurnSeat == null || !Number.isFinite(deadline)) return;
+    if (!Array.isArray(authoritativeSnapshot.board?.activeSeats) || !authoritativeSnapshot.board.activeSeats.includes(liveTurnSeat)) {
       return;
     }
-    const t = window.setTimeout(() => {
-      void requestOv2LudoMarkMissedTurn(roomId, turnSeat, {
-        revision: authoritativeSnapshot.revision,
-        participantKey: turnParticipantKey,
+    const turnMember = members.find(m => Number(m?.seat_index) === Number(liveTurnSeat)) || null;
+    const turnParticipantKey = turnMember?.participant_key ? String(turnMember.participant_key).trim() : "";
+    if (!turnParticipantKey || presentKeys.includes(turnParticipantKey)) return;
+    const turnKey = `${sessionId}|${liveTurnSeat}|${deadline}|playing`;
+    if (processedExpiredTurnKeysRef.current.has(turnKey)) return;
+    const runMissedTurn = async () => {
+      if (processedExpiredTurnKeysRef.current.has(turnKey)) return;
+      const snap = authoritativeSnapshotRef.current;
+      if (!snap || snap.phase !== "playing") return;
+      const verifySeat = parseSeatIndex(snap.board?.turnSeat);
+      const verifyDeadline = Number(snap.turnDeadline);
+      const verifySessionId = String(snap.sessionId || "").trim();
+      const verifyKey =
+        verifySessionId && verifySeat != null && Number.isFinite(verifyDeadline)
+          ? `${verifySessionId}|${verifySeat}|${verifyDeadline}|playing`
+          : null;
+      if (verifyKey !== turnKey || Date.now() < verifyDeadline) return;
+      if (!Array.isArray(snap.board?.activeSeats) || !snap.board.activeSeats.includes(verifySeat)) return;
+      const verifyMember = members.find(m => Number(m?.seat_index) === Number(verifySeat)) || null;
+      const verifyParticipantKey = verifyMember?.participant_key ? String(verifyMember.participant_key).trim() : "";
+      if (!verifyParticipantKey || presentKeys.includes(verifyParticipantKey)) return;
+      const res = await requestOv2LudoMarkMissedTurn(roomId, verifySeat, {
+        revision: snap.revision,
+        participantKey: verifyParticipantKey,
         isGone: true,
       });
+      if (res.ok) {
+        processedExpiredTurnKeysRef.current.add(turnKey);
+        if (res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+        else await refreshAuthoritativeSnapshot();
+      } else {
+        await refreshAuthoritativeSnapshot();
+      }
+    };
+    const ms = Math.max(0, deadline - Date.now());
+    const t = window.setTimeout(() => {
+      void runMissedTurn();
     }, ms);
     return () => window.clearTimeout(t);
-  }, [playMode, authoritativeSnapshot, roomId, members, presentKeys]);
+  }, [playMode, authoritativeSnapshot, roomId, members, presentKeys, refreshAuthoritativeSnapshot]);
 
   useEffect(() => {
     if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !authoritativeSnapshot || !roomId) return;
@@ -313,16 +340,29 @@ export function useOv2LudoSession(baseContext) {
     const awaiting = dbl && dbl.awaiting != null ? Number(dbl.awaiting) : null;
     const expiresAt = dbl && dbl.expires_at != null ? Number(dbl.expires_at) : null;
     if (awaiting == null || expiresAt == null || Number.isNaN(expiresAt)) return;
+    const timeoutKey = `${String(authoritativeSnapshot.sessionId || "")}|${awaiting}|${expiresAt}`;
+    if (processedDoubleExpiryKeysRef.current.has(timeoutKey)) return;
+    const runDoubleTimeout = async () => {
+      if (processedDoubleExpiryKeysRef.current.has(timeoutKey)) return;
+      const res = await requestOv2LudoHandleDoubleTimeout(roomId, awaiting, { revision: authoritativeSnapshot.revision });
+      if (res.ok) {
+        processedDoubleExpiryKeysRef.current.add(timeoutKey);
+        if (res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+        else await refreshAuthoritativeSnapshot();
+      } else {
+        await refreshAuthoritativeSnapshot();
+      }
+    };
     const ms = expiresAt - Date.now();
     if (ms <= 0) {
-      void requestOv2LudoHandleDoubleTimeout(roomId, awaiting, { revision: authoritativeSnapshot.revision });
+      void runDoubleTimeout();
       return;
     }
     const t = window.setTimeout(() => {
-      void requestOv2LudoHandleDoubleTimeout(roomId, awaiting, { revision: authoritativeSnapshot.revision });
+      void runDoubleTimeout();
     }, ms);
     return () => window.clearTimeout(t);
-  }, [playMode, authoritativeSnapshot, roomId]);
+  }, [playMode, authoritativeSnapshot, roomId, refreshAuthoritativeSnapshot]);
 
   const onPieceClick = useCallback(
     async pieceIdx => {
@@ -394,8 +434,17 @@ export function useOv2LudoSession(baseContext) {
   const turnSeatParsed = parseSeatIndex(turnSeatRaw);
   const turnSeat = turnSeatParsed != null && activeSeatsLive.includes(turnSeatParsed) ? turnSeatParsed : null;
   const turnDeadline = authoritativeSnapshot?.turnDeadline ?? null;
-  const turnTimeLeftMs =
-    turnDeadline != null && Number.isFinite(Number(turnDeadline)) ? Math.max(0, Number(turnDeadline) - nowMs) : null;
+  const authoritativeTurnKey = useMemo(() => {
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !authoritativeSnapshot) return null;
+    if (authoritativeSnapshot.phase !== "playing") return null;
+    if (authoritativeSnapshot.boardViewReadOnly === true) return null;
+    const sessionId = String(authoritativeSnapshot.sessionId || "").trim();
+    const deadline = Number(authoritativeSnapshot.turnDeadline);
+    if (!sessionId || turnSeat == null || !Number.isFinite(deadline)) return null;
+    if (!activeSeatsLive.includes(turnSeat)) return null;
+    return `${sessionId}|${turnSeat}|${deadline}|playing`;
+  }, [playMode, authoritativeSnapshot, turnSeat, activeSeatsLive]);
+  const turnTimeLeftMs = authoritativeTurnKey != null ? Math.max(0, Number(turnDeadline) - nowMs) : null;
   const turnTimeLeftSec = turnTimeLeftMs != null ? Math.ceil(turnTimeLeftMs / 1000) : null;
   const isTurnTimerActive = playMode === OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE && turnTimeLeftMs != null && turnTimeLeftMs > 0;
   const isMyTurnLive = playMode === OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE && liveMySeat != null && turnSeat === liveMySeat;
@@ -486,6 +535,7 @@ export function useOv2LudoSession(baseContext) {
       lobbySelfRingIndex: lobbySeatStrip.selfRingIndex,
       turnSeat,
       turnDeadline,
+      authoritativeTurnKey,
       turnTimeLeftMs,
       turnTimeLeftSec,
       isTurnTimerActive,
@@ -525,6 +575,17 @@ export function useOv2LudoSession(baseContext) {
         participantKey: selfKey,
       });
       if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+    },
+    rematch: async () => {
+      if (!roomId || !selfKey) return;
+      const res = await requestOv2LudoRematch(roomId, selfKey, {
+        presenceLeaderKey: selfKey,
+      });
+      if (res.ok && res.snapshot) {
+        setAuthoritativeSnapshot(res.snapshot);
+      } else {
+        await refreshAuthoritativeSnapshot();
+      }
     },
   };
 }

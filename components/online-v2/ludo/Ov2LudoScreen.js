@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   OV2_LUDO_PLAY_MODE,
   OV2_LUDO_PRODUCT_GAME_ID,
@@ -14,7 +14,8 @@ import Ov2SeatStrip from "../shared/Ov2SeatStrip";
  */
 export default function Ov2LudoScreen({ contextInput = null }) {
   const session = useOv2LudoSession(contextInput ?? undefined);
-  const { vm, rollDicePreview, onPieceClick, canRoll, resetPreviewBoard, offerDouble, respondDouble } = session;
+  const { vm, rollDicePreview, onPieceClick, canRoll, resetPreviewBoard, offerDouble, respondDouble, rematch } = session;
+  const [rematchBusy, setRematchBusy] = useState(false);
   const roomMembers = Array.isArray(contextInput?.members) ? contextInput.members : [];
   const roomProductId =
     contextInput?.room && typeof contextInput.room === "object" && contextInput.room.product_game_id != null
@@ -34,6 +35,7 @@ export default function Ov2LudoScreen({ contextInput = null }) {
     lobbySelfRingIndex,
     doubleState,
     turnSeat,
+    authoritativeTurnKey,
     turnTimeLeftSec,
     isTurnTimerActive,
     isMyTurnLive,
@@ -47,6 +49,7 @@ export default function Ov2LudoScreen({ contextInput = null }) {
     strikeDisplayMap,
     eliminatedSeats,
     statusLine,
+    result,
   } = vm;
 
   const isReadOnlyRoom = playMode === OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
@@ -95,9 +98,11 @@ export default function Ov2LudoScreen({ contextInput = null }) {
 
   const canOfferDouble =
     isLiveMatch &&
+    authoritativeTurnKey != null &&
     mySeat != null &&
     turnSeat === mySeat &&
     board.dice != null &&
+    !boardViewReadOnly &&
     doubleAwaitingSeat == null &&
     (doubleState?.proposed_by == null || doubleState?.awaiting == null);
   const isAwaitingMyDouble = isLiveMatch && mySeat != null && doubleAwaitingSeat === mySeat;
@@ -124,7 +129,7 @@ export default function Ov2LudoScreen({ contextInput = null }) {
       ? `Your response is required (${responderLabel})`
       : `Waiting for ${responderLabel}`;
   const turnToken = isMyTurnLive ? "Turn You" : turnSeat != null ? `Turn S${Number(turnSeat) + 1}` : "Turn —";
-  const turnTimeToken = isTurnTimerActive && turnTimeLeftSec != null ? `${turnTimeLeftSec}s` : "—";
+  const turnTimeToken = authoritativeTurnKey != null && isTurnTimerActive && turnTimeLeftSec != null ? `${turnTimeLeftSec}s` : "—";
   const doubleToken = `Dx${Number(currentMultiplier || 1)}`;
   const doubleTimeToken = isDoublePending && isDoubleTimerActive && doubleTimeLeftSec != null ? `${doubleTimeLeftSec}s` : "—";
   const pendingToken = isDoublePending && doubleAwaitingSeat != null ? `Wait S${Number(doubleAwaitingSeat) + 1}` : null;
@@ -143,8 +148,16 @@ export default function Ov2LudoScreen({ contextInput = null }) {
     : strikeSeats.length
       ? `St ${strikeSeats.map(x => `S${x.seat + 1}:${x.v}`).join(",")}`
       : null;
+  const selfKey = String(contextInput?.self?.participant_key || "").trim();
+  const roomHostKey = String(contextInput?.room?.host_participant_key || "").trim();
+  const isHost = Boolean(selfKey && roomHostKey && selfKey === roomHostKey);
+  const seatedCount = roomMembers.filter(m => m?.seat_index != null).length;
+  const isFinished = isLiveMatch && (vm?.phaseLine?.includes("Match finished") || vm?.board?.winner != null || result?.winner != null);
+  const winnerFromResult = result?.winner != null ? Number(result.winner) : winnerSeat != null ? Number(winnerSeat) : null;
+  const didIWin = isFinished && mySeat != null && winnerFromResult != null && Number(mySeat) === Number(winnerFromResult);
+  const canRematch = isFinished && isHost && seatedCount >= 2 && seatedCount <= 4 && !rematchBusy;
   const desktopStateSurface = isLiveMatch ? (
-    <div className="flex w-[16.75rem] flex-col gap-1.5">
+    <div className="pointer-events-auto flex w-[14.75rem] flex-col gap-1.5 rounded-lg border border-white/10 bg-black/35 p-2 backdrop-blur-[1px]">
       <button
         type="button"
         disabled={!canOfferDouble}
@@ -153,12 +166,14 @@ export default function Ov2LudoScreen({ contextInput = null }) {
       >
         Offer Double
       </button>
-      <div className={`rounded-md border px-2.5 py-1.5 text-[10px] font-semibold ${turnTimerTone}`}>
-        <div className="flex items-center justify-between gap-2">
-          <span>{turnToken}</span>
-          <span>{turnTimeToken}</span>
+      {authoritativeTurnKey != null ? (
+        <div className={`rounded-md border px-2.5 py-1.5 text-[10px] font-semibold ${turnTimerTone}`}>
+          <div className="flex items-center justify-between gap-2">
+            <span>{turnToken}</span>
+            <span>{turnTimeToken}</span>
+          </div>
         </div>
-      </div>
+      ) : null}
       <div className={`rounded-md border px-2.5 py-1.5 text-[10px] font-semibold ${doubleTimerTone}`}>
         <div className="flex items-center justify-between gap-2">
           <span>{doubleToken}</span>
@@ -218,7 +233,9 @@ export default function Ov2LudoScreen({ contextInput = null }) {
           </button>
         </>
       ) : null}
-      <span className={`rounded border px-2 py-1 font-semibold ${turnTimerTone}`}>{turnToken} {turnTimeToken}</span>
+      {authoritativeTurnKey != null ? (
+        <span className={`rounded border px-2 py-1 font-semibold ${turnTimerTone}`}>{turnToken} {turnTimeToken}</span>
+      ) : null}
       <span className={`rounded border px-2 py-1 font-semibold ${doubleTimerTone}`}>{doubleToken} {doubleTimeToken}</span>
       {pendingToken ? (
         <span className="rounded border border-fuchsia-400/30 bg-fuchsia-950/20 px-2 py-1 font-semibold text-fuchsia-100">{pendingToken}</span>
@@ -274,7 +291,7 @@ export default function Ov2LudoScreen({ contextInput = null }) {
         eliminatedIndices={eliminatedSeats}
       />
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {isLiveMatch ? <div className="absolute right-1 top-1 z-30 hidden md:block">{desktopStateSurface}</div> : null}
+        {isLiveMatch ? <div className="pointer-events-none absolute right-2 top-2 z-30 hidden md:block">{desktopStateSurface}</div> : null}
         <Ov2LudoBoardView
           board={board}
           mySeat={mySeat}
@@ -290,6 +307,32 @@ export default function Ov2LudoScreen({ contextInput = null }) {
           readOnlyPresentation={boardViewReadOnly}
           legalMovablePieceIndices={liveLegalMovablePieceIndices}
         />
+        {isFinished ? (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/45 p-3">
+            <div className="w-full max-w-xs rounded-xl border border-white/20 bg-zinc-900/95 p-4 text-center shadow-2xl">
+              <p className="text-lg font-semibold text-white">
+                {didIWin ? "You won" : mySeat != null && winnerFromResult != null ? "You lost" : "Finished match"}
+              </p>
+              <p className="mt-1 text-xs text-zinc-300">
+                {winnerFromResult != null ? `Winner Seat ${winnerFromResult + 1}` : "Match complete"}
+              </p>
+              <div className="mt-3">
+                <button
+                  type="button"
+                  disabled={!canRematch}
+                  onClick={() => {
+                    if (!canRematch) return;
+                    setRematchBusy(true);
+                    void rematch().finally(() => setRematchBusy(false));
+                  }}
+                  className="w-full rounded-md border border-emerald-500/40 bg-emerald-900/30 px-3 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-45"
+                >
+                  {rematchBusy ? "Starting rematch..." : isHost ? "Rematch" : "Waiting for host rematch"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
       {isLiveMatch ? <div className="shrink-0 md:hidden">{mobileStateRow}</div> : null}
     </div>
