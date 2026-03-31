@@ -86,8 +86,9 @@ export default function Ov2LudoLiveShell() {
   }, [roomId]);
 
   const reloadContextUntilSessionChanges = useCallback(
-    async (previousSessionId, rpcNewSessionId, timeoutMs = 20000) => {
+    async (previousSessionId, rpcNewSessionId, timeoutMs = 20000, options = {}) => {
       if (!roomId) return { ok: false, error: "no room" };
+      const expectClearedSession = options?.expectClearedSession === true;
       const prev =
         previousSessionId != null && String(previousSessionId).trim() !== "" ? String(previousSessionId).trim() : "";
       const rpcSid =
@@ -95,7 +96,7 @@ export default function Ov2LudoLiveShell() {
       const start = Date.now();
       setLoadError("");
       try {
-        if (rpcSid && rpcSid !== prev) {
+        if (!expectClearedSession && rpcSid && rpcSid !== prev) {
           setRoom(row => (row && typeof row === "object" ? { ...row, active_session_id: rpcSid } : row));
         }
         while (Date.now() - start < timeoutMs) {
@@ -113,17 +114,24 @@ export default function Ov2LudoLiveShell() {
             return { ok: false, error: "wrong game" };
           }
           const nextId = r.active_session_id != null ? String(r.active_session_id).trim() : "";
+          const life = r.lifecycle_phase != null ? String(r.lifecycle_phase).trim() : "";
           setRoom(r);
           const m = await fetchOv2RoomMembers(roomId);
           setMembers(m);
           loadedOnceForRoomRef.current = roomId;
-          if (nextId) {
+          if (expectClearedSession) {
+            if ((!nextId || nextId === "") && life === "pending_stakes") return { ok: true };
+          } else if (nextId) {
             if (rpcSid && nextId === rpcSid) return { ok: true };
             if (!rpcSid && prev && nextId !== prev) return { ok: true };
           }
           await new Promise(res => setTimeout(res, 150));
         }
-        setLoadError("Timed out waiting for the new match to start.");
+        setLoadError(
+          expectClearedSession
+            ? "Timed out waiting for the room to return to stake phase."
+            : "Timed out waiting for the new match to start."
+        );
         return { ok: false, error: "timeout" };
       } catch (e) {
         const msg = e?.message || String(e);
@@ -152,6 +160,13 @@ export default function Ov2LudoLiveShell() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "ov2_rooms", filter: `id=eq.${roomId}` },
+        () => {
+          void reloadContext();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "ov2_room_members", filter: `room_id=eq.${roomId}` },
         () => {
           void reloadContext();
         }

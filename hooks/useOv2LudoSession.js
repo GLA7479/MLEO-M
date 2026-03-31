@@ -17,7 +17,9 @@ import {
   requestOv2LudoRollDice,
   requestOv2LudoMarkMissedTurn,
   requestOv2LudoHandleDoubleTimeout,
-  requestOv2LudoRematch,
+  requestOv2LudoRequestRematch,
+  requestOv2LudoCancelRematch,
+  requestOv2LudoStartNextMatch,
   resolveOv2LudoPlayMode,
   resolveOv2LudoMySeatFromRoomMembers,
   subscribeOv2LudoAuthoritativeSnapshot,
@@ -859,17 +861,20 @@ export function useOv2LudoSession(baseContext) {
       });
       if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
     },
-    rematch: async () => {
+    requestRematch: async () => {
       if (!roomId || !selfKey) return { ok: false, error: "missing" };
-      const res = await requestOv2LudoRematch(roomId, selfKey, {
-        presenceLeaderKey: selfKey,
-      });
-      if (res.ok && res.snapshot) {
-        setAuthoritativeSnapshot(res.snapshot);
-      } else {
-        await refreshAuthoritativeSnapshot();
-      }
-      return res;
+      return requestOv2LudoRequestRematch(roomId, selfKey);
+    },
+    cancelRematch: async () => {
+      if (!roomId || !selfKey) return { ok: false, error: "missing" };
+      return requestOv2LudoCancelRematch(roomId, selfKey);
+    },
+    startNextMatch: async () => {
+      if (!roomId || !selfKey) return { ok: false, error: "missing" };
+      const rawSeq = room?.match_seq;
+      const seq =
+        rawSeq != null && rawSeq !== "" && Number.isFinite(Number(rawSeq)) ? Math.floor(Number(rawSeq)) : null;
+      return requestOv2LudoStartNextMatch(roomId, selfKey, seq);
     },
   };
 }

@@ -414,7 +414,8 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
       const debitKey =
         typeof window !== "undefined" ? ov2StakeDebitLocalKey(roomId, room.match_seq, participantId) : null;
       const debitAlreadyDone = debitKey && window.localStorage.getItem(debitKey) === "1";
-      if (!debitAlreadyDone) {
+      const skipVaultDebitForLudo = room.product_game_id === ONLINE_V2_GAME_IDS.LUDO;
+      if (!skipVaultDebitForLudo && !debitAlreadyDone) {
         const debit = await debitOnlineV2Vault(stake, room.product_game_id);
         if (!debit?.ok) {
           setMsg(
@@ -426,6 +427,9 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           return;
         }
         if (debitKey) window.localStorage.setItem(debitKey, "1");
+      }
+      if (skipVaultDebitForLudo && debitKey && !debitAlreadyDone) {
+        window.localStorage.setItem(debitKey, "1");
       }
       await load();
       onRoomChanged?.();

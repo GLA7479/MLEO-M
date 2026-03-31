@@ -10,12 +10,14 @@ import Ov2LudoBoardView from "../../../lib/online-v2/ludo/ov2LudoBoardView";
 import Ov2SeatStrip from "../shared/Ov2SeatStrip";
 
 /**
- * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null, onSessionRefresh?: (previousActiveSessionId: string, rpcNewSessionId?: string) => void | Promise<unknown> }} props
+ * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null, onSessionRefresh?: (previousActiveSessionId: string, rpcNewSessionId?: string, options?: { expectClearedSession?: boolean }) => void | Promise<unknown> }} props
  */
 export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh }) {
   const session = useOv2LudoSession(contextInput ?? undefined);
-  const { vm, rollDicePreview, onPieceClick, canRoll, resetPreviewBoard, offerDouble, respondDouble, rematch } = session;
-  const [rematchBusy, setRematchBusy] = useState(false);
+  const { vm, rollDicePreview, onPieceClick, canRoll, resetPreviewBoard, offerDouble, respondDouble, requestRematch, cancelRematch, startNextMatch } =
+    session;
+  const [rematchIntentBusy, setRematchIntentBusy] = useState(false);
+  const [startNextBusy, setStartNextBusy] = useState(false);
   const roomMembers = Array.isArray(contextInput?.members) ? contextInput.members : [];
   const roomProductId =
     contextInput?.room && typeof contextInput.room === "object" && contextInput.room.product_game_id != null
@@ -158,10 +160,44 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
   const roomHostKey = String(contextInput?.room?.host_participant_key || "").trim();
   const isHost = Boolean(selfKey && roomHostKey && selfKey === roomHostKey);
   const seatedCount = roomMembers.filter(m => m?.seat_index != null).length;
+  const myMemberRow = useMemo(
+    () => roomMembers.find(m => m && typeof m === "object" && String(m.participant_key || "").trim() === selfKey),
+    [roomMembers, selfKey]
+  );
+  const seatedCommitted = useMemo(
+    () =>
+      roomMembers.filter(m => m?.seat_index != null && String(m?.wallet_state || "").trim() === "committed"),
+    [roomMembers]
+  );
+  const eligibleRematch = seatedCommitted.length;
+  const readyRematch = useMemo(
+    () =>
+      seatedCommitted.filter(m => {
+        const raw = m && typeof m === "object" ? m.meta : null;
+        const l = raw && typeof raw === "object" && raw.ludo && typeof raw.ludo === "object" ? raw.ludo : null;
+        if (!l) return false;
+        return l.rematch_requested === true || l.rematch_requested === "true" || l.rematch_requested === 1;
+      }).length,
+    [seatedCommitted]
+  );
+  const myRematchRequested = (() => {
+    const raw = myMemberRow && typeof myMemberRow === "object" ? myMemberRow.meta : null;
+    const l = raw && typeof raw === "object" && raw.ludo && typeof raw.ludo === "object" ? raw.ludo : null;
+    if (!l) return false;
+    return l.rematch_requested === true || l.rematch_requested === "true" || l.rematch_requested === 1;
+  })();
   const isFinished = isLiveMatch && (vm?.phaseLine?.includes("Match finished") || vm?.board?.winner != null || result?.winner != null);
   const winnerFromResult = result?.winner != null ? Number(result.winner) : winnerSeat != null ? Number(winnerSeat) : null;
   const didIWin = isFinished && mySeat != null && winnerFromResult != null && Number(mySeat) === Number(winnerFromResult);
-  const canRematch = isFinished && isHost && seatedCount >= 2 && seatedCount <= 4 && !rematchBusy;
+  const canToggleRematchIntent =
+    isFinished &&
+    mySeat != null &&
+    String(myMemberRow?.wallet_state || "").trim() === "committed" &&
+    eligibleRematch >= 2 &&
+    eligibleRematch <= 4 &&
+    !rematchIntentBusy;
+  const canHostStartNextMatch =
+    isFinished && isHost && eligibleRematch >= 2 && readyRematch >= eligibleRematch && !startNextBusy;
   const prizeTotal = result?.prize != null && Number.isFinite(Number(result.prize)) ? Math.floor(Number(result.prize)) : null;
   const lossPerSeat = result?.lossPerSeat != null && Number.isFinite(Number(result.lossPerSeat)) ? Math.floor(Number(result.lossPerSeat)) : null;
   const winnerNet =
@@ -349,34 +385,62 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
                   Winner S{winnerFromResult + 1} · pot {prizeTotal.toLocaleString()}
                 </p>
               ) : null}
-              <div className="mt-3">
-                <button
-                  type="button"
-                  disabled={!canRematch}
-                  onClick={async () => {
-                    if (!canRematch) return;
-                    const prevSessionId =
-                      contextInput?.room?.active_session_id != null
-                        ? String(contextInput.room.active_session_id)
-                        : "";
-                    setRematchBusy(true);
-                    try {
-                      const r = await rematch();
-                      if (r?.ok && onSessionRefresh) {
-                        const rpcSid =
-                          r.snapshot && typeof r.snapshot === "object" && r.snapshot.sessionId != null
-                            ? String(r.snapshot.sessionId).trim()
-                            : "";
-                        await onSessionRefresh(prevSessionId, rpcSid || undefined);
+              <div className="mt-3 flex flex-col gap-2">
+                {eligibleRematch >= 2 ? (
+                  <p className="text-center text-[10px] text-zinc-400">
+                    Rematch ready: {readyRematch}/{eligibleRematch} seated players
+                  </p>
+                ) : null}
+                {canToggleRematchIntent ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setRematchIntentBusy(true);
+                      try {
+                        const r = myRematchRequested ? await cancelRematch() : await requestRematch();
+                        if (!r?.ok && r?.error) console.warn("[Ludo rematch intent]", r.error);
+                      } finally {
+                        setRematchIntentBusy(false);
                       }
-                    } finally {
-                      setRematchBusy(false);
-                    }
-                  }}
-                  className="w-full rounded-md border border-emerald-500/40 bg-emerald-900/30 px-3 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-45"
-                >
-                  {rematchBusy ? "Starting rematch..." : isHost ? "Rematch" : "Waiting for host rematch"}
-                </button>
+                    }}
+                    className="w-full rounded-md border border-sky-500/40 bg-sky-950/35 px-3 py-2 text-xs font-semibold text-sky-100 disabled:opacity-45"
+                  >
+                    {rematchIntentBusy
+                      ? "Updating…"
+                      : myRematchRequested
+                        ? "Cancel rematch"
+                        : "Ready for rematch"}
+                  </button>
+                ) : null}
+                {isHost ? (
+                  <button
+                    type="button"
+                    disabled={!canHostStartNextMatch}
+                    onClick={async () => {
+                      if (!canHostStartNextMatch) return;
+                      const prevSessionId =
+                        contextInput?.room?.active_session_id != null
+                          ? String(contextInput.room.active_session_id)
+                          : "";
+                      setStartNextBusy(true);
+                      try {
+                        const r = await startNextMatch();
+                        if (r?.ok && onSessionRefresh) {
+                          await onSessionRefresh(prevSessionId, undefined, { expectClearedSession: true });
+                        } else if (!r?.ok && r?.error) {
+                          console.warn("[Ludo start next match]", r.error);
+                        }
+                      } finally {
+                        setStartNextBusy(false);
+                      }
+                    }}
+                    className="w-full rounded-md border border-emerald-500/40 bg-emerald-900/30 px-3 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-45"
+                  >
+                    {startNextBusy ? "Starting next match…" : "Start next match (host)"}
+                  </button>
+                ) : isFinished && eligibleRematch >= 2 && readyRematch < eligibleRematch ? (
+                  <p className="text-center text-[10px] text-zinc-500">Waiting for all players to confirm rematch…</p>
+                ) : null}
               </div>
             </div>
           </div>
