@@ -42,6 +42,7 @@ export default function Ov2LudoLiveShell() {
   const [loading, setLoading] = useState(false);
   const [openBusy, setOpenBusy] = useState(false);
   const [openErr, setOpenErr] = useState("");
+  const [presenceMembers, setPresenceMembers] = useState([]);
   const loadedOnceForRoomRef = useRef(null);
 
   useEffect(() => {
@@ -106,43 +107,83 @@ export default function Ov2LudoLiveShell() {
     };
   }, [roomId, reloadContext]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !roomId || !participantId) return undefined;
+    const ch = supabaseMP
+      .channel(`ov2_ludo_live_presence:${roomId}`)
+      .on("presence", { event: "sync" }, () => {
+        const state = ch.presenceState();
+        const roster = Object.values(state)
+          .flat()
+          .map(r => ({
+            participant_key:
+              r && typeof r === "object" && "participant_key" in r ? String(r.participant_key || "").trim() : "",
+            display_name: r && typeof r === "object" && "display_name" in r ? String(r.display_name || "").trim() : "",
+          }))
+          .filter(r => r.participant_key);
+        setPresenceMembers(roster);
+      })
+      .subscribe(async status => {
+        if (status === "SUBSCRIBED") {
+          await ch.track({
+            participant_key: participantId,
+            display_name: "",
+            at: new Date().toISOString(),
+          });
+        }
+      });
+    return () => {
+      void ch.unsubscribe();
+      setPresenceMembers([]);
+    };
+  }, [roomId, participantId]);
+
   const isRoomMember = useMemo(
     () => Boolean(participantId && members.some(m => m.participant_key === participantId)),
     [members, participantId]
   );
 
-  const isHostUser = useMemo(
-    () => Boolean(room && participantId && room.host_participant_key === participantId),
-    [room, participantId]
-  );
-
-  const committedCount = useMemo(() => members.filter(m => m.wallet_state === "committed").length, [members]);
+  const seatedCount = useMemo(() => members.filter(m => m.seat_index != null).length, [members]);
+  const presenceLeaderKey = useMemo(() => {
+    const roster = (Array.isArray(presenceMembers) ? presenceMembers : [])
+      .slice()
+      .sort((a, b) => {
+        const an = String(a.display_name || "").trim();
+        const bn = String(b.display_name || "").trim();
+        if (an !== bn) return an.localeCompare(bn);
+        return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
+      });
+    return roster[0]?.participant_key || null;
+  }, [presenceMembers]);
 
   const canShellHostOpenLudo = useMemo(
     () =>
       Boolean(
         room &&
           room.product_game_id === ONLINE_V2_GAME_IDS.LUDO &&
-          room.lifecycle_phase === "active" &&
           !room.active_session_id &&
-          isHostUser &&
+          participantId &&
+          presenceLeaderKey === participantId &&
           isRoomMember
       ),
-    [room, isHostUser, isRoomMember]
+    [room, participantId, presenceLeaderKey, isRoomMember]
   );
 
   const shellOpenDisabledReason = useMemo(() => {
-    if (committedCount < 2) return "Need at least two committed players.";
-    if (committedCount > 4) return "At most four committed players.";
+    if (seatedCount < 2) return "Need at least two seated players.";
+    if (seatedCount > 4) return "At most four seated players.";
+    if (presenceLeaderKey !== participantId) return "Only current leader can open.";
     return "";
-  }, [committedCount]);
+  }, [seatedCount, presenceLeaderKey, participantId]);
 
   const onShellOpenLudo = useCallback(async () => {
     if (!roomId || !participantId || !canShellHostOpenLudo || shellOpenDisabledReason) return;
     setOpenBusy(true);
     setOpenErr("");
     try {
-      const res = await requestOv2LudoOpenSession(roomId, participantId);
+      const res = await requestOv2LudoOpenSession(roomId, participantId, {
+        presenceLeaderKey: presenceLeaderKey || "",
+      });
       if (!res.ok) {
         setOpenErr(res.error || "Could not open Ludo session.");
         return;
@@ -153,7 +194,7 @@ export default function Ov2LudoLiveShell() {
     } finally {
       setOpenBusy(false);
     }
-  }, [roomId, participantId, canShellHostOpenLudo, shellOpenDisabledReason, reloadContext]);
+  }, [roomId, participantId, canShellHostOpenLudo, shellOpenDisabledReason, reloadContext, presenceLeaderKey]);
 
   const contextInput = useMemo(() => {
     if (!roomId) return null;

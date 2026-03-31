@@ -12,11 +12,16 @@ import {
   buildLudoLobbySeatStripFromMembers,
   fetchOv2LudoAuthoritativeSnapshot,
   requestOv2LudoMovePiece,
+  requestOv2LudoOfferDouble,
+  requestOv2LudoRespondDouble,
   requestOv2LudoRollDice,
+  requestOv2LudoMarkMissedTurn,
+  requestOv2LudoHandleDoubleTimeout,
   resolveOv2LudoPlayMode,
   resolveOv2LudoMySeatFromRoomMembers,
   subscribeOv2LudoAuthoritativeSnapshot,
 } from "../lib/online-v2/ludo/ov2LudoSessionAdapter";
+import { supabaseMP } from "../lib/supabaseClients";
 
 /**
  * OV2 Ludo — React session layer above `ov2LudoSessionAdapter` + `ov2LudoLocalPreview`.
@@ -41,6 +46,7 @@ export function useOv2LudoSession(baseContext) {
 
   /** @type {import("../lib/online-v2/ludo/ov2LudoSessionAdapter").Ov2LudoAuthoritativeSnapshot|null} */
   const [authoritativeSnapshot, setAuthoritativeSnapshot] = useState(null);
+  const [presentKeys, setPresentKeys] = useState([]);
 
   useEffect(() => {
     setAuthoritativeSnapshot(null);
@@ -69,6 +75,29 @@ export function useOv2LudoSession(baseContext) {
       unsub();
     };
   }, [roomId, roomProductId, selfKey, activeSessionKey]);
+
+  useEffect(() => {
+    if (!roomId || !selfKey || roomProductId !== OV2_LUDO_PRODUCT_GAME_ID) return undefined;
+    const channel = supabaseMP
+      .channel(`ov2_ludo_presence:${roomId}`)
+      .on("presence", { event: "sync" }, () => {
+        const st = channel.presenceState();
+        const all = Object.values(st).flat();
+        const keys = all
+          .map(r => (r && typeof r === "object" && "participant_key" in r ? String(r.participant_key || "").trim() : ""))
+          .filter(Boolean);
+        setPresentKeys(keys);
+      })
+      .subscribe(async status => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({ participant_key: selfKey, at: new Date().toISOString() });
+        }
+      });
+    return () => {
+      void supabaseMP.removeChannel(channel);
+      setPresentKeys([]);
+    };
+  }, [roomId, selfKey, roomProductId]);
 
   const playMode = useMemo(() => {
     const ctx = roomId ? { room: { id: roomId } } : null;
@@ -140,6 +169,17 @@ export function useOv2LudoSession(baseContext) {
     return previewBoard;
   }, [playMode, authoritativeSnapshot, previewBoard]);
 
+  useEffect(() => {
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !authoritativeSnapshot) return;
+    const poll = window.setInterval(() => {
+      void (async () => {
+        const snap = await fetchOv2LudoAuthoritativeSnapshot(roomId || "", { participantKey: selfKey ?? "" });
+        if (snap) setAuthoritativeSnapshot(snap);
+      })();
+    }, 2000);
+    return () => window.clearInterval(poll);
+  }, [playMode, authoritativeSnapshot, roomId, selfKey]);
+
   const phaseLine = useMemo(() => {
     if (playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL) {
       return "Local preview — not an OV2 room match. Rules run in-browser for UI/testing only.";
@@ -209,6 +249,64 @@ export function useOv2LudoSession(baseContext) {
     selfKey,
     authoritativeSnapshot,
   ]);
+
+  useEffect(() => {
+    if (interactionTier !== "live_authoritative" || !authoritativeSnapshot || !roomId || !selfKey) return;
+    const turnSeat = authoritativeSnapshot.board?.turnSeat;
+    const mySeat = authoritativeSnapshot.mySeat;
+    if (mySeat == null || turnSeat !== mySeat) return;
+    if (authoritativeSnapshot.board?.dice != null) return;
+    const t = window.setTimeout(() => {
+      void rollDicePreview();
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [interactionTier, authoritativeSnapshot, roomId, selfKey, rollDicePreview]);
+
+  useEffect(() => {
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !authoritativeSnapshot || !roomId) return;
+    const deadline = authoritativeSnapshot.turnDeadline;
+    const turnSeat = authoritativeSnapshot.board?.turnSeat;
+    if (deadline == null || turnSeat == null) return;
+    const turnMember = members.find(m => Number(m?.seat_index) === Number(turnSeat)) || null;
+    const turnParticipantKey = turnMember?.participant_key ? String(turnMember.participant_key).trim() : "";
+    if (!turnParticipantKey) return;
+    const turnIsGone = !presentKeys.includes(turnParticipantKey);
+    if (!turnIsGone) return;
+    const ms = deadline - Date.now();
+    if (ms <= 0) {
+      void requestOv2LudoMarkMissedTurn(roomId, turnSeat, {
+        revision: authoritativeSnapshot.revision,
+        participantKey: turnParticipantKey,
+        isGone: true,
+      });
+      return;
+    }
+    const t = window.setTimeout(() => {
+      void requestOv2LudoMarkMissedTurn(roomId, turnSeat, {
+        revision: authoritativeSnapshot.revision,
+        participantKey: turnParticipantKey,
+        isGone: true,
+      });
+    }, ms);
+    return () => window.clearTimeout(t);
+  }, [playMode, authoritativeSnapshot, roomId, members, presentKeys]);
+
+  useEffect(() => {
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !authoritativeSnapshot || !roomId) return;
+    const dbl = authoritativeSnapshot.doubleState;
+    const awaiting = dbl && dbl.awaiting != null ? Number(dbl.awaiting) : null;
+    const expiresAt = dbl && dbl.expires_at != null ? Number(dbl.expires_at) : null;
+    if (awaiting == null || expiresAt == null || Number.isNaN(expiresAt)) return;
+    const ms = expiresAt - Date.now();
+    if (ms <= 0) {
+      void requestOv2LudoHandleDoubleTimeout(roomId, awaiting, { revision: authoritativeSnapshot.revision });
+      return;
+    }
+    const t = window.setTimeout(() => {
+      void requestOv2LudoHandleDoubleTimeout(roomId, awaiting, { revision: authoritativeSnapshot.revision });
+    }, ms);
+    return () => window.clearTimeout(t);
+  }, [playMode, authoritativeSnapshot, roomId]);
 
   const onPieceClick = useCallback(
     async pieceIdx => {
@@ -286,10 +384,30 @@ export function useOv2LudoSession(baseContext) {
       liveLegalMovablePieceIndices,
       lobbySeatLabels: lobbySeatStrip.labels,
       lobbySelfRingIndex: lobbySeatStrip.selfRingIndex,
+      turnDeadline: authoritativeSnapshot?.turnDeadline ?? null,
+      doubleState: authoritativeSnapshot?.doubleState ?? null,
+      result: authoritativeSnapshot?.result ?? null,
+      missedTurns: authoritativeSnapshot?.missedTurns ?? null,
     },
     rollDicePreview,
     onPieceClick,
     canRoll,
     resetPreviewBoard,
+    offerDouble: async () => {
+      if (!roomId || !selfKey || !authoritativeSnapshot?.sessionId) return;
+      const res = await requestOv2LudoOfferDouble(roomId, authoritativeSnapshot.sessionId, {
+        revision: authoritativeSnapshot.revision,
+        participantKey: selfKey,
+      });
+      if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+    },
+    respondDouble: async answer => {
+      if (!roomId || !selfKey || !authoritativeSnapshot?.sessionId) return;
+      const res = await requestOv2LudoRespondDouble(roomId, authoritativeSnapshot.sessionId, answer, {
+        revision: authoritativeSnapshot.revision,
+        participantKey: selfKey,
+      });
+      if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+    },
   };
 }

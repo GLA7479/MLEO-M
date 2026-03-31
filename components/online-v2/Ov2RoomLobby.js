@@ -6,7 +6,9 @@ import {
   commitOv2RoomStake,
   fetchOv2RoomById,
   fetchOv2RoomMembers,
+  claimOv2LudoSeat,
   joinOv2Room,
+  leaveOv2LudoSeat,
   leaveOv2Room,
   setOv2MemberReady,
   startOv2RoomIntent,
@@ -22,6 +24,10 @@ function fmtStake(n) {
 
 function ov2StakeDebitLocalKey(roomId, matchSeq, participantKey) {
   return `ov2_stake_debit_v1:${roomId}:${matchSeq}:${participantKey}`;
+}
+
+function ov2LudoSeatRememberKey(roomId) {
+  return `ov2_ludo_last_seat_v1:${roomId}`;
 }
 
 function ov2LobbyRtDevLog(payload) {
@@ -41,6 +47,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   const [members, setMembers] = useState([]);
   const [lobbyRtStatus, setLobbyRtStatus] = useState(/** @type {string|null} */ (null));
   const [lobbyRtLastEventAt, setLobbyRtLastEventAt] = useState(/** @type {number|null} */ (null));
+  const [presenceMembers, setPresenceMembers] = useState([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -61,26 +68,43 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     [room, participantId]
   );
 
-  const committedCount = useMemo(() => members.filter(m => m.wallet_state === "committed").length, [members]);
+  const seatedCount = useMemo(() => members.filter(m => m.seat_index != null).length, [members]);
+  const presenceLeaderKey = useMemo(() => {
+    const roster = (Array.isArray(presenceMembers) ? presenceMembers : [])
+      .slice()
+      .sort((a, b) => {
+        const an = String(a.display_name || "").trim();
+        const bn = String(b.display_name || "").trim();
+        if (an !== bn) return an.localeCompare(bn);
+        return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
+      });
+    return roster[0]?.participant_key || null;
+  }, [presenceMembers]);
 
   const canHostOpenLudoSession = useMemo(
     () =>
       Boolean(
-        isHost &&
+        presenceLeaderKey &&
+          participantId &&
+          presenceLeaderKey === participantId &&
           room?.product_game_id === ONLINE_V2_GAME_IDS.LUDO &&
-          room?.lifecycle_phase === "active" &&
           !room?.active_session_id
       ),
-    [isHost, room?.product_game_id, room?.lifecycle_phase, room?.active_session_id]
+    [presenceLeaderKey, participantId, room?.product_game_id, room?.active_session_id]
   );
 
   const hostOpenLudoDisabledReason = useMemo(() => {
-    if (committedCount < 2) return "Need at least two committed players.";
-    if (committedCount > 4) return "Ludo allows at most four committed players.";
+    if (seatedCount < 2) return "Need at least two seated players.";
+    if (seatedCount > 4) return "Ludo allows at most four seated players.";
+    if (room?.product_game_id === ONLINE_V2_GAME_IDS.LUDO && mySeatIndex == null) return "Claim a seat first.";
+    if (room?.product_game_id === ONLINE_V2_GAME_IDS.LUDO && presenceLeaderKey !== participantId)
+      return "Only current leader can open session.";
     return "";
-  }, [committedCount]);
+  }, [seatedCount, room?.product_game_id, mySeatIndex, presenceLeaderKey, participantId]);
 
   const myMember = useMemo(() => members.find(m => m.participant_key === participantId) || null, [members, participantId]);
+  const mySeatIndex =
+    myMember?.seat_index != null && Number.isInteger(Number(myMember.seat_index)) ? Number(myMember.seat_index) : null;
 
   const allReady = useMemo(() => members.length > 0 && members.every(m => m.is_ready), [members]);
 
@@ -119,6 +143,41 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!roomId || room?.product_game_id !== ONLINE_V2_GAME_IDS.LUDO || mySeatIndex != null) return;
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(ov2LudoSeatRememberKey(roomId));
+    if (!raw) return;
+    const seat = Number(raw);
+    if (!Number.isInteger(seat) || seat < 0 || seat > 3) {
+      window.localStorage.removeItem(ov2LudoSeatRememberKey(roomId));
+      return;
+    }
+    const occupied = members.some(m => m.participant_key !== participantId && Number(m.seat_index) === seat);
+    if (occupied) {
+      window.localStorage.removeItem(ov2LudoSeatRememberKey(roomId));
+      return;
+    }
+    void (async () => {
+      try {
+        const out = await claimOv2LudoSeat({ room_id: roomId, participant_key: participantId, seat_index: seat });
+        if (out?.room) setRoom(out.room);
+        if (Array.isArray(out?.members)) setMembers(out.members);
+      } catch {
+        window.localStorage.removeItem(ov2LudoSeatRememberKey(roomId));
+      }
+    })();
+  }, [roomId, room?.product_game_id, mySeatIndex, members, participantId]);
+
+  useEffect(() => {
+    if (!roomId || room?.product_game_id !== ONLINE_V2_GAME_IDS.LUDO || typeof window === "undefined") return;
+    if (mySeatIndex == null) {
+      window.localStorage.removeItem(ov2LudoSeatRememberKey(roomId));
+      return;
+    }
+    window.localStorage.setItem(ov2LudoSeatRememberKey(roomId), String(mySeatIndex));
+  }, [roomId, room?.product_game_id, mySeatIndex]);
+
   const loadRef = useRef(load);
   loadRef.current = load;
 
@@ -152,16 +211,36 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           schedule("ov2_room_members", payload);
         }
       )
+      .on("presence", { event: "sync" }, () => {
+        const state = ch.presenceState();
+        const roster = Object.values(state)
+          .flat()
+          .map(r => ({
+            participant_key:
+              r && typeof r === "object" && "participant_key" in r ? String(r.participant_key || "").trim() : "",
+            display_name: r && typeof r === "object" && "display_name" in r ? String(r.display_name || "").trim() : "",
+          }))
+          .filter(r => r.participant_key);
+        setPresenceMembers(roster);
+      })
       .subscribe((status, err) => {
         setLobbyRtStatus(String(status));
         ov2LobbyRtDevLog({ kind: "subscribe", channelName, status, err: err ?? null });
+        if (status === "SUBSCRIBED" && participantId) {
+          void ch.track({
+            participant_key: participantId,
+            display_name: String(displayName || "").trim(),
+            at: new Date().toISOString(),
+          });
+        }
       });
     return () => {
       void ch.unsubscribe();
       setLobbyRtStatus(null);
+      setPresenceMembers([]);
       if (debounceTimer != null) clearTimeout(debounceTimer);
     };
-  }, [roomId]);
+  }, [roomId, participantId, displayName]);
 
   async function ensureBalance(stake) {
     await readOnlineV2Vault({ fresh: true }).catch(() => {});
@@ -249,12 +328,44 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     setBusy(true);
     setMsg("");
     try {
-      const res = await requestOv2LudoOpenSession(roomId, participantId);
+      const res = await requestOv2LudoOpenSession(roomId, participantId, { presenceLeaderKey: presenceLeaderKey || "" });
       if (!res.ok) {
         setMsg(res.error || "Could not open Ludo session.");
         return;
       }
       await load();
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onClaimLudoSeat(seatIndex) {
+    if (!room || room.product_game_id !== ONLINE_V2_GAME_IDS.LUDO) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const out = await claimOv2LudoSeat({ room_id: roomId, participant_key: participantId, seat_index: seatIndex });
+      if (out?.room) setRoom(out.room);
+      if (Array.isArray(out?.members)) setMembers(out.members);
+      onRoomChanged?.();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onLeaveLudoSeat() {
+    if (!room || room.product_game_id !== ONLINE_V2_GAME_IDS.LUDO) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const out = await leaveOv2LudoSeat({ room_id: roomId, participant_key: participantId });
+      if (out?.room) setRoom(out.room);
+      if (Array.isArray(out?.members)) setMembers(out.members);
       onRoomChanged?.();
     } catch (e) {
       setMsg(e?.message || String(e));
@@ -475,6 +586,38 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
 
         {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && room.lifecycle_phase === "active" && !room.active_session_id && !isHost ? (
           <p className="text-center text-[11px] text-amber-200/85">Waiting for the host to open the Ludo match.</p>
+        ) : null}
+
+        {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO ? (
+          <div className="grid grid-cols-4 gap-2">
+            {[0, 1, 2, 3].map(seat => {
+              const holder = members.find(m => Number(m.seat_index) === seat);
+              const mine = holder?.participant_key === participantId;
+              return (
+                <button
+                  key={seat}
+                  type="button"
+                  disabled={busy || (holder && !mine)}
+                  onClick={() => void onClaimLudoSeat(seat)}
+                  className="rounded-lg border border-white/20 bg-white/10 py-2 text-xs font-semibold disabled:opacity-40"
+                  title={holder && !mine ? "Seat taken" : undefined}
+                >
+                  Seat {seat + 1}
+                  {holder ? mine ? " · you" : " · taken" : ""}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+        {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && mySeatIndex != null ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onLeaveLudoSeat()}
+            className="rounded-lg border border-red-500/30 bg-red-950/30 py-2 text-xs text-red-200 disabled:opacity-40"
+          >
+            Leave seat
+          </button>
         ) : null}
 
         {canHostOpenLudoSession ? (

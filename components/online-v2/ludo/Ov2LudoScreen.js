@@ -14,7 +14,7 @@ import Ov2SeatStrip from "../shared/Ov2SeatStrip";
  */
 export default function Ov2LudoScreen({ contextInput = null }) {
   const session = useOv2LudoSession(contextInput ?? undefined);
-  const { vm, rollDicePreview, onPieceClick, canRoll, resetPreviewBoard } = session;
+  const { vm, rollDicePreview, onPieceClick, canRoll, resetPreviewBoard, offerDouble, respondDouble } = session;
   const roomProductId =
     contextInput?.room && typeof contextInput.room === "object" && contextInput.room.product_game_id != null
       ? String(contextInput.room.product_game_id)
@@ -24,13 +24,14 @@ export default function Ov2LudoScreen({ contextInput = null }) {
     diceRolling,
     playMode,
     interactionTier,
-    boardSeatForUi,
+    boardSeatForUi: mySeat,
     previewWaitingOtherSeat,
     winnerSeat,
     boardViewReadOnly,
     liveLegalMovablePieceIndices,
     lobbySeatLabels,
     lobbySelfRingIndex,
+    doubleState,
   } = vm;
 
   const isReadOnlyRoom = playMode === OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
@@ -40,24 +41,68 @@ export default function Ov2LudoScreen({ contextInput = null }) {
     if (playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL) {
       return ["Seat 1 · you (preview)", "Seat 2", "Seat 3", "Seat 4"];
     }
-    if (isLiveMatch && boardSeatForUi != null) {
-      return ["Seat 1", "Seat 2", "Seat 3", "Seat 4"].map((l, i) => (i === boardSeatForUi ? `${l} · you` : l));
+    if (isLiveMatch && mySeat != null) {
+      return ["Seat 1", "Seat 2", "Seat 3", "Seat 4"].map((l, i) => (i === mySeat ? `${l} · you` : l));
     }
     if (isReadOnlyRoom && Array.isArray(lobbySeatLabels) && lobbySeatLabels.length >= 4) {
       return lobbySeatLabels;
     }
     return ["Seat 1 · —", "Seat 2 · —", "Seat 3 · —", "Seat 4 · —"];
-  }, [playMode, isLiveMatch, boardSeatForUi, isReadOnlyRoom, lobbySeatLabels]);
+  }, [playMode, isLiveMatch, mySeat, isReadOnlyRoom, lobbySeatLabels]);
 
   const selfHighlightIndex =
-    isLiveMatch && boardSeatForUi != null
-      ? boardSeatForUi
+    isLiveMatch && mySeat != null
+      ? mySeat
       : isReadOnlyRoom && lobbySelfRingIndex != null
         ? lobbySelfRingIndex
         : null;
 
+  const doubleAwaitingSeat =
+    doubleState && typeof doubleState === "object" && doubleState.awaiting != null ? Number(doubleState.awaiting) : null;
+  const canOfferDouble =
+    isLiveMatch &&
+    mySeat != null &&
+    board.turnSeat === mySeat &&
+    board.dice != null &&
+    doubleAwaitingSeat == null &&
+    (doubleState?.proposed_by == null || doubleState?.awaiting == null);
+  const isAwaitingMyDouble = isLiveMatch && mySeat != null && doubleAwaitingSeat === mySeat;
+
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-0.5 overflow-hidden px-0.5 sm:gap-1 sm:px-1">
+      {isLiveMatch ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-1">
+          <button
+            type="button"
+            disabled={!canOfferDouble}
+            onClick={() => void offerDouble()}
+            className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-40"
+          >
+            Double x{Number(doubleState?.value || 1)}
+          </button>
+          {doubleAwaitingSeat != null ? (
+            <span className="text-[9px] text-zinc-300 sm:text-[10px]">Waiting Seat {doubleAwaitingSeat + 1}</span>
+          ) : null}
+          {isAwaitingMyDouble ? (
+            <>
+              <button
+                type="button"
+                onClick={() => void respondDouble("accept")}
+                className="rounded-md border border-emerald-500/40 bg-emerald-900/30 px-2 py-1 text-[10px] font-semibold text-emerald-100"
+              >
+                Accept
+              </button>
+              <button
+                type="button"
+                onClick={() => void respondDouble("decline")}
+                className="rounded-md border border-red-500/40 bg-red-900/30 px-2 py-1 text-[10px] font-semibold text-red-100"
+              >
+                Decline
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
       {isReadOnlyRoom ? (
         <div
           className="shrink-0 rounded-md border border-amber-500/40 bg-amber-950/30 px-2 py-1 text-center text-[9px] font-semibold text-amber-100 sm:text-[10px]"
@@ -98,7 +143,7 @@ export default function Ov2LudoScreen({ contextInput = null }) {
       <div className="min-h-0 flex-1 overflow-hidden">
         <Ov2LudoBoardView
           board={board}
-          mySeat={boardSeatForUi}
+          mySeat={mySeat}
           diceValue={board.dice ?? board.lastDice}
           diceRolling={diceRolling}
           diceSeat={board.turnSeat}
