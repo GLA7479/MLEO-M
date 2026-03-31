@@ -30,6 +30,13 @@ function ov2LudoSeatRememberKey(roomId) {
   return `ov2_ludo_last_seat_v1:${roomId}`;
 }
 
+function parseLudoSeatIndex(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0 || n > 3) return null;
+  return n;
+}
+
 function ov2LobbyRtDevLog(payload) {
   if (typeof window === "undefined") return;
   const dev =
@@ -68,7 +75,10 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
     [room, participantId]
   );
 
-  const seatedCount = useMemo(() => members.filter(m => m.seat_index != null).length, [members]);
+  const seatedCount = useMemo(
+    () => members.filter(m => parseLudoSeatIndex(m?.seat_index) != null).length,
+    [members]
+  );
   const canHostOpenLudoSession = useMemo(
     () =>
       Boolean(
@@ -90,8 +100,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   }, [room?.product_game_id, room?.active_session_id, amMember, isHost, seatedCount]);
 
   const myMember = useMemo(() => members.find(m => m.participant_key === participantId) || null, [members, participantId]);
-  const mySeatIndex =
-    myMember?.seat_index != null && Number.isInteger(Number(myMember.seat_index)) ? Number(myMember.seat_index) : null;
+  const mySeatIndex = parseLudoSeatIndex(myMember?.seat_index);
 
   const allReady = useMemo(() => members.length > 0 && members.every(m => m.is_ready), [members]);
 
@@ -140,7 +149,9 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
       window.localStorage.removeItem(ov2LudoSeatRememberKey(roomId));
       return;
     }
-    const occupied = members.some(m => m.participant_key !== participantId && Number(m.seat_index) === seat);
+    const occupied = members.some(
+      m => m.participant_key !== participantId && parseLudoSeatIndex(m?.seat_index) === seat
+    );
     if (occupied) {
       window.localStorage.removeItem(ov2LudoSeatRememberKey(roomId));
       return;
@@ -592,7 +603,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
         {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO ? (
           <div className="grid grid-cols-4 gap-2">
             {[0, 1, 2, 3].map(seat => {
-              const holder = members.find(m => Number(m.seat_index) === seat);
+              const holder = members.find(m => parseLudoSeatIndex(m?.seat_index) === seat);
               const mine = holder?.participant_key === participantId;
               return (
                 <button
@@ -647,6 +658,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
                 <div>hostOpenLudoDisabledReason: {hostOpenLudoDisabledReason || ""}</div>
                 <div>participantId: {String(participantId || "").slice(0, 8)}</div>
                 <div>host_participant_key: {String(room.host_participant_key || "").slice(0, 8)}</div>
+                <div>rawSeatIndexes: {members.map(m => `${String(m.display_name || m.participant_key || "").slice(0,8)}=${String(m.seat_index)}`).join(" | ")}</div>
               </div>
             ) : null}
           </>
