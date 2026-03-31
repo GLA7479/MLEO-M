@@ -75,7 +75,12 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
       .sort((a, b) => {
         const an = String(a.display_name || "").trim();
         const bn = String(b.display_name || "").trim();
-        if (an !== bn) return an.localeCompare(bn);
+        if (an && bn) {
+          if (an !== bn) return an.localeCompare(bn);
+          return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
+        }
+        if (an && !bn) return -1;
+        if (!an && bn) return 1;
         return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
       });
     return roster[0]?.participant_key || null;
@@ -96,11 +101,10 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
   const hostOpenLudoDisabledReason = useMemo(() => {
     if (seatedCount < 2) return "Need at least two seated players.";
     if (seatedCount > 4) return "Ludo allows at most four seated players.";
-    if (room?.product_game_id === ONLINE_V2_GAME_IDS.LUDO && mySeatIndex == null) return "Claim a seat first.";
     if (room?.product_game_id === ONLINE_V2_GAME_IDS.LUDO && presenceLeaderKey !== participantId)
       return "Only current leader can open session.";
     return "";
-  }, [seatedCount, room?.product_game_id, mySeatIndex, presenceLeaderKey, participantId]);
+  }, [seatedCount, room?.product_game_id, presenceLeaderKey, participantId]);
 
   const myMember = useMemo(() => members.find(m => m.participant_key === participantId) || null, [members, participantId]);
   const mySeatIndex =
@@ -584,8 +588,8 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           <p className="text-center text-[11px] text-emerald-200/85">All stakes locked — open your game table when available.</p>
         ) : null}
 
-        {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && room.lifecycle_phase === "active" && !room.active_session_id && !isHost ? (
-          <p className="text-center text-[11px] text-amber-200/85">Waiting for the host to open the Ludo match.</p>
+        {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO && !room.active_session_id && presenceLeaderKey !== participantId ? (
+          <p className="text-center text-[11px] text-amber-200/85">Waiting for the current leader to open the Ludo match.</p>
         ) : null}
 
         {room.product_game_id === ONLINE_V2_GAME_IDS.LUDO ? (
@@ -624,7 +628,7 @@ export default function Ov2RoomLobby({ roomId, participantId, displayName, onBac
           <button
             type="button"
             disabled={busy || Boolean(hostOpenLudoDisabledReason)}
-            title={hostOpenLudoDisabledReason || "Creates the live Ludo session (2–4 committed players)."}
+            title={hostOpenLudoDisabledReason || "Creates the live Ludo session (2–4 seated players)."}
             onClick={() => void onOpenLudoSession()}
             className="rounded-lg border border-emerald-500/45 bg-emerald-950/35 py-2 text-xs font-bold text-emerald-100 disabled:opacity-40"
           >

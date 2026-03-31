@@ -109,7 +109,7 @@ export default function Ov2LudoScreen({ contextInput = null }) {
           role="status"
         >
           {roomProductId === OV2_LUDO_PRODUCT_GAME_ID
-            ? "Read-only — no live Ludo session yet. The host can open the match when the room is active with 2–4 committed players."
+            ? "Read-only — no live Ludo session yet. The current presence leader can open the match when 2–4 players are seated."
             : "Read-only — no authoritative match snapshot yet."}
         </div>
       ) : null}

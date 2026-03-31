@@ -20,7 +20,7 @@ function parseRoomQueryParam(q) {
 
 /**
  * Route shell: loads OV2 room row when `?room=` is present (product_game_id must match).
- * Host opens the live session via `requestOv2LudoOpenSession` when the room is active; snapshot fetch + Realtime
+ * Presence leader opens the live session once 2–4 seats are claimed; snapshot fetch + Realtime
  * drive `LIVE_MATCH_ACTIVE` in `useOv2LudoSession`. Without `?room=`, the screen is local preview only.
  */
 export default function Ov2LudoLiveShell() {
@@ -44,6 +44,10 @@ export default function Ov2LudoLiveShell() {
   const [openErr, setOpenErr] = useState("");
   const [presenceMembers, setPresenceMembers] = useState([]);
   const loadedOnceForRoomRef = useRef(null);
+  const selfDisplayName = useMemo(() => {
+    const mine = members.find(m => String(m?.participant_key || "") === String(participantId || ""));
+    return String(mine?.display_name || "").trim();
+  }, [members, participantId]);
 
   useEffect(() => {
     setParticipantId(getOv2ParticipantId());
@@ -127,7 +131,7 @@ export default function Ov2LudoLiveShell() {
         if (status === "SUBSCRIBED") {
           await ch.track({
             participant_key: participantId,
-            display_name: "",
+            display_name: selfDisplayName,
             at: new Date().toISOString(),
           });
         }
@@ -136,7 +140,7 @@ export default function Ov2LudoLiveShell() {
       void ch.unsubscribe();
       setPresenceMembers([]);
     };
-  }, [roomId, participantId]);
+  }, [roomId, participantId, selfDisplayName]);
 
   const isRoomMember = useMemo(
     () => Boolean(participantId && members.some(m => m.participant_key === participantId)),
@@ -150,7 +154,12 @@ export default function Ov2LudoLiveShell() {
       .sort((a, b) => {
         const an = String(a.display_name || "").trim();
         const bn = String(b.display_name || "").trim();
-        if (an !== bn) return an.localeCompare(bn);
+        if (an && bn) {
+          if (an !== bn) return an.localeCompare(bn);
+          return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
+        }
+        if (an && !bn) return -1;
+        if (!an && bn) return 1;
         return String(a.participant_key || "").localeCompare(String(b.participant_key || ""));
       });
     return roster[0]?.participant_key || null;
@@ -204,7 +213,7 @@ export default function Ov2LudoLiveShell() {
       members,
       self: {
         participant_key: participantId,
-        display_name: "",
+        display_name: selfDisplayName,
       },
     };
   }, [roomId, room, members, participantId]);
@@ -217,11 +226,11 @@ export default function Ov2LudoLiveShell() {
         <>
           <p>
             Without <code className="text-zinc-400">?room=</code> this page is a <strong className="text-amber-200">local preview</strong> only.
-            With a Ludo room, the host opens the live match after the room is <strong className="text-zinc-200">active</strong> and 2–4 players have{" "}
-            <strong className="text-zinc-200">committed</strong> stakes; turns and dice are enforced by the server.
+            With a Ludo room, the current <strong className="text-zinc-200">presence leader</strong> opens the live match once 2–4 seats are claimed;
+            turns and dice are enforced by the server.
           </p>
           <ul className="mt-2 space-y-1 text-[11px] text-zinc-400">
-            <li>In-room with no active session: board is read-only and the host opens the match.</li>
+            <li>In-room with no active session: board is read-only and the presence leader opens the match.</li>
             <li>After session opens: board becomes live-authoritative with server-owned turn/dice/moves.</li>
             <li>Without a room query: board stays local preview.</li>
           </ul>

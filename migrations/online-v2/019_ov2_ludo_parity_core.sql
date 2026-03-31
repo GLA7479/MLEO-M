@@ -225,6 +225,18 @@ BEGIN
   IF v_room.product_game_id IS DISTINCT FROM 'ov2_ludo' THEN
     RETURN jsonb_build_object('ok', false, 'code', 'WRONG_PRODUCT', 'message', 'Not a Ludo room');
   END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.ov2_room_members m
+    WHERE m.room_id = p_room_id
+      AND m.participant_key = v_pk
+  ) THEN
+    RETURN jsonb_build_object(
+      'ok', false,
+      'code', 'NOT_MEMBER',
+      'message', 'Only room members can open a Ludo session'
+    );
+  END IF;
 
   SELECT * INTO v_existing
   FROM public.ov2_ludo_sessions
@@ -314,7 +326,7 @@ CREATE OR REPLACE FUNCTION public.ov2_ludo_get_snapshot(
 )
 RETURNS jsonb
 LANGUAGE plpgsql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = public
 AS $$
