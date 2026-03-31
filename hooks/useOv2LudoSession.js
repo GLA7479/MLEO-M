@@ -89,6 +89,8 @@ export function useOv2LudoSession(baseContext) {
   const rollDicePreviewRef = useRef(/** @type {(() => Promise<void>)|null} */ (null));
   /** Per session: last seen double multiplier — when snapshot shows an increase, refresh server-backed vault display (all clients via Realtime snapshot). */
   const vaultDoubleMultRef = useRef(/** @type {{ sessionId: string, mult: number } | null} */ (null));
+  /** One server-backed vault read per finished session (win/loss settlement visible on strip). */
+  const vaultFinishedRefreshForSessionRef = useRef(/** @type {string|null} */ (null));
 
   useEffect(() => {
     authoritativeSnapshotRef.current = authoritativeSnapshot;
@@ -103,6 +105,7 @@ export function useOv2LudoSession(baseContext) {
     setLiveDiceRevealHold(null);
     setLiveRollServerFace(null);
     vaultDoubleMultRef.current = null;
+    vaultFinishedRefreshForSessionRef.current = null;
   }, [roomId]);
 
   useEffect(() => {
@@ -115,6 +118,7 @@ export function useOv2LudoSession(baseContext) {
     setLiveDiceRevealHold(null);
     setLiveRollServerFace(null);
     vaultDoubleMultRef.current = null;
+    vaultFinishedRefreshForSessionRef.current = null;
   }, [roomId, activeSessionKey]);
 
   useEffect(() => {
@@ -188,6 +192,17 @@ export function useOv2LudoSession(baseContext) {
       void readOnlineV2Vault({ fresh: true }).catch(() => {});
     }
     vaultDoubleMultRef.current = { sessionId: sid, mult };
+  }, [playMode, authoritativeSnapshot, roomProductId]);
+
+  useEffect(() => {
+    if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE || !authoritativeSnapshot) return;
+    if (roomProductId !== OV2_LUDO_PRODUCT_GAME_ID) return;
+    if (String(authoritativeSnapshot.phase || "").trim().toLowerCase() !== "finished") return;
+    const sid = String(authoritativeSnapshot.sessionId || "").trim();
+    if (!sid) return;
+    if (vaultFinishedRefreshForSessionRef.current === sid) return;
+    vaultFinishedRefreshForSessionRef.current = sid;
+    void readOnlineV2Vault({ fresh: true }).catch(() => {});
   }, [playMode, authoritativeSnapshot, roomProductId]);
 
   const lobbySeatStrip = useMemo(() => {
