@@ -214,33 +214,57 @@ export default function Ov2LudoLiveShell() {
   );
 
   const seatedCount = useMemo(() => members.filter(m => m.seat_index != null).length, [members]);
+  const seatedAllCommitted = useMemo(() => {
+    const seated = members.filter(m => m?.seat_index != null);
+    if (seated.length === 0) return true;
+    return seated.every(m => String(m?.wallet_state || "").trim() === "committed");
+  }, [members]);
+  const roomLifecycle =
+    room && typeof room === "object" && room.lifecycle_phase != null ? String(room.lifecycle_phase).trim() : "";
   const isHost = useMemo(
     () => Boolean(room && participantId && room.host_participant_key === participantId),
     [room, participantId]
   );
 
-  const canShellHostOpenLudo = useMemo(
+  /** After rematch the server sets `pending_stakes`; `ov2_ludo_open_session` only runs when the room is `active`. */
+  const showStakePhaseAfterRematchHint = useMemo(
     () =>
       Boolean(
         room &&
           room.product_game_id === ONLINE_V2_GAME_IDS.LUDO &&
           !room.active_session_id &&
-          participantId &&
-          isHost &&
-          isRoomMember
+          (roomLifecycle === "pending_stakes" || roomLifecycle === "pending_start")
       ),
-    [room, participantId, isHost, isRoomMember]
+    [room, roomLifecycle]
+  );
+
+  const canShellHostOpenLudo = useMemo(
+    () =>
+      Boolean(
+        participantId &&
+          isHost &&
+          isRoomMember &&
+          room &&
+          room.product_game_id === ONLINE_V2_GAME_IDS.LUDO &&
+          !room.active_session_id &&
+          roomLifecycle === "active" &&
+          seatedCount >= 2 &&
+          seatedCount <= 4
+      ),
+    [room, participantId, isHost, isRoomMember, roomLifecycle, seatedCount]
   );
 
   const shellOpenDisabledReason = useMemo(() => {
     if (!room || room.product_game_id !== ONLINE_V2_GAME_IDS.LUDO) return "";
     if (room.active_session_id) return "Match already opened.";
+    if (roomLifecycle !== "active") return "Room must be active (all members committed stakes) before opening a Ludo session.";
     if (!isRoomMember) return "Join the room first.";
     if (!isHost) return "Only room host can open session.";
     if (seatedCount < 2) return "Need at least two seated players.";
     if (seatedCount > 4) return "At most four seated players.";
+    if (!seatedAllCommitted) return "All seated players must commit stakes before opening.";
     return "";
-  }, [room, isRoomMember, isHost, seatedCount]);
+  }, [room, roomLifecycle, isRoomMember, isHost, seatedCount, seatedAllCommitted]);
 
   const onShellOpenLudo = useCallback(async () => {
     if (!roomId || !participantId || !canShellHostOpenLudo || shellOpenDisabledReason) return;
@@ -316,8 +340,23 @@ export default function Ov2LudoLiveShell() {
         <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-zinc-400">Loading room…</div>
       ) : (
         <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+          {showStakePhaseAfterRematchHint ? (
+            <div className="flex shrink-0 flex-col gap-1.5 border-b border-amber-500/25 bg-amber-950/20 px-2 py-2">
+              <p className="text-[10px] leading-snug text-amber-100/95 sm:text-[11px]">
+                <strong className="font-semibold">Next round:</strong> everyone must{" "}
+                <span className="text-amber-50">commit stake</span> again in the room lobby. When the room is active,
+                the host can open the Ludo table here.
+              </p>
+              <Link
+                href="/online-v2/rooms"
+                className="inline-flex w-fit items-center rounded-md border border-amber-400/50 bg-amber-900/35 px-2.5 py-1 text-[10px] font-semibold text-amber-50 hover:bg-amber-900/50 sm:text-xs"
+              >
+                Open room lobby (commit stake)
+              </Link>
+            </div>
+          ) : null}
           {canShellHostOpenLudo ? (
-            <div className="flex shrink-0 flex-col gap-1 border-b border-white/[0.08] pb-1">
+            <div className="flex shrink-0 flex-col gap-1 border-b border-white/[0.08] pb-1 pt-1">
               <button
                 type="button"
                 disabled={openBusy || Boolean(shellOpenDisabledReason)}
@@ -327,6 +366,9 @@ export default function Ov2LudoLiveShell() {
               >
                 {openBusy ? "Opening…" : "Open Ludo match (host)"}
               </button>
+              {shellOpenDisabledReason ? (
+                <p className="text-[10px] text-zinc-500">{shellOpenDisabledReason}</p>
+              ) : null}
               {openErr ? <p className="text-[10px] text-red-300">{openErr}</p> : null}
             </div>
           ) : null}
