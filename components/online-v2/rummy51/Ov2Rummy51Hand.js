@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { deserializeCard, sortHandCards } from "../../../lib/online-v2/rummy51/ov2Rummy51Engine";
+import { deserializeCard } from "../../../lib/online-v2/rummy51/ov2Rummy51Engine";
 
 /**
  * @typedef {import("../../../lib/online-v2/rummy51/ov2Rummy51Engine").Rummy51Card} Rummy51Card
@@ -80,7 +80,6 @@ function slotIndexFromClientX(clientX, orderIds, refs) {
  *   clearDisabled?: boolean,
  *   manualOrder: string[]|null,
  *   setManualOrder: import("react").Dispatch<import("react").SetStateAction<string[]|null>>,
- *   defaultOrderUsesSort?: boolean,
  * }} props
  */
 export default function Ov2Rummy51Hand({
@@ -105,7 +104,6 @@ export default function Ov2Rummy51Hand({
   clearDisabled,
   manualOrder,
   setManualOrder,
-  defaultOrderUsesSort = false,
 }) {
   const rankSuitLocked = sortDisabled === undefined ? disabled : sortDisabled;
   const reorderLocked = rankSuitLocked;
@@ -133,8 +131,6 @@ export default function Ov2Rummy51Hand({
     return out;
   }, [handRaw]);
 
-  const sortedCards = useMemo(() => sortHandCards(naturalCards, sortMode), [naturalCards, sortMode]);
-
   const cardById = useMemo(() => new Map(naturalCards.map(c => [c.id, c])), [naturalCards]);
 
   const displayCards = useMemo(() => {
@@ -153,8 +149,8 @@ export default function Ov2Rummy51Hand({
       }
       return out;
     }
-    return defaultOrderUsesSort ? sortedCards : naturalCards;
-  }, [manualOrder, sortedCards, naturalCards, cardById, defaultOrderUsesSort]);
+    return naturalCards;
+  }, [manualOrder, naturalCards, cardById]);
 
   /** Drag reorder: allowed when not busy / session idle (`reorderLocked`), even off-turn. */
   const allowPointerReorder = !reorderLocked && displayCards.length > 1;
@@ -254,9 +250,7 @@ export default function Ov2Rummy51Hand({
       if (!d.moved) {
         if (Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD_PX) return;
         d.moved = true;
-        const basis = manualOrder?.length
-          ? [...manualOrder]
-          : (defaultOrderUsesSort ? sortedCards : naturalCards).map(c => c.id);
+        const basis = manualOrder?.length ? [...manualOrder] : naturalCards.map(c => c.id);
         d.orderSnapshot = basis;
         setManualOrder(basis);
         setDraggingId(d.id);
@@ -265,7 +259,7 @@ export default function Ov2Rummy51Hand({
       const slot = slotIndexFromClientX(e.clientX, orderIds, cardRefs.current);
       hoverSlotRef.current = slot;
     },
-    [manualOrder, sortedCards, naturalCards, defaultOrderUsesSort, setManualOrder]
+    [manualOrder, naturalCards, setManualOrder]
   );
 
   const handlePointerUp = useCallback(
@@ -405,7 +399,6 @@ export default function Ov2Rummy51Hand({
           type="button"
           disabled={rankSuitLocked}
           onClick={() => {
-            setManualOrder(null);
             onSortModeChange("rank");
           }}
           className={`min-h-[34px] min-w-[3.35rem] shrink-0 rounded-md px-1.5 py-1.5 text-[10px] font-semibold leading-tight sm:min-h-[38px] sm:min-w-[4.25rem] sm:px-2.5 sm:py-2 sm:text-xs ${
@@ -418,7 +411,6 @@ export default function Ov2Rummy51Hand({
           type="button"
           disabled={rankSuitLocked}
           onClick={() => {
-            setManualOrder(null);
             onSortModeChange("suit");
           }}
           className={`min-h-[34px] min-w-[3.35rem] shrink-0 rounded-md px-1.5 py-1.5 text-[10px] font-semibold leading-tight sm:min-h-[38px] sm:min-w-[4.25rem] sm:px-2.5 sm:py-2 sm:text-xs ${

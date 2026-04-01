@@ -33,25 +33,40 @@ function handOrderStorageKey(roomId, selfKey) {
   return `${OV2_R51_HAND_ORDER_PREFIX}:${r}:${s}`;
 }
 
-/** @param {string|null} key */
-function readStoredHandOrder(key) {
-  if (!key || typeof sessionStorage === "undefined") return null;
+/**
+ * Persisted layout: ordered ids + which Rank/Suit chip is highlighted (does not drive render order).
+ * Legacy value was a bare JSON array of ids — still supported.
+ * @param {string|null} key
+ * @returns {{ order: string[]|null, sortUi: "rank"|"suit" }}
+ */
+function readStoredHandLayout(key) {
+  const fallback = { order: /** @type {string[]|null} */ (null), sortUi: /** @type {"rank"|"suit"} */ ("rank") };
+  if (!key || typeof sessionStorage === "undefined") return fallback;
   try {
     const raw = sessionStorage.getItem(key);
-    if (!raw) return null;
+    if (!raw) return fallback;
     const p = JSON.parse(raw);
-    return Array.isArray(p) ? p.map(String) : null;
+    if (Array.isArray(p)) {
+      return { order: p.map(String), sortUi: "rank" };
+    }
+    if (p && typeof p === "object" && Array.isArray(p.order)) {
+      const su = p.sortUi === "suit" ? "suit" : "rank";
+      return { order: p.order.map(String), sortUi: su };
+    }
   } catch {
-    return null;
+    /* ignore */
   }
+  return fallback;
 }
 
-/** @param {string|null} key @param {string[]|null|undefined} ids */
-function writeStoredHandOrder(key, ids) {
+/** @param {string|null} key @param {string[]|null|undefined} order @param {"rank"|"suit"} sortUi */
+function writeStoredHandLayout(key, order, sortUi) {
   if (!key || typeof sessionStorage === "undefined") return;
   try {
-    if (ids?.length) sessionStorage.setItem(key, JSON.stringify(ids));
-    else sessionStorage.removeItem(key);
+    if (order?.length) {
+      const su = sortUi === "suit" ? "suit" : "rank";
+      sessionStorage.setItem(key, JSON.stringify({ order, sortUi: su }));
+    } else sessionStorage.removeItem(key);
   } catch {
     /* ignore */
   }
@@ -228,9 +243,8 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const [discardPickMode, setDiscardPickMode] = useState(false);
   const [discardCardId, setDiscardCardId] = useState(/** @type {string|null} */ (null));
   const [sortMode, setSortMode] = useState(/** @type {"rank"|"suit"} */ ("rank"));
-  /** Custom hand strip order (visible hand only); cleared when Rank/Suit sort is chosen in hand UI. */
+  /** Visible hand order (persisted): drag/nudge/Rank/Suit all write this list; refresh restores it. */
   const [manualOrder, setManualOrder] = useState(/** @type {string[]|null} */ (null));
-  const [handOrderBasis, setHandOrderBasis] = useState(/** @type {"natural"|"sorted"} */ ("natural"));
   const [optimisticReturnedJokers, setOptimisticReturnedJokers] = useState(/** @type {Rummy51Card[]} */ ([]));
   /** @type {Rummy51Card[][]} */
   const [draftNewMelds, setDraftNewMelds] = useState([]);
@@ -340,41 +354,55 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
 
   const visibleUiOrderSig = visibleUiOrderIds.join("\0");
 
+  const handOrderKeyHydratedRef = useRef(/** @type {string|null} */ (null));
+
   useEffect(() => {
-    if (!handOrderKey || handOrderBasis !== "natural") return;
+    if (!handOrderKey) {
+      handOrderKeyHydratedRef.current = null;
+      return;
+    }
+    const newKey = handOrderKeyHydratedRef.current !== handOrderKey;
+    if (newKey) {
+      handOrderKeyHydratedRef.current = handOrderKey;
+      const layout = readStoredHandLayout(handOrderKey);
+      setSortMode(layout.sortUi);
+      const merged = mergeHandOrderWithVisible(layout.order, visibleUiOrderIds);
+      setManualOrder(merged.length ? merged : null);
+      return;
+    }
     setManualOrder(prev => {
-      const stored = readStoredHandOrder(handOrderKey);
-      const base = prev?.length ? prev : stored;
+      const { order: storedOrder } = readStoredHandLayout(handOrderKey);
+      const base = prev?.length ? prev : storedOrder;
       const merged = mergeHandOrderWithVisible(base, visibleUiOrderIds);
       return merged.length ? merged : null;
     });
-  }, [handOrderKey, handOrderBasis, visibleUiOrderSig]);
+  }, [handOrderKey, visibleUiOrderSig]);
 
   useEffect(() => {
-    if (!handOrderKey || handOrderBasis !== "natural" || !manualOrder?.length) return;
-    writeStoredHandOrder(handOrderKey, manualOrder);
-  }, [handOrderKey, handOrderBasis, manualOrder]);
+    if (!handOrderKey || !manualOrder?.length) return;
+    const vis = new Set(visibleUiOrderIds);
+    if (!manualOrder.every(id => vis.has(id))) return;
+    writeStoredHandLayout(handOrderKey, manualOrder, sortMode);
+  }, [handOrderKey, manualOrder, sortMode, visibleUiOrderIds]);
 
-  const sortedVisibleHandCards = useMemo(() => {
-    const out = [];
-    for (const raw of handRawForUi) {
-      try {
-        out.push(deserializeCard(raw));
-      } catch {
-        /* skip */
-      }
-    }
-    return sortHandCards(out, sortMode);
-  }, [handRawForUi, sortMode]);
-
-  const onSortModeFromUser = useCallback(
+  /** Rank/Suit: sort once, persist that id order; refresh does not re-sort — it reloads this list. */
+  const applyUserSortMode = useCallback(
     mode => {
-      setHandOrderBasis("sorted");
       setSortMode(mode);
-      setManualOrder(null);
-      if (handOrderKey) writeStoredHandOrder(handOrderKey, []);
+      const out = [];
+      for (const raw of handRawForUi) {
+        try {
+          out.push(deserializeCard(raw));
+        } catch {
+          /* skip */
+        }
+      }
+      const sorted = sortHandCards(out, mode);
+      const ids = sorted.map(c => c.id);
+      setManualOrder(ids);
+      if (handOrderKey) writeStoredHandLayout(handOrderKey, ids, mode);
     },
-    [handOrderKey]
+    [handRawForUi, handOrderKey]
   );
 
   const myPs = useMemo(() => {
@@ -478,9 +506,8 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
 
   const orderIdsForDockNudge = useMemo(() => {
     if (manualOrder?.length) return manualOrder;
-    if (handOrderBasis === "sorted") return sortedVisibleHandCards.map(c => c.id);
     return visibleUiOrderIds;
-  }, [manualOrder, handOrderBasis, sortedVisibleHandCards, visibleUiOrderIds]);
+  }, [manualOrder, visibleUiOrderIds]);
 
   const singleSelForDockNudge = selectedIds.size === 1 ? [...selectedIds][0] : null;
   const singleSelIdxDock =
@@ -495,21 +522,16 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const nudgeHandOrder = useCallback(
     delta => {
       if (!singleSelForDockNudge) return;
-      const base = manualOrder?.length
-        ? [...manualOrder]
-        : handOrderBasis === "sorted"
-          ? sortedVisibleHandCards.map(c => c.id)
-          : [...visibleUiOrderIds];
+      const base = manualOrder?.length ? [...manualOrder] : [...visibleUiOrderIds];
       const i = base.indexOf(singleSelForDockNudge);
       if (i < 0) return;
       const j = i + delta;
       if (j < 0 || j >= base.length) return;
       const next = [...base];
       [next[i], next[j]] = [next[j], next[i]];
-      setHandOrderBasis("natural");
       setManualOrder(next);
     },
-    [singleSelForDockNudge, manualOrder, handOrderBasis, sortedVisibleHandCards, visibleUiOrderIds]
+    [singleSelForDockNudge, manualOrder, visibleUiOrderIds]
   );
 
   useEffect(() => {
@@ -1058,8 +1080,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
           clearDisabled={busy || !canClearTransient}
           hasMeldDraft={draftNewMelds.length > 0 || draftTableAdds.length > 0}
           onToggleCardId={onToggleCardId}
-          onSortModeChange={onSortModeFromUser}
-          defaultOrderUsesSort={handOrderBasis === "sorted"}
+          onSortModeChange={applyUserSortMode}
           onEnterDiscardPickMode={() => {
             setDiscardPickMode(true);
             setSelectedIds(new Set());
