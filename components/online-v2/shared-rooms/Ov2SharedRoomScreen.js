@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/router";
 import {
   claimOv2Seat,
   hostStartOv2Room,
   leaveOv2Room,
   releaseOv2Seat,
 } from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
+import { requestOv2LudoOpenSession } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import { useOv2SharedRoom } from "../../../hooks/useOv2SharedRoom";
 import Ov2SharedSeatGrid from "./Ov2SharedSeatGrid";
 
@@ -15,6 +17,7 @@ export default function Ov2SharedRoomScreen({
   gameTitleById,
   onExitRoom,
 }) {
+  const router = useRouter();
   const { room, members, me, isHost, loading, error, isEjected, reload } = useOv2SharedRoom({
     roomId,
     participantKey: participantId,
@@ -23,8 +26,12 @@ export default function Ov2SharedRoomScreen({
   const [msg, setMsg] = useState("");
   const [runtimeHandoff, setRuntimeHandoff] = useState(null);
   const [autoExitPending, setAutoExitPending] = useState(false);
+  const [launchingLive, setLaunchingLive] = useState(false);
+  const didRouteToLiveRef = useRef(false);
 
   const joinedCount = useMemo(() => members.length, [members]);
+  const isLudoRoom = room?.product_game_id === "ov2_ludo";
+  const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
 
   async function onClaimSeat(seatIndex) {
     setBusy(true);
@@ -73,6 +80,19 @@ export default function Ov2SharedRoomScreen({
         host_participant_key: participantId,
       });
       setRuntimeHandoff(out.runtime_handoff || null);
+      if (isLudoRoom) {
+        const open = await requestOv2LudoOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Ludo session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
       await reload();
     } catch (e) {
       setMsg(e?.message || String(e));
@@ -92,6 +112,16 @@ export default function Ov2SharedRoomScreen({
     }, 900);
     return () => clearTimeout(t);
   }, [isEjected, onExitRoom]);
+
+  useEffect(() => {
+    if (didRouteToLiveRef.current) return;
+    if (!isLudoRoom) return;
+    if (room?.status !== "IN_GAME") return;
+    if (!liveRuntimeId) return;
+    didRouteToLiveRef.current = true;
+    setLaunchingLive(true);
+    void router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
+  }, [isLudoRoom, room?.status, liveRuntimeId, roomId, router]);
 
   if (isEjected || autoExitPending) {
     return (
@@ -160,12 +190,14 @@ export default function Ov2SharedRoomScreen({
       ) : null}
 
       {runtimeHandoff ? (
+        !isLudoRoom ? (
         <div className="rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
           <div className="font-bold">Runtime handoff ready</div>
           <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
           <div>Policy: {runtimeHandoff.economy_entry_policy}</div>
           <div className="mt-1 text-sky-200/80">Runtime migration is pending in a later phase.</div>
         </div>
+        ) : null
       ) : null}
 
       <div className="flex gap-2">
@@ -188,6 +220,7 @@ export default function Ov2SharedRoomScreen({
       </div>
 
       {loading ? <p className="text-[11px] text-zinc-500">Loading room...</p> : null}
+      {launchingLive ? <p className="text-[11px] text-sky-300">Opening live Ludo game...</p> : null}
       {error ? <p className="text-[11px] text-red-300">{error}</p> : null}
       {msg ? <p className="text-[11px] text-amber-200">{msg}</p> : null}
       {displayName ? null : <p className="text-[11px] text-zinc-500">Set your display name to continue.</p>}
