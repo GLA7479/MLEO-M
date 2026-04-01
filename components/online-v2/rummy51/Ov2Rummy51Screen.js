@@ -722,12 +722,34 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     );
   }
 
-  if (!hasActiveSession || !snapshot) {
+  if (!hasActiveSession) {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-3 text-center">
-        <p className="text-sm text-zinc-400">No active Rummy 51 session for this room yet.</p>
-        <p className="text-[11px] text-zinc-500">The host opens the match from the lobby when the room is active and stakes are committed.</p>
+        {isHost ? (
+          <>
+            <p className="text-sm text-zinc-300">No Rummy 51 session yet</p>
+            <p className="text-[11px] text-zinc-500">
+              Use <strong className="text-zinc-400">Open Rummy 51 match (host)</strong> above (or{" "}
+              <strong className="text-zinc-400">Open match</strong> in the shared room). The room row must show an active
+              session before play loads here.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-zinc-300">Waiting for the host</p>
+            <p className="text-[11px] text-zinc-500">
+              The host must open the match first. This page will show the table when the session exists. You can use
+              Refresh room in the info panel to poll.
+            </p>
+          </>
+        )}
       </div>
+    );
+  }
+
+  if (!snapshot) {
+    return (
+      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-zinc-500">Loading table…</div>
     );
   }
 

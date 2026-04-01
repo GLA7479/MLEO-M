@@ -81,6 +81,29 @@ export default function Ov2SharedRoomScreen({
     }
   }
 
+  async function onOpenRummy51InGame() {
+    if (!isHost) {
+      setMsg("Only the host can open the match.");
+      return;
+    }
+    setBusy(true);
+    setMsg("");
+    try {
+      const open = await openOv2Rummy51Session(roomId, participantId);
+      if (!open?.ok) {
+        setMsg(open?.error || "Could not open Rummy 51 session.");
+        return;
+      }
+      didRouteToLiveRef.current = true;
+      setLaunchingLive(true);
+      await router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onHostStart() {
     setBusy(true);
     setMsg("");
@@ -277,8 +300,17 @@ export default function Ov2SharedRoomScreen({
       ) : null}
       {room?.status === "IN_GAME" && isRummy51Room && !launchingLive ? (
         <div className="rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
-          <p className="font-semibold text-teal-50">Match in progress</p>
-          <p className="mt-1 text-teal-200/90">Connecting to live Rummy 51… If this stays stuck, use Open Rummy 51 below.</p>
+          {isHost ? (
+            <>
+              <p className="font-semibold text-teal-50">Room started — open the Rummy match</p>
+              <p className="mt-1 text-teal-200/90">The table is not live until the host opens the session (authoritative RPC).</p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold text-teal-50">Waiting for host</p>
+              <p className="mt-1 text-teal-200/90">The host must open the Rummy 51 match before you can join the live table.</p>
+            </>
+          )}
         </div>
       ) : null}
 
@@ -301,18 +333,20 @@ export default function Ov2SharedRoomScreen({
             Start
           </button>
         ) : room?.status === "IN_GAME" && isRummy51Room ? (
-          <button
-            type="button"
-            disabled={busy || launchingLive}
-            onClick={() => {
-              didRouteToLiveRef.current = true;
-              setLaunchingLive(true);
-              void router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
-            }}
-            className="flex-1 rounded-lg border border-teal-500/45 bg-teal-900/45 py-2 text-xs font-bold text-teal-100 disabled:opacity-45"
-          >
-            {launchingLive ? "Opening…" : "Open Rummy 51"}
-          </button>
+          isHost ? (
+            <button
+              type="button"
+              disabled={busy || launchingLive}
+              onClick={() => void onOpenRummy51InGame()}
+              className="flex-1 rounded-lg border border-teal-500/45 bg-teal-900/45 py-2 text-xs font-bold text-teal-100 disabled:opacity-45"
+            >
+              {busy || launchingLive ? "Opening…" : "Open match"}
+            </button>
+          ) : (
+            <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-400">
+              Waiting for host…
+            </div>
+          )
         ) : (
           <button
             type="button"

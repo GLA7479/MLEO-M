@@ -147,11 +147,16 @@ export default function Ov2Rummy51LiveShell() {
   const roomLifecycle =
     room && typeof room === "object" && room.lifecycle_phase != null ? String(room.lifecycle_phase).trim() : "";
 
+  const isSharedOv2Room = Number(room?.shared_schema_version) === 1;
+  const sharedInGame =
+    isSharedOv2Room && String(room?.status || "").toUpperCase() === "IN_GAME";
+
   const isHost = useMemo(
     () => Boolean(room && participantId && room.host_participant_key === participantId),
     [room, participantId]
   );
 
+  /** Session exists on `ov2_rooms.active_session_id` — set only after `openOv2Rummy51Session` succeeds. */
   const canShellHostOpen = useMemo(
     () =>
       Boolean(
@@ -161,25 +166,27 @@ export default function Ov2Rummy51LiveShell() {
           room &&
           room.product_game_id === ONLINE_V2_GAME_IDS.RUMMY51 &&
           !room.active_session_id &&
-          roomLifecycle === "active" &&
           seatedCount >= 2 &&
           seatedCount <= 4 &&
-          seatedAllCommitted
+          seatedAllCommitted &&
+          (roomLifecycle === "active" || sharedInGame)
       ),
-    [room, participantId, isHost, isRoomMember, roomLifecycle, seatedCount, seatedAllCommitted]
+    [room, participantId, isHost, isRoomMember, roomLifecycle, seatedCount, seatedAllCommitted, sharedInGame]
   );
 
   const shellOpenDisabledReason = useMemo(() => {
     if (!room || room.product_game_id !== ONLINE_V2_GAME_IDS.RUMMY51) return "";
     if (room.active_session_id) return "Match already opened.";
-    if (roomLifecycle !== "active") return "Room must be active (stakes committed) before opening.";
+    if (roomLifecycle !== "active" && !sharedInGame) {
+      return "Room must be active (stakes committed) or shared room must be in game before opening.";
+    }
     if (!isRoomMember) return "Join the room from the lobby first.";
     if (!isHost) return "Only the host can open the session.";
     if (seatedCount < 2) return "Need at least two seated players.";
     if (seatedCount > 4) return "At most four players.";
     if (!seatedAllCommitted) return "Every seated player must commit stake.";
     return "";
-  }, [room, roomLifecycle, isRoomMember, isHost, seatedCount, seatedAllCommitted]);
+  }, [room, roomLifecycle, sharedInGame, isRoomMember, isHost, seatedCount, seatedAllCommitted]);
 
   const onLeaveTable = useCallback(async () => {
     if (!roomId || !participantId) return;
@@ -244,6 +251,14 @@ export default function Ov2Rummy51LiveShell() {
       (roomLifecycle === "pending_stakes" || roomLifecycle === "pending_start")
   );
 
+  const showNonHostWaitingForSession = Boolean(
+    room &&
+      room.product_game_id === ONLINE_V2_GAME_IDS.RUMMY51 &&
+      !room.active_session_id &&
+      isRoomMember &&
+      !isHost
+  );
+
   return (
     <OnlineV2GamePageShell
       title="Rummy 51"
@@ -306,6 +321,12 @@ export default function Ov2Rummy51LiveShell() {
               >
                 Open lobby
               </Link>
+            </div>
+          ) : null}
+          {showNonHostWaitingForSession ? (
+            <div className="shrink-0 border-b border-cyan-500/25 bg-cyan-950/20 px-2 py-2 text-[10px] leading-snug text-cyan-100 sm:text-[11px]">
+              <strong className="font-semibold text-cyan-50">Waiting for host</strong> — the live match is not open yet.
+              Use Refresh room or wait; the table appears once the host opens the session.
             </div>
           ) : null}
           {canShellHostOpen ? (
