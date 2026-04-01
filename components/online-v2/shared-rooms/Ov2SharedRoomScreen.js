@@ -7,6 +7,10 @@ import {
   releaseOv2Seat,
 } from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
 import { requestOv2LudoOpenSession } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
+import {
+  fetchOv2Rummy51Snapshot,
+  openOv2Rummy51Session,
+} from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
 import { useOv2SharedRoom } from "../../../hooks/useOv2SharedRoom";
 import Ov2SharedSeatGrid from "./Ov2SharedSeatGrid";
 
@@ -18,7 +22,7 @@ export default function Ov2SharedRoomScreen({
   onExitRoom,
 }) {
   const router = useRouter();
-  const { room, members, me, isHost, loading, error, isEjected, reload } = useOv2SharedRoom({
+  const { room, members, me, isHost, loading, error, isEjected, reload, lastLoadedAt } = useOv2SharedRoom({
     roomId,
     participantKey: participantId,
   });
@@ -31,7 +35,9 @@ export default function Ov2SharedRoomScreen({
 
   const joinedCount = useMemo(() => members.length, [members]);
   const isLudoRoom = room?.product_game_id === "ov2_ludo";
+  const isRummy51Room = room?.product_game_id === "ov2_rummy51";
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
+  const rummySessionId = room?.active_session_id || null;
 
   async function onClaimSeat(seatIndex) {
     setBusy(true);
@@ -93,6 +99,17 @@ export default function Ov2SharedRoomScreen({
         await router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
         return;
       }
+      if (isRummy51Room) {
+        const open = await openOv2Rummy51Session(roomId, participantId);
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Rummy 51 session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
       await reload();
     } catch (e) {
       setMsg(e?.message || String(e));
@@ -115,13 +132,36 @@ export default function Ov2SharedRoomScreen({
 
   useEffect(() => {
     if (didRouteToLiveRef.current) return;
-    if (!isLudoRoom) return;
     if (room?.status !== "IN_GAME") return;
     if (!liveRuntimeId) return;
-    didRouteToLiveRef.current = true;
-    setLaunchingLive(true);
-    void router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
-  }, [isLudoRoom, room?.status, liveRuntimeId, roomId, router]);
+    if (isLudoRoom) {
+      didRouteToLiveRef.current = true;
+      setLaunchingLive(true);
+      void router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
+      return;
+    }
+    if (isRummy51Room) {
+      if (rummySessionId) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelled = false;
+      void fetchOv2Rummy51Snapshot(roomId).then(r => {
+        if (cancelled || didRouteToLiveRef.current) return;
+        const phase = r.ok && r.snapshot ? String(r.snapshot.phase || "") : "";
+        if (phase === "playing" || phase === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [isLudoRoom, isRummy51Room, room?.status, liveRuntimeId, rummySessionId, roomId, router, lastLoadedAt]);
 
   if (isEjected || autoExitPending) {
     return (
@@ -220,7 +260,11 @@ export default function Ov2SharedRoomScreen({
       </div>
 
       {loading ? <p className="text-[11px] text-zinc-500">Loading room...</p> : null}
-      {launchingLive ? <p className="text-[11px] text-sky-300">Opening live Ludo game...</p> : null}
+      {launchingLive ? (
+        <p className="text-[11px] text-sky-300">
+          {isRummy51Room ? "Opening live Rummy 51 game..." : "Opening live Ludo game..."}
+        </p>
+      ) : null}
       {error ? <p className="text-[11px] text-red-300">{error}</p> : null}
       {msg ? <p className="text-[11px] text-amber-200">{msg}</p> : null}
       {displayName ? null : <p className="text-[11px] text-zinc-500">Set your display name to continue.</p>}
