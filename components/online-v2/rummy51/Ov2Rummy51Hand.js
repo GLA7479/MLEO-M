@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { deserializeCard, sortCardsForHand } from "../../../lib/online-v2/rummy51/ov2Rummy51Engine";
+import { deserializeCard, sortHandCards } from "../../../lib/online-v2/rummy51/ov2Rummy51Engine";
 
 /**
  * @typedef {import("../../../lib/online-v2/rummy51/ov2Rummy51Engine").Rummy51Card} Rummy51Card
@@ -117,18 +117,7 @@ export default function Ov2Rummy51Hand({
         /* skip */
       }
     }
-    const sorted = sortCardsForHand(out);
-    if (sortMode === "suit") {
-      return [...sorted].sort((a, b) => {
-        const sa = a.isJoker ? "Z" : a.suit || "";
-        const sb = b.isJoker ? "Z" : b.suit || "";
-        if (sa !== sb) return sa.localeCompare(sb);
-        const ra = a.rank === 1 ? 14 : a.rank;
-        const rb = b.rank === 1 ? 14 : b.rank;
-        return ra - rb;
-      });
-    }
-    return sorted;
+    return sortHandCards(out, sortMode);
   }, [handRaw, sortMode]);
 
   const sortedIdKey = useMemo(() => [...sortedCards.map(c => c.id)].sort().join("\0"), [sortedCards]);

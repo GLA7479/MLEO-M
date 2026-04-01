@@ -5,6 +5,7 @@ import {
   ov2Rummy51DrawDiscard,
   ov2Rummy51DrawStock,
   ov2Rummy51SubmitTurn,
+  ov2Rummy51UndoDiscardDraw,
   OV2_RUMMY51_PRODUCT_GAME_ID,
   requestOv2Rummy51Rematch,
   cancelOv2Rummy51Rematch,
@@ -91,6 +92,27 @@ export function useOv2Rummy51Session(baseContext) {
       const r = await ov2Rummy51DrawDiscard(roomId, selfKey, snapshot.revision);
       if (!r.ok) {
         setActionError(r.error || "Draw failed");
+        return r;
+      }
+      if (r.snapshot) applySnapshot(r.snapshot);
+      return { ok: true };
+    } catch (e) {
+      const msg = e?.message || String(e);
+      setActionError(msg);
+      return { ok: false, error: msg };
+    } finally {
+      setBusy(false);
+    }
+  }, [roomId, selfKey, snapshot, applySnapshot]);
+
+  const undoDiscardDraw = useCallback(async () => {
+    if (!roomId || !selfKey || !snapshot) return { ok: false, error: "no session" };
+    setBusy(true);
+    setActionError("");
+    try {
+      const r = await ov2Rummy51UndoDiscardDraw(roomId, selfKey, snapshot.revision);
+      if (!r.ok) {
+        setActionError(r.error || "Could not return discard");
         return r;
       }
       if (r.snapshot) applySnapshot(r.snapshot);
@@ -225,6 +247,7 @@ export function useOv2Rummy51Session(baseContext) {
     refresh,
     drawStock,
     drawDiscard,
+    undoDiscardDraw,
     submitTurn,
     requestRematch,
     cancelRematch,

@@ -81,6 +81,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     setActionError,
     drawStock,
     drawDiscard,
+    undoDiscardDraw,
     submitTurn,
     requestRematch,
     cancelRematch,
@@ -501,6 +502,12 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     if (r.ok) resetTurnUi();
   }, [canSubmitTurn, discardCardId, draftNewMelds, draftTableAdds, submitTurn, resetTurnUi, setActionError]);
 
+  const onUndoDiscardDraw = useCallback(async () => {
+    setActionError("");
+    const r = await undoDiscardDraw();
+    if (r.ok) resetTurnUi();
+  }, [undoDiscardDraw, resetTurnUi, setActionError]);
+
   const previewOnly = !contextInput?.room?.id || !isRummyRoom;
 
   if (previewOnly) {
@@ -677,6 +684,16 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
                   <div className="flex flex-col gap-0">
                     {validationMessage ? (
                       <p className="px-0.5 pb-0.5 text-[8px] leading-snug text-amber-200/95 sm:text-[9px]">{validationMessage}</p>
+                    ) : null}
+                    {pendingDraw === "discard" ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void onUndoDiscardDraw()}
+                        className="min-h-[28px] w-full rounded-md border border-zinc-500/35 bg-zinc-900/60 py-0.5 text-[9px] font-semibold text-zinc-300 disabled:opacity-40 sm:min-h-[30px] sm:text-[10px]"
+                      >
+                        Put discard back
+                      </button>
                     ) : null}
                     <button
                       type="button"
