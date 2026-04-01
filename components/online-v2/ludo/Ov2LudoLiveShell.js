@@ -5,7 +5,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ONLINE_V2_GAME_IDS } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { requestOv2LudoOpenSession } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
-import { fetchOv2RoomById, fetchOv2RoomMembers } from "../../../lib/online-v2/ov2RoomsApi";
+import { fetchOv2RoomById, fetchOv2RoomMembers, leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { getOv2ParticipantId } from "../../../lib/online-v2/ov2ParticipantId";
 import { supabaseMP } from "../../../lib/supabaseClients";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
@@ -43,6 +43,8 @@ export default function Ov2LudoLiveShell() {
   const [openBusy, setOpenBusy] = useState(false);
   const [openErr, setOpenErr] = useState("");
   const [, setPresenceMembers] = useState([]);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [leaveErr, setLeaveErr] = useState("");
   const loadedOnceForRoomRef = useRef(null);
   const selfDisplayName = useMemo(() => {
     const mine = members.find(m => String(m?.participant_key || "") === String(participantId || ""));
@@ -266,6 +268,29 @@ export default function Ov2LudoLiveShell() {
     return "";
   }, [room, roomLifecycle, isRoomMember, isHost, seatedCount, seatedAllCommitted]);
 
+  const onLeaveTable = useCallback(async () => {
+    if (!roomId || !participantId) return;
+    setLeaveErr("");
+    setLeaveBusy(true);
+    try {
+      await leaveOv2RoomWithForfeitRetry({
+        room,
+        room_id: roomId,
+        participant_key: participantId,
+      });
+      try {
+        window.sessionStorage.removeItem("ov2_shared_last_room_id_v1");
+      } catch {
+        // ignore
+      }
+      await router.replace("/online-v2/rooms");
+    } catch (e) {
+      setLeaveErr(e?.message || String(e) || "Could not leave.");
+    } finally {
+      setLeaveBusy(false);
+    }
+  }, [roomId, participantId, room, router]);
+
   const onShellOpenLudo = useCallback(async () => {
     if (!roomId || !participantId || !canShellHostOpenLudo || shellOpenDisabledReason) return;
     setOpenBusy(true);
@@ -296,8 +321,10 @@ export default function Ov2LudoLiveShell() {
         participant_key: participantId,
         display_name: selfDisplayName,
       },
+      onLeaveToLobby: onLeaveTable,
+      leaveToLobbyBusy: leaveBusy,
     };
-  }, [roomId, room, members, participantId]);
+  }, [roomId, room, members, participantId, selfDisplayName, onLeaveTable, leaveBusy]);
 
   return (
     <OnlineV2GamePageShell
@@ -324,6 +351,16 @@ export default function Ov2LudoLiveShell() {
               <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
                 Refresh
               </button>
+              {" · "}
+              <button
+                type="button"
+                disabled={leaveBusy || !participantId}
+                className="text-sky-300 underline disabled:opacity-45"
+                onClick={() => void onLeaveTable()}
+              >
+                {leaveBusy ? "Leaving…" : "Leave table"}
+              </button>
+              {leaveErr ? <span className="ml-1 text-red-300">{leaveErr}</span> : null}
             </p>
           ) : null}
         </>

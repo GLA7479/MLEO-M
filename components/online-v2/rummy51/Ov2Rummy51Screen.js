@@ -131,7 +131,7 @@ function DiscardUndoIconButton({ disabled, onClick }) {
 }
 
 /**
- * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null }} props
+ * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string }, onLeaveToLobby?: () => void | Promise<void>, leaveToLobbyBusy?: boolean } | null }} props
  */
 export default function Ov2Rummy51Screen({ contextInput = null }) {
   const session = useOv2Rummy51Session(contextInput ?? undefined);
@@ -188,6 +188,14 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       : null;
 
   const isRummyRoom = roomProductId === OV2_RUMMY51_PRODUCT_GAME_ID;
+
+  const onLeaveToLobby =
+    contextInput && typeof contextInput === "object" && typeof contextInput.onLeaveToLobby === "function"
+      ? contextInput.onLeaveToLobby
+      : null;
+  const leaveToLobbyBusy = Boolean(
+    contextInput && typeof contextInput === "object" && contextInput.leaveToLobbyBusy === true
+  );
 
   const myHandRaw = useMemo(() => {
     if (!snapshot?.hands || !selfKey) return [];
@@ -745,6 +753,18 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
         seatOpenedFlags={seatStripMeta.openedFlags}
         seatNearElim={seatStripMeta.nearFlags}
       />
+      {onLeaveToLobby ? (
+        <div className="flex shrink-0 justify-end px-0.5 pt-0.5">
+          <button
+            type="button"
+            disabled={leaveToLobbyBusy}
+            onClick={() => void onLeaveToLobby()}
+            className="text-[10px] font-semibold text-red-200/95 underline decoration-red-400/50 disabled:opacity-45"
+          >
+            {leaveToLobbyBusy ? "Leaving…" : "Leave table"}
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-teal-500/20 bg-teal-950/10">

@@ -5,7 +5,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ONLINE_V2_GAME_IDS } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { openOv2Rummy51Session } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
-import { fetchOv2RoomById, fetchOv2RoomMembers } from "../../../lib/online-v2/ov2RoomsApi";
+import { fetchOv2RoomById, fetchOv2RoomMembers, leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { getOv2ParticipantId } from "../../../lib/online-v2/ov2ParticipantId";
 import { supabaseMP } from "../../../lib/supabaseClients";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
@@ -41,6 +41,8 @@ export default function Ov2Rummy51LiveShell() {
   const [loading, setLoading] = useState(false);
   const [openBusy, setOpenBusy] = useState(false);
   const [openErr, setOpenErr] = useState("");
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [leaveErr, setLeaveErr] = useState("");
   const loadedOnceForRoomRef = useRef(null);
 
   const selfDisplayName = useMemo(() => {
@@ -179,6 +181,29 @@ export default function Ov2Rummy51LiveShell() {
     return "";
   }, [room, roomLifecycle, isRoomMember, isHost, seatedCount, seatedAllCommitted]);
 
+  const onLeaveTable = useCallback(async () => {
+    if (!roomId || !participantId) return;
+    setLeaveErr("");
+    setLeaveBusy(true);
+    try {
+      await leaveOv2RoomWithForfeitRetry({
+        room,
+        room_id: roomId,
+        participant_key: participantId,
+      });
+      try {
+        window.sessionStorage.removeItem("ov2_shared_last_room_id_v1");
+      } catch {
+        // ignore
+      }
+      await router.replace("/online-v2/rooms");
+    } catch (e) {
+      setLeaveErr(e?.message || String(e) || "Could not leave.");
+    } finally {
+      setLeaveBusy(false);
+    }
+  }, [roomId, participantId, room, router]);
+
   const onShellOpen = useCallback(async () => {
     if (!roomId || !participantId || !canShellHostOpen || shellOpenDisabledReason) return;
     setOpenBusy(true);
@@ -207,8 +232,10 @@ export default function Ov2Rummy51LiveShell() {
         display_name: selfDisplayName,
       },
       reloadRoomContext: reloadContext,
+      onLeaveToLobby: onLeaveTable,
+      leaveToLobbyBusy: leaveBusy,
     };
-  }, [roomId, room, members, participantId, selfDisplayName, reloadContext]);
+  }, [roomId, room, members, participantId, selfDisplayName, reloadContext, onLeaveTable, leaveBusy]);
 
   const showStakeHint = Boolean(
     room &&
@@ -236,6 +263,16 @@ export default function Ov2Rummy51LiveShell() {
               <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
                 Refresh room
               </button>
+              {" · "}
+              <button
+                type="button"
+                disabled={leaveBusy || !participantId}
+                className="text-sky-300 underline disabled:opacity-45"
+                onClick={() => void onLeaveTable()}
+              >
+                {leaveBusy ? "Leaving…" : "Leave table"}
+              </button>
+              {leaveErr ? <span className="ml-1 text-red-300">{leaveErr}</span> : null}
             </p>
           </>
         ) : (

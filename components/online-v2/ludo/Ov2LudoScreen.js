@@ -6,7 +6,7 @@ import {
   OV2_LUDO_PLAY_MODE,
   OV2_LUDO_PRODUCT_GAME_ID,
 } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
-import { leaveOv2Room } from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
+import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { useOv2LudoSession } from "../../../hooks/useOv2LudoSession";
 import Ov2LudoBoardView from "../../../lib/online-v2/ludo/ov2LudoBoardView";
 import Ov2SeatStrip from "../shared/Ov2SeatStrip";
@@ -168,6 +168,13 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
       ? `St ${strikeSeats.map(x => `S${x.seat + 1}:${x.v}`).join(",")}`
       : null;
   const selfKey = String(contextInput?.self?.participant_key || "").trim();
+  const onLeaveToLobby =
+    contextInput && typeof contextInput === "object" && typeof contextInput.onLeaveToLobby === "function"
+      ? contextInput.onLeaveToLobby
+      : null;
+  const leaveToLobbyBusy = Boolean(
+    contextInput && typeof contextInput === "object" && contextInput.leaveToLobbyBusy === true
+  );
   const roomHostKey = String(contextInput?.room?.host_participant_key || "").trim();
   const isHost = Boolean(selfKey && roomHostKey && selfKey === roomHostKey);
   const seatedCount = roomMembers.filter(m => m?.seat_index != null).length;
@@ -347,6 +354,18 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
         awaitedIndex={isDoublePending ? doubleAwaitingSeat : null}
         eliminatedIndices={eliminatedSeats}
       />
+      {isLiveMatch && !isFinished && onLeaveToLobby ? (
+        <div className="flex shrink-0 justify-end px-0.5 pt-0.5">
+          <button
+            type="button"
+            disabled={leaveToLobbyBusy}
+            onClick={() => void onLeaveToLobby()}
+            className="text-[10px] font-semibold text-red-200/95 underline decoration-red-400/50 disabled:opacity-45"
+          >
+            {leaveToLobbyBusy ? "Leaving…" : "Leave table"}
+          </button>
+        </div>
+      ) : null}
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {isLiveMatch ? <div className="pointer-events-none absolute right-2 top-2 z-30 hidden md:block">{desktopStateSurface}</div> : null}
         <Ov2LudoBoardView
@@ -480,7 +499,11 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
                         setExitErr("");
                         setExitBusy(true);
                         try {
-                          await leaveOv2Room({ room_id: roomId, participant_key: selfKey });
+                          await leaveOv2RoomWithForfeitRetry({
+                            room: contextInput?.room,
+                            room_id: roomId,
+                            participant_key: selfKey,
+                          });
                           try {
                             window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_KEY);
                           } catch {

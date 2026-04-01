@@ -13,6 +13,7 @@ import {
 import {
   fetchOv2Rummy51Snapshot,
   openOv2Rummy51Session,
+  OV2_RUMMY51_PRODUCT_GAME_ID,
 } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
 import { useOv2SharedRoom } from "../../../hooks/useOv2SharedRoom";
 import Ov2SharedSeatGrid from "./Ov2SharedSeatGrid";
@@ -38,7 +39,7 @@ export default function Ov2SharedRoomScreen({
 
   const joinedCount = useMemo(() => members.length, [members]);
   const isLudoRoom = room?.product_game_id === "ov2_ludo";
-  const isRummy51Room = room?.product_game_id === "ov2_rummy51";
+  const isRummy51Room = String(room?.product_game_id || "").trim() === OV2_RUMMY51_PRODUCT_GAME_ID;
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
   const rummySessionId = room?.active_session_id || null;
 
@@ -136,6 +137,32 @@ export default function Ov2SharedRoomScreen({
   useEffect(() => {
     if (didRouteToLiveRef.current) return;
     if (room?.status !== "IN_GAME") return;
+
+    // Rummy51: public room JSON omits active_session_id; active_runtime_id can be missing in edge cases.
+    // Do NOT gate on liveRuntimeId — otherwise the watcher never runs and users stay on the shared room forever.
+    if (isRummy51Room) {
+      if (rummySessionId) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelled = false;
+      void fetchOv2Rummy51Snapshot(roomId).then(r => {
+        if (cancelled || didRouteToLiveRef.current) return;
+        const raw = r.ok && r.snapshot ? String(r.snapshot.phase || "") : "";
+        const phase = raw.toLowerCase();
+        if (phase === "playing" || phase === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     if (!liveRuntimeId) return;
     if (isLudoRoom) {
       const ludoSid = room?.active_session_id || null;
@@ -153,27 +180,6 @@ export default function Ov2SharedRoomScreen({
           didRouteToLiveRef.current = true;
           setLaunchingLive(true);
           void router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
-        }
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-    if (isRummy51Room) {
-      if (rummySessionId) {
-        didRouteToLiveRef.current = true;
-        setLaunchingLive(true);
-        void router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
-        return;
-      }
-      let cancelled = false;
-      void fetchOv2Rummy51Snapshot(roomId).then(r => {
-        if (cancelled || didRouteToLiveRef.current) return;
-        const phase = r.ok && r.snapshot ? String(r.snapshot.phase || "") : "";
-        if (phase === "playing" || phase === "finished") {
-          didRouteToLiveRef.current = true;
-          setLaunchingLive(true);
-          void router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
         }
       });
       return () => {
@@ -259,15 +265,21 @@ export default function Ov2SharedRoomScreen({
         />
       ) : null}
 
-      {runtimeHandoff ? (
+      {runtimeHandoff && !isRummy51Room ? (
         !isLudoRoom ? (
-        <div className="rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
-          <div className="font-bold">Runtime handoff ready</div>
-          <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
-          <div>Policy: {runtimeHandoff.economy_entry_policy}</div>
-          <div className="mt-1 text-sky-200/80">Runtime migration is pending in a later phase.</div>
-        </div>
+          <div className="rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
+            <div className="font-bold">Runtime handoff ready</div>
+            <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
+            <div>Policy: {runtimeHandoff.economy_entry_policy}</div>
+            <div className="mt-1 text-sky-200/80">Runtime migration is pending in a later phase.</div>
+          </div>
         ) : null
+      ) : null}
+      {room?.status === "IN_GAME" && isRummy51Room && !launchingLive ? (
+        <div className="rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
+          <p className="font-semibold text-teal-50">Match in progress</p>
+          <p className="mt-1 text-teal-200/90">Connecting to live Rummy 51… If this stays stuck, use Open Rummy 51 below.</p>
+        </div>
       ) : null}
 
       <div className="flex gap-2">
@@ -279,14 +291,37 @@ export default function Ov2SharedRoomScreen({
         >
           Leave room
         </button>
-        <button
-          type="button"
-          disabled={busy || !isHost || room?.status !== "OPEN"}
-          onClick={() => void onHostStart()}
-          className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-900/40 py-2 text-xs font-bold text-emerald-100 disabled:opacity-45"
-        >
-          Start
-        </button>
+        {room?.status === "OPEN" ? (
+          <button
+            type="button"
+            disabled={busy || !isHost}
+            onClick={() => void onHostStart()}
+            className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-900/40 py-2 text-xs font-bold text-emerald-100 disabled:opacity-45"
+          >
+            Start
+          </button>
+        ) : room?.status === "IN_GAME" && isRummy51Room ? (
+          <button
+            type="button"
+            disabled={busy || launchingLive}
+            onClick={() => {
+              didRouteToLiveRef.current = true;
+              setLaunchingLive(true);
+              void router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
+            }}
+            className="flex-1 rounded-lg border border-teal-500/45 bg-teal-900/45 py-2 text-xs font-bold text-teal-100 disabled:opacity-45"
+          >
+            {launchingLive ? "Opening…" : "Open Rummy 51"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-900/40 py-2 text-xs font-bold text-emerald-100 opacity-45"
+          >
+            Start
+          </button>
+        )}
       </div>
 
       {loading ? <p className="text-[11px] text-zinc-500">Loading room...</p> : null}
