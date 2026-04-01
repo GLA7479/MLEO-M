@@ -125,6 +125,13 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   /** @type {{ title: string, lines: string[] }|null} */
   const [roundBanner, setRoundBanner] = useState(null);
 
+  /** Brief highlight on card(s) just drawn from stock or discard (revision diff). */
+  const [drawHighlightIds, setDrawHighlightIds] = useState(() => new Set());
+  const prevDrawRevisionRef = useRef(-1);
+  const prevHandIdsForDrawRef = useRef(/** @type {Set<string>} */ (new Set()));
+  /** Must not clear on every effect re-run — that blocked the 2s fade (cleanup ran before timeout fired). */
+  const drawHighlightTimeoutRef = useRef(/** @type {number} */ (0));
+
   const scoreSnapRef = useRef(/** @type {Record<string, number>} */ ({}));
   const roundRef = useRef(0);
 
@@ -282,6 +289,35 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const discardCount = snapshot?.discardCount != null ? Number(snapshot.discardCount) : 0;
 
   const pendingDraw = snapshot?.pendingDrawSource != null ? String(snapshot.pendingDrawSource) : "";
+
+  useEffect(() => {
+    const rev = snapshot?.revision ?? 0;
+    const ids = new Set(handCards.map(c => c.id));
+    const drewPending = pendingDraw === "stock" || pendingDraw === "discard";
+
+    if (prevDrawRevisionRef.current >= 0 && rev > prevDrawRevisionRef.current && drewPending) {
+      const added = [...ids].filter(id => !prevHandIdsForDrawRef.current.has(id));
+      if (added.length > 0) {
+        setDrawHighlightIds(new Set(added));
+        if (drawHighlightTimeoutRef.current) window.clearTimeout(drawHighlightTimeoutRef.current);
+        drawHighlightTimeoutRef.current = window.setTimeout(() => {
+          drawHighlightTimeoutRef.current = 0;
+          setDrawHighlightIds(new Set());
+        }, 2000);
+      }
+    }
+    prevDrawRevisionRef.current = rev;
+    prevHandIdsForDrawRef.current = ids;
+  }, [snapshot?.revision, handCards, pendingDraw]);
+
+  useEffect(() => {
+    return () => {
+      if (drawHighlightTimeoutRef.current) {
+        window.clearTimeout(drawHighlightTimeoutRef.current);
+        drawHighlightTimeoutRef.current = 0;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!snapshot?.roundNumber || !snapshot.playerState) return undefined;
@@ -680,6 +716,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
         <Ov2Rummy51Hand
           embedded
           handRaw={myHandRawVisible}
+          drawHighlightIds={drawHighlightIds}
           selectedIds={selectedIds}
           discardCardId={discardCardId}
           discardPickMode={discardPickMode}

@@ -60,6 +60,7 @@ function slotIndexFromClientX(clientX, orderIds, refs) {
 /**
  * @param {{
  *   handRaw: unknown[],
+ *   drawHighlightIds?: Set<string>|null,
  *   selectedIds: Set<string>|string[],
  *   discardCardId: string|null,
  *   discardPickMode: boolean,
@@ -79,6 +80,7 @@ function slotIndexFromClientX(clientX, orderIds, refs) {
  */
 export default function Ov2Rummy51Hand({
   handRaw = [],
+  drawHighlightIds = null,
   selectedIds,
   discardCardId,
   discardPickMode,
@@ -309,11 +311,14 @@ export default function Ov2Rummy51Hand({
     ? "flex w-full shrink-0 flex-col gap-0 overflow-hidden px-0.5 pb-0 pt-0 sm:px-1"
     : "flex w-full shrink-0 flex-col gap-1 overflow-hidden rounded-lg border border-violet-500/25 bg-violet-950/20 p-2";
 
+  /** Without touch-none, mobile browsers steal touch for scroll; pointer-drag reorder never starts. */
+  const allowPointerReorder = cardsInteractive && !reorderLocked && displayCards.length > 1;
+
   return (
     <div className={shell}>
       <div
         ref={rowRef}
-        className={`relative flex w-full shrink-0 flex-row flex-nowrap items-end justify-center overflow-hidden overscroll-none ${draggingId ? "touch-none" : ""} ${displayCards.length ? "min-h-[5.45rem] pt-3.5 pb-0 sm:min-h-[5.7rem] sm:pt-4" : "min-h-0 py-0.5"}`}
+        className={`relative flex w-full shrink-0 flex-row flex-nowrap select-none items-end justify-center overflow-hidden overscroll-none ${draggingId ? "touch-none" : ""} ${displayCards.length ? "min-h-[5.45rem] pt-3.5 pb-0 sm:min-h-[5.7rem] sm:pt-4" : "min-h-0 py-0.5"}`}
         role="list"
         aria-label="Your cards"
       >
@@ -321,13 +326,14 @@ export default function Ov2Rummy51Hand({
           const id = c.id;
           const isSel = selected.has(id);
           const isDisc = discardCardId === id;
+          const isDrawGlow = Boolean(drawHighlightIds && drawHighlightIds.size > 0 && drawHighlightIds.has(id));
           const red = c.suit === "H" || c.suit === "D";
           const mid = (displayCards.length - 1) / 2;
           const fanDeg = displayCards.length > 1 ? (idx - mid) * 1.1 : 0;
           const marginLeft = idx === 0 ? 0 : -overlapPx;
           const zBase = 10 + idx;
           const isDragging = draggingId === id;
-          const z = isDragging ? 80 : isSel ? 60 : isDisc ? 50 : zBase;
+          const z = isDragging ? 80 : isSel ? 60 : isDrawGlow ? 55 : isDisc ? 50 : zBase;
 
           const passiveHand = !cardsInteractive;
           const liftPx = isSel ? (passiveHand ? 10 : 14) : 0;
@@ -360,6 +366,8 @@ export default function Ov2Rummy51Hand({
               }}
               className={[
                 "relative box-border h-[4.1rem] w-[3rem] shrink-0 rounded-md border-[1.5px] bg-[#faf7f0] text-left transition-[transform,box-shadow,border-color,opacity] duration-150 sm:h-[4.35rem] sm:w-[3.5rem]",
+                allowPointerReorder || isDragging ? "touch-none" : "",
+                isDrawGlow ? "duration-300 animate-pulse shadow-[0_0_16px_rgba(16,185,129,0.7),0_2px_10px_rgba(0,0,0,0.35)]" : "",
                 passiveHand && !isSel && !isDisc
                   ? "border-zinc-700 shadow-[0_1px_5px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.96)]"
                   : "border-zinc-900 shadow-[0_2px_10px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.98)]",
@@ -367,6 +375,7 @@ export default function Ov2Rummy51Hand({
                 isSel
                   ? "z-[1] border-sky-500 shadow-[0_0_0_2px_rgba(14,165,233,0.55),0_4px_16px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.98)]"
                   : "",
+                isDrawGlow && !isDisc ? "ring-2 ring-emerald-400 ring-offset-2 ring-offset-[#faf7f0]" : "",
                 isDisc ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-[#faf7f0]" : "",
               ].join(" ")}
             >
