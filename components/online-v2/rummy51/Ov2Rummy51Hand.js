@@ -88,6 +88,9 @@ export default function Ov2Rummy51Hand({
   const rankSuitLocked = sortDisabled === undefined ? disabled : sortDisabled;
   const reorderLocked = rankSuitLocked;
 
+  /** Hand play / selection / reorder — false when not your turn, busy, or not in play (parent `disabled`). */
+  const cardsInteractive = !disabled;
+
   const selected = useMemo(() => {
     if (selectedIds instanceof Set) return selectedIds;
     return new Set(Array.isArray(selectedIds) ? selectedIds : []);
@@ -220,6 +223,7 @@ export default function Ov2Rummy51Hand({
 
   const handlePointerDown = useCallback(
     (e, id, idx) => {
+      if (!cardsInteractive) return;
       if (reorderLocked) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
       hoverSlotRef.current = null;
@@ -234,7 +238,7 @@ export default function Ov2Rummy51Hand({
       };
       e.currentTarget.setPointerCapture(e.pointerId);
     },
-    [reorderLocked]
+    [reorderLocked, cardsInteractive]
   );
 
   const handlePointerMove = useCallback(
@@ -324,6 +328,10 @@ export default function Ov2Rummy51Hand({
           const isDragging = draggingId === id;
           const z = isDragging ? 80 : isSel ? 60 : isDisc ? 50 : zBase;
 
+          const passiveHand = !cardsInteractive;
+          const liftPx = isSel ? (passiveHand ? 10 : 14) : 0;
+          const liftScale = isSel ? (passiveHand ? 1.04 : 1.07) : 1;
+
           return (
             <button
               key={id}
@@ -333,8 +341,8 @@ export default function Ov2Rummy51Hand({
                 if (el) cardRefs.current.set(id, el);
                 else cardRefs.current.delete(id);
               }}
-              disabled={reorderLocked}
-              aria-disabled={disabled}
+              tabIndex={cardsInteractive ? 0 : -1}
+              aria-disabled={!cardsInteractive}
               onClick={() => handleCardClick(id)}
               onPointerDown={e => handlePointerDown(e, id, idx)}
               onPointerMove={handlePointerMove}
@@ -345,18 +353,20 @@ export default function Ov2Rummy51Hand({
                 zIndex: z,
                 transformOrigin: "50% 100%",
                 transform: isSel
-                  ? `translateY(-14px) scale(1.07) rotate(${fanDeg}deg)`
+                  ? `translateY(-${liftPx}px) scale(${liftScale}) rotate(${fanDeg}deg)`
                   : `translateY(0) rotate(${fanDeg}deg)`,
                 opacity: isDragging ? 0.92 : undefined,
               }}
               className={[
-                "relative box-border h-[4.1rem] w-[3rem] shrink-0 rounded-md border-[1.5px] border-zinc-800 bg-[#faf7f0] text-left shadow-[0_2px_8px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.95)] transition-[transform,box-shadow,border-color,opacity] duration-150 sm:h-[4.35rem] sm:w-[3.5rem]",
-                reorderLocked ? "cursor-default" : "cursor-grab active:cursor-grabbing",
+                "relative box-border h-[4.1rem] w-[3rem] shrink-0 rounded-md border-[1.5px] bg-[#faf7f0] text-left transition-[transform,box-shadow,border-color,opacity] duration-150 sm:h-[4.35rem] sm:w-[3.5rem]",
+                passiveHand && !isSel && !isDisc
+                  ? "border-zinc-700 shadow-[0_1px_5px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.96)]"
+                  : "border-zinc-900 shadow-[0_2px_10px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.98)]",
+                cardsInteractive ? "cursor-grab active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-400/80" : "pointer-events-none cursor-default",
                 isSel
-                  ? "z-[1] border-sky-500 shadow-[0_0_0_2px_rgba(14,165,233,0.55),0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.95)]"
+                  ? "z-[1] border-sky-500 shadow-[0_0_0_2px_rgba(14,165,233,0.55),0_4px_16px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.98)]"
                   : "",
                 isDisc ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-[#faf7f0]" : "",
-                disabled && !reorderLocked ? "opacity-45" : "",
               ].join(" ")}
             >
               <span
