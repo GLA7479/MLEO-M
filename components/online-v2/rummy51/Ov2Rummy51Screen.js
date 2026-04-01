@@ -29,23 +29,23 @@ function MidDiscardSlot({ card, showHint, highlight }) {
   const red = Boolean(card && !card.isJoker && (card.suit === "H" || card.suit === "D"));
   return (
     <div
-      className={`mx-0.5 shrink-0 rounded-md border px-1 py-0.5 sm:px-1.5 sm:py-1 ${
+      className={`shrink-0 rounded border px-0.5 py-px sm:px-1 sm:py-0.5 ${
         highlight
-          ? "border-amber-400/45 bg-gradient-to-b from-amber-950/40 to-zinc-950/85 shadow-[0_0_18px_rgba(245,158,11,0.1)]"
+          ? "border-amber-400/45 bg-gradient-to-b from-amber-950/40 to-zinc-950/85 shadow-[0_0_12px_rgba(245,158,11,0.08)]"
           : "border-white/[0.06] bg-black/25"
       }`}
     >
-      <p className="text-center text-[6px] font-bold uppercase tracking-widest text-amber-200/70">Discard</p>
+      <p className="text-center text-[5px] font-bold uppercase tracking-wider text-amber-200/65">Discard</p>
       {card ? (
-        <div className="relative mx-auto mt-0.5 flex h-[5rem] w-[3.5rem] flex-col rounded-lg border-2 border-amber-400/50 bg-gradient-to-b from-zinc-600 to-zinc-950 py-1 shadow-lg sm:h-[5.25rem] sm:w-16">
+        <div className="relative mx-auto mt-px flex h-[4rem] w-[2.85rem] flex-col rounded-md border border-amber-400/45 bg-gradient-to-b from-zinc-600 to-zinc-950 py-0.5 shadow-md sm:h-[4.15rem] sm:w-[3.1rem]">
           <div
-            className={`px-1 text-left leading-none ${card.isJoker ? "text-amber-200" : red ? "text-rose-300" : "text-zinc-100"}`}
+            className={`px-0.5 text-left leading-none ${card.isJoker ? "text-amber-200" : red ? "text-rose-300" : "text-zinc-100"}`}
           >
-            <div className="text-xs font-extrabold sm:text-sm">{card.isJoker ? "J" : MID_RANK[card.rank] ?? "?"}</div>
-            <div className="text-sm font-bold sm:text-base">{card.isJoker ? "★" : card.suit ? MID_SUIT[card.suit] ?? "" : ""}</div>
+            <div className="text-[10px] font-extrabold leading-none sm:text-[11px]">{card.isJoker ? "J" : MID_RANK[card.rank] ?? "?"}</div>
+            <div className="text-xs font-bold leading-none sm:text-sm">{card.isJoker ? "★" : card.suit ? MID_SUIT[card.suit] ?? "" : ""}</div>
           </div>
           <div
-            className={`flex flex-1 items-center justify-center px-0.5 text-center text-base font-black leading-none sm:text-lg ${
+            className={`flex flex-1 items-center justify-center px-0.5 text-center text-sm font-black leading-none sm:text-base ${
               card.isJoker ? "text-amber-200" : red ? "text-rose-200" : "text-zinc-100"
             }`}
           >
@@ -53,9 +53,9 @@ function MidDiscardSlot({ card, showHint, highlight }) {
           </div>
         </div>
       ) : showHint ? (
-        <p className="mt-0.5 text-center text-[8px] leading-tight text-zinc-500">Choose in hand</p>
+        <p className="mt-px text-center text-[7px] leading-none text-zinc-500">Hand</p>
       ) : (
-        <p className="mt-0.5 text-center text-[7px] text-zinc-600/90">—</p>
+        <p className="mt-px text-center text-[6px] leading-none text-zinc-600/90">—</p>
       )}
     </div>
   );
@@ -555,18 +555,21 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
-        <MidDiscardSlot
-          card={isMyTurn && isPlaying && pendingDraw ? pickedDiscardCard : null}
-          showHint={Boolean(isMyTurn && isPlaying && pendingDraw && !pickedDiscardCard)}
-          highlight={Boolean(isMyTurn && isPlaying && pendingDraw && pickedDiscardCard)}
-        />
-
-        <Ov2Rummy51TableMelds
-          tableMeldsRaw={snapshot.tableMelds || []}
-          selectedTargetMeldId={targetMeldId}
-          onSelectTargetMeld={setTargetMeldId}
-          disabled={busy || !isMyTurn || !isPlaying}
-        />
+        <div className="flex min-h-0 shrink-0 flex-col gap-0.5 sm:flex-row sm:items-start sm:gap-1">
+          <MidDiscardSlot
+            card={isMyTurn && isPlaying && pendingDraw ? pickedDiscardCard : null}
+            showHint={Boolean(isMyTurn && isPlaying && pendingDraw && !pickedDiscardCard)}
+            highlight={Boolean(isMyTurn && isPlaying && pendingDraw && pickedDiscardCard)}
+          />
+          <div className="min-h-0 min-w-0 flex-1">
+            <Ov2Rummy51TableMelds
+              tableMeldsRaw={snapshot.tableMelds || []}
+              selectedTargetMeldId={targetMeldId}
+              onSelectTargetMeld={setTargetMeldId}
+              disabled={busy || !isMyTurn || !isPlaying}
+            />
+          </div>
+        </div>
 
         {roundBanner ? (
           <div className="shrink-0 rounded border border-cyan-500/30 bg-cyan-950/25 px-1.5 py-0.5 text-[8px] text-cyan-50">

@@ -1,7 +1,53 @@
 "use client";
 
 import { useMemo } from "react";
-import { deserializeCard, getCardDisplayLabel } from "../../../lib/online-v2/rummy51/ov2Rummy51Engine";
+import { deserializeCard } from "../../../lib/online-v2/rummy51/ov2Rummy51Engine";
+
+/**
+ * @typedef {import("../../../lib/online-v2/rummy51/ov2Rummy51Engine").Rummy51Card} Rummy51Card
+ */
+
+const SUIT_SYM = /** @type {const} */ ({ S: "♠", H: "♥", D: "♦", C: "♣" });
+const RANK_CORNER = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+
+/** @param {Rummy51Card} card */
+function cornerRank(card) {
+  if (card.isJoker) return "J";
+  return RANK_CORNER[card.rank] ?? "?";
+}
+
+/** @param {Rummy51Card} card */
+function cornerSuit(card) {
+  if (card.isJoker) return "★";
+  return card.suit ? SUIT_SYM[card.suit] ?? "" : "";
+}
+
+/**
+ * Single overlapping mini-card in a table meld (readable rank/suit, not a text pill).
+ * @param {{ card: Rummy51Card, overlap: boolean, stackIndex: number }} props
+ */
+function TableMeldMiniCard({ card, overlap, stackIndex }) {
+  const red = card.suit === "H" || card.suit === "D";
+  return (
+    <div
+      style={{ zIndex: stackIndex }}
+      className={[
+        "relative box-border h-[2.75rem] w-[1.9rem] shrink-0 rounded-md border-[1.5px] border-zinc-800 bg-[#faf7f0] shadow-[0_2px_6px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.92)] sm:h-[2.95rem] sm:w-[2.05rem]",
+        overlap ? "-ml-[0.62rem] sm:-ml-[0.72rem]" : "",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "pointer-events-none absolute left-0.5 top-0.5 flex flex-col leading-none whitespace-nowrap",
+          card.isJoker ? "text-amber-900" : red ? "text-red-700" : "text-neutral-900",
+        ].join(" ")}
+      >
+        <span className="text-[10px] font-extrabold tracking-tight sm:text-[11px]">{cornerRank(card)}</span>
+        <span className="text-[12px] font-bold leading-none sm:text-[13px]">{cornerSuit(card)}</span>
+      </span>
+    </div>
+  );
+}
 
 /**
  * @param {{
@@ -39,16 +85,15 @@ export default function Ov2Rummy51TableMelds({
 
   if (!melds.length) {
     return (
-      <div className="shrink-0 border-b border-white/5 py-px text-center text-[8px] leading-none text-zinc-500">
-        Table · no melds yet
+      <div className="min-h-0 shrink-0 border-b border-white/[0.06] py-0.5 text-center text-[8px] leading-tight text-zinc-500">
+        No melds yet
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-0 max-h-[min(30vh,200px)] shrink-0 flex-col gap-1 overflow-y-auto rounded-md border border-teal-500/20 bg-teal-950/10 px-1 py-1 [scrollbar-width:thin] sm:max-h-[min(34vh,260px)]">
-      <p className="shrink-0 text-[8px] font-semibold uppercase tracking-wide text-teal-200/75">Table</p>
-      <div className="flex flex-col gap-1">
+    <div className="min-h-0 max-h-[8.75rem] shrink-0 overflow-x-hidden overflow-y-auto rounded-md border border-teal-500/20 bg-teal-950/10 px-1 py-1 [scrollbar-width:thin]">
+      <div className="flex flex-wrap content-start items-end gap-x-2 gap-y-1.5">
         {melds.map(m => {
           if (!m) return null;
           const isRun = m.kind === "run";
@@ -60,30 +105,16 @@ export default function Ov2Rummy51TableMelds({
               disabled={disabled}
               onClick={() => onSelectTargetMeld(isTarget ? null : m.meldId)}
               className={[
-                "flex w-full flex-col gap-0.5 rounded border px-1 py-0.5 text-left transition",
+                "inline-flex max-w-full items-end gap-1 rounded-lg border px-1 py-0.5 text-left transition",
                 isRun ? "border-sky-500/35 bg-sky-950/25" : "border-amber-500/35 bg-amber-950/20",
-                isTarget ? "ring-1 ring-fuchsia-400/80" : "",
-                disabled ? "opacity-50" : "hover:brightness-110",
+                isTarget ? "ring-2 ring-fuchsia-400/70 ring-offset-1 ring-offset-zinc-950" : "",
+                disabled ? "opacity-[0.58]" : "hover:brightness-[1.06]",
               ].join(" ")}
             >
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-[7px] font-bold uppercase text-zinc-400">{isRun ? "Run" : m.kind === "set" ? "Set" : "Meld"}</span>
-                {isTarget ? <span className="text-[7px] font-bold text-fuchsia-200">target</span> : null}
-              </div>
-              <div className="flex flex-wrap gap-0.5">
-                {m.cards.map(c => {
-                  const red = c.suit === "H" || c.suit === "D";
-                  return (
-                    <span
-                      key={c.id}
-                      className={`rounded border border-white/15 bg-black/35 px-1 py-px font-mono text-[9px] font-semibold ${
-                        red && !c.isJoker ? "text-rose-200" : "text-zinc-100"
-                      } ${c.isJoker ? "text-amber-200" : ""}`}
-                    >
-                      {getCardDisplayLabel(c)}
-                    </span>
-                  );
-                })}
+              <div className="flex min-w-0 flex-row flex-nowrap items-stretch pr-0.5">
+                {m.cards.map((c, i) => (
+                  <TableMeldMiniCard key={c.id} card={c} overlap={i > 0} stackIndex={i} />
+                ))}
               </div>
             </button>
           );
