@@ -18,6 +18,49 @@ import Ov2Rummy51TableMelds from "./Ov2Rummy51TableMelds";
  * @typedef {import("../../../lib/online-v2/rummy51/ov2Rummy51Engine").Rummy51Card} Rummy51Card
  */
 
+const MID_RANK = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+const MID_SUIT = /** @type {const} */ ({ S: "♠", H: "♥", D: "♦", C: "♣" });
+
+/**
+ * Center play area: chosen discard as a distinct “throw” card vs the hand.
+ * @param {{ card: Rummy51Card|null, showHint: boolean, highlight: boolean }} props
+ */
+function MidDiscardSlot({ card, showHint, highlight }) {
+  const red = Boolean(card && !card.isJoker && (card.suit === "H" || card.suit === "D"));
+  return (
+    <div
+      className={`mx-0.5 shrink-0 rounded-md border px-1 py-0.5 sm:px-1.5 sm:py-1 ${
+        highlight
+          ? "border-amber-400/45 bg-gradient-to-b from-amber-950/40 to-zinc-950/85 shadow-[0_0_18px_rgba(245,158,11,0.1)]"
+          : "border-white/[0.06] bg-black/25"
+      }`}
+    >
+      <p className="text-center text-[6px] font-bold uppercase tracking-widest text-amber-200/70">Discard</p>
+      {card ? (
+        <div className="relative mx-auto mt-0.5 flex h-[5rem] w-[3.5rem] flex-col rounded-lg border-2 border-amber-400/50 bg-gradient-to-b from-zinc-600 to-zinc-950 py-1 shadow-lg sm:h-[5.25rem] sm:w-16">
+          <div
+            className={`px-1 text-left leading-none ${card.isJoker ? "text-amber-200" : red ? "text-rose-300" : "text-zinc-100"}`}
+          >
+            <div className="text-xs font-extrabold sm:text-sm">{card.isJoker ? "J" : MID_RANK[card.rank] ?? "?"}</div>
+            <div className="text-sm font-bold sm:text-base">{card.isJoker ? "★" : card.suit ? MID_SUIT[card.suit] ?? "" : ""}</div>
+          </div>
+          <div
+            className={`flex flex-1 items-center justify-center px-0.5 text-center text-base font-black leading-none sm:text-lg ${
+              card.isJoker ? "text-amber-200" : red ? "text-rose-200" : "text-zinc-100"
+            }`}
+          >
+            {getCardDisplayLabel(card)}
+          </div>
+        </div>
+      ) : showHint ? (
+        <p className="mt-0.5 text-center text-[8px] leading-tight text-zinc-500">Choose in hand</p>
+      ) : (
+        <p className="mt-0.5 text-center text-[7px] text-zinc-600/90">—</p>
+      )}
+    </div>
+  );
+}
+
 /**
  * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null }} props
  */
@@ -149,18 +192,32 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     return out;
   }, [snapshot?.playerState]);
 
-  const scoreboardRows = useMemo(() => {
-    if (!snapshot?.playerState) return [];
-    return Object.entries(snapshot.playerState).map(([pk, ps]) => {
-      if (!ps || typeof ps !== "object") return null;
-      const name = ps.displayName != null ? String(ps.displayName) : pk.slice(0, 6);
+  /** Per-seat lines for `Ov2SeatStrip` (score / opened / near-elimination). */
+  const seatStripMeta = useMemo(() => {
+    const scoreLines = /** @type {(string|null)[]} */ ([null, null, null, null]);
+    const openedFlags = [false, false, false, false];
+    const nearFlags = [false, false, false, false];
+    if (!snapshot?.playerState) {
+      return { scoreLines, openedFlags, nearFlags };
+    }
+    for (const [, ps] of Object.entries(snapshot.playerState)) {
+      if (!ps || typeof ps !== "object") continue;
+      const si = ps.seatIndex;
+      if (si == null || !Number.isInteger(Number(si)) || Number(si) < 0 || Number(si) > 3) continue;
+      const s = Number(si);
       const total = ps.scoreTotal != null ? Number(ps.scoreTotal) : 0;
-      const opened = Boolean(ps.hasEverOpened);
       const out = Boolean(ps.isEliminated);
-      const near = !out && total >= RUMMY51_ELIMINATION_SCORE - 80;
-      return { pk, name, total, opened, out, near, you: pk === selfKey };
-    }).filter(Boolean);
-  }, [snapshot?.playerState, selfKey]);
+      scoreLines[s] = `${total}/${RUMMY51_ELIMINATION_SCORE}`;
+      openedFlags[s] = Boolean(ps.hasEverOpened);
+      nearFlags[s] = !out && total >= RUMMY51_ELIMINATION_SCORE - 80;
+    }
+    return { scoreLines, openedFlags, nearFlags };
+  }, [snapshot?.playerState]);
+
+  const pickedDiscardCard = useMemo(() => {
+    if (!discardCardId) return null;
+    return handById.get(discardCardId) ?? null;
+  }, [discardCardId, handById]);
 
   const discardTopLabel = useMemo(() => {
     const t = snapshot?.discardTop;
@@ -467,6 +524,9 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
         selfIndex={selfSeatIndex}
         awaitedIndex={turnSeatIndex}
         eliminatedIndices={eliminatedSeatIndices}
+        seatScoreLines={seatStripMeta.scoreLines}
+        seatOpenedFlags={seatStripMeta.openedFlags}
+        seatNearElim={seatStripMeta.nearFlags}
       />
 
       <div className="flex h-5 shrink-0 flex-nowrap items-center gap-x-1 overflow-hidden whitespace-nowrap rounded border border-white/10 bg-black/50 px-1 text-[7px] text-zinc-400 sm:h-6 sm:text-[8px]">
@@ -495,39 +555,11 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
-        <div className="flex shrink-0 gap-0.5 overflow-x-auto overflow-y-hidden border-b border-white/5 pb-px [scrollbar-width:thin]">
-          {scoreboardRows.map(row => {
-            if (!row) return null;
-            return (
-              <div
-                key={row.pk}
-                className={`w-[4rem] shrink-0 rounded border px-0.5 py-px text-[7px] leading-tight sm:w-[4.5rem] sm:text-[8px] ${
-                  row.out
-                    ? "border-zinc-700 bg-zinc-900/50 text-zinc-500 line-through decoration-zinc-500"
-                    : row.near
-                      ? "border-amber-500/45 bg-amber-950/30 text-amber-100"
-                      : "border-white/10 bg-white/5 text-zinc-200"
-                }`}
-              >
-                <div className="truncate font-semibold text-white">
-                  {row.name}
-                  {row.you ? " · you" : ""}
-                </div>
-                <div className="font-mono text-[8px] text-zinc-300 sm:text-[9px]">
-                  {row.total}/{RUMMY51_ELIMINATION_SCORE}
-                </div>
-                <div className="flex flex-wrap gap-px">
-                  {row.opened ? (
-                    <span className="rounded bg-emerald-900/55 px-0.5 text-[6px] font-semibold leading-none text-emerald-100">opened</span>
-                  ) : null}
-                  {row.out ? (
-                    <span className="rounded bg-zinc-800 px-0.5 text-[6px] font-semibold text-zinc-400">out</span>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <MidDiscardSlot
+          card={isMyTurn && isPlaying && pendingDraw ? pickedDiscardCard : null}
+          showHint={Boolean(isMyTurn && isPlaying && pendingDraw && !pickedDiscardCard)}
+          highlight={Boolean(isMyTurn && isPlaying && pendingDraw && pickedDiscardCard)}
+        />
 
         <Ov2Rummy51TableMelds
           tableMeldsRaw={snapshot.tableMelds || []}
@@ -594,8 +626,45 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       </div>
 
       <div className="shrink-0 overflow-hidden rounded-md border border-violet-500/35 bg-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        {isMyTurn && isPlaying ? (
+          <Ov2Rummy51MeldComposer
+            compact={!hasComposerDraft}
+            hasEverOpened={hasEverOpened}
+            draftNewMelds={draftNewMelds}
+            draftTableAdds={draftTableAdds}
+            selectedIds={selectedIds}
+            targetMeldId={targetMeldId}
+            onNewMeldFromSelection={onNewMeldFromSelection}
+            onAddSelectionToTarget={onAddSelectionToTarget}
+            onRemoveDraftMeld={i => setDraftNewMelds(prev => prev.filter((_, j) => j !== i))}
+            onRemoveTableAdd={i => setDraftTableAdds(prev => prev.filter((_, j) => j !== i))}
+            onClearDraft={() => {
+              setDraftNewMelds([]);
+              setDraftTableAdds([]);
+            }}
+            disabled={busy}
+          />
+        ) : null}
+
+        <Ov2Rummy51Hand
+          embedded
+          handRaw={myHandRaw}
+          selectedIds={selectedIds}
+          discardCardId={discardCardId}
+          discardPickMode={discardPickMode}
+          sortMode={sortMode}
+          disabled={busy || !isMyTurn || !isPlaying}
+          sortDisabled={busy}
+          onToggleCardId={onToggleCardId}
+          onSortModeChange={setSortMode}
+          onEnterDiscardPickMode={() => {
+            setDiscardPickMode(true);
+            setSelectedIds(new Set());
+          }}
+        />
+
         {hasBottomActionBlock ? (
-          <div className="shrink-0 space-y-0.5 border-b border-violet-500/20 bg-black/50 px-1.5 py-0.5 sm:px-2">
+          <div className="shrink-0 space-y-0.5 border-t border-violet-500/25 bg-black/50 px-1 py-0.5 sm:px-1.5 sm:py-1">
             {actionError ? <p className="text-center text-[9px] leading-tight text-red-300">{actionError}</p> : null}
             {!pendingDraw && isMyTurn && isPlaying ? (
               <div className="flex gap-1">
@@ -635,42 +704,6 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
             ) : null}
           </div>
         ) : null}
-
-        {isMyTurn && isPlaying ? (
-          <Ov2Rummy51MeldComposer
-            compact={!hasComposerDraft}
-            hasEverOpened={hasEverOpened}
-            draftNewMelds={draftNewMelds}
-            draftTableAdds={draftTableAdds}
-            selectedIds={selectedIds}
-            targetMeldId={targetMeldId}
-            onNewMeldFromSelection={onNewMeldFromSelection}
-            onAddSelectionToTarget={onAddSelectionToTarget}
-            onRemoveDraftMeld={i => setDraftNewMelds(prev => prev.filter((_, j) => j !== i))}
-            onRemoveTableAdd={i => setDraftTableAdds(prev => prev.filter((_, j) => j !== i))}
-            onClearDraft={() => {
-              setDraftNewMelds([]);
-              setDraftTableAdds([]);
-            }}
-            disabled={busy}
-          />
-        ) : null}
-
-        <Ov2Rummy51Hand
-          embedded
-          handRaw={myHandRaw}
-          selectedIds={selectedIds}
-          discardCardId={discardCardId}
-          discardPickMode={discardPickMode}
-          sortMode={sortMode}
-          disabled={busy || !isMyTurn || !isPlaying}
-          onToggleCardId={onToggleCardId}
-          onSortModeChange={setSortMode}
-          onEnterDiscardPickMode={() => {
-            setDiscardPickMode(true);
-            setSelectedIds(new Set());
-          }}
-        />
       </div>
     </div>
   );
