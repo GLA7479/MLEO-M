@@ -1,13 +1,16 @@
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Layout from "../Layout";
 import { ONLINE_V2_REGISTRY } from "../../lib/online-v2/onlineV2GameRegistry";
 import { getOv2ParticipantId } from "../../lib/online-v2/ov2ParticipantId";
+import { getOv2RoomSnapshot } from "../../lib/online-v2/room-api/ov2SharedRoomsApi";
 import OnlineV2VaultStrip from "./OnlineV2VaultStrip";
 import Ov2SharedLobbyScreen from "./shared-rooms/Ov2SharedLobbyScreen";
 import Ov2SharedRoomScreen from "./shared-rooms/Ov2SharedRoomScreen";
 
 const OV2_DISPLAY_NAME_KEY = "ov2_display_name_v1";
+const OV2_SHARED_LAST_ROOM_KEY = "ov2_shared_last_room_id_v1";
 
 function isOv2HubEnabled() {
   if (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ONLINE_V2_ENABLED === "false") {
@@ -17,10 +20,21 @@ function isOv2HubEnabled() {
 }
 
 export default function OnlineV2RoomsScreen() {
+  const router = useRouter();
   const enabled = isOv2HubEnabled();
-  const [participantId, setParticipantId] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const [participantId, setParticipantId] = useState(() =>
+    typeof window !== "undefined" ? getOv2ParticipantId() : ""
+  );
+  const [displayName, setDisplayName] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      return window.localStorage.getItem(OV2_DISPLAY_NAME_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
   const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const sessionResumeTriedRef = useRef(false);
 
   useEffect(() => {
     setParticipantId(getOv2ParticipantId());
@@ -28,13 +42,75 @@ export default function OnlineV2RoomsScreen() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setDisplayName(window.localStorage.getItem(OV2_DISPLAY_NAME_KEY) || "");
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
     window.localStorage.setItem(OV2_DISPLAY_NAME_KEY, displayName || "");
   }, [displayName]);
+
+  const enterRoom = useCallback(
+    roomId => {
+      if (!roomId) return;
+      setSelectedRoomId(roomId);
+      try {
+        window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_KEY, roomId);
+      } catch {
+        // ignore
+      }
+      router.replace({ pathname: "/online-v2/rooms", query: { room: roomId } }, undefined, { shallow: true });
+    },
+    [router]
+  );
+
+  const exitRoom = useCallback(() => {
+    sessionResumeTriedRef.current = true;
+    setSelectedRoomId(null);
+    router.replace({ pathname: "/online-v2/rooms" }, undefined, { shallow: true });
+  }, [router]);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const q = router.query.room;
+    const fromQuery = Array.isArray(q) ? q[0] : q;
+    if (typeof fromQuery === "string" && fromQuery.length >= 32) {
+      setSelectedRoomId(fromQuery);
+      try {
+        window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_KEY, fromQuery);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    if (selectedRoomId) return;
+    if (!participantId) return;
+    if (sessionResumeTriedRef.current) return;
+
+    let last = null;
+    try {
+      last = window.sessionStorage.getItem(OV2_SHARED_LAST_ROOM_KEY);
+    } catch {
+      sessionResumeTriedRef.current = true;
+      return;
+    }
+    if (!last) {
+      sessionResumeTriedRef.current = true;
+      return;
+    }
+
+    sessionResumeTriedRef.current = true;
+    void getOv2RoomSnapshot({ room_id: last, viewer_participant_key: participantId })
+      .then(snap => {
+        const me = snap.members?.find(m => m.participant_key === participantId);
+        const st = me?.member_state;
+        if (
+          me &&
+          (st === "joined" || st === "disconnected" || st === null || st === undefined)
+        ) {
+          setSelectedRoomId(last);
+          router.replace({ pathname: "/online-v2/rooms", query: { room: last } }, undefined, { shallow: true });
+        }
+      })
+      .catch(() => {});
+  }, [router.isReady, router.query.room, participantId, selectedRoomId, router]);
 
   const gameTitleById = useMemo(() => {
     const out = {};
@@ -80,14 +156,14 @@ export default function OnlineV2RoomsScreen() {
               participantId={participantId}
               displayName={displayName}
               gameTitleById={gameTitleById}
-              onExitRoom={() => setSelectedRoomId(null)}
+              onExitRoom={exitRoom}
             />
           ) : (
             <Ov2SharedLobbyScreen
               participantId={participantId}
               displayName={displayName}
               onDisplayNameChange={setDisplayName}
-              onEnterRoom={setSelectedRoomId}
+              onEnterRoom={enterRoom}
             />
           )}
         </div>
