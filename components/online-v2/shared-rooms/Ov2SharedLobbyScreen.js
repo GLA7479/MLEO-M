@@ -124,19 +124,19 @@ export default function Ov2SharedLobbyScreen({
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       <div className="shrink-0 rounded-xl border border-white/10 bg-black/25 p-3">
         <div className="text-sm font-bold">Central lobby</div>
-        <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-1 flex min-w-0 flex-row items-stretch gap-2">
           <input
             value={displayName}
             onChange={e => onDisplayNameChange(e.target.value)}
             maxLength={24}
             placeholder="Display name"
-            className="flex-1 rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-sm text-white placeholder:text-zinc-500"
+            className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-sm text-white placeholder:text-zinc-500"
           />
           <button
             type="button"
             disabled={busy}
             onClick={() => void loadRooms()}
-            className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold"
+            className="shrink-0 whitespace-nowrap rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold sm:px-3"
           >
             Refresh
           </button>

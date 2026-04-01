@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { claimOv2Seat, hostStartOv2Room, releaseOv2Seat } from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
+import {
+  claimOv2Seat,
+  hostStartOv2Room,
+  joinOv2Room,
+  releaseOv2Seat,
+} from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
 import {
   fetchOv2LudoAuthoritativeSnapshot,
   requestOv2LudoOpenSession,
@@ -58,6 +63,7 @@ export default function Ov2SharedRoomScreen({
   const [launchingLive, setLaunchingLive] = useState(false);
   const didRouteToLiveRef = useRef(false);
   const leaveInFlightRef = useRef(false);
+  const autoJoinPublicAttemptedRef = useRef(false);
   const [ledgerMembers, setLedgerMembers] = useState([]);
   const [canonicalRoom, setCanonicalRoom] = useState(null);
   const [ledgerErr, setLedgerErr] = useState("");
@@ -103,6 +109,42 @@ export default function Ov2SharedRoomScreen({
     if (!roomId || !(isRummy51Room || isLudoRoom)) return;
     void refreshSharedEconomySnapshot();
   }, [roomId, isRummy51Room, isLudoRoom, lastLoadedAt, refreshSharedEconomySnapshot]);
+
+  useEffect(() => {
+    autoJoinPublicAttemptedRef.current = false;
+  }, [roomId]);
+
+  useEffect(() => {
+    if (loading || !roomId || !room) return;
+    if (me) return;
+    if (String(room.visibility_mode || "").toLowerCase() !== "public") return;
+    if (String(room.status || "").toUpperCase() !== "OPEN") return;
+    const dn = String(displayName || "").trim();
+    const pk = String(participantId || "").trim();
+    if (!dn || !pk) return;
+    if (autoJoinPublicAttemptedRef.current) return;
+    autoJoinPublicAttemptedRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await joinOv2Room({
+          room_id: roomId,
+          participant_key: pk,
+          display_name: dn,
+          password_plaintext: null,
+        });
+        if (!cancelled) await reload();
+      } catch (e) {
+        if (!cancelled) {
+          autoJoinPublicAttemptedRef.current = false;
+          setMsg(e?.message || String(e));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, room, me, roomId, participantId, displayName, reload]);
 
   const sharedStatusUpper = useMemo(() => String(room?.status || "").toUpperCase(), [room?.status]);
   const canonicalStatusUpper = useMemo(() => String(canonicalRoom?.status || "").toUpperCase(), [canonicalRoom?.status]);

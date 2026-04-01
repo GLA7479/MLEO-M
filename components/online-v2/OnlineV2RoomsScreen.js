@@ -41,6 +41,8 @@ export default function OnlineV2RoomsScreen() {
   });
   const [selectedRoomId, setSelectedRoomId] = useState(null);
   const sessionResumeTriedRef = useRef(false);
+  /** After `exitRoom`, Next may still expose old `?room=` briefly; avoid snapping back into the room. */
+  const lastExitedRoomIdRef = useRef(null);
 
   useEffect(() => {
     setParticipantId(getOv2ParticipantId());
@@ -54,6 +56,7 @@ export default function OnlineV2RoomsScreen() {
   const enterRoom = useCallback(
     roomId => {
       if (!roomId) return;
+      lastExitedRoomIdRef.current = null;
       setSelectedRoomId(roomId);
       try {
         window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_SESSION_KEY, roomId);
@@ -67,8 +70,12 @@ export default function OnlineV2RoomsScreen() {
 
   const exitRoom = useCallback(() => {
     sessionResumeTriedRef.current = true;
-    setSelectedRoomId(null);
-    router.replace({ pathname: "/online-v2/rooms" }, undefined, { shallow: true });
+    clearOv2SharedLastRoomSessionKey();
+    setSelectedRoomId(prev => {
+      if (prev) lastExitedRoomIdRef.current = prev;
+      return null;
+    });
+    router.replace("/online-v2/rooms", undefined, { shallow: true });
   }, [router]);
 
   useEffect(() => {
@@ -76,6 +83,10 @@ export default function OnlineV2RoomsScreen() {
 
     const q = router.query.room;
     const fromQuery = Array.isArray(q) ? q[0] : q;
+
+    if (!(typeof fromQuery === "string" && isOv2RoomIdQueryParam(fromQuery))) {
+      lastExitedRoomIdRef.current = null;
+    }
 
     if (typeof fromQuery === "string" && fromQuery.length > 0 && !isOv2RoomIdQueryParam(fromQuery)) {
       sessionResumeTriedRef.current = true;
@@ -86,9 +97,14 @@ export default function OnlineV2RoomsScreen() {
     }
 
     if (typeof fromQuery === "string" && isOv2RoomIdQueryParam(fromQuery)) {
-      setSelectedRoomId(fromQuery.trim());
+      const qid = fromQuery.trim();
+      if (lastExitedRoomIdRef.current && lastExitedRoomIdRef.current === qid) {
+        return;
+      }
+      lastExitedRoomIdRef.current = null;
+      setSelectedRoomId(qid);
       try {
-        window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_SESSION_KEY, fromQuery.trim());
+        window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_SESSION_KEY, qid);
       } catch {
         // ignore
       }
@@ -130,12 +146,14 @@ export default function OnlineV2RoomsScreen() {
           me &&
           (st === "joined" || st === "disconnected" || st === null || st === undefined)
         ) {
+          lastExitedRoomIdRef.current = null;
           setSelectedRoomId(last);
           router.replace({ pathname: "/online-v2/rooms", query: { room: last } }, undefined, { shallow: true });
         }
       })
       .catch(() => {});
-  }, [router.isReady, router.query.room, participantId, selectedRoomId, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `router` identity can churn and retrigger this effect; we only react to query/participant/selection.
+  }, [router.isReady, router.query.room, participantId, selectedRoomId]);
 
   const gameTitleById = useMemo(() => {
     const out = {};
@@ -164,9 +182,7 @@ export default function OnlineV2RoomsScreen() {
               <h1 className="truncate text-sm font-extrabold sm:text-base lg:text-lg xl:text-xl">
                 Shared rooms
               </h1>
-              <p className="truncate text-[11px] text-zinc-300 lg:text-xs xl:text-sm">
-                Ludo or Rummy 51 — join room, claim seat, start
-              </p>
+              <p className="truncate text-[11px] text-zinc-300 lg:text-xs xl:text-sm">Play with others</p>
             </div>
             <OnlineV2VaultStrip />
           </header>
