@@ -308,7 +308,7 @@ export default function Ov2Rummy51Hand({
     <div className={shell}>
       <div
         ref={rowRef}
-        className={`relative flex w-full shrink-0 flex-row flex-nowrap items-end justify-center overflow-hidden overscroll-none ${draggingId ? "touch-none" : ""} ${displayCards.length ? "min-h-[6.125rem] pt-4 pb-1 sm:min-h-[6.35rem] sm:pt-[1.125rem]" : "min-h-0 py-0.5"}`}
+        className={`relative flex w-full shrink-0 flex-row flex-nowrap items-end justify-center overflow-hidden overscroll-none ${draggingId ? "touch-none" : ""} ${displayCards.length ? "min-h-[5.45rem] pt-3.5 pb-0 sm:min-h-[5.7rem] sm:pt-4" : "min-h-0 py-0.5"}`}
         role="list"
         aria-label="Your cards"
       >
@@ -347,20 +347,22 @@ export default function Ov2Rummy51Hand({
                 transform: isSel
                   ? `translateY(-14px) scale(1.07) rotate(${fanDeg}deg)`
                   : `translateY(0) rotate(${fanDeg}deg)`,
-                opacity: isDragging ? 0.88 : undefined,
+                opacity: isDragging ? 0.92 : undefined,
               }}
               className={[
-                "relative box-border h-[4.1rem] w-[3rem] shrink-0 rounded-lg border-2 bg-white text-left shadow-md transition-[transform,box-shadow,border-color,opacity] duration-150 sm:h-[4.35rem] sm:w-[3.5rem]",
+                "relative box-border h-[4.1rem] w-[3rem] shrink-0 rounded-md border-[1.5px] border-zinc-800 bg-[#faf7f0] text-left shadow-[0_2px_8px_rgba(0,0,0,0.32),inset_0_1px_0_rgba(255,255,255,0.95)] transition-[transform,box-shadow,border-color,opacity] duration-150 sm:h-[4.35rem] sm:w-[3.5rem]",
                 reorderLocked ? "cursor-default" : "cursor-grab active:cursor-grabbing",
-                isSel ? "border-sky-500 shadow-[0_0_0_2px_rgba(56,189,248,0.5),0_6px_16px_rgba(0,0,0,0.2)]" : "border-zinc-400/90",
-                isDisc ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-white" : "",
+                isSel
+                  ? "z-[1] border-sky-500 shadow-[0_0_0_2px_rgba(14,165,233,0.55),0_4px_16px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.95)]"
+                  : "",
+                isDisc ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-[#faf7f0]" : "",
                 disabled && !reorderLocked ? "opacity-45" : "",
               ].join(" ")}
             >
               <span
                 className={[
-                  "pointer-events-none absolute left-0.5 top-0.5 flex flex-col leading-none whitespace-nowrap",
-                  c.isJoker ? "text-amber-700" : red ? "text-red-600" : "text-zinc-900",
+                  "pointer-events-none absolute left-0.5 top-0.5 flex flex-col leading-none whitespace-nowrap drop-shadow-[0_0.5px_0_rgba(255,255,255,0.6)]",
+                  c.isJoker ? "text-amber-900" : red ? "text-red-700" : "text-neutral-900",
                 ].join(" ")}
               >
                 <span className="text-[11px] font-extrabold tracking-tight sm:text-xs">{cornerRank(c)}</span>
@@ -380,7 +382,7 @@ export default function Ov2Rummy51Hand({
         <p className="shrink-0 px-0.5 pb-0.5 text-center text-[8px] leading-tight text-amber-200/90">Tap card to discard.</p>
       ) : null}
 
-      <div className="flex shrink-0 flex-nowrap items-center justify-center gap-0.5 border-t border-white/5 pt-0.5">
+      <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1 border-t border-white/5 pt-1">
         <button
           type="button"
           disabled={rankSuitLocked}
@@ -388,7 +390,7 @@ export default function Ov2Rummy51Hand({
             setManualOrder(null);
             onSortModeChange("rank");
           }}
-          className={`shrink-0 rounded px-1.5 py-0.5 text-[8px] font-semibold sm:text-[9px] ${
+          className={`min-h-[34px] min-w-[4.75rem] shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold leading-tight sm:min-h-[38px] sm:min-w-[5.75rem] sm:px-4 sm:py-2 sm:text-sm ${
             sortMode === "rank" ? "bg-violet-600/50 text-white" : "bg-white/10 text-zinc-400"
           } disabled:opacity-40`}
         >
@@ -401,7 +403,7 @@ export default function Ov2Rummy51Hand({
             setManualOrder(null);
             onSortModeChange("suit");
           }}
-          className={`shrink-0 rounded px-1.5 py-0.5 text-[8px] font-semibold sm:text-[9px] ${
+          className={`min-h-[34px] min-w-[4.75rem] shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold leading-tight sm:min-h-[38px] sm:min-w-[5.75rem] sm:px-4 sm:py-2 sm:text-sm ${
             sortMode === "suit" ? "bg-violet-600/50 text-white" : "bg-white/10 text-zinc-400"
           } disabled:opacity-40`}
         >
@@ -411,7 +413,7 @@ export default function Ov2Rummy51Hand({
           type="button"
           disabled={disabled}
           onClick={() => onEnterDiscardPickMode()}
-          className={`shrink-0 rounded px-1.5 py-0.5 text-[8px] font-semibold sm:text-[9px] ${
+          className={`min-h-[34px] min-w-[4.75rem] shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold leading-tight sm:min-h-[38px] sm:min-w-[5.75rem] sm:px-4 sm:py-2 sm:text-sm ${
             discardPickMode ? "bg-amber-600/60 text-amber-50" : "border border-amber-500/40 bg-amber-950/30 text-amber-100"
           } disabled:opacity-40`}
         >
