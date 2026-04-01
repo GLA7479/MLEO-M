@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
+import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import {
   fetchOv2Rummy51Snapshot,
   normalizeOv2Rummy51Snapshot,
@@ -7,11 +9,9 @@ import {
   ov2Rummy51SubmitTurn,
   ov2Rummy51UndoDiscardDraw,
   OV2_RUMMY51_PRODUCT_GAME_ID,
-  requestOv2Rummy51Rematch,
-  cancelOv2Rummy51Rematch,
-  startOv2Rummy51NextMatch,
   subscribeOv2Rummy51Session,
 } from "../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
+import { requestOv2Rummy51ClaimSettlement } from "../lib/online-v2/rummy51/ov2Rummy51Settlement";
 
 /**
  * @param {null|undefined|{
@@ -62,6 +62,34 @@ export function useOv2Rummy51Session(baseContext) {
   const applySnapshot = useCallback(s => {
     if (s && typeof s === "object") setSnapshot(normalizeOv2Rummy51Snapshot(s));
   }, []);
+
+  const vaultFinishedRefreshForSessionRef = useRef(/** @type {string|null} */ (null));
+
+  useEffect(() => {
+    vaultFinishedRefreshForSessionRef.current = null;
+  }, [roomId]);
+
+  useEffect(() => {
+    if (!roomId || roomProductId !== OV2_RUMMY51_PRODUCT_GAME_ID) return;
+    if (String(snapshot?.phase || "").trim().toLowerCase() !== "finished") return;
+    const sid = String(snapshot?.sessionId || "").trim();
+    if (!sid || !selfKey) return;
+    if (vaultFinishedRefreshForSessionRef.current === sid) return;
+    vaultFinishedRefreshForSessionRef.current = sid;
+    void (async () => {
+      try {
+        const claim = await requestOv2Rummy51ClaimSettlement(roomId, selfKey);
+        if (claim.ok && Array.isArray(claim.lines) && claim.lines.length > 0) {
+          await applyBoardPathSettlementClaimLinesToVault(claim.lines, OV2_RUMMY51_PRODUCT_GAME_ID);
+        } else if (!claim.ok) {
+          vaultFinishedRefreshForSessionRef.current = null;
+        }
+      } catch {
+        vaultFinishedRefreshForSessionRef.current = null;
+      }
+      await readOnlineV2Vault({ fresh: true }).catch(() => {});
+    })();
+  }, [roomId, roomProductId, snapshot?.phase, snapshot?.sessionId, selfKey]);
 
   const drawStock = useCallback(async () => {
     if (!roomId || !selfKey || !snapshot) return { ok: false, error: "no session" };
@@ -150,64 +178,6 @@ export function useOv2Rummy51Session(baseContext) {
     [roomId, selfKey, snapshot, applySnapshot]
   );
 
-  const requestRematch = useCallback(async () => {
-    if (!roomId || !selfKey) return { ok: false };
-    setBusy(true);
-    setActionError("");
-    try {
-      const r = await requestOv2Rummy51Rematch(roomId, selfKey);
-      if (!r.ok) setActionError(r.error || "Rematch request failed");
-      await refresh();
-      void reloadRoomContext?.();
-      return r;
-    } catch (e) {
-      const msg = e?.message || String(e);
-      setActionError(msg);
-      return { ok: false, error: msg };
-    } finally {
-      setBusy(false);
-    }
-  }, [roomId, selfKey, refresh, reloadRoomContext]);
-
-  const cancelRematch = useCallback(async () => {
-    if (!roomId || !selfKey) return { ok: false };
-    setBusy(true);
-    setActionError("");
-    try {
-      const r = await cancelOv2Rummy51Rematch(roomId, selfKey);
-      if (!r.ok) setActionError(r.error || "Cancel failed");
-      await refresh();
-      void reloadRoomContext?.();
-      return r;
-    } catch (e) {
-      const msg = e?.message || String(e);
-      setActionError(msg);
-      return { ok: false, error: msg };
-    } finally {
-      setBusy(false);
-    }
-  }, [roomId, selfKey, refresh, reloadRoomContext]);
-
-  const startNextMatch = useCallback(async () => {
-    if (!roomId || !selfKey || !room) return { ok: false };
-    setBusy(true);
-    setActionError("");
-    try {
-      const seq = room.match_seq != null ? Number(room.match_seq) : null;
-      const r = await startOv2Rummy51NextMatch(roomId, selfKey, seq);
-      if (!r.ok) setActionError(r.error || "Could not start next match");
-      await refresh();
-      void reloadRoomContext?.();
-      return r;
-    } catch (e) {
-      const msg = e?.message || String(e);
-      setActionError(msg);
-      return { ok: false, error: msg };
-    } finally {
-      setBusy(false);
-    }
-  }, [roomId, selfKey, room, refresh, reloadRoomContext]);
-
   const isMyTurn = useMemo(
     () => Boolean(selfKey && snapshot?.turnParticipantKey && snapshot.turnParticipantKey === selfKey),
     [selfKey, snapshot?.turnParticipantKey]
@@ -217,21 +187,6 @@ export function useOv2Rummy51Session(baseContext) {
   const phase = snapshot?.phase != null ? String(snapshot.phase) : "";
   const isPlaying = phase === "playing";
   const isFinished = phase === "finished";
-
-  const rematchCounts = useMemo(() => {
-    let eligible = 0;
-    let ready = 0;
-    for (const m of members) {
-      if (!m || typeof m !== "object") continue;
-      if (m.seat_index == null || m.seat_index === "") continue;
-      if (String(m.wallet_state || "") !== "committed") continue;
-      eligible += 1;
-      const meta = m.meta && typeof m.meta === "object" ? m.meta : null;
-      const r51 = meta?.rummy51 && typeof meta.rummy51 === "object" ? meta.rummy51 : null;
-      if (r51?.rematch_requested === true) ready += 1;
-    }
-    return { eligible, ready };
-  }, [members]);
 
   const hostKey = room?.host_participant_key != null ? String(room.host_participant_key) : "";
   const isHost = Boolean(selfKey && hostKey && selfKey === hostKey);
@@ -249,14 +204,10 @@ export function useOv2Rummy51Session(baseContext) {
     drawDiscard,
     undoDiscardDraw,
     submitTurn,
-    requestRematch,
-    cancelRematch,
-    startNextMatch,
     isMyTurn,
     hasActiveSession,
     isPlaying,
     isFinished,
-    rematchCounts,
     isHost,
     productId: OV2_RUMMY51_PRODUCT_GAME_ID,
   };

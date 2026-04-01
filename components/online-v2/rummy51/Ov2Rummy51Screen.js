@@ -228,14 +228,10 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     drawDiscard,
     undoDiscardDraw,
     submitTurn,
-    requestRematch,
-    cancelRematch,
-    startNextMatch,
     isMyTurn,
     hasActiveSession,
     isPlaying,
     isFinished,
-    rematchCounts,
     isHost,
   } = session;
 
@@ -278,6 +274,17 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const leaveToLobbyBusy = Boolean(
     contextInput && typeof contextInput === "object" && contextInput.leaveToLobbyBusy === true
   );
+
+  const finishedPotLabel = useMemo(() => {
+    if (!snapshot || String(snapshot.phase) !== "finished") return "";
+    const m = snapshot.matchMeta && typeof snapshot.matchMeta === "object" ? snapshot.matchMeta : null;
+    if (!m) return "";
+    const stake = m.stakePerSeat != null ? Number(m.stakePerSeat) : 0;
+    const seats = m.seatCount != null ? Number(m.seatCount) : 0;
+    if (!Number.isFinite(stake) || !Number.isFinite(seats) || stake <= 0 || seats <= 0) return "";
+    const total = Math.floor(stake * seats);
+    return `${total} (pool: ${stake} × ${seats} seats)`;
+  }, [snapshot]);
 
   const myHandRaw = useMemo(() => {
     if (!snapshot?.hands || !selfKey) return [];
@@ -1019,33 +1026,22 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
             <p className="mt-0.5 text-[8px] text-amber-100/85">
               Winner: {snapshot.winnerName || snapshot.winnerParticipantKey?.slice(0, 10) || "—"}
             </p>
-            <div className="mt-1 flex flex-col gap-0.5">
+            {finishedPotLabel ? (
+              <p className="mt-0.5 text-[8px] text-amber-100/80">Winner payout: {finishedPotLabel}</p>
+            ) : null}
+            <p className="mt-1 text-[7px] leading-snug text-zinc-400">
+              Official result is recorded. The winner&apos;s share is applied to the vault when this result loads (forfeit or normal end).
+            </p>
+            {onLeaveToLobby ? (
               <button
                 type="button"
-                disabled={busy || !selfKey}
-                onClick={() => void requestRematch()}
-                className="min-h-[38px] rounded-md border border-amber-500/40 bg-amber-950/35 py-1 text-[10px] font-semibold text-amber-100 disabled:opacity-40"
+                disabled={leaveToLobbyBusy}
+                onClick={() => void onLeaveToLobby()}
+                className="mt-1.5 min-h-[36px] w-full rounded-md border border-emerald-500/45 bg-emerald-950/40 py-1.5 text-[10px] font-semibold text-emerald-100 disabled:opacity-40"
               >
-                Request rematch ({rematchCounts.ready}/{rematchCounts.eligible})
+                {leaveToLobbyBusy ? "Leaving…" : "Back to lobby"}
               </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void cancelRematch()}
-                className="min-h-[38px] rounded-md border border-white/20 bg-white/10 py-1 text-[10px] font-semibold text-zinc-200 disabled:opacity-40"
-              >
-                Cancel rematch
-              </button>
-              <button
-                type="button"
-                disabled={busy || !isHost}
-                onClick={() => void startNextMatch()}
-                className="min-h-[38px] rounded-md border border-emerald-500/40 bg-emerald-950/35 py-1 text-[10px] font-semibold text-emerald-100 disabled:opacity-40"
-              >
-                Start next match (host)
-              </button>
-            </div>
-            <p className="mt-1 text-[7px] text-zinc-500">Next match returns the room to stake commit in the lobby.</p>
+            ) : null}
           </div>
         ) : null}
 
