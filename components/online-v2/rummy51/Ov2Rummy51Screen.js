@@ -22,41 +22,48 @@ const MID_RANK = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q
 const MID_SUIT = /** @type {const} */ ({ S: "♠", H: "♥", D: "♦", C: "♣" });
 
 /**
- * Center play area: chosen discard as a distinct “throw” card vs the hand.
- * @param {{ card: Rummy51Card|null, showHint: boolean, highlight: boolean }} props
+ * Top of discard pile — bottom-right of the play surface (above hand / violet dock), large and always visible.
+ * @param {{ card: Rummy51Card|null, empty: boolean, showHint: boolean, highlight: boolean }} props
  */
-function MidDiscardSlot({ card, showHint, highlight }) {
+function CornerDiscardTopCard({ card, empty, showHint, highlight }) {
   const red = Boolean(card && !card.isJoker && (card.suit === "H" || card.suit === "D"));
   return (
     <div
-      className={`shrink-0 self-start rounded border px-0.5 py-px sm:px-1 sm:py-0.5 ${
-        highlight
-          ? "border-amber-400/45 bg-gradient-to-b from-amber-950/40 to-zinc-950/85 shadow-[0_0_12px_rgba(245,158,11,0.08)]"
-          : "border-white/[0.06] bg-black/25"
-      }`}
+      className={`pointer-events-none shrink-0 select-none flex-col items-center gap-0.5 ${
+        highlight ? "drop-shadow-[0_0_10px_rgba(245,158,11,0.35)]" : ""
+      } flex`}
     >
-      <p className="text-center text-[5px] font-bold uppercase tracking-wider text-amber-200/65">Discard</p>
+      <p className="text-center text-[8px] font-bold uppercase tracking-wide text-amber-200/85 sm:text-[9px]">Discard</p>
       {card ? (
-        <div className="relative mx-auto mt-px flex h-[4rem] w-[2.85rem] flex-col rounded-md border border-amber-400/45 bg-gradient-to-b from-zinc-600 to-zinc-950 py-0.5 shadow-md sm:h-[4.15rem] sm:w-[3.1rem]">
+        <div
+          className={`relative flex h-[4.85rem] w-[3.45rem] flex-col rounded-xl border-2 py-1 shadow-lg sm:h-[5.15rem] sm:w-[3.65rem] ${
+            highlight
+              ? "border-amber-400/70 bg-gradient-to-b from-amber-900/50 to-zinc-950 shadow-amber-900/30"
+              : "border-amber-500/50 bg-gradient-to-b from-zinc-500 to-zinc-950"
+          }`}
+        >
           <div
-            className={`px-0.5 text-left leading-none ${card.isJoker ? "text-amber-200" : red ? "text-rose-300" : "text-zinc-100"}`}
+            className={`px-1 text-left leading-none ${card.isJoker ? "text-amber-200" : red ? "text-rose-300" : "text-zinc-100"}`}
           >
-            <div className="text-[10px] font-extrabold leading-none sm:text-[11px]">{card.isJoker ? "J" : MID_RANK[card.rank] ?? "?"}</div>
-            <div className="text-xs font-bold leading-none sm:text-sm">{card.isJoker ? "★" : card.suit ? MID_SUIT[card.suit] ?? "" : ""}</div>
+            <div className="text-sm font-extrabold leading-none sm:text-base">{card.isJoker ? "J" : MID_RANK[card.rank] ?? "?"}</div>
+            <div className="text-base font-bold leading-none sm:text-lg">{card.isJoker ? "★" : card.suit ? MID_SUIT[card.suit] ?? "" : ""}</div>
           </div>
           <div
-            className={`flex flex-1 items-center justify-center px-0.5 text-center text-sm font-black leading-none sm:text-base ${
+            className={`flex flex-1 items-center justify-center px-0.5 text-center text-lg font-black leading-none sm:text-xl ${
               card.isJoker ? "text-amber-200" : red ? "text-rose-200" : "text-zinc-100"
             }`}
           >
             {getCardDisplayLabel(card)}
           </div>
         </div>
-      ) : showHint ? (
-        <p className="mt-px text-center text-[7px] leading-none text-zinc-500">Hand</p>
       ) : (
-        <p className="mt-px text-center text-[6px] leading-none text-zinc-600/90">—</p>
+        <div className="flex h-[4.85rem] w-[3.45rem] flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-600/60 bg-zinc-950/80 sm:h-[5.15rem] sm:w-[3.65rem]">
+          <span className="text-center text-[10px] font-semibold text-zinc-500 sm:text-xs">{empty ? "Empty" : "—"}</span>
+        </div>
       )}
+      {showHint ? (
+        <p className="max-w-[4.5rem] text-center text-[7px] leading-tight text-amber-200/80 sm:text-[8px]">Choose in hand</p>
+      ) : null}
     </div>
   );
 }
@@ -228,6 +235,18 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       return "—";
     }
   }, [snapshot?.discardTop]);
+
+  const discardTopCard = useMemo(() => {
+    const t = snapshot?.discardTop;
+    if (!t || typeof t !== "object") return null;
+    try {
+      return deserializeCard(t);
+    } catch {
+      return null;
+    }
+  }, [snapshot?.discardTop]);
+
+  const discardCount = snapshot?.discardCount != null ? Number(snapshot.discardCount) : 0;
 
   const pendingDraw = snapshot?.pendingDrawSource != null ? String(snapshot.pendingDrawSource) : "";
 
@@ -558,18 +577,21 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
-        <div className="flex min-h-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-stretch sm:gap-1">
-          <MidDiscardSlot
-            card={isMyTurn && isPlaying && pendingDraw ? pickedDiscardCard : null}
-            showHint={Boolean(isMyTurn && isPlaying && pendingDraw && !pickedDiscardCard)}
-            highlight={Boolean(isMyTurn && isPlaying && pendingDraw && pickedDiscardCard)}
-          />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
             <Ov2Rummy51TableMelds
               tableMeldsRaw={snapshot.tableMelds || []}
               selectedTargetMeldId={targetMeldId}
               onSelectTargetMeld={setTargetMeldId}
               disabled={busy || !isMyTurn || !isPlaying}
+            />
+          </div>
+          <div className="flex shrink-0 flex-row items-end justify-end border-t border-white/[0.08] bg-black/25 px-1 py-1 sm:px-1.5">
+            <CornerDiscardTopCard
+              card={discardTopCard}
+              empty={discardCount <= 0}
+              showHint={Boolean(isMyTurn && isPlaying && pendingDraw && !pickedDiscardCard)}
+              highlight={Boolean(isMyTurn && isPlaying && pendingDraw && pickedDiscardCard)}
             />
           </div>
         </div>
