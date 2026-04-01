@@ -77,8 +77,10 @@ function slotIndexFromClientX(clientX, orderIds, refs) {
  *   onAddSelectionToTarget: () => void,
  *   onClearMeldDraft: () => void,
  *   hasMeldDraft: boolean,
+ *   clearDisabled?: boolean,
  *   manualOrder: string[]|null,
  *   setManualOrder: import("react").Dispatch<import("react").SetStateAction<string[]|null>>,
+ *   defaultOrderUsesSort?: boolean,
  * }} props
  */
 export default function Ov2Rummy51Hand({
@@ -100,8 +102,10 @@ export default function Ov2Rummy51Hand({
   onAddSelectionToTarget,
   onClearMeldDraft,
   hasMeldDraft,
+  clearDisabled,
   manualOrder,
   setManualOrder,
+  defaultOrderUsesSort = false,
 }) {
   const rankSuitLocked = sortDisabled === undefined ? disabled : sortDisabled;
   const reorderLocked = rankSuitLocked;
@@ -117,7 +121,7 @@ export default function Ov2Rummy51Hand({
 
   const selCount = selected.size;
 
-  const sortedCards = useMemo(() => {
+  const naturalCards = useMemo(() => {
     const out = [];
     for (const raw of handRaw) {
       try {
@@ -126,20 +130,31 @@ export default function Ov2Rummy51Hand({
         /* skip */
       }
     }
-    return sortHandCards(out, sortMode);
-  }, [handRaw, sortMode]);
+    return out;
+  }, [handRaw]);
 
-  const cardById = useMemo(() => new Map(sortedCards.map(c => [c.id, c])), [sortedCards]);
+  const sortedCards = useMemo(() => sortHandCards(naturalCards, sortMode), [naturalCards, sortMode]);
+
+  const cardById = useMemo(() => new Map(naturalCards.map(c => [c.id, c])), [naturalCards]);
 
   const displayCards = useMemo(() => {
-    if (!manualOrder?.length) return sortedCards;
-    const out = [];
-    for (const id of manualOrder) {
-      const c = cardById.get(id);
-      if (c) out.push(c);
+    if (manualOrder?.length) {
+      const out = [];
+      const seen = new Set();
+      for (const id of manualOrder) {
+        const c = cardById.get(id);
+        if (c) {
+          out.push(c);
+          seen.add(id);
+        }
+      }
+      for (const c of naturalCards) {
+        if (!seen.has(c.id)) out.push(c);
+      }
+      return out;
     }
-    return out;
-  }, [manualOrder, sortedCards, cardById]);
+    return defaultOrderUsesSort ? sortedCards : naturalCards;
+  }, [manualOrder, sortedCards, naturalCards, cardById, defaultOrderUsesSort]);
 
   /** Drag reorder: allowed when not busy / session idle (`reorderLocked`), even off-turn. */
   const allowPointerReorder = !reorderLocked && displayCards.length > 1;
@@ -158,6 +173,8 @@ export default function Ov2Rummy51Hand({
   const [draggingId, setDraggingId] = useState(/** @type {string|null} */ (null));
 
   const n = displayCards.length;
+
+  const clrBtnDisabled = clearDisabled !== undefined ? clearDisabled : disabled || !hasMeldDraft;
 
   useLayoutEffect(() => {
     const el = rowRef.current;
@@ -237,16 +254,18 @@ export default function Ov2Rummy51Hand({
       if (!d.moved) {
         if (Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD_PX) return;
         d.moved = true;
-        const snap = manualOrder?.length ? [...manualOrder] : sortedCards.map(c => c.id);
-        d.orderSnapshot = snap;
-        setManualOrder(snap);
+        const basis = manualOrder?.length
+          ? [...manualOrder]
+          : (defaultOrderUsesSort ? sortedCards : naturalCards).map(c => c.id);
+        d.orderSnapshot = basis;
+        setManualOrder(basis);
         setDraggingId(d.id);
       }
       const orderIds = d.orderSnapshot;
       const slot = slotIndexFromClientX(e.clientX, orderIds, cardRefs.current);
       hoverSlotRef.current = slot;
     },
-    [manualOrder, sortedCards, setManualOrder]
+    [manualOrder, sortedCards, naturalCards, defaultOrderUsesSort, setManualOrder]
   );
 
   const handlePointerUp = useCallback(
@@ -426,7 +445,7 @@ export default function Ov2Rummy51Hand({
         </button>
         <button
           type="button"
-          disabled={disabled || !hasMeldDraft}
+          disabled={clrBtnDisabled}
           onClick={() => onClearMeldDraft()}
           className="min-h-[34px] min-w-[3.1rem] shrink-0 rounded-md border border-red-500/25 px-1.5 py-1.5 text-[10px] font-semibold leading-tight text-red-300/90 disabled:opacity-40 sm:min-h-[38px] sm:min-w-[3.5rem] sm:px-2 sm:py-2 sm:text-xs"
         >

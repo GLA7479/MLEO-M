@@ -58,7 +58,7 @@ function TableMeldMiniCard({ card, overlap, stackIndex, draft }) {
  *   disabled?: boolean,
  *   framed?: boolean,
  *   draftNewMelds?: Rummy51Card[][],
- *   draftTableAdds?: { meldId: string, cards: Rummy51Card[] }[],
+ *   draftTableAdds?: { meldId: string, cards: Rummy51Card[], replaceJokerIds?: (string|null)[] }[],
  * }} props
  */
 export default function Ov2Rummy51TableMelds({
@@ -91,30 +91,37 @@ export default function Ov2Rummy51TableMelds({
   }, [tableMeldsRaw]);
 
   const draftAddsByMeldId = useMemo(() => {
-    /** @type {Map<string, Rummy51Card[]>} */
+    /** @type {Map<string, { cards: Rummy51Card[], replaceJokerIds: (string|null)[] }>} */
     const m = new Map();
     for (const row of draftTableAdds) {
       if (!row || typeof row.meldId !== "string") continue;
       const id = row.meldId;
       const chunk = Array.isArray(row.cards) ? row.cards : [];
-      const prev = m.get(id) ?? [];
-      m.set(id, [...prev, ...chunk]);
+      const rep = Array.isArray(row.replaceJokerIds) ? row.replaceJokerIds : [];
+      const prev = m.get(id) ?? { cards: [], replaceJokerIds: [] };
+      m.set(id, {
+        cards: [...prev.cards, ...chunk],
+        replaceJokerIds: [...prev.replaceJokerIds, ...rep, ...Array(Math.max(0, chunk.length - rep.length)).fill(null)],
+      });
     }
     return m;
   }, [draftTableAdds]);
 
   const displayRows = useMemo(() => {
-    /** @type {Array<{ type: 'server', meldId: string, kind: string, serverCards: Rummy51Card[], draftCards: Rummy51Card[] } | { type: 'draftNew', meldId: string, kind: string, cards: Rummy51Card[] }>} */
+    /** @type {Array<{ type: 'server', meldId: string, kind: string, serverCards: Rummy51Card[], draftCards: Rummy51Card[], replaceJokerIds: (string|null)[] } | { type: 'draftNew', meldId: string, kind: string, cards: Rummy51Card[] }>} */
     const rows = [];
     for (const m of melds) {
       if (!m) continue;
-      const draftCards = draftAddsByMeldId.get(m.meldId) ?? [];
+      const pack = draftAddsByMeldId.get(m.meldId);
+      const draftCards = pack?.cards ?? [];
+      const replaceJokerIds = pack?.replaceJokerIds ?? [];
       rows.push({
         type: "server",
         meldId: m.meldId,
         kind: m.kind,
         serverCards: m.cards,
         draftCards,
+        replaceJokerIds,
       });
     }
     const news = Array.isArray(draftNewMelds) ? draftNewMelds : [];
@@ -168,7 +175,19 @@ export default function Ov2Rummy51TableMelds({
             const isRun = row.kind === "run";
             const isTarget = selectedTargetMeldId === row.meldId;
             const hasDraftTail = row.draftCards.length > 0;
-            const allCards = [...row.serverCards, ...row.draftCards];
+            /** @type {Rummy51Card[]} */
+            let allCards = [...row.serverCards];
+            for (let k = 0; k < row.draftCards.length; k++) {
+              const c = row.draftCards[k];
+              const jid = row.replaceJokerIds[k] ?? null;
+              if (jid) {
+                const ji = allCards.findIndex(x => x.id === jid);
+                if (ji >= 0) allCards = [...allCards.slice(0, ji), c, ...allCards.slice(ji + 1)];
+                else allCards = [...allCards, c];
+              } else {
+                allCards = [...allCards, c];
+              }
+            }
             return (
               <button
                 key={row.meldId}
@@ -184,16 +203,13 @@ export default function Ov2Rummy51TableMelds({
                 ].join(" ")}
               >
                 <div className="flex min-w-0 flex-row flex-nowrap items-stretch pr-0.5">
-                  {row.serverCards.map((c, i) => (
-                    <TableMeldMiniCard key={c.id} card={c} overlap={i > 0} stackIndex={i} draft={false} />
-                  ))}
-                  {row.draftCards.map((c, i) => (
+                  {allCards.map((c, i) => (
                     <TableMeldMiniCard
-                      key={c.id}
+                      key={`${c.id}-${i}`}
                       card={c}
-                      overlap={row.serverCards.length + i > 0}
-                      stackIndex={row.serverCards.length + i}
-                      draft
+                      overlap={i > 0}
+                      stackIndex={i}
+                      draft={row.draftCards.some(d => d.id === c.id)}
                     />
                   ))}
                 </div>

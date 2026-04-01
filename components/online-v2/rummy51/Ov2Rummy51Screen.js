@@ -6,7 +6,9 @@ import {
   deserializeCard,
   getCardDisplayLabel,
   RUMMY51_ELIMINATION_SCORE,
+  simulateTableAddsJokerReturns,
   sortHandCards,
+  tryAddCardToMeldWithJokerSwap,
   validateFullTurnSubmission,
 } from "../../../lib/online-v2/rummy51/ov2Rummy51Engine";
 import { OV2_RUMMY51_PRODUCT_GAME_ID } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
@@ -20,6 +22,70 @@ import Ov2Rummy51TableMelds from "./Ov2Rummy51TableMelds";
 
 const MID_RANK = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const MID_SUIT = /** @type {const} */ ({ S: "♠", H: "♥", D: "♦", C: "♣" });
+
+const OV2_R51_HAND_ORDER_PREFIX = "ov2_r51_hand_order_v1";
+
+/** @param {string|null|undefined} roomId @param {string|null|undefined} selfKey */
+function handOrderStorageKey(roomId, selfKey) {
+  const r = String(roomId || "").trim();
+  const s = String(selfKey || "").trim();
+  if (!r || !s) return null;
+  return `${OV2_R51_HAND_ORDER_PREFIX}:${r}:${s}`;
+}
+
+/** @param {string|null} key */
+function readStoredHandOrder(key) {
+  if (!key || typeof sessionStorage === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return Array.isArray(p) ? p.map(String) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** @param {string|null} key @param {string[]|null|undefined} ids */
+function writeStoredHandOrder(key, ids) {
+  if (!key || typeof sessionStorage === "undefined") return;
+  try {
+    if (ids?.length) sessionStorage.setItem(key, JSON.stringify(ids));
+    else sessionStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** @param {string[]|null|undefined} prev @param {string[]} serverVisibleIds */
+function mergeHandOrderWithVisible(prev, serverVisibleIds) {
+  const vis = new Set(serverVisibleIds);
+  const next = [];
+  for (const id of prev || []) {
+    if (vis.has(id)) {
+      next.push(id);
+      vis.delete(id);
+    }
+  }
+  for (const id of serverVisibleIds) {
+    if (vis.has(id)) {
+      next.push(id);
+      vis.delete(id);
+    }
+  }
+  return next;
+}
+
+/** @param {Rummy51Card} c */
+function cardToHandRaw(c) {
+  return {
+    id: c.id,
+    rank: c.rank,
+    suit: c.suit,
+    isJoker: c.isJoker,
+    deckIndex: c.deckIndex,
+  };
+}
 
 const HAND_NUDGE_BTN =
   "flex h-full min-h-[32px] w-8 shrink-0 items-center justify-center rounded-md border border-white/20 bg-zinc-800/90 text-sm font-bold leading-none text-zinc-100 active:bg-zinc-700 disabled:pointer-events-none disabled:opacity-35 sm:min-h-[34px] sm:w-9 sm:text-base";
@@ -164,6 +230,8 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const [sortMode, setSortMode] = useState(/** @type {"rank"|"suit"} */ ("rank"));
   /** Custom hand strip order (visible hand only); cleared when Rank/Suit sort is chosen in hand UI. */
   const [manualOrder, setManualOrder] = useState(/** @type {string[]|null} */ (null));
+  const [handOrderBasis, setHandOrderBasis] = useState(/** @type {"natural"|"sorted"} */ ("natural"));
+  const [optimisticReturnedJokers, setOptimisticReturnedJokers] = useState(/** @type {Rummy51Card[]} */ ([]));
   /** @type {Rummy51Card[][]} */
   const [draftNewMelds, setDraftNewMelds] = useState([]);
   /** @type {{ meldId: string, cards: Rummy51Card[] }[]} */
@@ -228,42 +296,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     });
   }, [myHandRaw, draftPlayedCardIds]);
 
-  const sortedVisibleHandCards = useMemo(() => {
-    const out = [];
-    for (const raw of myHandRawVisible) {
-      try {
-        out.push(deserializeCard(raw));
-      } catch {
-        /* skip */
-      }
-    }
-    return sortHandCards(out, sortMode);
-  }, [myHandRawVisible, sortMode]);
-
-  const sortedVisibleIdKey = useMemo(
-    () => [...sortedVisibleHandCards.map(c => c.id)].sort().join("\0"),
-    [sortedVisibleHandCards]
-  );
-
-  useEffect(() => {
-    setManualOrder(prev => {
-      if (!prev?.length) return null;
-      const ids = new Set(sortedVisibleHandCards.map(c => c.id));
-      if (![...prev].some(id => ids.has(id))) return null;
-      const next = [];
-      const leftover = new Set(ids);
-      for (const id of prev) {
-        if (leftover.has(id)) {
-          next.push(id);
-          leftover.delete(id);
-        }
-      }
-      for (const c of sortedVisibleHandCards) {
-        if (leftover.has(c.id)) next.push(c.id);
-      }
-      return next;
-    });
-  }, [sortedVisibleIdKey, sortedVisibleHandCards]);
+  const handOrderKey = useMemo(() => handOrderStorageKey(room?.id, selfKey), [room?.id, selfKey]);
 
   const handCards = useMemo(() => {
     const out = [];
@@ -282,6 +315,67 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     for (const c of handCards) m.set(c.id, c);
     return m;
   }, [handCards]);
+
+  const optimisticHandExtraRaw = useMemo(() => {
+    const have = new Set(handCards.map(c => c.id));
+    return optimisticReturnedJokers.filter(j => j && !have.has(j.id)).map(cardToHandRaw);
+  }, [optimisticReturnedJokers, handCards]);
+
+  const handRawForUi = useMemo(
+    () => [...myHandRawVisible, ...optimisticHandExtraRaw],
+    [myHandRawVisible, optimisticHandExtraRaw]
+  );
+
+  const visibleUiOrderIds = useMemo(() => {
+    const out = [];
+    for (const raw of handRawForUi) {
+      try {
+        out.push(deserializeCard(raw).id);
+      } catch {
+        /* skip */
+      }
+    }
+    return out;
+  }, [handRawForUi]);
+
+  const visibleUiOrderSig = visibleUiOrderIds.join("\0");
+
+  useEffect(() => {
+    if (!handOrderKey || handOrderBasis !== "natural") return;
+    setManualOrder(prev => {
+      const stored = readStoredHandOrder(handOrderKey);
+      const base = prev?.length ? prev : stored;
+      const merged = mergeHandOrderWithVisible(base, visibleUiOrderIds);
+      return merged.length ? merged : null;
+    });
+  }, [handOrderKey, handOrderBasis, visibleUiOrderSig]);
+
+  useEffect(() => {
+    if (!handOrderKey || handOrderBasis !== "natural" || !manualOrder?.length) return;
+    writeStoredHandOrder(handOrderKey, manualOrder);
+  }, [handOrderKey, handOrderBasis, manualOrder]);
+
+  const sortedVisibleHandCards = useMemo(() => {
+    const out = [];
+    for (const raw of handRawForUi) {
+      try {
+        out.push(deserializeCard(raw));
+      } catch {
+        /* skip */
+      }
+    }
+    return sortHandCards(out, sortMode);
+  }, [handRawForUi, sortMode]);
+
+  const onSortModeFromUser = useCallback(
+    mode => {
+      setHandOrderBasis("sorted");
+      setSortMode(mode);
+      setManualOrder(null);
+      if (handOrderKey) writeStoredHandOrder(handOrderKey, []);
+    },
+    [handOrderKey]
+  );
 
   const myPs = useMemo(() => {
     if (!snapshot?.playerState || !selfKey) return null;
@@ -384,8 +478,9 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
 
   const orderIdsForDockNudge = useMemo(() => {
     if (manualOrder?.length) return manualOrder;
-    return sortedVisibleHandCards.map(c => c.id);
-  }, [manualOrder, sortedVisibleHandCards]);
+    if (handOrderBasis === "sorted") return sortedVisibleHandCards.map(c => c.id);
+    return visibleUiOrderIds;
+  }, [manualOrder, handOrderBasis, sortedVisibleHandCards, visibleUiOrderIds]);
 
   const singleSelForDockNudge = selectedIds.size === 1 ? [...selectedIds][0] : null;
   const singleSelIdxDock =
@@ -400,16 +495,21 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const nudgeHandOrder = useCallback(
     delta => {
       if (!singleSelForDockNudge) return;
-      const base = manualOrder?.length ? [...manualOrder] : sortedVisibleHandCards.map(c => c.id);
+      const base = manualOrder?.length
+        ? [...manualOrder]
+        : handOrderBasis === "sorted"
+          ? sortedVisibleHandCards.map(c => c.id)
+          : [...visibleUiOrderIds];
       const i = base.indexOf(singleSelForDockNudge);
       if (i < 0) return;
       const j = i + delta;
       if (j < 0 || j >= base.length) return;
       const next = [...base];
       [next[i], next[j]] = [next[j], next[i]];
+      setHandOrderBasis("natural");
       setManualOrder(next);
     },
-    [singleSelForDockNudge, manualOrder, sortedVisibleHandCards]
+    [singleSelForDockNudge, manualOrder, handOrderBasis, sortedVisibleHandCards, visibleUiOrderIds]
   );
 
   useEffect(() => {
@@ -492,7 +592,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     setDraftNewMelds([]);
     setDraftTableAdds([]);
     setTargetMeldId(null);
-    setManualOrder(null);
+    setOptimisticReturnedJokers([]);
   }, []);
 
   const prevTurnPkRef = useRef(/** @type {string|null} */ (null));
@@ -513,6 +613,27 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     }
     return out;
   }, [selectedIds, handById]);
+
+  const tableMeldById = useMemo(() => {
+    const m = new Map();
+    for (const raw of snapshot?.tableMelds || []) {
+      if (!raw || typeof raw !== "object") continue;
+      const o = /** @type {Record<string, unknown>} */ (raw);
+      const id = o.meldId != null ? String(o.meldId) : "";
+      if (!id) continue;
+      const cardsRaw = Array.isArray(o.cards) ? o.cards : [];
+      const cards = [];
+      for (const c of cardsRaw) {
+        try {
+          cards.push(deserializeCard(c));
+        } catch {
+          /* skip */
+        }
+      }
+      m.set(id, cards);
+    }
+    return m;
+  }, [snapshot?.tableMelds]);
 
   const onToggleCardId = useCallback(
     id => {
@@ -542,39 +663,61 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const onAddSelectionToTarget = useCallback(() => {
     if (!targetMeldId || selectedCards.length < 1) return;
     const played = new Set(selectedCards.map(c => c.id));
-    setDraftTableAdds(prev => {
-      const idx = prev.findIndex(x => x.meldId === targetMeldId);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = { meldId: targetMeldId, cards: [...copy[idx].cards, ...selectedCards] };
-        return copy;
+    const existing = tableMeldById.get(targetMeldId) ?? [];
+    let cur = [...existing];
+    /** @type {(string|null)[]} */
+    const replaceJokerIds = [];
+    /** @type {Rummy51Card[]} */
+    const returned = [];
+    let swapPathOk = true;
+    for (const c of selectedCards) {
+      const res = tryAddCardToMeldWithJokerSwap(cur, c, {});
+      if (!res) {
+        swapPathOk = false;
+        break;
       }
-      return [...prev, { meldId: targetMeldId, cards: [...selectedCards] }];
-    });
+      cur = res.meld;
+      replaceJokerIds.push(res.returnedJoker ? res.returnedJoker.id : null);
+      if (res.returnedJoker) returned.push(res.returnedJoker);
+    }
+    if (swapPathOk) {
+      if (returned.length) setOptimisticReturnedJokers(prev => [...prev, ...returned]);
+      setDraftTableAdds(prev => {
+        const idx = prev.findIndex(x => x.meldId === targetMeldId);
+        const row = {
+          meldId: targetMeldId,
+          cards: [...selectedCards],
+          replaceJokerIds,
+        };
+        if (idx >= 0) {
+          const copy = [...prev];
+          const prevRow = copy[idx];
+          copy[idx] = {
+            meldId: targetMeldId,
+            cards: [...(prevRow.cards || []), ...row.cards],
+            replaceJokerIds: [
+              ...(Array.isArray(prevRow.replaceJokerIds) ? prevRow.replaceJokerIds : []),
+              ...replaceJokerIds,
+            ],
+          };
+          return copy;
+        }
+        return [...prev, row];
+      });
+    } else {
+      setDraftTableAdds(prev => {
+        const idx = prev.findIndex(x => x.meldId === targetMeldId);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = { meldId: targetMeldId, cards: [...copy[idx].cards, ...selectedCards] };
+          return copy;
+        }
+        return [...prev, { meldId: targetMeldId, cards: [...selectedCards] }];
+      });
+    }
     setSelectedIds(new Set());
     setDiscardCardId(prev => (prev && played.has(prev) ? null : prev));
-  }, [targetMeldId, selectedCards]);
-
-  const tableMeldById = useMemo(() => {
-    const m = new Map();
-    for (const raw of snapshot?.tableMelds || []) {
-      if (!raw || typeof raw !== "object") continue;
-      const o = /** @type {Record<string, unknown>} */ (raw);
-      const id = o.meldId != null ? String(o.meldId) : "";
-      if (!id) continue;
-      const cardsRaw = Array.isArray(o.cards) ? o.cards : [];
-      const cards = [];
-      for (const c of cardsRaw) {
-        try {
-          cards.push(deserializeCard(c));
-        } catch {
-          /* skip */
-        }
-      }
-      m.set(id, cards);
-    }
-    return m;
-  }, [snapshot?.tableMelds]);
+  }, [targetMeldId, selectedCards, tableMeldById]);
 
   const canSubmitTurn = useMemo(() => {
     if (!isMyTurn || !isPlaying || !pendingDraw || !discardCardId) return false;
@@ -585,7 +728,15 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     for (const meld of draftNewMelds) for (const c of meld) playedIds.add(c.id);
     for (const row of draftTableAdds) for (const c of row.cards) playedIds.add(c.id);
 
+    const tableAddsForSim = draftTableAdds.map(a => ({
+      existing: tableMeldById.get(a.meldId) ?? [],
+      cardsFromHand: a.cards,
+    }));
+    const jokerSim = simulateTableAddsJokerReturns(tableAddsForSim, {});
+    const returnedFromTable = jokerSim.ok ? jokerSim.returnedJokers : [];
+
     let after = handCards.filter(c => !playedIds.has(c.id));
+    for (const j of returnedFromTable) after.push(j);
     const hasDiscardInAfter = after.some(c => c.id === discardCardId);
     if (!hasDiscardInAfter) return false;
 
@@ -643,7 +794,14 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     const playedIds = new Set();
     for (const meld of draftNewMelds) for (const c of meld) playedIds.add(c.id);
     for (const row of draftTableAdds) for (const c of row.cards) playedIds.add(c.id);
-    const after = handCards.filter(c => !playedIds.has(c.id));
+    const tableAddsForSimV = draftTableAdds.map(a => ({
+      existing: tableMeldById.get(a.meldId) ?? [],
+      cardsFromHand: a.cards,
+    }));
+    const jokerSimV = simulateTableAddsJokerReturns(tableAddsForSimV, {});
+    const returnedV = jokerSimV.ok ? jokerSimV.returnedJokers : [];
+    let after = handCards.filter(c => !playedIds.has(c.id));
+    for (const j of returnedV) after.push(j);
     if (!after.some(c => c.id === discardCardId)) {
       return "The card you marked to discard (orange “out”) is also in a Meld/Tbl draft — remove it from the draft (Clr) or mark a different discard. The discard must stay in your hand until you submit.";
     }
@@ -697,12 +855,12 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       meld_id: a.meldId,
       cards_from_hand: a.cards.map(c => ({ ...c })),
     }));
-    const r = await submitTurn({
+    await submitTurn({
       new_melds: newMeldsPayload,
       table_additions: tableAddsPayload,
       discard_card_id: discardCardId,
     });
-    if (r.ok) resetTurnUi();
+    resetTurnUi();
   }, [canSubmitTurn, discardCardId, draftNewMelds, draftTableAdds, submitTurn, resetTurnUi, setActionError]);
 
   const onUndoDiscardDraw = useCallback(async () => {
@@ -761,6 +919,15 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
 
   /** Fixed dock height during play so Draw / Take / Submit never shifts the hand. */
   const reserveBottomActionDock = isPlaying && !isFinished;
+
+  const canClearTransient =
+    draftNewMelds.length > 0 ||
+    draftTableAdds.length > 0 ||
+    discardPickMode ||
+    Boolean(discardCardId) ||
+    selectedIds.size > 0 ||
+    Boolean(targetMeldId) ||
+    optimisticReturnedJokers.length > 0;
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col gap-0 overflow-hidden">
@@ -873,7 +1040,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       <div className="flex shrink-0 flex-col overflow-hidden rounded-md border border-violet-500/35 bg-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <Ov2Rummy51Hand
           embedded
-          handRaw={myHandRawVisible}
+          handRaw={handRawForUi}
           manualOrder={manualOrder}
           setManualOrder={setManualOrder}
           drawHighlightIds={drawHighlightIds}
@@ -887,13 +1054,12 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
           targetMeldId={targetMeldId}
           onNewMeldFromSelection={onNewMeldFromSelection}
           onAddSelectionToTarget={onAddSelectionToTarget}
-          onClearMeldDraft={() => {
-            setDraftNewMelds([]);
-            setDraftTableAdds([]);
-          }}
+          onClearMeldDraft={resetTurnUi}
+          clearDisabled={busy || !canClearTransient}
           hasMeldDraft={draftNewMelds.length > 0 || draftTableAdds.length > 0}
           onToggleCardId={onToggleCardId}
-          onSortModeChange={setSortMode}
+          onSortModeChange={onSortModeFromUser}
+          defaultOrderUsesSort={handOrderBasis === "sorted"}
           onEnterDiscardPickMode={() => {
             setDiscardPickMode(true);
             setSelectedIds(new Set());
