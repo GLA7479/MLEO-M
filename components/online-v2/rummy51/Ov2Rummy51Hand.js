@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { deserializeCard, sortHandCards } from "../../../lib/online-v2/rummy51/ov2Rummy51Engine";
 
 /**
@@ -76,6 +76,8 @@ function slotIndexFromClientX(clientX, orderIds, refs) {
  *   onAddSelectionToTarget: () => void,
  *   onClearMeldDraft: () => void,
  *   hasMeldDraft: boolean,
+ *   manualOrder: string[]|null,
+ *   setManualOrder: import("react").Dispatch<import("react").SetStateAction<string[]|null>>,
  * }} props
  */
 export default function Ov2Rummy51Hand({
@@ -96,6 +98,8 @@ export default function Ov2Rummy51Hand({
   onAddSelectionToTarget,
   onClearMeldDraft,
   hasMeldDraft,
+  manualOrder,
+  setManualOrder,
 }) {
   const rankSuitLocked = sortDisabled === undefined ? disabled : sortDisabled;
   const reorderLocked = rankSuitLocked;
@@ -122,31 +126,6 @@ export default function Ov2Rummy51Hand({
     return sortHandCards(out, sortMode);
   }, [handRaw, sortMode]);
 
-  const sortedIdKey = useMemo(() => [...sortedCards.map(c => c.id)].sort().join("\0"), [sortedCards]);
-
-  /** @type {[string[]|null, import("react").Dispatch<import("react").SetStateAction<string[]|null>>]} */
-  const [manualOrder, setManualOrder] = useState(/** @type {string[]|null} */ (null));
-
-  useEffect(() => {
-    setManualOrder(prev => {
-      if (!prev?.length) return null;
-      const ids = new Set(sortedCards.map(c => c.id));
-      if (![...prev].some(id => ids.has(id))) return null;
-      const next = [];
-      const leftover = new Set(ids);
-      for (const id of prev) {
-        if (leftover.has(id)) {
-          next.push(id);
-          leftover.delete(id);
-        }
-      }
-      for (const c of sortedCards) {
-        if (leftover.has(c.id)) next.push(c.id);
-      }
-      return next;
-    });
-  }, [sortedIdKey, sortedCards]);
-
   const cardById = useMemo(() => new Map(sortedCards.map(c => [c.id, c])), [sortedCards]);
 
   const displayCards = useMemo(() => {
@@ -158,6 +137,9 @@ export default function Ov2Rummy51Hand({
     }
     return out;
   }, [manualOrder, sortedCards, cardById]);
+
+  /** Without touch-none, mobile browsers steal touch for scroll; pointer-drag reorder never starts. */
+  const allowPointerReorder = cardsInteractive && !reorderLocked && displayCards.length > 1;
 
   const rowRef = useRef(/** @type {HTMLDivElement|null} */ (null));
   const cardRefs = useRef(/** @type {Map<string, HTMLButtonElement>} */ (new Map()));
@@ -262,7 +244,7 @@ export default function Ov2Rummy51Hand({
       const slot = slotIndexFromClientX(e.clientX, orderIds, cardRefs.current);
       hoverSlotRef.current = slot;
     },
-    [manualOrder, sortedCards]
+    [manualOrder, sortedCards, setManualOrder]
   );
 
   const handlePointerUp = useCallback(
@@ -281,7 +263,7 @@ export default function Ov2Rummy51Hand({
       }
       finishDrag();
     },
-    [finishDrag]
+    [finishDrag, setManualOrder]
   );
 
   const handlePointerCancel = useCallback(
@@ -310,9 +292,6 @@ export default function Ov2Rummy51Hand({
   const shell = embedded
     ? "flex w-full shrink-0 flex-col gap-0 overflow-hidden px-0.5 pb-0 pt-0 sm:px-1"
     : "flex w-full shrink-0 flex-col gap-1 overflow-hidden rounded-lg border border-violet-500/25 bg-violet-950/20 p-2";
-
-  /** Without touch-none, mobile browsers steal touch for scroll; pointer-drag reorder never starts. */
-  const allowPointerReorder = cardsInteractive && !reorderLocked && displayCards.length > 1;
 
   return (
     <div className={shell}>

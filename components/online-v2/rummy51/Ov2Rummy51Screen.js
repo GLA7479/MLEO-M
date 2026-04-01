@@ -6,6 +6,7 @@ import {
   deserializeCard,
   getCardDisplayLabel,
   RUMMY51_ELIMINATION_SCORE,
+  sortHandCards,
   validateFullTurnSubmission,
 } from "../../../lib/online-v2/rummy51/ov2Rummy51Engine";
 import { OV2_RUMMY51_PRODUCT_GAME_ID } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
@@ -117,6 +118,8 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const [discardPickMode, setDiscardPickMode] = useState(false);
   const [discardCardId, setDiscardCardId] = useState(/** @type {string|null} */ (null));
   const [sortMode, setSortMode] = useState(/** @type {"rank"|"suit"} */ ("rank"));
+  /** Custom hand strip order (visible hand only); cleared when Rank/Suit sort is chosen in hand UI. */
+  const [manualOrder, setManualOrder] = useState(/** @type {string[]|null} */ (null));
   /** @type {Rummy51Card[][]} */
   const [draftNewMelds, setDraftNewMelds] = useState([]);
   /** @type {{ meldId: string, cards: Rummy51Card[] }[]} */
@@ -172,6 +175,43 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       return typeof id !== "string" || !draftPlayedCardIds.has(id);
     });
   }, [myHandRaw, draftPlayedCardIds]);
+
+  const sortedVisibleHandCards = useMemo(() => {
+    const out = [];
+    for (const raw of myHandRawVisible) {
+      try {
+        out.push(deserializeCard(raw));
+      } catch {
+        /* skip */
+      }
+    }
+    return sortHandCards(out, sortMode);
+  }, [myHandRawVisible, sortMode]);
+
+  const sortedVisibleIdKey = useMemo(
+    () => [...sortedVisibleHandCards.map(c => c.id)].sort().join("\0"),
+    [sortedVisibleHandCards]
+  );
+
+  useEffect(() => {
+    setManualOrder(prev => {
+      if (!prev?.length) return null;
+      const ids = new Set(sortedVisibleHandCards.map(c => c.id));
+      if (![...prev].some(id => ids.has(id))) return null;
+      const next = [];
+      const leftover = new Set(ids);
+      for (const id of prev) {
+        if (leftover.has(id)) {
+          next.push(id);
+          leftover.delete(id);
+        }
+      }
+      for (const c of sortedVisibleHandCards) {
+        if (leftover.has(c.id)) next.push(c.id);
+      }
+      return next;
+    });
+  }, [sortedVisibleIdKey, sortedVisibleHandCards]);
 
   const handCards = useMemo(() => {
     const out = [];
@@ -290,6 +330,38 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
 
   const pendingDraw = snapshot?.pendingDrawSource != null ? String(snapshot.pendingDrawSource) : "";
 
+  const orderIdsForDockNudge = useMemo(() => {
+    if (manualOrder?.length) return manualOrder;
+    return sortedVisibleHandCards.map(c => c.id);
+  }, [manualOrder, sortedVisibleHandCards]);
+
+  const singleSelForDockNudge = selectedIds.size === 1 ? [...selectedIds][0] : null;
+  const singleSelIdxDock =
+    singleSelForDockNudge != null ? orderIdsForDockNudge.indexOf(singleSelForDockNudge) : -1;
+
+  const showHandReorderInDock =
+    Boolean(pendingDraw) &&
+    isMyTurn &&
+    isPlaying &&
+    !busy &&
+    myHandRawVisible.length > 1 &&
+    selectedIds.size === 1;
+
+  const nudgeHandOrder = useCallback(
+    delta => {
+      if (!singleSelForDockNudge) return;
+      const base = manualOrder?.length ? [...manualOrder] : sortedVisibleHandCards.map(c => c.id);
+      const i = base.indexOf(singleSelForDockNudge);
+      if (i < 0) return;
+      const j = i + delta;
+      if (j < 0 || j >= base.length) return;
+      const next = [...base];
+      [next[i], next[j]] = [next[j], next[i]];
+      setManualOrder(next);
+    },
+    [singleSelForDockNudge, manualOrder, sortedVisibleHandCards]
+  );
+
   useEffect(() => {
     const rev = snapshot?.revision ?? 0;
     const ids = new Set(handCards.map(c => c.id));
@@ -370,6 +442,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     setDraftNewMelds([]);
     setDraftTableAdds([]);
     setTargetMeldId(null);
+    setManualOrder(null);
   }, []);
 
   const prevTurnPkRef = useRef(/** @type {string|null} */ (null));
@@ -716,6 +789,8 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
         <Ov2Rummy51Hand
           embedded
           handRaw={myHandRawVisible}
+          manualOrder={manualOrder}
+          setManualOrder={setManualOrder}
           drawHighlightIds={drawHighlightIds}
           selectedIds={selectedIds}
           discardCardId={discardCardId}
@@ -773,14 +848,40 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
                     {validationMessage ? (
                       <p className="px-0.5 pb-0.5 text-[8px] leading-snug text-amber-200/95 sm:text-[9px]">{validationMessage}</p>
                     ) : null}
-                    <button
-                      type="button"
-                      disabled={busy || !canSubmitTurn}
-                      onClick={() => void onSubmitTurn()}
-                      className="min-h-[32px] w-full rounded-md border border-violet-500/50 bg-violet-950/45 py-0.5 text-[11px] font-bold text-violet-100 disabled:opacity-40 sm:min-h-[34px] sm:text-sm"
-                    >
-                      Submit turn
-                    </button>
+                    <div className="flex min-h-[32px] flex-row items-stretch gap-1 sm:min-h-[34px]">
+                      {showHandReorderInDock ? (
+                        <>
+                          <button
+                            type="button"
+                            aria-label="Move card left"
+                            disabled={singleSelIdxDock <= 0}
+                            onClick={() => nudgeHandOrder(-1)}
+                            className="flex w-8 shrink-0 items-center justify-center rounded-md border border-white/20 bg-zinc-800/90 text-sm font-bold leading-none text-zinc-100 active:bg-zinc-700 disabled:pointer-events-none disabled:opacity-35 sm:w-9 sm:text-base"
+                          >
+                            ◀
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Move card right"
+                            disabled={
+                              singleSelIdxDock < 0 || singleSelIdxDock >= orderIdsForDockNudge.length - 1
+                            }
+                            onClick={() => nudgeHandOrder(1)}
+                            className="flex w-8 shrink-0 items-center justify-center rounded-md border border-white/20 bg-zinc-800/90 text-sm font-bold leading-none text-zinc-100 active:bg-zinc-700 disabled:pointer-events-none disabled:opacity-35 sm:w-9 sm:text-base"
+                          >
+                            ▶
+                          </button>
+                        </>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={busy || !canSubmitTurn}
+                        onClick={() => void onSubmitTurn()}
+                        className="min-h-[32px] min-w-0 flex-1 rounded-md border border-violet-500/50 bg-violet-950/45 px-1.5 py-0.5 text-[10px] font-bold leading-tight text-violet-100 disabled:opacity-40 sm:min-h-[34px] sm:text-xs"
+                      >
+                        Submit
+                      </button>
+                    </div>
                   </div>
                 ) : null}
               </>
