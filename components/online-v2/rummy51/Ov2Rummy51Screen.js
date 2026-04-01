@@ -515,6 +515,9 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     (!pendingDraw && isMyTurn && isPlaying) ||
     (pendingDraw && isMyTurn && isPlaying);
 
+  /** Fixed dock height during play so Draw / Take / Submit never shifts the hand. */
+  const reserveBottomActionDock = isPlaying && !isFinished;
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col gap-0 overflow-hidden">
       <Ov2SeatStrip
@@ -628,7 +631,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
         </div>
       </div>
 
-      <div className="shrink-0 overflow-hidden rounded-md border border-violet-500/35 bg-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="flex shrink-0 flex-col overflow-hidden rounded-md border border-violet-500/35 bg-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         {isMyTurn && isPlaying ? (
           <Ov2Rummy51MeldComposer
             compact={!hasComposerDraft}
@@ -666,44 +669,51 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
           }}
         />
 
-        {hasBottomActionBlock ? (
-          <div className="shrink-0 space-y-0.5 border-t border-violet-500/25 bg-black/50 px-1 py-0.5 sm:px-1.5 sm:py-1">
-            {actionError ? <p className="text-center text-[9px] leading-tight text-red-300">{actionError}</p> : null}
-            {!pendingDraw && isMyTurn && isPlaying ? (
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  disabled={busy || (snapshot.stockCount ?? 0) <= 0}
-                  onClick={() => void drawStock()}
-                  className="min-h-[38px] flex-1 rounded-md border border-emerald-500/40 bg-emerald-950/40 py-1 text-[11px] font-bold text-emerald-100 disabled:opacity-40 sm:min-h-[40px] sm:text-xs"
-                >
-                  Draw stock
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || (snapshot.discardCount ?? 0) <= 0}
-                  onClick={() => void drawDiscard()}
-                  className="min-h-[38px] flex-1 rounded-md border border-sky-500/40 bg-sky-950/40 py-1 text-[11px] font-bold text-sky-100 disabled:opacity-40 sm:min-h-[40px] sm:text-xs"
-                >
-                  Take discard
-                </button>
-              </div>
-            ) : null}
-
-            {pendingDraw && isMyTurn && isPlaying ? (
-              <div className="flex flex-col gap-0">
-                {validationMessage ? (
-                  <p className="px-0.5 pb-0.5 text-[8px] leading-snug text-amber-200/95 sm:text-[9px]">{validationMessage}</p>
+        {reserveBottomActionDock ? (
+          <div
+            className="flex min-h-[2.5rem] shrink-0 flex-col justify-center space-y-0.5 border-t border-violet-500/25 bg-black/50 px-1 py-px sm:min-h-[2.625rem] sm:px-1.5 sm:py-0.5"
+            aria-hidden={!hasBottomActionBlock}
+          >
+            {hasBottomActionBlock ? (
+              <>
+                {actionError ? <p className="text-center text-[9px] leading-tight text-red-300">{actionError}</p> : null}
+                {!pendingDraw && isMyTurn && isPlaying ? (
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      disabled={busy || (snapshot.stockCount ?? 0) <= 0}
+                      onClick={() => void drawStock()}
+                      className="min-h-[32px] flex-1 rounded-md border border-emerald-500/40 bg-emerald-950/40 py-0.5 text-[10px] font-bold text-emerald-100 disabled:opacity-40 sm:min-h-[34px] sm:text-xs"
+                    >
+                      Draw stock
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || (snapshot.discardCount ?? 0) <= 0}
+                      onClick={() => void drawDiscard()}
+                      className="min-h-[32px] flex-1 rounded-md border border-sky-500/40 bg-sky-950/40 py-0.5 text-[10px] font-bold text-sky-100 disabled:opacity-40 sm:min-h-[34px] sm:text-xs"
+                    >
+                      Take discard
+                    </button>
+                  </div>
                 ) : null}
-                <button
-                  type="button"
-                  disabled={busy || !canSubmitTurn}
-                  onClick={() => void onSubmitTurn()}
-                  className="min-h-[38px] w-full rounded-md border border-violet-500/50 bg-violet-950/45 py-1 text-xs font-bold text-violet-100 disabled:opacity-40 sm:min-h-[40px] sm:text-sm"
-                >
-                  Submit turn
-                </button>
-              </div>
+
+                {pendingDraw && isMyTurn && isPlaying ? (
+                  <div className="flex flex-col gap-0">
+                    {validationMessage ? (
+                      <p className="px-0.5 pb-0.5 text-[8px] leading-snug text-amber-200/95 sm:text-[9px]">{validationMessage}</p>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={busy || !canSubmitTurn}
+                      onClick={() => void onSubmitTurn()}
+                      className="min-h-[32px] w-full rounded-md border border-violet-500/50 bg-violet-950/45 py-0.5 text-[11px] font-bold text-violet-100 disabled:opacity-40 sm:min-h-[34px] sm:text-sm"
+                    >
+                      Submit turn
+                    </button>
+                  </div>
+                ) : null}
+              </>
             ) : null}
           </div>
         ) : null}
