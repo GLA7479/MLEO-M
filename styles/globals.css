@@ -1,10 +1,9 @@
 /* styles/globals.css */
+@import './game-fixes.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import game fixes */
-@import './game-fixes.css';
 
 /* ===== iOS/Android real viewport height (updated by JS too) ===== */
 :root {
