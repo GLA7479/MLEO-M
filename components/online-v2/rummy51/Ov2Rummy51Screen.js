@@ -28,16 +28,16 @@ function SideDiscardStrip({ card, empty, highlight }) {
   const red = Boolean(card && !card.isJoker && (card.suit === "H" || card.suit === "D"));
   return (
     <div
-      className={`pointer-events-none flex w-max shrink-0 select-none flex-col items-center gap-0.5 rounded-md bg-zinc-950/85 px-0.5 py-0.5 shadow-[0_2px_12px_rgba(0,0,0,0.45)] ring-1 ring-white/10 ${
+      className={`flex w-max shrink-0 select-none flex-col items-center gap-0.5 rounded-md bg-zinc-950/90 px-1 py-1 shadow-[0_2px_14px_rgba(0,0,0,0.5)] ring-1 ring-white/12 ${
         highlight ? "ring-amber-400/50 drop-shadow-[0_0_10px_rgba(245,158,11,0.35)]" : ""
       }`}
     >
-      <p className="w-full truncate text-center text-[5px] font-bold uppercase leading-none text-amber-200/75 sm:text-[6px]">
+      <p className="w-full truncate text-center text-[6px] font-bold uppercase leading-none text-amber-200/80 sm:text-[7px]">
         Discard
       </p>
       {card ? (
         <div
-          className={`relative flex h-[3.35rem] w-[2.45rem] flex-col rounded-md border py-0.5 shadow-md sm:h-[3.5rem] sm:w-[2.55rem] ${
+          className={`relative flex h-[3.65rem] w-[2.65rem] flex-col rounded-md border py-0.5 shadow-md sm:h-[3.95rem] sm:w-[2.85rem] ${
             highlight
               ? "border-amber-400/65 bg-gradient-to-b from-amber-900/45 to-zinc-950"
               : "border-amber-500/45 bg-gradient-to-b from-zinc-600 to-zinc-950"
@@ -46,8 +46,8 @@ function SideDiscardStrip({ card, empty, highlight }) {
           <div
             className={`px-0.5 text-left leading-none ${card.isJoker ? "text-amber-200" : red ? "text-rose-300" : "text-zinc-100"}`}
           >
-            <div className="text-[10px] font-extrabold leading-none">{card.isJoker ? "J" : MID_RANK[card.rank] ?? "?"}</div>
-            <div className="text-[11px] font-bold leading-none">{card.isJoker ? "★" : card.suit ? MID_SUIT[card.suit] ?? "" : ""}</div>
+            <div className="text-[11px] font-extrabold leading-none sm:text-xs">{card.isJoker ? "J" : MID_RANK[card.rank] ?? "?"}</div>
+            <div className="text-[12px] font-bold leading-none sm:text-sm">{card.isJoker ? "★" : card.suit ? MID_SUIT[card.suit] ?? "" : ""}</div>
           </div>
           <div
             className={`flex flex-1 items-center justify-center px-px text-center text-[11px] font-black leading-none sm:text-xs ${
@@ -58,11 +58,30 @@ function SideDiscardStrip({ card, empty, highlight }) {
           </div>
         </div>
       ) : (
-        <div className="flex h-[3.35rem] w-[2.45rem] flex-col items-center justify-center rounded-md border border-dashed border-zinc-600/55 bg-zinc-950/90 sm:h-[3.5rem] sm:w-[2.55rem]">
-          <span className="px-px text-center text-[7px] font-semibold leading-tight text-zinc-500">{empty ? "∅" : "—"}</span>
+        <div className="flex h-[3.65rem] w-[2.65rem] flex-col items-center justify-center rounded-md border border-dashed border-zinc-600/55 bg-zinc-950/90 sm:h-[3.95rem] sm:w-[2.85rem]">
+          <span className="px-px text-center text-[7px] font-semibold leading-tight text-zinc-500 sm:text-[8px]">{empty ? "∅" : "—"}</span>
         </div>
       )}
     </div>
+  );
+}
+
+/** Icon-only undo: return last discard draw (sibling to discard strip; pointer-events-auto on button only). */
+function DiscardUndoIconButton({ disabled, onClick }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      title="Return card to discard"
+      aria-label="Return taken card to discard pile"
+      className="pointer-events-auto mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-500/45 bg-zinc-950/95 text-amber-200 shadow-[0_2px_10px_rgba(0,0,0,0.4)] ring-1 ring-white/10 backdrop-blur-sm transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 sm:h-10 sm:w-10"
+    >
+      <svg className="h-4 w-4 sm:h-[1.15rem] sm:w-[1.15rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M9 14 4 9l5-5" />
+        <path d="M4 9h8.5a4.5 4.5 0 0 1 0 9H11" />
+      </svg>
+    </button>
   );
 }
 
@@ -121,6 +140,31 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     const h = snapshot.hands[selfKey];
     return Array.isArray(h) ? h : [];
   }, [snapshot?.hands, selfKey]);
+
+  /** Cards committed to meld draft — hidden from hand strip until submit or Clr (server hand unchanged). */
+  const draftPlayedCardIds = useMemo(() => {
+    const s = new Set();
+    for (const meld of draftNewMelds) {
+      for (const c of meld) {
+        if (c && typeof c.id === "string") s.add(c.id);
+      }
+    }
+    for (const row of draftTableAdds) {
+      for (const c of row.cards) {
+        if (c && typeof c.id === "string") s.add(c.id);
+      }
+    }
+    return s;
+  }, [draftNewMelds, draftTableAdds]);
+
+  const myHandRawVisible = useMemo(() => {
+    if (draftPlayedCardIds.size === 0) return myHandRaw;
+    return myHandRaw.filter(raw => {
+      if (!raw || typeof raw !== "object") return true;
+      const id = /** @type {Record<string, unknown>} */ (raw).id;
+      return typeof id !== "string" || !draftPlayedCardIds.has(id);
+    });
+  }, [myHandRaw, draftPlayedCardIds]);
 
   const handCards = useMemo(() => {
     const out = [];
@@ -555,16 +599,23 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
           <Ov2Rummy51TableMelds
             framed={false}
             tableMeldsRaw={snapshot.tableMelds || []}
+            draftNewMelds={draftNewMelds}
+            draftTableAdds={draftTableAdds}
             selectedTargetMeldId={targetMeldId}
             onSelectTargetMeld={setTargetMeldId}
             disabled={busy || !isMyTurn || !isPlaying}
           />
-          <div className="pointer-events-none absolute bottom-1 right-1 z-20 sm:bottom-1.5 sm:right-1.5">
-            <SideDiscardStrip
-              card={discardTopCard}
-              empty={discardCount <= 0}
-              highlight={Boolean(isMyTurn && isPlaying && pendingDraw && pickedDiscardCard)}
-            />
+          <div className="pointer-events-none absolute bottom-1 right-1 z-20 flex flex-row items-end gap-1 sm:bottom-1.5 sm:right-1.5 sm:gap-1.5">
+            {pendingDraw === "discard" && isMyTurn && isPlaying ? (
+              <DiscardUndoIconButton disabled={busy} onClick={() => void onUndoDiscardDraw()} />
+            ) : null}
+            <div className="pointer-events-none shrink-0">
+              <SideDiscardStrip
+                card={discardTopCard}
+                empty={discardCount <= 0}
+                highlight={Boolean(isMyTurn && isPlaying && pendingDraw && pickedDiscardCard)}
+              />
+            </div>
           </div>
         </div>
 
@@ -628,7 +679,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       <div className="flex shrink-0 flex-col overflow-hidden rounded-md border border-violet-500/35 bg-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <Ov2Rummy51Hand
           embedded
-          handRaw={myHandRaw}
+          handRaw={myHandRawVisible}
           selectedIds={selectedIds}
           discardCardId={discardCardId}
           discardPickMode={discardPickMode}
@@ -684,16 +735,6 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
                   <div className="flex flex-col gap-0">
                     {validationMessage ? (
                       <p className="px-0.5 pb-0.5 text-[8px] leading-snug text-amber-200/95 sm:text-[9px]">{validationMessage}</p>
-                    ) : null}
-                    {pendingDraw === "discard" ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void onUndoDiscardDraw()}
-                        className="min-h-[28px] w-full rounded-md border border-zinc-500/35 bg-zinc-900/60 py-0.5 text-[9px] font-semibold text-zinc-300 disabled:opacity-40 sm:min-h-[30px] sm:text-[10px]"
-                      >
-                        Put discard back
-                      </button>
                     ) : null}
                     <button
                       type="button"
