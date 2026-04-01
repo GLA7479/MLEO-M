@@ -70,6 +70,11 @@ function slotIndexFromClientX(clientX, orderIds, refs) {
  *   onToggleCardId: (id: string) => void,
  *   onSortModeChange: (m: "rank"|"suit") => void,
  *   onEnterDiscardPickMode: () => void,
+ *   targetMeldId: string|null,
+ *   onNewMeldFromSelection: () => void,
+ *   onAddSelectionToTarget: () => void,
+ *   onClearMeldDraft: () => void,
+ *   hasMeldDraft: boolean,
  * }} props
  */
 export default function Ov2Rummy51Hand({
@@ -84,6 +89,11 @@ export default function Ov2Rummy51Hand({
   onToggleCardId,
   onSortModeChange,
   onEnterDiscardPickMode,
+  targetMeldId,
+  onNewMeldFromSelection,
+  onAddSelectionToTarget,
+  onClearMeldDraft,
+  hasMeldDraft,
 }) {
   const rankSuitLocked = sortDisabled === undefined ? disabled : sortDisabled;
   const reorderLocked = rankSuitLocked;
@@ -95,6 +105,8 @@ export default function Ov2Rummy51Hand({
     if (selectedIds instanceof Set) return selectedIds;
     return new Set(Array.isArray(selectedIds) ? selectedIds : []);
   }, [selectedIds]);
+
+  const selCount = selected.size;
 
   const sortedCards = useMemo(() => {
     const out = [];
@@ -388,7 +400,7 @@ export default function Ov2Rummy51Hand({
         })}
       </div>
 
-      <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1 border-t border-white/5 pt-1">
+      <div className="flex shrink-0 flex-nowrap items-center justify-center gap-0.5 overflow-x-auto border-t border-white/5 pt-1 [scrollbar-width:thin]">
         <button
           type="button"
           disabled={rankSuitLocked}
@@ -396,7 +408,7 @@ export default function Ov2Rummy51Hand({
             setManualOrder(null);
             onSortModeChange("rank");
           }}
-          className={`min-h-[34px] min-w-[4.75rem] shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold leading-tight sm:min-h-[38px] sm:min-w-[5.75rem] sm:px-4 sm:py-2 sm:text-sm ${
+          className={`min-h-[34px] min-w-[3.35rem] shrink-0 rounded-md px-1.5 py-1.5 text-[10px] font-semibold leading-tight sm:min-h-[38px] sm:min-w-[4.25rem] sm:px-2.5 sm:py-2 sm:text-xs ${
             sortMode === "rank" ? "bg-violet-600/50 text-white" : "bg-white/10 text-zinc-400"
           } disabled:opacity-40`}
         >
@@ -409,7 +421,7 @@ export default function Ov2Rummy51Hand({
             setManualOrder(null);
             onSortModeChange("suit");
           }}
-          className={`min-h-[34px] min-w-[4.75rem] shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold leading-tight sm:min-h-[38px] sm:min-w-[5.75rem] sm:px-4 sm:py-2 sm:text-sm ${
+          className={`min-h-[34px] min-w-[3.35rem] shrink-0 rounded-md px-1.5 py-1.5 text-[10px] font-semibold leading-tight sm:min-h-[38px] sm:min-w-[4.25rem] sm:px-2.5 sm:py-2 sm:text-xs ${
             sortMode === "suit" ? "bg-violet-600/50 text-white" : "bg-white/10 text-zinc-400"
           } disabled:opacity-40`}
         >
@@ -417,9 +429,33 @@ export default function Ov2Rummy51Hand({
         </button>
         <button
           type="button"
+          disabled={disabled || selCount < 3}
+          onClick={() => onNewMeldFromSelection()}
+          className="min-h-[34px] min-w-[3.35rem] shrink-0 rounded-md border border-white/15 bg-white/5 px-1.5 py-1.5 text-[10px] font-semibold leading-tight text-zinc-200 disabled:opacity-40 sm:min-h-[38px] sm:min-w-[4.25rem] sm:px-2.5 sm:py-2 sm:text-xs"
+        >
+          Meld
+        </button>
+        <button
+          type="button"
+          disabled={disabled || selCount < 1 || !targetMeldId}
+          onClick={() => onAddSelectionToTarget()}
+          className="min-h-[34px] min-w-[3.35rem] shrink-0 rounded-md border border-fuchsia-500/35 bg-fuchsia-950/25 px-1.5 py-1.5 text-[10px] font-semibold leading-tight text-fuchsia-100 disabled:opacity-40 sm:min-h-[38px] sm:min-w-[4.25rem] sm:px-2.5 sm:py-2 sm:text-xs"
+        >
+          Tbl
+        </button>
+        <button
+          type="button"
+          disabled={disabled || !hasMeldDraft}
+          onClick={() => onClearMeldDraft()}
+          className="min-h-[34px] min-w-[3.1rem] shrink-0 rounded-md border border-red-500/25 px-1.5 py-1.5 text-[10px] font-semibold leading-tight text-red-300/90 disabled:opacity-40 sm:min-h-[38px] sm:min-w-[3.5rem] sm:px-2 sm:py-2 sm:text-xs"
+        >
+          Clr
+        </button>
+        <button
+          type="button"
           disabled={disabled}
           onClick={() => onEnterDiscardPickMode()}
-          className={`min-h-[34px] min-w-[4.75rem] shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold leading-tight sm:min-h-[38px] sm:min-w-[5.75rem] sm:px-4 sm:py-2 sm:text-sm ${
+          className={`min-h-[34px] min-w-[3.35rem] shrink-0 rounded-md px-1.5 py-1.5 text-[10px] font-semibold leading-tight sm:min-h-[38px] sm:min-w-[4.25rem] sm:px-2.5 sm:py-2 sm:text-xs ${
             discardPickMode ? "bg-amber-600/60 text-amber-50" : "border border-amber-500/40 bg-amber-950/30 text-amber-100"
           } disabled:opacity-40`}
         >

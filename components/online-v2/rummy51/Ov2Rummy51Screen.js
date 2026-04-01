@@ -11,7 +11,6 @@ import {
 import { OV2_RUMMY51_PRODUCT_GAME_ID } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
 import Ov2SeatStrip from "../shared/Ov2SeatStrip";
 import Ov2Rummy51Hand from "./Ov2Rummy51Hand";
-import Ov2Rummy51MeldComposer from "./Ov2Rummy51MeldComposer";
 import Ov2Rummy51TableMelds from "./Ov2Rummy51TableMelds";
 
 /**
@@ -22,15 +21,15 @@ const MID_RANK = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q
 const MID_SUIT = /** @type {const} */ ({ S: "♠", H: "♥", D: "♦", C: "♣" });
 
 /**
- * Slim discard rail inside the same table frame as melds (bottom-aligned).
+ * Discard pile top — floated above the table (absolute in parent); does not shrink meld layout.
  * @param {{ card: Rummy51Card|null, empty: boolean, highlight: boolean }} props
  */
 function SideDiscardStrip({ card, empty, highlight }) {
   const red = Boolean(card && !card.isJoker && (card.suit === "H" || card.suit === "D"));
   return (
     <div
-      className={`pointer-events-none flex w-full shrink-0 select-none flex-col items-center gap-0.5 ${
-        highlight ? "drop-shadow-[0_0_8px_rgba(245,158,11,0.3)]" : ""
+      className={`pointer-events-none flex w-max shrink-0 select-none flex-col items-center gap-0.5 rounded-md bg-zinc-950/85 px-0.5 py-0.5 shadow-[0_2px_12px_rgba(0,0,0,0.45)] ring-1 ring-white/10 ${
+        highlight ? "ring-amber-400/50 drop-shadow-[0_0_10px_rgba(245,158,11,0.35)]" : ""
       }`}
     >
       <p className="w-full truncate text-center text-[5px] font-bold uppercase leading-none text-amber-200/75 sm:text-[6px]">
@@ -516,8 +515,6 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     );
   }
 
-  const hasComposerDraft = draftNewMelds.length > 0 || draftTableAdds.length > 0;
-
   const hasBottomActionBlock =
     Boolean(actionError) ||
     (!pendingDraw && isMyTurn && isPlaying) ||
@@ -541,17 +538,15 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden rounded-md border border-teal-500/20 bg-teal-950/10">
-          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            <Ov2Rummy51TableMelds
-              framed={false}
-              tableMeldsRaw={snapshot.tableMelds || []}
-              selectedTargetMeldId={targetMeldId}
-              onSelectTargetMeld={setTargetMeldId}
-              disabled={busy || !isMyTurn || !isPlaying}
-            />
-          </div>
-          <div className="flex w-[2.65rem] shrink-0 flex-col justify-end border-l border-teal-500/25 py-1 pl-0.5 pr-0.5 sm:w-[2.85rem]">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-teal-500/20 bg-teal-950/10">
+          <Ov2Rummy51TableMelds
+            framed={false}
+            tableMeldsRaw={snapshot.tableMelds || []}
+            selectedTargetMeldId={targetMeldId}
+            onSelectTargetMeld={setTargetMeldId}
+            disabled={busy || !isMyTurn || !isPlaying}
+          />
+          <div className="pointer-events-none absolute bottom-1 right-1 z-20 sm:bottom-1.5 sm:right-1.5">
             <SideDiscardStrip
               card={discardTopCard}
               empty={discardCount <= 0}
@@ -618,26 +613,6 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       </div>
 
       <div className="flex shrink-0 flex-col overflow-hidden rounded-md border border-violet-500/35 bg-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        {isMyTurn && isPlaying ? (
-          <Ov2Rummy51MeldComposer
-            compact={!hasComposerDraft}
-            hasEverOpened={hasEverOpened}
-            draftNewMelds={draftNewMelds}
-            draftTableAdds={draftTableAdds}
-            selectedIds={selectedIds}
-            targetMeldId={targetMeldId}
-            onNewMeldFromSelection={onNewMeldFromSelection}
-            onAddSelectionToTarget={onAddSelectionToTarget}
-            onRemoveDraftMeld={i => setDraftNewMelds(prev => prev.filter((_, j) => j !== i))}
-            onRemoveTableAdd={i => setDraftTableAdds(prev => prev.filter((_, j) => j !== i))}
-            onClearDraft={() => {
-              setDraftNewMelds([]);
-              setDraftTableAdds([]);
-            }}
-            disabled={busy}
-          />
-        ) : null}
-
         <Ov2Rummy51Hand
           embedded
           handRaw={myHandRaw}
@@ -647,6 +622,14 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
           sortMode={sortMode}
           disabled={busy || !isMyTurn || !isPlaying}
           sortDisabled={busy}
+          targetMeldId={targetMeldId}
+          onNewMeldFromSelection={onNewMeldFromSelection}
+          onAddSelectionToTarget={onAddSelectionToTarget}
+          onClearMeldDraft={() => {
+            setDraftNewMelds([]);
+            setDraftTableAdds([]);
+          }}
+          hasMeldDraft={draftNewMelds.length > 0 || draftTableAdds.length > 0}
           onToggleCardId={onToggleCardId}
           onSortModeChange={setSortMode}
           onEnterDiscardPickMode={() => {
