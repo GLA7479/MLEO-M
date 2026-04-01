@@ -2,15 +2,21 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Layout from "../Layout";
-import { ONLINE_V2_REGISTRY } from "../../lib/online-v2/onlineV2GameRegistry";
+import {
+  clearOv2SharedLastRoomSessionKey,
+  isOv2ActiveSharedProductId,
+  isOv2RoomIdQueryParam,
+  ONLINE_V2_SHARED_LOBBY_GAMES,
+  OV2_SHARED_LAST_ROOM_SESSION_KEY,
+} from "../../lib/online-v2/onlineV2GameRegistry";
 import { getOv2ParticipantId } from "../../lib/online-v2/ov2ParticipantId";
 import { getOv2RoomSnapshot } from "../../lib/online-v2/room-api/ov2SharedRoomsApi";
+import OnlineV2ReservedAdSlot from "./OnlineV2ReservedAdSlot";
 import OnlineV2VaultStrip from "./OnlineV2VaultStrip";
 import Ov2SharedLobbyScreen from "./shared-rooms/Ov2SharedLobbyScreen";
 import Ov2SharedRoomScreen from "./shared-rooms/Ov2SharedRoomScreen";
 
 const OV2_DISPLAY_NAME_KEY = "ov2_display_name_v1";
-const OV2_SHARED_LAST_ROOM_KEY = "ov2_shared_last_room_id_v1";
 
 function isOv2HubEnabled() {
   if (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ONLINE_V2_ENABLED === "false") {
@@ -50,7 +56,7 @@ export default function OnlineV2RoomsScreen() {
       if (!roomId) return;
       setSelectedRoomId(roomId);
       try {
-        window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_KEY, roomId);
+        window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_SESSION_KEY, roomId);
       } catch {
         // ignore
       }
@@ -70,10 +76,19 @@ export default function OnlineV2RoomsScreen() {
 
     const q = router.query.room;
     const fromQuery = Array.isArray(q) ? q[0] : q;
-    if (typeof fromQuery === "string" && fromQuery.length >= 32) {
-      setSelectedRoomId(fromQuery);
+
+    if (typeof fromQuery === "string" && fromQuery.length > 0 && !isOv2RoomIdQueryParam(fromQuery)) {
+      sessionResumeTriedRef.current = true;
+      clearOv2SharedLastRoomSessionKey();
+      setSelectedRoomId(null);
+      void router.replace({ pathname: "/online-v2/rooms" }, undefined, { shallow: true });
+      return;
+    }
+
+    if (typeof fromQuery === "string" && isOv2RoomIdQueryParam(fromQuery)) {
+      setSelectedRoomId(fromQuery.trim());
       try {
-        window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_KEY, fromQuery);
+        window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_SESSION_KEY, fromQuery.trim());
       } catch {
         // ignore
       }
@@ -86,7 +101,7 @@ export default function OnlineV2RoomsScreen() {
 
     let last = null;
     try {
-      last = window.sessionStorage.getItem(OV2_SHARED_LAST_ROOM_KEY);
+      last = window.sessionStorage.getItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
     } catch {
       sessionResumeTriedRef.current = true;
       return;
@@ -95,10 +110,20 @@ export default function OnlineV2RoomsScreen() {
       sessionResumeTriedRef.current = true;
       return;
     }
+    if (!isOv2RoomIdQueryParam(last)) {
+      clearOv2SharedLastRoomSessionKey();
+      sessionResumeTriedRef.current = true;
+      return;
+    }
 
     sessionResumeTriedRef.current = true;
     void getOv2RoomSnapshot({ room_id: last, viewer_participant_key: participantId })
       .then(snap => {
+        const productId = snap?.room?.product_game_id;
+        if (!isOv2ActiveSharedProductId(productId)) {
+          clearOv2SharedLastRoomSessionKey();
+          return;
+        }
         const me = snap.members?.find(m => m.participant_key === participantId);
         const st = me?.member_state;
         if (
@@ -114,20 +139,20 @@ export default function OnlineV2RoomsScreen() {
 
   const gameTitleById = useMemo(() => {
     const out = {};
-    for (const g of ONLINE_V2_REGISTRY) out[g.id] = g.title;
+    for (const g of ONLINE_V2_SHARED_LOBBY_GAMES) out[g.id] = g.title;
     return out;
   }, []);
 
   return (
     <Layout title="Online V2 — Rooms">
       <main
-        className="online-v2-rooms-main flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white"
+        className="online-v2-rooms-main flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white"
         style={{
           paddingTop: "max(8px, env(safe-area-inset-top))",
           paddingBottom: "max(8px, env(safe-area-inset-bottom))",
         }}
       >
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-1 flex-col gap-2 px-2 md:max-w-4xl md:px-4 lg:max-w-5xl lg:gap-2 lg:px-6 xl:max-w-6xl xl:gap-2.5 xl:px-8 2xl:max-w-7xl">
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col gap-2 overflow-hidden px-2 md:max-w-4xl md:px-4 lg:max-w-5xl lg:gap-2 lg:px-6 xl:max-w-6xl xl:gap-2.5 xl:px-8 2xl:max-w-7xl">
           <header className="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-white/15 bg-black/30 px-2 py-2 md:px-3 lg:px-4 lg:py-2.5 xl:px-5">
             <Link
               href="/online-v2"
@@ -140,32 +165,36 @@ export default function OnlineV2RoomsScreen() {
                 Shared rooms
               </h1>
               <p className="truncate text-[11px] text-zinc-300 lg:text-xs xl:text-sm">
-                Choose game, join room, claim seat, start
+                Ludo or Rummy 51 — join room, claim seat, start
               </p>
             </div>
             <OnlineV2VaultStrip />
           </header>
 
-          {!enabled ? (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-100">
-              Online V2 is disabled.
-            </div>
-          ) : selectedRoomId ? (
-            <Ov2SharedRoomScreen
-              roomId={selectedRoomId}
-              participantId={participantId}
-              displayName={displayName}
-              gameTitleById={gameTitleById}
-              onExitRoom={exitRoom}
-            />
-          ) : (
-            <Ov2SharedLobbyScreen
-              participantId={participantId}
-              displayName={displayName}
-              onDisplayNameChange={setDisplayName}
-              onEnterRoom={enterRoom}
-            />
-          )}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {!enabled ? (
+              <div className="shrink-0 rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-100">
+                Online V2 is disabled.
+              </div>
+            ) : selectedRoomId ? (
+              <Ov2SharedRoomScreen
+                roomId={selectedRoomId}
+                participantId={participantId}
+                displayName={displayName}
+                gameTitleById={gameTitleById}
+                onExitRoom={exitRoom}
+              />
+            ) : (
+              <Ov2SharedLobbyScreen
+                participantId={participantId}
+                displayName={displayName}
+                onDisplayNameChange={setDisplayName}
+                onEnterRoom={enterRoom}
+              />
+            )}
+          </div>
+
+          <OnlineV2ReservedAdSlot variant="subtle" />
         </div>
       </main>
     </Layout>

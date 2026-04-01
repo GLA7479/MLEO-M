@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
+import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import {
   OV2_LUDO_PLAY_MODE,
   OV2_LUDO_PRODUCT_GAME_ID,
@@ -10,8 +11,6 @@ import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi
 import { useOv2LudoSession } from "../../../hooks/useOv2LudoSession";
 import Ov2LudoBoardView from "../../../lib/online-v2/ludo/ov2LudoBoardView";
 import Ov2SeatStrip from "../shared/Ov2SeatStrip";
-
-const OV2_SHARED_LAST_ROOM_KEY = "ov2_shared_last_room_id_v1";
 
 /**
  * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null, onSessionRefresh?: (previousActiveSessionId: string, rpcNewSessionId?: string, options?: { expectClearedSession?: boolean }) => void | Promise<unknown> }} props
@@ -62,6 +61,7 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
     strikeDisplayMap,
     eliminatedSeats,
     statusLine,
+    matchPhase,
     result,
     liveDiceDisplayValue,
     doubleCycleUsedSeats,
@@ -204,7 +204,9 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
     if (!l) return false;
     return l.rematch_requested === true || l.rematch_requested === "true" || l.rematch_requested === 1;
   })();
-  const isFinished = isLiveMatch && (vm?.phaseLine?.includes("Match finished") || vm?.board?.winner != null || result?.winner != null);
+  const isFinished =
+    isLiveMatch &&
+    (String(matchPhase || "").toLowerCase() === "finished" || vm?.board?.winner != null || result?.winner != null);
   const winnerFromResult = result?.winner != null ? Number(result.winner) : winnerSeat != null ? Number(winnerSeat) : null;
   const didIWin = isFinished && mySeat != null && winnerFromResult != null && Number(mySeat) === Number(winnerFromResult);
   const canToggleRematchIntent =
@@ -505,7 +507,7 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
                             participant_key: selfKey,
                           });
                           try {
-                            window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_KEY);
+                            window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
                           } catch {
                             // ignore
                           }

@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import {
-  claimOv2Seat,
-  hostStartOv2Room,
-  leaveOv2Room,
-  releaseOv2Seat,
-} from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
+import { claimOv2Seat, hostStartOv2Room, releaseOv2Seat } from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
 import {
   fetchOv2LudoAuthoritativeSnapshot,
   requestOv2LudoOpenSession,
@@ -15,9 +10,14 @@ import {
   commitOv2RoomStake,
   fetchOv2RoomById,
   fetchOv2RoomMembers,
+  leaveOv2RoomWithForfeitRetry,
   setOv2MemberReady,
   startOv2RoomIntent,
 } from "../../../lib/online-v2/ov2RoomsApi";
+import {
+  clearOv2SharedLastRoomSessionKey,
+  isOv2ActiveSharedProductId,
+} from "../../../lib/online-v2/onlineV2GameRegistry";
 import { buildOnlineV2EconomyEventKey, clampSuggestedOnlineV2Stake } from "../../../lib/online-v2/ov2Economy";
 import { debitOnlineV2Vault, peekOnlineV2Vault, readOnlineV2Vault } from "../../../lib/online-v2/onlineV2VaultBridge";
 import {
@@ -123,14 +123,30 @@ export default function Ov2SharedRoomScreen({
   }, [canonicalRoom]);
 
   useEffect(() => {
-    if (!isRummy51Room || sharedStatusUpper !== "IN_GAME") return;
+    if (sharedStatusUpper !== "IN_GAME") return;
     setMsg(m => {
       if (!m) return m;
       const lower = String(m).toLowerCase();
-      if (lower.includes("waiting for stakes") || lower.includes("only be committed while")) return "";
+      if (
+        lower.includes("waiting for stakes") ||
+        lower.includes("only be committed while") ||
+        lower.includes("waiting for seated players") ||
+        lower.includes("could not open") ||
+        lower.includes("not in the pre-start")
+      ) {
+        return "";
+      }
       return m;
     });
-  }, [isRummy51Room, sharedStatusUpper]);
+  }, [sharedStatusUpper]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!room) return;
+    if (isOv2ActiveSharedProductId(room.product_game_id)) return;
+    clearOv2SharedLastRoomSessionKey();
+    onExitRoom();
+  }, [room, loading, onExitRoom]);
 
   async function ensureBalanceForStake(stake) {
     await readOnlineV2Vault({ fresh: true }).catch(() => {});
@@ -329,7 +345,12 @@ export default function Ov2SharedRoomScreen({
     setBusy(true);
     setMsg("");
     try {
-      await leaveOv2Room({ room_id: roomId, participant_key: participantId });
+      const canon = canonicalRoom || (await fetchOv2RoomById(roomId).catch(() => null));
+      await leaveOv2RoomWithForfeitRetry({
+        room: canon || room,
+        room_id: roomId,
+        participant_key: participantId,
+      });
       onExitRoom();
     } catch (e) {
       setMsg(e?.message || String(e));
@@ -503,6 +524,13 @@ export default function Ov2SharedRoomScreen({
         <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 px-2 py-2 text-center text-[10px] font-medium text-zinc-400">
           Waiting for host to start match
         </div>
+      ) : !rummyLedgerSynced || ledgerErr ? (
+        <div
+          className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 px-2 py-2 text-center text-[10px] font-medium text-zinc-400"
+          title={ledgerErr ? String(ledgerErr) : "Syncing stake state with server…"}
+        >
+          {ledgerErr ? "Room sync issue — tap Refresh above" : "Syncing room…"}
+        </div>
       ) : (
         <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-500">
           Loading…
@@ -512,7 +540,7 @@ export default function Ov2SharedRoomScreen({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-      <div className="flex items-center justify-between">
+      <div className="flex shrink-0 items-center justify-between">
         <button
           type="button"
           onClick={onExitRoom}
@@ -530,10 +558,10 @@ export default function Ov2SharedRoomScreen({
         </button>
       </div>
 
-      <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+      <div className="shrink-0 rounded-xl border border-white/10 bg-black/25 p-3">
         <div className="text-base font-bold text-white">{room?.title || "Room"}</div>
         <div className="text-xs text-zinc-400">
-          {gameTitleById[room?.product_game_id] || room?.product_game_id} • {room?.visibility_mode} • {joinedCount} players
+          {gameTitleById[room?.product_game_id] || "Game"} • {room?.visibility_mode} • {joinedCount} players
         </div>
         <div className="mt-1 text-[11px] text-zinc-500">
           {room?.min_players}-{room?.max_players} players • status {room?.status}
@@ -542,7 +570,10 @@ export default function Ov2SharedRoomScreen({
         {room?.join_code ? <div className="mt-1 text-[11px] text-zinc-300">Code: {room.join_code}</div> : null}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-2">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain rounded-xl border border-white/10 bg-black/20 p-2"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
         <div className="mb-2 text-xs font-semibold text-zinc-400">Players</div>
         <ul className="space-y-1.5">
           {members.map(m => {
@@ -575,46 +606,48 @@ export default function Ov2SharedRoomScreen({
           })}
         </ul>
         {isRummy51Room && ledgerErr ? <p className="mt-2 text-[11px] text-red-300">Room sync: {ledgerErr}</p> : null}
+
+        {room ? (
+          <div className="mt-3">
+            <Ov2SharedSeatGrid
+              room={room}
+              members={members}
+              participantId={participantId}
+              busy={busy}
+              onClaimSeat={onClaimSeat}
+              onReleaseSeat={onReleaseSeat}
+            />
+          </div>
+        ) : null}
+
+        {isRummy51Room && sharedStatusUpper === "IN_GAME" && seatedStakeBlockersPreview.length ? (
+          <div className="mt-3 rounded-xl border border-rose-500/35 bg-rose-950/25 p-3 text-[11px] text-rose-100">
+            <p className="font-semibold text-rose-50">Stake state incomplete</p>
+            <p className="mt-1 text-rose-200/90">{formatSeatedStakeBlockers(seatedStakeBlockersPreview)}</p>
+          </div>
+        ) : null}
+
+        {runtimeHandoff && !isRummy51Room ? (
+          !isLudoRoom ? (
+            <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
+              <div className="font-bold">Runtime handoff ready</div>
+              <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
+              <div>Policy: {runtimeHandoff.economy_entry_policy}</div>
+              <div className="mt-1 text-sky-200/80">Runtime migration is pending in a later phase.</div>
+            </div>
+          ) : null
+        ) : null}
+        {sharedStatusUpper === "IN_GAME" && isRummy51Room && !launchingLive ? (
+          <div className="mt-3 rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
+            <p className="font-semibold text-teal-50">Match starting</p>
+            <p className="mt-1 text-teal-200/90">
+              Heading to the live table when the session is ready. If nothing happens, use Refresh or wait a few seconds.
+            </p>
+          </div>
+        ) : null}
       </div>
 
-      {room ? (
-        <Ov2SharedSeatGrid
-          room={room}
-          members={members}
-          participantId={participantId}
-          busy={busy}
-          onClaimSeat={onClaimSeat}
-          onReleaseSeat={onReleaseSeat}
-        />
-      ) : null}
-
-      {isRummy51Room && sharedStatusUpper === "IN_GAME" && seatedStakeBlockersPreview.length ? (
-        <div className="rounded-xl border border-rose-500/35 bg-rose-950/25 p-3 text-[11px] text-rose-100">
-          <p className="font-semibold text-rose-50">Stake state incomplete</p>
-          <p className="mt-1 text-rose-200/90">{formatSeatedStakeBlockers(seatedStakeBlockersPreview)}</p>
-        </div>
-      ) : null}
-
-      {runtimeHandoff && !isRummy51Room ? (
-        !isLudoRoom ? (
-          <div className="rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
-            <div className="font-bold">Runtime handoff ready</div>
-            <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
-            <div>Policy: {runtimeHandoff.economy_entry_policy}</div>
-            <div className="mt-1 text-sky-200/80">Runtime migration is pending in a later phase.</div>
-          </div>
-        ) : null
-      ) : null}
-      {sharedStatusUpper === "IN_GAME" && isRummy51Room && !launchingLive ? (
-        <div className="rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
-          <p className="font-semibold text-teal-50">Match starting</p>
-          <p className="mt-1 text-teal-200/90">
-            Heading to the live table when the session is ready. If nothing happens, use Refresh or wait a few seconds.
-          </p>
-        </div>
-      ) : null}
-
-      <div className="flex gap-2">
+      <div className="flex shrink-0 gap-2">
         <button
           type="button"
           disabled={busy}
@@ -649,16 +682,18 @@ export default function Ov2SharedRoomScreen({
         )}
       </div>
 
-      {loading ? <p className="text-[11px] text-zinc-500">Loading room...</p> : null}
-      {launchingLive ? (
-        <p className="text-[11px] text-sky-300">
-          {isRummy51Room ? "Opening live Rummy 51 game..." : "Opening live Ludo game..."}
-        </p>
-      ) : null}
-      {error ? <p className="text-[11px] text-red-300">{error}</p> : null}
-      {msg ? <p className="text-[11px] text-amber-200">{msg}</p> : null}
-      {displayName ? null : <p className="text-[11px] text-zinc-500">Set your display name to continue.</p>}
-      {me ? null : <p className="text-[11px] text-zinc-500">You are not currently joined in this room.</p>}
+      <div className="shrink-0 space-y-0.5">
+        {loading ? <p className="text-[11px] text-zinc-500">Loading room...</p> : null}
+        {launchingLive ? (
+          <p className="text-[11px] text-sky-300">
+            {isRummy51Room ? "Opening live Rummy 51 game..." : "Opening live Ludo game..."}
+          </p>
+        ) : null}
+        {error ? <p className="text-[11px] text-red-300">{error}</p> : null}
+        {msg ? <p className="text-[11px] text-amber-200">{msg}</p> : null}
+        {displayName ? null : <p className="text-[11px] text-zinc-500">Set your display name to continue.</p>}
+        {me ? null : <p className="text-[11px] text-zinc-500">You are not currently joined in this room.</p>}
+      </div>
     </div>
   );
 }

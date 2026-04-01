@@ -5,7 +5,10 @@ import {
   joinOv2RoomByCode,
   listOv2Rooms,
 } from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
-import { ONLINE_V2_REGISTRY } from "../../../lib/online-v2/onlineV2GameRegistry";
+import {
+  isOv2ActiveSharedProductId,
+  ONLINE_V2_SHARED_LOBBY_GAMES,
+} from "../../../lib/online-v2/onlineV2GameRegistry";
 import Ov2SharedCreateRoomModal from "./Ov2SharedCreateRoomModal";
 import Ov2SharedJoinByCodeModal from "./Ov2SharedJoinByCodeModal";
 import Ov2SharedRoomDirectory from "./Ov2SharedRoomDirectory";
@@ -23,13 +26,19 @@ export default function Ov2SharedLobbyScreen({
   const [createOpen, setCreateOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
 
-  const games = useMemo(() => ONLINE_V2_REGISTRY, []);
+  const games = useMemo(() => ONLINE_V2_SHARED_LOBBY_GAMES, []);
+  const gameTitleById = useMemo(() => {
+    const out = {};
+    for (const g of ONLINE_V2_SHARED_LOBBY_GAMES) out[g.id] = g.title;
+    return out;
+  }, []);
 
   const loadRooms = useCallback(async () => {
     setMsg("");
     try {
       const out = await listOv2Rooms({ product_game_id: selectedGameId, limit: 80 });
-      const list = Array.isArray(out.rooms) ? out.rooms : [];
+      const raw = Array.isArray(out.rooms) ? out.rooms : [];
+      const list = raw.filter(r => r && isOv2ActiveSharedProductId(r.product_game_id));
       setRooms(list);
     } catch (e) {
       setMsg(e?.message || String(e));
@@ -113,7 +122,7 @@ export default function Ov2SharedLobbyScreen({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-      <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+      <div className="shrink-0 rounded-xl border border-white/10 bg-black/25 p-3">
         <div className="text-sm font-bold">Central lobby</div>
         <div className="mt-1 flex flex-col gap-2 sm:flex-row">
           <input
@@ -134,7 +143,7 @@ export default function Ov2SharedLobbyScreen({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1">
+      <div className="flex shrink-0 flex-wrap gap-1">
         <button
           type="button"
           onClick={() => setSelectedGameId(null)}
@@ -154,7 +163,7 @@ export default function Ov2SharedLobbyScreen({
         ))}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex shrink-0 gap-2">
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
@@ -171,15 +180,21 @@ export default function Ov2SharedLobbyScreen({
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-2">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain rounded-xl border border-white/10 bg-black/20 p-2"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
         <Ov2SharedRoomDirectory
           rooms={rooms}
           busy={busy}
+          gameTitleById={gameTitleById}
           onJoinRoom={handleJoin}
         />
       </div>
 
-      {msg ? <div className="rounded border border-red-500/30 bg-red-950/30 px-2 py-1 text-xs text-red-200">{msg}</div> : null}
+      {msg ? (
+        <div className="shrink-0 rounded border border-red-500/30 bg-red-950/30 px-2 py-1 text-xs text-red-200">{msg}</div>
+      ) : null}
 
       <Ov2SharedCreateRoomModal
         open={createOpen}

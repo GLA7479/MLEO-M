@@ -810,6 +810,8 @@ export function useOv2LudoSession(baseContext) {
       diceRolling,
       liveDiceDisplayValue,
       doubleCycleUsedSeats: authoritativeSnapshot?.doubleCycleUsedSeats ?? [],
+      /** Authoritative session phase when in live match (`lobby` | `playing` | `finished` | …). */
+      matchPhase: authoritativeSnapshot?.phase ?? null,
       phaseLine,
       boardSeatForUi,
       boardViewReadOnly,

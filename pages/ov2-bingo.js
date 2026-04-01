@@ -1,5 +1,5 @@
-import Ov2BingoLiveShell from "../components/online-v2/bingo/Ov2BingoLiveShell";
+import Ov2HardRedirectToSharedRooms from "../components/online-v2/Ov2HardRedirectToSharedRooms";
 
 export default function Ov2BingoPage() {
-  return <Ov2BingoLiveShell />;
+  return <Ov2HardRedirectToSharedRooms />;
 }

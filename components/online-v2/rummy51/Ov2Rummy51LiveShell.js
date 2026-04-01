@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ONLINE_V2_GAME_IDS } from "../../../lib/online-v2/onlineV2GameRegistry";
+import {
+  clearOv2SharedLastRoomSessionKey,
+  isOv2RoomIdQueryParam,
+  ONLINE_V2_GAME_IDS,
+} from "../../../lib/online-v2/onlineV2GameRegistry";
+import { useOv2LiveShellFatalRoomRedirect } from "../../../hooks/useOv2LiveShellFatalRoomRedirect";
 import { openOv2Rummy51Session } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
 import { fetchOv2RoomById, fetchOv2RoomMembers, leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import {
@@ -24,7 +29,7 @@ function parseRoomQueryParam(q) {
 
 /**
  * `?room=` loads OV2 room + members; live Rummy 51 session is authoritative via RPC + Realtime.
- * Without `?room=`, only a short secondary note is shown — no confusing “preview match” copy.
+ * No room → redirect to shared rooms.
  */
 export default function Ov2Rummy51LiveShell() {
   const router = useRouter();
@@ -36,7 +41,8 @@ export default function Ov2Rummy51LiveShell() {
   }, []);
 
   const routerRoomId = router.isReady ? parseRoomQueryParam(router.query.room) : null;
-  const roomId = router.isReady ? routerRoomId : bootRoomId;
+  const rawRoomId = router.isReady ? routerRoomId : bootRoomId;
+  const roomId = rawRoomId && isOv2RoomIdQueryParam(rawRoomId) ? String(rawRoomId).trim() : null;
 
   const [participantId, setParticipantId] = useState("");
   const [room, setRoom] = useState(null);
@@ -98,6 +104,14 @@ export default function Ov2Rummy51LiveShell() {
     if (!roomId) return;
     void reloadContext();
   }, [roomId, reloadContext]);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (roomId) return;
+    void router.replace("/online-v2/rooms");
+  }, [router.isReady, roomId, router]);
+
+  useOv2LiveShellFatalRoomRedirect(router, roomId, loadError);
 
   useEffect(() => {
     if (typeof window === "undefined" || !roomId) return undefined;
@@ -206,11 +220,7 @@ export default function Ov2Rummy51LiveShell() {
         room_id: roomId,
         participant_key: participantId,
       });
-      try {
-        window.sessionStorage.removeItem("ov2_shared_last_room_id_v1");
-      } catch {
-        // ignore
-      }
+      clearOv2SharedLastRoomSessionKey();
       await router.replace("/online-v2/rooms");
     } catch (e) {
       setLeaveErr(e?.message || String(e) || "Could not leave.");
@@ -275,43 +285,46 @@ export default function Ov2Rummy51LiveShell() {
       !isHost
   );
 
+  if (!roomId) {
+    return (
+      <OnlineV2GamePageShell title="Rummy 51" showSubtitle={false} infoPanel={null}>
+        <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-sm text-zinc-400">
+          {router.isReady ? "Opening rooms…" : "Loading…"}
+        </div>
+      </OnlineV2GamePageShell>
+    );
+  }
+
   return (
     <OnlineV2GamePageShell
       title="Rummy 51"
       showSubtitle={false}
       infoPanel={
-        roomId ? (
-          <>
-            <p>
-              Live table for room <span className="font-mono text-zinc-300">{roomId.slice(0, 8)}…</span>. Turns, melds, and
-              scoring are enforced on the server.
-            </p>
-            <p className="mt-2 text-[11px] text-zinc-500">
-              <Link href="/online-v2/rooms" className="text-sky-300 underline">
-                Lobby
-              </Link>
-              {" · "}
-              <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
-                Refresh room
-              </button>
-              {" · "}
-              <button
-                type="button"
-                disabled={leaveBusy || !participantId}
-                className="text-sky-300 underline disabled:opacity-45"
-                onClick={() => void onLeaveTable()}
-              >
-                {leaveBusy ? "Leaving…" : "Leave table"}
-              </button>
-              {leaveErr ? <span className="ml-1 text-red-300">{leaveErr}</span> : null}
-            </p>
-          </>
-        ) : (
-          <p className="text-[11px] text-zinc-500">
-            <strong className="text-zinc-300">Live play</strong> uses <span className="font-mono">/ov2-rummy51?room=…</span>{" "}
-            from the lobby. Open a Rummy 51 room there first.
+        <>
+          <p>
+            Live table for room <span className="font-mono text-zinc-300">{roomId.slice(0, 8)}…</span>. Turns, melds, and
+            scoring are enforced on the server.
           </p>
-        )
+          <p className="mt-2 text-[11px] text-zinc-500">
+            <Link href="/online-v2/rooms" className="text-sky-300 underline">
+              Lobby
+            </Link>
+            {" · "}
+            <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
+              Refresh room
+            </button>
+            {" · "}
+            <button
+              type="button"
+              disabled={leaveBusy || !participantId}
+              className="text-sky-300 underline disabled:opacity-45"
+              onClick={() => void onLeaveTable()}
+            >
+              {leaveBusy ? "Leaving…" : "Leave table"}
+            </button>
+            {leaveErr ? <span className="ml-1 text-red-300">{leaveErr}</span> : null}
+          </p>
+        </>
       }
     >
       {roomId && loadError && !room ? (
@@ -328,7 +341,7 @@ export default function Ov2Rummy51LiveShell() {
           {showStakeHint ? (
             <div className="flex shrink-0 flex-col gap-1.5 border-b border-amber-500/25 bg-amber-950/20 px-2 py-2">
               <p className="text-[10px] leading-snug text-amber-100/95 sm:text-[11px]">
-                <strong className="font-semibold">Next match:</strong> commit stake in the room lobby. When the room is
+                <strong className="font-semibold">Stake phase:</strong> commit stake in the room lobby. When the room is
                 active, the host can open Rummy 51 here.
               </p>
               <Link

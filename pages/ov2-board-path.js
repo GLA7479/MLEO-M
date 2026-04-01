@@ -1,5 +1,5 @@
-import Ov2BoardPathLiveShell from "../components/online-v2/Ov2BoardPathLiveShell";
+import Ov2HardRedirectToSharedRooms from "../components/online-v2/Ov2HardRedirectToSharedRooms";
 
 export default function Ov2BoardPathPage() {
-  return <Ov2BoardPathLiveShell />;
+  return <Ov2HardRedirectToSharedRooms />;
 }

@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ONLINE_V2_GAME_IDS } from "../../../lib/online-v2/onlineV2GameRegistry";
+import {
+  clearOv2SharedLastRoomSessionKey,
+  isOv2RoomIdQueryParam,
+  ONLINE_V2_GAME_IDS,
+} from "../../../lib/online-v2/onlineV2GameRegistry";
+import { useOv2LiveShellFatalRoomRedirect } from "../../../hooks/useOv2LiveShellFatalRoomRedirect";
 import { requestOv2LudoOpenSession } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import { fetchOv2RoomById, fetchOv2RoomMembers, leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { getOv2ParticipantId } from "../../../lib/online-v2/ov2ParticipantId";
@@ -19,9 +24,7 @@ function parseRoomQueryParam(q) {
 }
 
 /**
- * Route shell: loads OV2 room row when `?room=` is present (product_game_id must match).
- * Presence leader opens the live session once 2–4 seats are claimed; snapshot fetch + Realtime
- * drive `LIVE_MATCH_ACTIVE` in `useOv2LudoSession`. Without `?room=`, the screen is local preview only.
+ * Route shell: requires `?room=` (Ludo product). No room → redirect to shared rooms.
  */
 export default function Ov2LudoLiveShell() {
   const router = useRouter();
@@ -33,7 +36,8 @@ export default function Ov2LudoLiveShell() {
   }, []);
 
   const routerRoomId = router.isReady ? parseRoomQueryParam(router.query.room) : null;
-  const roomId = router.isReady ? routerRoomId : bootRoomId;
+  const rawRoomId = router.isReady ? routerRoomId : bootRoomId;
+  const roomId = rawRoomId && isOv2RoomIdQueryParam(rawRoomId) ? String(rawRoomId).trim() : null;
 
   const [participantId, setParticipantId] = useState("");
   const [room, setRoom] = useState(null);
@@ -156,6 +160,14 @@ export default function Ov2LudoLiveShell() {
   }, [roomId, reloadContext]);
 
   useEffect(() => {
+    if (!router.isReady) return;
+    if (roomId) return;
+    void router.replace("/online-v2/rooms");
+  }, [router.isReady, roomId, router]);
+
+  useOv2LiveShellFatalRoomRedirect(router, roomId, loadError);
+
+  useEffect(() => {
     if (typeof window === "undefined" || !roomId) return undefined;
     const ch = supabaseMP
       .channel(`ov2_ludo_shell_room:${roomId}`)
@@ -228,7 +240,7 @@ export default function Ov2LudoLiveShell() {
     [room, participantId]
   );
 
-  /** After rematch the server sets `pending_stakes`; `ov2_ludo_open_session` only runs when the room is `active`. */
+  /** Room returned to stake phase; host opens next match when lifecycle is `active` again. */
   const showStakePhaseAfterRematchHint = useMemo(
     () =>
       Boolean(
@@ -278,11 +290,7 @@ export default function Ov2LudoLiveShell() {
         room_id: roomId,
         participant_key: participantId,
       });
-      try {
-        window.sessionStorage.removeItem("ov2_shared_last_room_id_v1");
-      } catch {
-        // ignore
-      }
+      clearOv2SharedLastRoomSessionKey();
       await router.replace("/online-v2/rooms");
     } catch (e) {
       setLeaveErr(e?.message || String(e) || "Could not leave.");
@@ -326,6 +334,16 @@ export default function Ov2LudoLiveShell() {
     };
   }, [roomId, room, members, participantId, selfDisplayName, onLeaveTable, leaveBusy]);
 
+  if (!roomId) {
+    return (
+      <OnlineV2GamePageShell title="Ludo" showSubtitle={false} infoPanel={null}>
+        <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-sm text-zinc-400">
+          {router.isReady ? "Opening rooms…" : "Loading…"}
+        </div>
+      </OnlineV2GamePageShell>
+    );
+  }
+
   return (
     <OnlineV2GamePageShell
       title="Ludo"
@@ -333,36 +351,28 @@ export default function Ov2LudoLiveShell() {
       infoPanel={
         <>
           <p>
-            Without <code className="text-zinc-400">?room=</code> this page is a <strong className="text-amber-200">local preview</strong> only.
-            With a Ludo room, the <strong className="text-zinc-200">room host</strong> opens the live match once 2–4 seats are claimed;
-            turns and dice are enforced by the server.
+            Live Ludo for this room. The room host opens the match when 2–4 seats are claimed and stakes are committed;
+            turns and dice are enforced on the server.
           </p>
-          <ul className="mt-2 space-y-1 text-[11px] text-zinc-400">
-            <li>In-room with no active session: board is read-only and the room host opens the match.</li>
-            <li>After session opens: board becomes live-authoritative with server-owned turn/dice/moves.</li>
-            <li>Without a room query: board stays local preview.</li>
-          </ul>
-          {roomId ? (
-            <p className="mt-2 text-[11px] text-zinc-500">
-              <Link href="/online-v2/rooms" className="text-sky-300 underline">
-                Lobby
-              </Link>
-              {" · "}
-              <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
-                Refresh
-              </button>
-              {" · "}
-              <button
-                type="button"
-                disabled={leaveBusy || !participantId}
-                className="text-sky-300 underline disabled:opacity-45"
-                onClick={() => void onLeaveTable()}
-              >
-                {leaveBusy ? "Leaving…" : "Leave table"}
-              </button>
-              {leaveErr ? <span className="ml-1 text-red-300">{leaveErr}</span> : null}
-            </p>
-          ) : null}
+          <p className="mt-2 text-[11px] text-zinc-500">
+            <Link href="/online-v2/rooms" className="text-sky-300 underline">
+              Lobby
+            </Link>
+            {" · "}
+            <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
+              Refresh
+            </button>
+            {" · "}
+            <button
+              type="button"
+              disabled={leaveBusy || !participantId}
+              className="text-sky-300 underline disabled:opacity-45"
+              onClick={() => void onLeaveTable()}
+            >
+              {leaveBusy ? "Leaving…" : "Leave table"}
+            </button>
+            {leaveErr ? <span className="ml-1 text-red-300">{leaveErr}</span> : null}
+          </p>
         </>
       }
     >

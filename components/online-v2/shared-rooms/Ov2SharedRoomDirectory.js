@@ -9,6 +9,7 @@ function visibilityBadge(room) {
 export default function Ov2SharedRoomDirectory({
   rooms,
   busy,
+  gameTitleById = {},
   onJoinRoom,
 }) {
   const [passwordByRoom, setPasswordByRoom] = useState({});
@@ -23,7 +24,7 @@ export default function Ov2SharedRoomDirectory({
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-white">{room.title || "Room"}</div>
                 <div className="text-xs text-zinc-400">
-                  {room.product_game_id} • {visibilityBadge(room)} {requiresPassword ? "🔒" : ""}
+                  {gameTitleById[room.product_game_id] || "Game"} • {visibilityBadge(room)} {requiresPassword ? "🔒" : ""}
                 </div>
                 <div className="text-xs text-zinc-500">
                   {room.min_players}-{room.max_players} players • {room.status}
