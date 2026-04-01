@@ -388,10 +388,6 @@ export default function Ov2Rummy51Hand({
         })}
       </div>
 
-      {discardPickMode ? (
-        <p className="shrink-0 px-0.5 pb-0.5 text-center text-[8px] leading-tight text-amber-200/90">Tap card to discard.</p>
-      ) : null}
-
       <div className="flex shrink-0 flex-nowrap items-center justify-center gap-1 border-t border-white/5 pt-1">
         <button
           type="button"

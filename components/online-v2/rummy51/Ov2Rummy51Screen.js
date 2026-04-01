@@ -22,34 +22,36 @@ const MID_RANK = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q
 const MID_SUIT = /** @type {const} */ ({ S: "♠", H: "♥", D: "♦", C: "♣" });
 
 /**
- * Top of discard pile — overlaid bottom-right inside the table panel (does not reduce table height).
- * @param {{ card: Rummy51Card|null, empty: boolean, showHint: boolean, highlight: boolean }} props
+ * Slim discard rail inside the same table frame as melds (bottom-aligned).
+ * @param {{ card: Rummy51Card|null, empty: boolean, highlight: boolean }} props
  */
-function CornerDiscardTopCard({ card, empty, showHint, highlight }) {
+function SideDiscardStrip({ card, empty, highlight }) {
   const red = Boolean(card && !card.isJoker && (card.suit === "H" || card.suit === "D"));
   return (
     <div
-      className={`pointer-events-none shrink-0 select-none flex-col items-center gap-0.5 ${
-        highlight ? "drop-shadow-[0_0_10px_rgba(245,158,11,0.35)]" : ""
-      } flex`}
+      className={`pointer-events-none flex w-full shrink-0 select-none flex-col items-center gap-0.5 ${
+        highlight ? "drop-shadow-[0_0_8px_rgba(245,158,11,0.3)]" : ""
+      }`}
     >
-      <p className="text-center text-[8px] font-bold uppercase tracking-wide text-amber-200/85 sm:text-[9px]">Discard</p>
+      <p className="w-full truncate text-center text-[5px] font-bold uppercase leading-none text-amber-200/75 sm:text-[6px]">
+        Discard
+      </p>
       {card ? (
         <div
-          className={`relative flex h-[4.85rem] w-[3.45rem] flex-col rounded-xl border-2 py-1 shadow-lg sm:h-[5.15rem] sm:w-[3.65rem] ${
+          className={`relative flex h-[3.35rem] w-[2.45rem] flex-col rounded-md border py-0.5 shadow-md sm:h-[3.5rem] sm:w-[2.55rem] ${
             highlight
-              ? "border-amber-400/70 bg-gradient-to-b from-amber-900/50 to-zinc-950 shadow-amber-900/30"
-              : "border-amber-500/50 bg-gradient-to-b from-zinc-500 to-zinc-950"
+              ? "border-amber-400/65 bg-gradient-to-b from-amber-900/45 to-zinc-950"
+              : "border-amber-500/45 bg-gradient-to-b from-zinc-600 to-zinc-950"
           }`}
         >
           <div
-            className={`px-1 text-left leading-none ${card.isJoker ? "text-amber-200" : red ? "text-rose-300" : "text-zinc-100"}`}
+            className={`px-0.5 text-left leading-none ${card.isJoker ? "text-amber-200" : red ? "text-rose-300" : "text-zinc-100"}`}
           >
-            <div className="text-sm font-extrabold leading-none sm:text-base">{card.isJoker ? "J" : MID_RANK[card.rank] ?? "?"}</div>
-            <div className="text-base font-bold leading-none sm:text-lg">{card.isJoker ? "★" : card.suit ? MID_SUIT[card.suit] ?? "" : ""}</div>
+            <div className="text-[10px] font-extrabold leading-none">{card.isJoker ? "J" : MID_RANK[card.rank] ?? "?"}</div>
+            <div className="text-[11px] font-bold leading-none">{card.isJoker ? "★" : card.suit ? MID_SUIT[card.suit] ?? "" : ""}</div>
           </div>
           <div
-            className={`flex flex-1 items-center justify-center px-0.5 text-center text-lg font-black leading-none sm:text-xl ${
+            className={`flex flex-1 items-center justify-center px-px text-center text-[11px] font-black leading-none sm:text-xs ${
               card.isJoker ? "text-amber-200" : red ? "text-rose-200" : "text-zinc-100"
             }`}
           >
@@ -57,13 +59,10 @@ function CornerDiscardTopCard({ card, empty, showHint, highlight }) {
           </div>
         </div>
       ) : (
-        <div className="flex h-[4.85rem] w-[3.45rem] flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-600/60 bg-zinc-950/80 sm:h-[5.15rem] sm:w-[3.65rem]">
-          <span className="text-center text-[10px] font-semibold text-zinc-500 sm:text-xs">{empty ? "Empty" : "—"}</span>
+        <div className="flex h-[3.35rem] w-[2.45rem] flex-col items-center justify-center rounded-md border border-dashed border-zinc-600/55 bg-zinc-950/90 sm:h-[3.5rem] sm:w-[2.55rem]">
+          <span className="px-px text-center text-[7px] font-semibold leading-tight text-zinc-500">{empty ? "∅" : "—"}</span>
         </div>
       )}
-      {showHint ? (
-        <p className="max-w-[4.5rem] text-center text-[7px] leading-tight text-amber-200/80 sm:text-[8px]">Choose in hand</p>
-      ) : null}
     </div>
   );
 }
@@ -542,18 +541,20 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <Ov2Rummy51TableMelds
-            tableMeldsRaw={snapshot.tableMelds || []}
-            selectedTargetMeldId={targetMeldId}
-            onSelectTargetMeld={setTargetMeldId}
-            disabled={busy || !isMyTurn || !isPlaying}
-          />
-          <div className="pointer-events-none absolute bottom-1 right-1 z-20 sm:bottom-1.5 sm:right-1.5">
-            <CornerDiscardTopCard
+        <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden rounded-md border border-teal-500/20 bg-teal-950/10">
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+            <Ov2Rummy51TableMelds
+              framed={false}
+              tableMeldsRaw={snapshot.tableMelds || []}
+              selectedTargetMeldId={targetMeldId}
+              onSelectTargetMeld={setTargetMeldId}
+              disabled={busy || !isMyTurn || !isPlaying}
+            />
+          </div>
+          <div className="flex w-[2.65rem] shrink-0 flex-col justify-end border-l border-teal-500/25 py-1 pl-0.5 pr-0.5 sm:w-[2.85rem]">
+            <SideDiscardStrip
               card={discardTopCard}
               empty={discardCount <= 0}
-              showHint={Boolean(isMyTurn && isPlaying && pendingDraw && !pickedDiscardCard)}
               highlight={Boolean(isMyTurn && isPlaying && pendingDraw && pickedDiscardCard)}
             />
           </div>
