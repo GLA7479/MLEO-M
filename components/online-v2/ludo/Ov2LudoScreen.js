@@ -1,24 +1,35 @@
 "use client";
 
+import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
 import {
   OV2_LUDO_PLAY_MODE,
   OV2_LUDO_PRODUCT_GAME_ID,
 } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
+import { leaveOv2Room } from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
 import { useOv2LudoSession } from "../../../hooks/useOv2LudoSession";
 import Ov2LudoBoardView from "../../../lib/online-v2/ludo/ov2LudoBoardView";
 import Ov2SeatStrip from "../shared/Ov2SeatStrip";
+
+const OV2_SHARED_LAST_ROOM_KEY = "ov2_shared_last_room_id_v1";
 
 /**
  * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null, onSessionRefresh?: (previousActiveSessionId: string, rpcNewSessionId?: string, options?: { expectClearedSession?: boolean }) => void | Promise<unknown> }} props
  */
 export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh }) {
+  const router = useRouter();
   const session = useOv2LudoSession(contextInput ?? undefined);
   const { vm, rollDicePreview, onPieceClick, canRoll, resetPreviewBoard, offerDouble, respondDouble, requestRematch, cancelRematch, startNextMatch } =
     session;
   const [rematchIntentBusy, setRematchIntentBusy] = useState(false);
   const [startNextBusy, setStartNextBusy] = useState(false);
+  const [exitBusy, setExitBusy] = useState(false);
+  const [exitErr, setExitErr] = useState("");
   const roomMembers = Array.isArray(contextInput?.members) ? contextInput.members : [];
+  const roomId =
+    contextInput?.room && typeof contextInput.room === "object" && contextInput.room.id != null
+      ? String(contextInput.room.id)
+      : "";
   const roomProductId =
     contextInput?.room && typeof contextInput.room === "object" && contextInput.room.product_game_id != null
       ? String(contextInput.room.product_game_id)
@@ -440,6 +451,53 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
                   </button>
                 ) : isFinished && eligibleRematch >= 2 && readyRematch < eligibleRematch ? (
                   <p className="text-center text-[10px] text-zinc-500">Waiting for all players to confirm rematch…</p>
+                ) : null}
+                {exitErr ? (
+                  <p className="text-center text-[10px] text-red-300">{exitErr}</p>
+                ) : null}
+                {roomId ? (
+                  <div className="mt-1 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      disabled={exitBusy}
+                      onClick={() => {
+                        setExitErr("");
+                        void router.replace(
+                          { pathname: "/online-v2/rooms", query: { room: roomId } },
+                          undefined,
+                          { shallow: true }
+                        );
+                      }}
+                      className="rounded-md border border-white/25 bg-white/10 px-3 py-2 text-xs font-semibold text-white disabled:opacity-45"
+                    >
+                      Back to room
+                    </button>
+                    <button
+                      type="button"
+                      disabled={exitBusy || !selfKey}
+                      onClick={async () => {
+                        if (!selfKey) return;
+                        setExitErr("");
+                        setExitBusy(true);
+                        try {
+                          await leaveOv2Room({ room_id: roomId, participant_key: selfKey });
+                          try {
+                            window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_KEY);
+                          } catch {
+                            // ignore
+                          }
+                          await router.replace("/online-v2/rooms");
+                        } catch (e) {
+                          setExitErr(e?.message || "Could not leave room.");
+                        } finally {
+                          setExitBusy(false);
+                        }
+                      }}
+                      className="rounded-md border border-red-500/45 bg-red-950/35 px-3 py-2 text-xs font-semibold text-red-100 disabled:opacity-45"
+                    >
+                      {exitBusy ? "Leaving…" : "Leave room"}
+                    </button>
+                  </div>
                 ) : null}
               </div>
             </div>

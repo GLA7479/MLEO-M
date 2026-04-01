@@ -6,7 +6,10 @@ import {
   leaveOv2Room,
   releaseOv2Seat,
 } from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
-import { requestOv2LudoOpenSession } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
+import {
+  fetchOv2LudoAuthoritativeSnapshot,
+  requestOv2LudoOpenSession,
+} from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import {
   fetchOv2Rummy51Snapshot,
   openOv2Rummy51Session,
@@ -135,10 +138,26 @@ export default function Ov2SharedRoomScreen({
     if (room?.status !== "IN_GAME") return;
     if (!liveRuntimeId) return;
     if (isLudoRoom) {
-      didRouteToLiveRef.current = true;
-      setLaunchingLive(true);
-      void router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
-      return;
+      const ludoSid = room?.active_session_id || null;
+      if (ludoSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelled = false;
+      void fetchOv2LudoAuthoritativeSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelled || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
     }
     if (isRummy51Room) {
       if (rummySessionId) {
@@ -161,7 +180,18 @@ export default function Ov2SharedRoomScreen({
         cancelled = true;
       };
     }
-  }, [isLudoRoom, isRummy51Room, room?.status, liveRuntimeId, rummySessionId, roomId, router, lastLoadedAt]);
+  }, [
+    isLudoRoom,
+    isRummy51Room,
+    room?.status,
+    room?.active_session_id,
+    liveRuntimeId,
+    rummySessionId,
+    roomId,
+    participantId,
+    router,
+    lastLoadedAt,
+  ]);
 
   if (isEjected || autoExitPending) {
     return (
