@@ -86,10 +86,36 @@ export default function Ov2SharedRoomScreen({
 
   const seatedStakeBlockersPreview = useMemo(() => seatedPlayersNotStakeCommitted(ledgerMembers), [ledgerMembers]);
 
+  /** Until canonical members load, do not let the host start or open on empty ledger (avoids a race). */
+  const rummyLedgerSynced = useMemo(() => {
+    if (!isRummy51Room || ledgerErr) return false;
+    if (!members.length) return true;
+    return ledgerMembers.length >= members.length;
+  }, [isRummy51Room, ledgerErr, members.length, ledgerMembers.length]);
+
   useEffect(() => {
     if (!roomId || !isRummy51Room) return;
     void refreshRummyEconomySnapshot();
   }, [roomId, isRummy51Room, lastLoadedAt, refreshRummyEconomySnapshot]);
+
+  const sharedStatusUpper = useMemo(() => String(room?.status || "").toUpperCase(), [room?.status]);
+  const canonicalStatusUpper = useMemo(() => String(canonicalRoom?.status || "").toUpperCase(), [canonicalRoom?.status]);
+
+  /** Stake commit UI only when both snapshot and canonical `ov2_rooms.status` are OPEN (avoids stale snapshot vs IN_GAME). */
+  const rummyPreStartStrict = useMemo(
+    () => isRummy51Room && sharedStatusUpper === "OPEN" && canonicalStatusUpper === "OPEN" && Boolean(canonicalRoom),
+    [isRummy51Room, sharedStatusUpper, canonicalStatusUpper, canonicalRoom]
+  );
+
+  useEffect(() => {
+    if (!isRummy51Room || sharedStatusUpper !== "IN_GAME") return;
+    setMsg(m => {
+      if (!m) return m;
+      const lower = String(m).toLowerCase();
+      if (lower.includes("waiting for stakes") || lower.includes("only be committed while")) return "";
+      return m;
+    });
+  }, [isRummy51Room, sharedStatusUpper]);
 
   async function reloadLedgerAndSeatedStakeBlockers() {
     await reload();
@@ -109,6 +135,12 @@ export default function Ov2SharedRoomScreen({
   }
 
   async function onCommitStakeFromShared() {
+    const sharedU = String(room?.status || "").toUpperCase();
+    const canonU = String(canonicalRoom?.status || "").toUpperCase();
+    if (sharedU !== "OPEN" || canonU !== "OPEN") {
+      setMsg("Stake commit is only available before the room starts (status must be OPEN on the server).");
+      return;
+    }
     if (!canonicalRoom || !participantId) return;
     const stake = clampSuggestedOnlineV2Stake(canonicalRoom.stake_per_seat);
     if (!(await ensureBalanceForStake(canonicalRoom.stake_per_seat))) return;
@@ -131,7 +163,7 @@ export default function Ov2SharedRoomScreen({
         if (!debit?.ok) {
           setMsg(
             debit?.error ||
-              "Vault debit failed after the server recorded your stake. Tap Commit stake again to retry the debit, or sync your balance."
+              "Vault debit failed after the server recorded your stake. Retry Commit stake (before Start) or sync your balance."
           );
           await refreshRummyEconomySnapshot();
           await reload();
@@ -220,6 +252,15 @@ export default function Ov2SharedRoomScreen({
     setBusy(true);
     setMsg("");
     try {
+      if (isRummy51Room) {
+        const { blockers } = await reloadLedgerAndSeatedStakeBlockers();
+        if (blockers.length) {
+          setMsg(
+            `Cannot start: every seated player must commit stake on the server first. ${formatSeatedStakeBlockers(blockers)}`
+          );
+          return;
+        }
+      }
       const out = await hostStartOv2Room({
         room_id: roomId,
         host_participant_key: participantId,
@@ -244,7 +285,7 @@ export default function Ov2SharedRoomScreen({
         const blockers = seatedPlayersNotStakeCommitted(ledger);
         if (blockers.length) {
           setMsg(
-            `Cannot open match: one or more seated players have not committed stakes on the server. ${formatSeatedStakeBlockers(blockers)}`
+            `Cannot open match: stake state on the server is still incomplete for this room. ${formatSeatedStakeBlockers(blockers)} Leave and recreate the room, or resolve stakes from the main room lobby.`
           );
           return;
         }
@@ -352,6 +393,18 @@ export default function Ov2SharedRoomScreen({
     );
   }
 
+  const rummyHostStartBlocked =
+    isRummy51Room &&
+    isHost &&
+    sharedStatusUpper === "OPEN" &&
+    (!rummyLedgerSynced || Boolean(ledgerErr) || seatedStakeBlockersPreview.length > 0);
+
+  const rummyHostOpenBlocked =
+    isRummy51Room &&
+    isHost &&
+    sharedStatusUpper === "IN_GAME" &&
+    (!rummyLedgerSynced || seatedStakeBlockersPreview.length > 0);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       <div className="flex items-center justify-between">
@@ -417,10 +470,10 @@ export default function Ov2SharedRoomScreen({
           })}
         </ul>
         {isRummy51Room && ledgerErr ? <p className="mt-2 text-[11px] text-red-300">Stake sync: {ledgerErr}</p> : null}
-        {isRummy51Room && seatedStakeBlockersPreview.length ? (
+        {isRummy51Room && rummyPreStartStrict && seatedStakeBlockersPreview.length ? (
           <p className="mt-2 text-[11px] text-amber-200/90">
-            Stakes: {formatSeatedStakeBlockers(seatedStakeBlockersPreview)} — each seated player must tap Commit stake (or use
-            the room lobby) before the host can open the match.
+            Before Start: {formatSeatedStakeBlockers(seatedStakeBlockersPreview)} — each seated player must commit stake here or
+            in the main room lobby.
           </p>
         ) : null}
       </div>
@@ -436,27 +489,30 @@ export default function Ov2SharedRoomScreen({
         />
       ) : null}
 
-      {isRummy51Room && room?.status === "IN_GAME" && canonicalRoom && me?.seat_index != null ? (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-[11px] text-amber-100">
-          {String(ledgerByParticipant.get(String(participantId).trim())?.wallet_state || "").trim() === "committed" ? (
-            <p className="text-emerald-200/90">Your stake is committed on the server.</p>
-          ) : (
-            <>
-              <p className="font-semibold text-amber-50">Commit your stake</p>
-              <p className="mt-1 text-amber-200/85">
-                The shared room list does not show server stake state until this syncs. Use Commit stake here (same as the room
-                lobby) so the host can open the match.
-              </p>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void onCommitStakeFromShared()}
-                className="mt-2 w-full rounded-lg border border-amber-500/45 bg-amber-900/40 py-2 text-xs font-bold text-amber-50 disabled:opacity-45"
-              >
-                Commit stake ({fmtStake(canonicalRoom.stake_per_seat)})
-              </button>
-            </>
-          )}
+      {isRummy51Room && rummyPreStartStrict && me?.seat_index != null ? (
+        String(ledgerByParticipant.get(String(participantId).trim())?.wallet_state || "").trim() !== "committed" ? (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-[11px] text-amber-100">
+            <p className="font-semibold text-amber-50">Commit your stake</p>
+            <p className="mt-1 text-amber-200/85">Required before the host can start the room.</p>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void onCommitStakeFromShared()}
+              className="mt-2 w-full rounded-lg border border-amber-500/45 bg-amber-900/40 py-2 text-xs font-bold text-amber-50 disabled:opacity-45"
+            >
+              Commit stake ({fmtStake(canonicalRoom.stake_per_seat)})
+            </button>
+          </div>
+        ) : null
+      ) : null}
+
+      {isRummy51Room && sharedStatusUpper === "IN_GAME" && seatedStakeBlockersPreview.length ? (
+        <div className="rounded-xl border border-rose-500/35 bg-rose-950/25 p-3 text-[11px] text-rose-100">
+          <p className="font-semibold text-rose-50">Stake commit incomplete on the server</p>
+          <p className="mt-1 text-rose-200/90">
+            This room is already started, but seated players are not all marked committed: {formatSeatedStakeBlockers(seatedStakeBlockersPreview)}.
+            The host cannot open the match from here. Use the main room lobby if available, or leave and start a new room.
+          </p>
         </div>
       ) : null}
 
@@ -470,7 +526,7 @@ export default function Ov2SharedRoomScreen({
           </div>
         ) : null
       ) : null}
-      {room?.status === "IN_GAME" && isRummy51Room && !launchingLive ? (
+      {sharedStatusUpper === "IN_GAME" && isRummy51Room && !launchingLive ? (
         <div className="rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
           {isHost ? (
             <>
@@ -495,20 +551,26 @@ export default function Ov2SharedRoomScreen({
         >
           Leave room
         </button>
-        {room?.status === "OPEN" ? (
+        {sharedStatusUpper === "OPEN" ? (
           <button
             type="button"
-            disabled={busy || !isHost}
+            disabled={busy || !isHost || rummyHostStartBlocked}
+            title={rummyHostStartBlocked ? "All seated players must commit stake on the server before Start." : undefined}
             onClick={() => void onHostStart()}
             className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-900/40 py-2 text-xs font-bold text-emerald-100 disabled:opacity-45"
           >
             Start
           </button>
-        ) : room?.status === "IN_GAME" && isRummy51Room ? (
+        ) : sharedStatusUpper === "IN_GAME" && isRummy51Room ? (
           isHost ? (
             <button
               type="button"
-              disabled={busy || launchingLive}
+              disabled={busy || launchingLive || rummyHostOpenBlocked}
+              title={
+                rummyHostOpenBlocked
+                  ? "Cannot open until every seated player is committed on the server (see list above)."
+                  : undefined
+              }
               onClick={() => void onOpenRummy51InGame()}
               className="flex-1 rounded-lg border border-teal-500/45 bg-teal-900/45 py-2 text-xs font-bold text-teal-100 disabled:opacity-45"
             >
