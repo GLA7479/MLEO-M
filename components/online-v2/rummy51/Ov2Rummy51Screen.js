@@ -22,7 +22,7 @@ const MID_RANK = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q
 const MID_SUIT = /** @type {const} */ ({ S: "♠", H: "♥", D: "♦", C: "♣" });
 
 /**
- * Top of discard pile — bottom-right of the play surface (above hand / violet dock), large and always visible.
+ * Top of discard pile — overlaid bottom-right inside the table panel (does not reduce table height).
  * @param {{ card: Rummy51Card|null, empty: boolean, showHint: boolean, highlight: boolean }} props
  */
 function CornerDiscardTopCard({ card, empty, showHint, highlight }) {
@@ -225,16 +225,6 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     if (!discardCardId) return null;
     return handById.get(discardCardId) ?? null;
   }, [discardCardId, handById]);
-
-  const discardTopLabel = useMemo(() => {
-    const t = snapshot?.discardTop;
-    if (!t || typeof t !== "object") return "—";
-    try {
-      return getCardDisplayLabel(deserializeCard(t));
-    } catch {
-      return "—";
-    }
-  }, [snapshot?.discardTop]);
 
   const discardTopCard = useMemo(() => {
     const t = snapshot?.discardTop;
@@ -551,42 +541,15 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
         seatNearElim={seatStripMeta.nearFlags}
       />
 
-      <div className="flex h-5 shrink-0 flex-nowrap items-center gap-x-1 overflow-hidden whitespace-nowrap rounded border border-white/10 bg-black/50 px-1 text-[7px] text-zinc-400 sm:h-6 sm:text-[8px]">
-        <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-white/10 px-1 py-px">
-          <span className="text-zinc-500">T</span>
-          <strong className="font-semibold text-white">
-            {snapshot.turnParticipantKey === selfKey ? "You" : snapshot.turnParticipantKey?.slice(0, 6) ?? "—"}
-          </strong>
-        </span>
-        <span className="shrink-0 text-zinc-600">|</span>
-        <span className="shrink-0 font-mono" title="Stock">
-          S{snapshot.stockCount ?? 0}
-        </span>
-        <span className="shrink-0 text-zinc-600">|</span>
-        <span className="min-w-0 max-w-[7rem] shrink truncate font-mono sm:max-w-[9rem]" title={`Discard ${discardTopLabel}`}>
-          D{discardTopLabel}
-        </span>
-        <span className="shrink-0 text-zinc-600">|</span>
-        <span className="shrink-0 font-mono">R{snapshot.roundNumber ?? 1}</span>
-        {pendingDraw ? (
-          <>
-            <span className="shrink-0 text-zinc-600">|</span>
-            <span className="shrink-0 rounded bg-emerald-500/15 px-1 py-px font-semibold text-emerald-300">+{pendingDraw}</span>
-          </>
-        ) : null}
-      </div>
-
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            <Ov2Rummy51TableMelds
-              tableMeldsRaw={snapshot.tableMelds || []}
-              selectedTargetMeldId={targetMeldId}
-              onSelectTargetMeld={setTargetMeldId}
-              disabled={busy || !isMyTurn || !isPlaying}
-            />
-          </div>
-          <div className="flex shrink-0 flex-row items-end justify-end border-t border-white/[0.08] bg-black/25 px-1 py-1 sm:px-1.5">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <Ov2Rummy51TableMelds
+            tableMeldsRaw={snapshot.tableMelds || []}
+            selectedTargetMeldId={targetMeldId}
+            onSelectTargetMeld={setTargetMeldId}
+            disabled={busy || !isMyTurn || !isPlaying}
+          />
+          <div className="pointer-events-none absolute bottom-1 right-1 z-20 sm:bottom-1.5 sm:right-1.5">
             <CornerDiscardTopCard
               card={discardTopCard}
               empty={discardCount <= 0}

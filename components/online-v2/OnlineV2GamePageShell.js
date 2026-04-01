@@ -47,7 +47,7 @@ export default function OnlineV2GamePageShell({
         }}
       >
         <div className="mx-auto flex h-full w-full min-h-0 max-w-2xl flex-col gap-2 px-2 md:max-w-4xl md:gap-2 md:px-3 lg:max-w-5xl lg:gap-2.5 lg:px-5 xl:max-w-6xl xl:px-7 2xl:max-w-7xl">
-          <header className="shrink-0 border-b border-white/[0.06] pb-1 pt-1.5 md:pb-1.5">
+          <header className="shrink-0 border-b border-white/[0.06] pb-0.5 pt-1 md:pb-0.5">
             <div className="flex items-center justify-between gap-1.5 sm:gap-2">
               <div className="flex items-center gap-1.5">
                 <Link href="/online-v2" className={OV2_HUD_CHROME_BTN}>
@@ -78,7 +78,7 @@ export default function OnlineV2GamePageShell({
             </div>
           </header>
 
-          <div className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-hidden pt-1.5 sm:pt-2">
+          <div className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-hidden pt-0">
             {children}
 
             <OnlineV2GameOverlay

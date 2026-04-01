@@ -85,7 +85,7 @@ export default function Ov2Rummy51TableMelds({
 
   if (!melds.length) {
     return (
-      <div className="flex h-full min-h-0 w-full flex-1 items-start justify-center rounded-md border border-teal-500/15 bg-teal-950/10 py-2 text-center text-[8px] leading-tight text-zinc-500">
+      <div className="flex h-full min-h-0 w-full flex-1 items-start justify-center rounded-md border border-teal-500/15 bg-teal-950/10 px-1 py-2 pr-[4rem] pb-24 text-center text-[8px] leading-tight text-zinc-500 sm:pr-[4.25rem] sm:pb-28">
         No melds yet
       </div>
     );
@@ -93,7 +93,7 @@ export default function Ov2Rummy51TableMelds({
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-teal-500/20 bg-teal-950/10">
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-1 py-1 [scrollbar-width:thin]">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-1 py-1 pr-[4rem] pb-24 [scrollbar-width:thin] sm:pr-[4.25rem] sm:pb-28">
         <div className="flex flex-wrap content-start items-end gap-x-2 gap-y-1.5">
         {melds.map(m => {
           if (!m) return null;
