@@ -57,11 +57,12 @@ export default function Ov2SharedRoomScreen({
   const [autoExitPending, setAutoExitPending] = useState(false);
   const [launchingLive, setLaunchingLive] = useState(false);
   const didRouteToLiveRef = useRef(false);
+  const leaveInFlightRef = useRef(false);
   const [ledgerMembers, setLedgerMembers] = useState([]);
   const [canonicalRoom, setCanonicalRoom] = useState(null);
   const [ledgerErr, setLedgerErr] = useState("");
 
-  const refreshRummyEconomySnapshot = useCallback(async () => {
+  const refreshSharedEconomySnapshot = useCallback(async () => {
     if (!roomId) return { ledger: [], canon: null };
     try {
       setLedgerErr("");
@@ -92,23 +93,27 @@ export default function Ov2SharedRoomScreen({
 
   const seatedStakeBlockersPreview = useMemo(() => seatedPlayersNotStakeCommitted(ledgerMembers), [ledgerMembers]);
 
-  const rummyLedgerSynced = useMemo(() => {
-    if (!isRummy51Room || ledgerErr) return false;
+  const sharedLedgerSynced = useMemo(() => {
+    if (!(isRummy51Room || isLudoRoom) || ledgerErr) return false;
     if (!members.length) return true;
     return ledgerMembers.length >= members.length;
-  }, [isRummy51Room, ledgerErr, members.length, ledgerMembers.length]);
+  }, [isRummy51Room, isLudoRoom, ledgerErr, members.length, ledgerMembers.length]);
 
   useEffect(() => {
-    if (!roomId || !isRummy51Room) return;
-    void refreshRummyEconomySnapshot();
-  }, [roomId, isRummy51Room, lastLoadedAt, refreshRummyEconomySnapshot]);
+    if (!roomId || !(isRummy51Room || isLudoRoom)) return;
+    void refreshSharedEconomySnapshot();
+  }, [roomId, isRummy51Room, isLudoRoom, lastLoadedAt, refreshSharedEconomySnapshot]);
 
   const sharedStatusUpper = useMemo(() => String(room?.status || "").toUpperCase(), [room?.status]);
   const canonicalStatusUpper = useMemo(() => String(canonicalRoom?.status || "").toUpperCase(), [canonicalRoom?.status]);
 
-  const rummyPreStartStrict = useMemo(
-    () => isRummy51Room && sharedStatusUpper === "OPEN" && canonicalStatusUpper === "OPEN" && Boolean(canonicalRoom),
-    [isRummy51Room, sharedStatusUpper, canonicalStatusUpper, canonicalRoom]
+  const sharedPreStartStrict = useMemo(
+    () =>
+      (isRummy51Room || isLudoRoom) &&
+      sharedStatusUpper === "OPEN" &&
+      canonicalStatusUpper === "OPEN" &&
+      Boolean(canonicalRoom),
+    [isRummy51Room, isLudoRoom, sharedStatusUpper, canonicalStatusUpper, canonicalRoom]
   );
 
   const myPk = String(participantId || "").trim();
@@ -189,7 +194,7 @@ export default function Ov2SharedRoomScreen({
     if (!debitAlreadyDone) {
       const debit = await debitOnlineV2Vault(stake, rAfter.product_game_id);
       if (!debit?.ok) {
-        await refreshRummyEconomySnapshot();
+        await refreshSharedEconomySnapshot();
         await reload();
         return {
           ok: false,
@@ -203,12 +208,57 @@ export default function Ov2SharedRoomScreen({
     return { ok: true };
   }
 
+  /**
+   * Host-only: lobby → pending stakes, host stake if needed, block until all seated players committed.
+   * @returns {{ ok: true } | { ok: false, error: string }}
+   */
+  async function prepareSharedHostPreStartStakes() {
+    if (!roomId || !myPk) return { ok: false, error: "Missing room or participant." };
+    let { canon, ledger } = await refreshSharedEconomySnapshot();
+    if (!canon || String(canon.status || "").toUpperCase() !== "OPEN") {
+      return { ok: false, error: "Room is not in the pre-start (OPEN) state." };
+    }
+    try {
+      await setOv2MemberReady({ room_id: roomId, participant_key: myPk, is_ready: true });
+    } catch {
+      /* ignore */
+    }
+    let phase = lifecyclePhase(canon);
+    if (phase === "lobby") {
+      await startOv2RoomIntent({ room_id: roomId, host_participant_key: myPk });
+    }
+    const snap = await refreshSharedEconomySnapshot();
+    canon = snap.canon;
+    ledger = snap.ledger;
+    if (!canon) {
+      return { ok: false, error: "Could not refresh room after starting stake round." };
+    }
+    phase = lifecyclePhase(canon);
+    const hostRow = ledger.find(m => String(m.participant_key || "").trim() === myPk);
+    const hostWs = String(hostRow?.wallet_state || "").trim();
+    if (hostWs !== "committed" && (phase === "pending_start" || phase === "pending_stakes")) {
+      const cr = await commitStakeForParticipant(canon, myPk);
+      if (!cr.ok) return { ok: false, error: cr.error };
+      const again = await refreshSharedEconomySnapshot();
+      canon = again.canon;
+      ledger = again.ledger;
+    }
+    const blockers = seatedPlayersNotStakeCommitted(ledger);
+    if (blockers.length) {
+      return {
+        ok: false,
+        error: `Waiting for seated players to join (stake): ${formatSeatedStakeBlockers(blockers)}`,
+      };
+    }
+    return { ok: true };
+  }
+
   async function onNonHostJoinMatchStake() {
     if (!roomId || !myPk || isHost) return;
     setBusy(true);
     setMsg("");
     try {
-      const { canon } = await refreshRummyEconomySnapshot();
+      const { canon } = await refreshSharedEconomySnapshot();
       if (!canon || String(canon.status || "").toUpperCase() !== "OPEN") {
         setMsg("Room is not open for stake join.");
         return;
@@ -226,7 +276,7 @@ export default function Ov2SharedRoomScreen({
         setMsg(r.error);
         return;
       }
-      await refreshRummyEconomySnapshot();
+      await refreshSharedEconomySnapshot();
       await reload();
     } catch (e) {
       setMsg(e?.message || String(e));
@@ -240,48 +290,9 @@ export default function Ov2SharedRoomScreen({
     setBusy(true);
     setMsg("");
     try {
-      let { canon, ledger } = await refreshRummyEconomySnapshot();
-      if (!canon || String(canon.status || "").toUpperCase() !== "OPEN") {
-        setMsg("Room is not in the pre-start (OPEN) state.");
-        return;
-      }
-
-      try {
-        await setOv2MemberReady({ room_id: roomId, participant_key: myPk, is_ready: true });
-      } catch {
-        /* ignore */
-      }
-
-      let phase = lifecyclePhase(canon);
-      if (phase === "lobby") {
-        await startOv2RoomIntent({ room_id: roomId, host_participant_key: myPk });
-      }
-
-      const snap = await refreshRummyEconomySnapshot();
-      canon = snap.canon;
-      ledger = snap.ledger;
-      if (!canon) {
-        setMsg("Could not refresh room after starting stake round.");
-        return;
-      }
-
-      phase = lifecyclePhase(canon);
-      const hostRow = ledger.find(m => String(m.participant_key || "").trim() === myPk);
-      const hostWs = String(hostRow?.wallet_state || "").trim();
-      if (hostWs !== "committed" && (phase === "pending_start" || phase === "pending_stakes")) {
-        const cr = await commitStakeForParticipant(canon, myPk);
-        if (!cr.ok) {
-          setMsg(cr.error);
-          return;
-        }
-        const again = await refreshRummyEconomySnapshot();
-        canon = again.canon;
-        ledger = again.ledger;
-      }
-
-      const blockers = seatedPlayersNotStakeCommitted(ledger);
-      if (blockers.length) {
-        setMsg(`Waiting for seated players to join (stake): ${formatSeatedStakeBlockers(blockers)}`);
+      const prep = await prepareSharedHostPreStartStakes();
+      if (!prep.ok) {
+        setMsg(prep.error);
         return;
       }
 
@@ -291,6 +302,8 @@ export default function Ov2SharedRoomScreen({
       });
       setRuntimeHandoff(out.runtime_handoff || null);
       await reload();
+
+      await refreshSharedEconomySnapshot();
 
       const open = await openOv2Rummy51Session(roomId, myPk);
       if (!open?.ok) {
@@ -313,13 +326,13 @@ export default function Ov2SharedRoomScreen({
     try {
       await claimOv2Seat({ room_id: roomId, participant_key: participantId, seat_index: seatIndex });
       await reload();
-      if (isRummy51Room) {
+      if (isRummy51Room || isLudoRoom) {
         try {
           await setOv2MemberReady({ room_id: roomId, participant_key: participantId, is_ready: true });
         } catch {
           /* lobby-only */
         }
-        await refreshRummyEconomySnapshot();
+        await refreshSharedEconomySnapshot();
       }
     } catch (e) {
       setMsg(e?.message || String(e));
@@ -342,6 +355,8 @@ export default function Ov2SharedRoomScreen({
   }
 
   async function onLeave() {
+    if (leaveInFlightRef.current) return;
+    leaveInFlightRef.current = true;
     setBusy(true);
     setMsg("");
     try {
@@ -354,6 +369,8 @@ export default function Ov2SharedRoomScreen({
       onExitRoom();
     } catch (e) {
       setMsg(e?.message || String(e));
+    } finally {
+      leaveInFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -363,6 +380,13 @@ export default function Ov2SharedRoomScreen({
     setBusy(true);
     setMsg("");
     try {
+      if (isLudoRoom) {
+        const prep = await prepareSharedHostPreStartStakes();
+        if (!prep.ok) {
+          setMsg(prep.error);
+          return;
+        }
+      }
       const out = await hostStartOv2Room({
         room_id: roomId,
         host_participant_key: participantId,
@@ -474,26 +498,37 @@ export default function Ov2SharedRoomScreen({
     );
   }
 
-  const rummySeated = me?.seat_index != null && me?.seat_index !== "";
+  const sharedSeated = me?.seat_index != null && me?.seat_index !== "";
   const showNonHostJoinBtn =
-    isRummy51Room &&
-    rummyPreStartStrict &&
+    (isRummy51Room || isLudoRoom) &&
+    sharedPreStartStrict &&
     !isHost &&
-    rummySeated &&
+    sharedSeated &&
     !myWalletCommitted &&
     phaseOpen &&
-    rummyLedgerSynced &&
+    sharedLedgerSynced &&
     !ledgerErr;
 
   const showNonHostWaitingLobby =
-    isRummy51Room && rummyPreStartStrict && !isHost && rummySeated && !myWalletCommitted && !phaseOpen && rummyLedgerSynced;
+    (isRummy51Room || isLudoRoom) &&
+    sharedPreStartStrict &&
+    !isHost &&
+    sharedSeated &&
+    !myWalletCommitted &&
+    !phaseOpen &&
+    sharedLedgerSynced;
 
   const showHostStartBtn =
-    isRummy51Room && rummyPreStartStrict && isHost && rummySeated && rummyLedgerSynced && !ledgerErr;
+    (isRummy51Room || isLudoRoom) &&
+    sharedPreStartStrict &&
+    isHost &&
+    sharedSeated &&
+    sharedLedgerSynced &&
+    !ledgerErr;
 
-  const rummySecondFooterSlot =
-    isRummy51Room && sharedStatusUpper === "OPEN" ? (
-      !rummySeated ? (
+  const sharedSecondFooterSlot =
+    (isRummy51Room || isLudoRoom) && sharedStatusUpper === "OPEN" ? (
+      !sharedSeated ? (
         <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-500">
           Pick a seat
         </div>
@@ -501,8 +536,8 @@ export default function Ov2SharedRoomScreen({
         <button
           type="button"
           disabled={busy || !showHostStartBtn}
-          title={!rummyLedgerSynced || ledgerErr ? "Syncing room state…" : undefined}
-          onClick={() => void onHostStartMatch()}
+          title={!sharedLedgerSynced || ledgerErr ? "Syncing room state…" : undefined}
+          onClick={() => void (isRummy51Room ? onHostStartMatch() : onHostStart())}
           className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-900/40 py-2 text-xs font-bold text-emerald-100 disabled:opacity-45"
         >
           {busy ? "Working…" : "Start match"}
@@ -524,7 +559,7 @@ export default function Ov2SharedRoomScreen({
         <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 px-2 py-2 text-center text-[10px] font-medium text-zinc-400">
           Waiting for host to start match
         </div>
-      ) : !rummyLedgerSynced || ledgerErr ? (
+      ) : !sharedLedgerSynced || ledgerErr ? (
         <div
           className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 px-2 py-2 text-center text-[10px] font-medium text-zinc-400"
           title={ledgerErr ? String(ledgerErr) : "Syncing stake state with server…"}
@@ -581,7 +616,7 @@ export default function Ov2SharedRoomScreen({
             const ledgerRow = pk ? ledgerByParticipant.get(pk) : null;
             const ws = ledgerRow ? String(ledgerRow.wallet_state ?? "").trim() : "";
             const stakeLabel =
-              isRummy51Room && m.seat_index != null
+              (isRummy51Room || isLudoRoom) && m.seat_index != null
                 ? ws === "committed"
                   ? "stake committed"
                   : ws
@@ -605,7 +640,9 @@ export default function Ov2SharedRoomScreen({
             );
           })}
         </ul>
-        {isRummy51Room && ledgerErr ? <p className="mt-2 text-[11px] text-red-300">Room sync: {ledgerErr}</p> : null}
+        {(isRummy51Room || isLudoRoom) && ledgerErr ? (
+          <p className="mt-2 text-[11px] text-red-300">Room sync: {ledgerErr}</p>
+        ) : null}
 
         {room ? (
           <div className="mt-3">
@@ -620,7 +657,7 @@ export default function Ov2SharedRoomScreen({
           </div>
         ) : null}
 
-        {isRummy51Room && sharedStatusUpper === "IN_GAME" && seatedStakeBlockersPreview.length ? (
+        {(isRummy51Room || isLudoRoom) && sharedStatusUpper === "IN_GAME" && seatedStakeBlockersPreview.length ? (
           <div className="mt-3 rounded-xl border border-rose-500/35 bg-rose-950/25 p-3 text-[11px] text-rose-100">
             <p className="font-semibold text-rose-50">Stake state incomplete</p>
             <p className="mt-1 text-rose-200/90">{formatSeatedStakeBlockers(seatedStakeBlockersPreview)}</p>
@@ -656,8 +693,8 @@ export default function Ov2SharedRoomScreen({
         >
           Leave room
         </button>
-        {isRummy51Room && sharedStatusUpper === "OPEN" ? (
-          rummySecondFooterSlot
+        {sharedStatusUpper === "OPEN" && (isRummy51Room || isLudoRoom) ? (
+          sharedSecondFooterSlot
         ) : sharedStatusUpper === "OPEN" ? (
           <button
             type="button"
@@ -667,7 +704,7 @@ export default function Ov2SharedRoomScreen({
           >
             Start
           </button>
-        ) : sharedStatusUpper === "IN_GAME" && isRummy51Room ? (
+        ) : sharedStatusUpper === "IN_GAME" && (isRummy51Room || isLudoRoom) ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-400">
             {launchingLive ? "Opening…" : "Waiting for live session…"}
           </div>

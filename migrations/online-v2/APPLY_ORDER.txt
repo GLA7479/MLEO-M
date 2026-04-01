@@ -50,3 +50,5 @@ rummy51/045_ov2_r51_undo_discard_draw.sql
 rummy51/054_ov2_rummy51_shared_room_start_bridge.sql
 055_ov2_quit_forfeit_ludo_rummy51.sql
 056_ov2_rummy51_full_pot_settlement.sql
+057_ov2_shared_leave_keep_empty_open_room.sql
+058_ov2_shared_hidden_join_by_code.sql
