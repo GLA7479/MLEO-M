@@ -66,6 +66,7 @@ function slotIndexFromClientX(clientX, orderIds, refs) {
  *   discardPickMode: boolean,
  *   sortMode: "rank"|"suit",
  *   disabled?: boolean,
+ *   selectionDisabled?: boolean, // when unset, falls back to `disabled`; use to allow select/reorder off-turn
  *   sortDisabled?: boolean,
  *   embedded?: boolean,
  *   onToggleCardId: (id: string) => void,
@@ -88,6 +89,7 @@ export default function Ov2Rummy51Hand({
   discardPickMode,
   sortMode,
   disabled = false,
+  selectionDisabled,
   sortDisabled,
   embedded = false,
   onToggleCardId,
@@ -104,8 +106,9 @@ export default function Ov2Rummy51Hand({
   const rankSuitLocked = sortDisabled === undefined ? disabled : sortDisabled;
   const reorderLocked = rankSuitLocked;
 
-  /** Hand play / selection / reorder — false when not your turn, busy, or not in play (parent `disabled`). */
-  const cardsInteractive = !disabled;
+  const selectionLocked = selectionDisabled !== undefined ? selectionDisabled : disabled;
+  /** Tap to select — can stay true off-turn while `disabled` blocks meld/discard actions. */
+  const cardsInteractive = !selectionLocked;
 
   const selected = useMemo(() => {
     if (selectedIds instanceof Set) return selectedIds;
@@ -138,8 +141,8 @@ export default function Ov2Rummy51Hand({
     return out;
   }, [manualOrder, sortedCards, cardById]);
 
-  /** Without touch-none, mobile browsers steal touch for scroll; pointer-drag reorder never starts. */
-  const allowPointerReorder = cardsInteractive && !reorderLocked && displayCards.length > 1;
+  /** Drag reorder: allowed when not busy / session idle (`reorderLocked`), even off-turn. */
+  const allowPointerReorder = !reorderLocked && displayCards.length > 1;
 
   const rowRef = useRef(/** @type {HTMLDivElement|null} */ (null));
   const cardRefs = useRef(/** @type {Map<string, HTMLButtonElement>} */ (new Map()));
@@ -208,8 +211,7 @@ export default function Ov2Rummy51Hand({
 
   const handlePointerDown = useCallback(
     (e, id, idx) => {
-      if (!cardsInteractive) return;
-      if (reorderLocked) return;
+      if (reorderLocked || displayCards.length <= 1) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
       hoverSlotRef.current = null;
       dragRef.current = {
@@ -223,7 +225,7 @@ export default function Ov2Rummy51Hand({
       };
       e.currentTarget.setPointerCapture(e.pointerId);
     },
-    [reorderLocked, cardsInteractive]
+    [reorderLocked, displayCards.length]
   );
 
   const handlePointerMove = useCallback(
@@ -283,10 +285,10 @@ export default function Ov2Rummy51Hand({
   const handleCardClick = useCallback(
     id => {
       if (suppressClickRef.current) return;
-      if (disabled) return;
+      if (selectionLocked) return;
       onToggleCardId(id);
     },
-    [onToggleCardId, disabled]
+    [onToggleCardId, selectionLocked]
   );
 
   const shell = embedded
@@ -327,8 +329,8 @@ export default function Ov2Rummy51Hand({
                 if (el) cardRefs.current.set(id, el);
                 else cardRefs.current.delete(id);
               }}
-              tabIndex={cardsInteractive ? 0 : -1}
-              aria-disabled={!cardsInteractive}
+              tabIndex={cardsInteractive || allowPointerReorder ? 0 : -1}
+              aria-disabled={!(cardsInteractive || allowPointerReorder)}
               onClick={() => handleCardClick(id)}
               onPointerDown={e => handlePointerDown(e, id, idx)}
               onPointerMove={handlePointerMove}
@@ -350,7 +352,9 @@ export default function Ov2Rummy51Hand({
                 passiveHand && !isSel && !isDisc
                   ? "border-zinc-700 shadow-[0_1px_5px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.96)]"
                   : "border-zinc-900 shadow-[0_2px_10px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.98)]",
-                cardsInteractive ? "cursor-grab active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-400/80" : "pointer-events-none cursor-default",
+                cardsInteractive || allowPointerReorder
+                  ? "cursor-grab active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-400/80"
+                  : "pointer-events-none cursor-default",
                 isSel
                   ? "z-[1] border-sky-500 shadow-[0_0_0_2px_rgba(14,165,233,0.55),0_4px_16px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.98)]"
                   : "",

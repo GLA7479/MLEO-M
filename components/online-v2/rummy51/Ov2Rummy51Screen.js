@@ -21,6 +21,35 @@ import Ov2Rummy51TableMelds from "./Ov2Rummy51TableMelds";
 const MID_RANK = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const MID_SUIT = /** @type {const} */ ({ S: "♠", H: "♥", D: "♦", C: "♣" });
 
+const HAND_NUDGE_BTN =
+  "flex w-8 shrink-0 items-center justify-center rounded-md border border-white/20 bg-zinc-800/90 text-sm font-bold leading-none text-zinc-100 active:bg-zinc-700 disabled:pointer-events-none disabled:opacity-35 sm:w-9 sm:text-base";
+
+/** @param {{ leftDisabled: boolean, rightDisabled: boolean, onNudge: (delta: -1 | 1) => void }} props */
+function HandReorderNudgeButtons({ leftDisabled, rightDisabled, onNudge }) {
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Move card left"
+        disabled={leftDisabled}
+        onClick={() => onNudge(-1)}
+        className={HAND_NUDGE_BTN}
+      >
+        ◀
+      </button>
+      <button
+        type="button"
+        aria-label="Move card right"
+        disabled={rightDisabled}
+        onClick={() => onNudge(1)}
+        className={HAND_NUDGE_BTN}
+      >
+        ▶
+      </button>
+    </>
+  );
+}
+
 /**
  * Discard pile top — floated above the table (absolute in parent); does not shrink meld layout.
  * @param {{ card: Rummy51Card|null, empty: boolean, highlight: boolean }} props
@@ -339,13 +368,11 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const singleSelIdxDock =
     singleSelForDockNudge != null ? orderIdsForDockNudge.indexOf(singleSelForDockNudge) : -1;
 
-  const showHandReorderInDock =
-    Boolean(pendingDraw) &&
-    isMyTurn &&
-    isPlaying &&
-    !busy &&
-    myHandRawVisible.length > 1 &&
-    selectedIds.size === 1;
+  /** One card selected + 2+ visible cards — nudge order (any time in play, any seat). */
+  const dockHandReorder =
+    isPlaying && !busy && myHandRawVisible.length > 1 && selectedIds.size === 1;
+
+  const showOffTurnHandReorderDock = dockHandReorder && !isMyTurn;
 
   const nudgeHandOrder = useCallback(
     delta => {
@@ -684,7 +711,8 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const hasBottomActionBlock =
     Boolean(actionError) ||
     (!pendingDraw && isMyTurn && isPlaying) ||
-    (pendingDraw && isMyTurn && isPlaying);
+    (pendingDraw && isMyTurn && isPlaying) ||
+    showOffTurnHandReorderDock;
 
   /** Fixed dock height during play so Draw / Take / Submit never shifts the hand. */
   const reserveBottomActionDock = isPlaying && !isFinished;
@@ -797,7 +825,8 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
           discardPickMode={discardPickMode}
           sortMode={sortMode}
           disabled={busy || !isMyTurn || !isPlaying}
-          sortDisabled={busy}
+          selectionDisabled={busy || !isPlaying}
+          sortDisabled={busy || !isPlaying}
           targetMeldId={targetMeldId}
           onNewMeldFromSelection={onNewMeldFromSelection}
           onAddSelectionToTarget={onAddSelectionToTarget}
@@ -823,23 +852,44 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
               <>
                 {actionError ? <p className="text-center text-[9px] leading-tight text-red-300">{actionError}</p> : null}
                 {!pendingDraw && isMyTurn && isPlaying ? (
-                  <div className="flex gap-1">
+                  <div className="flex min-h-[32px] items-stretch gap-1 sm:min-h-[34px]">
+                    {dockHandReorder ? (
+                      <HandReorderNudgeButtons
+                        leftDisabled={singleSelIdxDock <= 0}
+                        rightDisabled={
+                          singleSelIdxDock < 0 || singleSelIdxDock >= orderIdsForDockNudge.length - 1
+                        }
+                        onNudge={nudgeHandOrder}
+                      />
+                    ) : null}
                     <button
                       type="button"
                       disabled={busy || (snapshot.stockCount ?? 0) <= 0}
                       onClick={() => void drawStock()}
-                      className="min-h-[32px] flex-1 rounded-md border border-emerald-500/40 bg-emerald-950/40 py-0.5 text-[10px] font-bold text-emerald-100 disabled:opacity-40 sm:min-h-[34px] sm:text-xs"
+                      className="min-h-[32px] min-w-0 flex-1 rounded-md border border-emerald-500/40 bg-emerald-950/40 px-1 py-0.5 text-[10px] font-bold leading-tight text-emerald-100 disabled:opacity-40 sm:min-h-[34px] sm:text-xs"
                     >
-                      Draw stock
+                      Draw
                     </button>
                     <button
                       type="button"
                       disabled={busy || (snapshot.discardCount ?? 0) <= 0}
                       onClick={() => void drawDiscard()}
-                      className="min-h-[32px] flex-1 rounded-md border border-sky-500/40 bg-sky-950/40 py-0.5 text-[10px] font-bold text-sky-100 disabled:opacity-40 sm:min-h-[34px] sm:text-xs"
+                      className="min-h-[32px] min-w-0 flex-1 rounded-md border border-sky-500/40 bg-sky-950/40 px-1 py-0.5 text-[10px] font-bold leading-tight text-sky-100 disabled:opacity-40 sm:min-h-[34px] sm:text-xs"
                     >
-                      Take discard
+                      Take
                     </button>
+                  </div>
+                ) : null}
+
+                {showOffTurnHandReorderDock ? (
+                  <div className="flex min-h-[32px] items-stretch justify-center gap-1 sm:min-h-[34px]">
+                    <HandReorderNudgeButtons
+                      leftDisabled={singleSelIdxDock <= 0}
+                      rightDisabled={
+                        singleSelIdxDock < 0 || singleSelIdxDock >= orderIdsForDockNudge.length - 1
+                      }
+                      onNudge={nudgeHandOrder}
+                    />
                   </div>
                 ) : null}
 
@@ -849,29 +899,14 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
                       <p className="px-0.5 pb-0.5 text-[8px] leading-snug text-amber-200/95 sm:text-[9px]">{validationMessage}</p>
                     ) : null}
                     <div className="flex min-h-[32px] flex-row items-stretch gap-1 sm:min-h-[34px]">
-                      {showHandReorderInDock ? (
-                        <>
-                          <button
-                            type="button"
-                            aria-label="Move card left"
-                            disabled={singleSelIdxDock <= 0}
-                            onClick={() => nudgeHandOrder(-1)}
-                            className="flex w-8 shrink-0 items-center justify-center rounded-md border border-white/20 bg-zinc-800/90 text-sm font-bold leading-none text-zinc-100 active:bg-zinc-700 disabled:pointer-events-none disabled:opacity-35 sm:w-9 sm:text-base"
-                          >
-                            ◀
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="Move card right"
-                            disabled={
-                              singleSelIdxDock < 0 || singleSelIdxDock >= orderIdsForDockNudge.length - 1
-                            }
-                            onClick={() => nudgeHandOrder(1)}
-                            className="flex w-8 shrink-0 items-center justify-center rounded-md border border-white/20 bg-zinc-800/90 text-sm font-bold leading-none text-zinc-100 active:bg-zinc-700 disabled:pointer-events-none disabled:opacity-35 sm:w-9 sm:text-base"
-                          >
-                            ▶
-                          </button>
-                        </>
+                      {dockHandReorder ? (
+                        <HandReorderNudgeButtons
+                          leftDisabled={singleSelIdxDock <= 0}
+                          rightDisabled={
+                            singleSelIdxDock < 0 || singleSelIdxDock >= orderIdsForDockNudge.length - 1
+                          }
+                          onNudge={nudgeHandOrder}
+                        />
                       ) : null}
                       <button
                         type="button"
