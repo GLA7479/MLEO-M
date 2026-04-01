@@ -22,7 +22,11 @@ const MID_RANK = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q
 const MID_SUIT = /** @type {const} */ ({ S: "♠", H: "♥", D: "♦", C: "♣" });
 
 const HAND_NUDGE_BTN =
-  "flex w-8 shrink-0 items-center justify-center rounded-md border border-white/20 bg-zinc-800/90 text-sm font-bold leading-none text-zinc-100 active:bg-zinc-700 disabled:pointer-events-none disabled:opacity-35 sm:w-9 sm:text-base";
+  "flex h-full min-h-[32px] w-8 shrink-0 items-center justify-center rounded-md border border-white/20 bg-zinc-800/90 text-sm font-bold leading-none text-zinc-100 active:bg-zinc-700 disabled:pointer-events-none disabled:opacity-35 sm:min-h-[34px] sm:w-9 sm:text-base";
+
+/** Fixed-width column between Draw and Take (or beside Submit); holds ◀/▶ or invisible spacers. */
+const HAND_NUDGE_SLOT =
+  "flex shrink-0 items-stretch justify-center gap-1 basis-[4.5rem] sm:basis-[5rem]";
 
 /** @param {{ leftDisabled: boolean, rightDisabled: boolean, onNudge: (delta: -1 | 1) => void }} props */
 function HandReorderNudgeButtons({ leftDisabled, rightDisabled, onNudge }) {
@@ -46,6 +50,17 @@ function HandReorderNudgeButtons({ leftDisabled, rightDisabled, onNudge }) {
       >
         ▶
       </button>
+    </>
+  );
+}
+
+/** Invisible same-width spacers — keeps Draw/Take/Submit layout stable when nudges are hidden. */
+function HandNudgeSlotSpacer() {
+  const bar = "min-h-[32px] w-8 shrink-0 sm:min-h-[34px] sm:w-9";
+  return (
+    <>
+      <div className={bar} aria-hidden />
+      <div className={bar} aria-hidden />
     </>
   );
 }
@@ -852,31 +867,35 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
               <>
                 {actionError ? <p className="text-center text-[9px] leading-tight text-red-300">{actionError}</p> : null}
                 {!pendingDraw && isMyTurn && isPlaying ? (
-                  <div className="flex min-h-[32px] items-stretch gap-1 sm:min-h-[34px]">
-                    {dockHandReorder ? (
-                      <HandReorderNudgeButtons
-                        leftDisabled={singleSelIdxDock <= 0}
-                        rightDisabled={
-                          singleSelIdxDock < 0 || singleSelIdxDock >= orderIdsForDockNudge.length - 1
-                        }
-                        onNudge={nudgeHandOrder}
-                      />
-                    ) : null}
+                  <div className="flex min-h-[32px] w-full items-stretch gap-1.5 sm:min-h-[34px]">
                     <button
                       type="button"
                       disabled={busy || (snapshot.stockCount ?? 0) <= 0}
                       onClick={() => void drawStock()}
-                      className="min-h-[32px] min-w-0 flex-1 rounded-md border border-emerald-500/40 bg-emerald-950/40 px-1 py-0.5 text-[10px] font-bold leading-tight text-emerald-100 disabled:opacity-40 sm:min-h-[34px] sm:text-xs"
+                      className="flex min-h-[32px] min-w-0 flex-1 items-center justify-center rounded-md border border-emerald-500/40 bg-emerald-950/40 px-1 py-0.5 text-[9px] font-bold leading-none text-emerald-100 disabled:opacity-40 sm:min-h-[34px] sm:px-1.5 sm:text-[10px]"
                     >
-                      Draw
+                      Draw stock
                     </button>
+                    <div className={HAND_NUDGE_SLOT}>
+                      {dockHandReorder ? (
+                        <HandReorderNudgeButtons
+                          leftDisabled={singleSelIdxDock <= 0}
+                          rightDisabled={
+                            singleSelIdxDock < 0 || singleSelIdxDock >= orderIdsForDockNudge.length - 1
+                          }
+                          onNudge={nudgeHandOrder}
+                        />
+                      ) : (
+                        <HandNudgeSlotSpacer />
+                      )}
+                    </div>
                     <button
                       type="button"
                       disabled={busy || (snapshot.discardCount ?? 0) <= 0}
                       onClick={() => void drawDiscard()}
-                      className="min-h-[32px] min-w-0 flex-1 rounded-md border border-sky-500/40 bg-sky-950/40 px-1 py-0.5 text-[10px] font-bold leading-tight text-sky-100 disabled:opacity-40 sm:min-h-[34px] sm:text-xs"
+                      className="flex min-h-[32px] min-w-0 flex-1 items-center justify-center rounded-md border border-sky-500/40 bg-sky-950/40 px-1 py-0.5 text-[9px] font-bold leading-none text-sky-100 disabled:opacity-40 sm:min-h-[34px] sm:px-1.5 sm:text-[10px]"
                     >
-                      Take
+                      Take discard
                     </button>
                   </div>
                 ) : null}
@@ -899,15 +918,19 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
                       <p className="px-0.5 pb-0.5 text-[8px] leading-snug text-amber-200/95 sm:text-[9px]">{validationMessage}</p>
                     ) : null}
                     <div className="flex min-h-[32px] flex-row items-stretch gap-1 sm:min-h-[34px]">
-                      {dockHandReorder ? (
-                        <HandReorderNudgeButtons
-                          leftDisabled={singleSelIdxDock <= 0}
-                          rightDisabled={
-                            singleSelIdxDock < 0 || singleSelIdxDock >= orderIdsForDockNudge.length - 1
-                          }
-                          onNudge={nudgeHandOrder}
-                        />
-                      ) : null}
+                      <div className={HAND_NUDGE_SLOT}>
+                        {dockHandReorder ? (
+                          <HandReorderNudgeButtons
+                            leftDisabled={singleSelIdxDock <= 0}
+                            rightDisabled={
+                              singleSelIdxDock < 0 || singleSelIdxDock >= orderIdsForDockNudge.length - 1
+                            }
+                            onNudge={nudgeHandOrder}
+                          />
+                        ) : (
+                          <HandNudgeSlotSpacer />
+                        )}
+                      </div>
                       <button
                         type="button"
                         disabled={busy || !canSubmitTurn}
