@@ -15,6 +15,8 @@ import {
   commitOv2RoomStake,
   fetchOv2RoomById,
   fetchOv2RoomMembers,
+  setOv2MemberReady,
+  startOv2RoomIntent,
 } from "../../../lib/online-v2/ov2RoomsApi";
 import { buildOnlineV2EconomyEventKey, clampSuggestedOnlineV2Stake } from "../../../lib/online-v2/ov2Economy";
 import { debitOnlineV2Vault, peekOnlineV2Vault, readOnlineV2Vault } from "../../../lib/online-v2/onlineV2VaultBridge";
@@ -31,6 +33,10 @@ function ov2StakeDebitLocalKey(roomId, matchSeq, participantKey) {
 
 function fmtStake(n) {
   return Math.floor(Number(n) || 0).toLocaleString();
+}
+
+function lifecyclePhase(canon) {
+  return String(canon?.lifecycle_phase || "").trim();
 }
 
 export default function Ov2SharedRoomScreen({
@@ -86,7 +92,6 @@ export default function Ov2SharedRoomScreen({
 
   const seatedStakeBlockersPreview = useMemo(() => seatedPlayersNotStakeCommitted(ledgerMembers), [ledgerMembers]);
 
-  /** Until canonical members load, do not let the host start or open on empty ledger (avoids a race). */
   const rummyLedgerSynced = useMemo(() => {
     if (!isRummy51Room || ledgerErr) return false;
     if (!members.length) return true;
@@ -101,11 +106,21 @@ export default function Ov2SharedRoomScreen({
   const sharedStatusUpper = useMemo(() => String(room?.status || "").toUpperCase(), [room?.status]);
   const canonicalStatusUpper = useMemo(() => String(canonicalRoom?.status || "").toUpperCase(), [canonicalRoom?.status]);
 
-  /** Stake commit UI only when both snapshot and canonical `ov2_rooms.status` are OPEN (avoids stale snapshot vs IN_GAME). */
   const rummyPreStartStrict = useMemo(
     () => isRummy51Room && sharedStatusUpper === "OPEN" && canonicalStatusUpper === "OPEN" && Boolean(canonicalRoom),
     [isRummy51Room, sharedStatusUpper, canonicalStatusUpper, canonicalRoom]
   );
+
+  const myPk = String(participantId || "").trim();
+  const myWalletCommitted = useMemo(() => {
+    const row = myPk ? ledgerByParticipant.get(myPk) : null;
+    return String(row?.wallet_state || "").trim() === "committed";
+  }, [ledgerByParticipant, myPk]);
+
+  const phaseOpen = useMemo(() => {
+    const p = lifecyclePhase(canonicalRoom);
+    return p === "pending_start" || p === "pending_stakes";
+  }, [canonicalRoom]);
 
   useEffect(() => {
     if (!isRummy51Room || sharedStatusUpper !== "IN_GAME") return;
@@ -117,62 +132,158 @@ export default function Ov2SharedRoomScreen({
     });
   }, [isRummy51Room, sharedStatusUpper]);
 
-  async function reloadLedgerAndSeatedStakeBlockers() {
-    await reload();
-    const { ledger } = await refreshRummyEconomySnapshot();
-    return { ledger, blockers: seatedPlayersNotStakeCommitted(ledger) };
-  }
-
   async function ensureBalanceForStake(stake) {
     await readOnlineV2Vault({ fresh: true }).catch(() => {});
     const bal = Math.floor(Number(peekOnlineV2Vault().balance) || 0);
     const need = clampSuggestedOnlineV2Stake(stake);
     if (bal < need) {
-      setMsg(`Need at least ${fmtStake(need)} coins (have ${fmtStake(bal)}).`);
-      return false;
+      return { ok: false, error: `Need at least ${fmtStake(need)} coins (have ${fmtStake(bal)}).` };
     }
-    return true;
+    return { ok: true };
   }
 
-  async function onCommitStakeFromShared() {
-    const sharedU = String(room?.status || "").toUpperCase();
-    const canonU = String(canonicalRoom?.status || "").toUpperCase();
-    if (sharedU !== "OPEN" || canonU !== "OPEN") {
-      setMsg("Stake commit is only available before the room starts (status must be OPEN on the server).");
-      return;
+  /**
+   * Commit stake for `pk` when lifecycle is already pending_start / pending_stakes.
+   * @returns {{ ok: true } | { ok: false, error: string }}
+   */
+  async function commitStakeForParticipant(canonRow, pk) {
+    const phase = lifecyclePhase(canonRow);
+    if (phase !== "pending_start" && phase !== "pending_stakes") {
+      return { ok: false, error: `Cannot commit stake in lifecycle phase "${phase || "unknown"}".` };
     }
-    if (!canonicalRoom || !participantId) return;
-    const stake = clampSuggestedOnlineV2Stake(canonicalRoom.stake_per_seat);
-    if (!(await ensureBalanceForStake(canonicalRoom.stake_per_seat))) return;
-    const idem = buildOnlineV2EconomyEventKey("commit", roomId, participantId, canonicalRoom.match_seq, "v1");
+    try {
+      await setOv2MemberReady({ room_id: roomId, participant_key: pk, is_ready: true });
+    } catch {
+      /* not in lobby */
+    }
+    const stake = clampSuggestedOnlineV2Stake(canonRow.stake_per_seat);
+    const bal = await ensureBalanceForStake(canonRow.stake_per_seat);
+    if (!bal.ok) return { ok: false, error: bal.error };
+    const idem = buildOnlineV2EconomyEventKey("commit", roomId, pk, canonRow.match_seq, "v1");
+    const stakeOut = await commitOv2RoomStake({
+      room_id: roomId,
+      participant_key: pk,
+      idempotency_key: idem,
+    });
+    const rAfter = stakeOut?.room || canonRow;
+    if (stakeOut?.room) setCanonicalRoom(stakeOut.room);
+    const debitKey =
+      typeof window !== "undefined" ? ov2StakeDebitLocalKey(roomId, rAfter.match_seq, pk) : null;
+    const debitAlreadyDone = debitKey && window.localStorage.getItem(debitKey) === "1";
+    if (!debitAlreadyDone) {
+      const debit = await debitOnlineV2Vault(stake, rAfter.product_game_id);
+      if (!debit?.ok) {
+        await refreshRummyEconomySnapshot();
+        await reload();
+        return {
+          ok: false,
+          error:
+            debit?.error ||
+            "Vault debit failed after the server recorded your stake. Try again or sync your balance.",
+        };
+      }
+      if (debitKey) window.localStorage.setItem(debitKey, "1");
+    }
+    return { ok: true };
+  }
+
+  async function onNonHostJoinMatchStake() {
+    if (!roomId || !myPk || isHost) return;
     setBusy(true);
     setMsg("");
     try {
-      const stakeOut = await commitOv2RoomStake({
-        room_id: roomId,
-        participant_key: participantId,
-        idempotency_key: idem,
-      });
-      const rAfter = stakeOut?.room || canonicalRoom;
-      if (stakeOut?.room) setCanonicalRoom(stakeOut.room);
-      const debitKey =
-        typeof window !== "undefined" ? ov2StakeDebitLocalKey(roomId, rAfter.match_seq, participantId) : null;
-      const debitAlreadyDone = debitKey && window.localStorage.getItem(debitKey) === "1";
-      if (!debitAlreadyDone) {
-        const debit = await debitOnlineV2Vault(stake, rAfter.product_game_id);
-        if (!debit?.ok) {
-          setMsg(
-            debit?.error ||
-              "Vault debit failed after the server recorded your stake. Retry Commit stake (before Start) or sync your balance."
-          );
-          await refreshRummyEconomySnapshot();
-          await reload();
-          return;
-        }
-        if (debitKey) window.localStorage.setItem(debitKey, "1");
+      const { canon } = await refreshRummyEconomySnapshot();
+      if (!canon || String(canon.status || "").toUpperCase() !== "OPEN") {
+        setMsg("Room is not open for stake join.");
+        return;
+      }
+      const phase = lifecyclePhase(canon);
+      if (phase === "lobby") {
+        return;
+      }
+      if (phase !== "pending_start" && phase !== "pending_stakes") {
+        setMsg(`Cannot join stake in phase "${phase || "unknown"}".`);
+        return;
+      }
+      const r = await commitStakeForParticipant(canon, myPk);
+      if (!r.ok) {
+        setMsg(r.error);
+        return;
       }
       await refreshRummyEconomySnapshot();
       await reload();
+    } catch (e) {
+      setMsg(e?.message || String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onHostStartMatch() {
+    if (!roomId || !myPk || !isHost) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      let { canon, ledger } = await refreshRummyEconomySnapshot();
+      if (!canon || String(canon.status || "").toUpperCase() !== "OPEN") {
+        setMsg("Room is not in the pre-start (OPEN) state.");
+        return;
+      }
+
+      try {
+        await setOv2MemberReady({ room_id: roomId, participant_key: myPk, is_ready: true });
+      } catch {
+        /* ignore */
+      }
+
+      let phase = lifecyclePhase(canon);
+      if (phase === "lobby") {
+        await startOv2RoomIntent({ room_id: roomId, host_participant_key: myPk });
+      }
+
+      const snap = await refreshRummyEconomySnapshot();
+      canon = snap.canon;
+      ledger = snap.ledger;
+      if (!canon) {
+        setMsg("Could not refresh room after starting stake round.");
+        return;
+      }
+
+      phase = lifecyclePhase(canon);
+      const hostRow = ledger.find(m => String(m.participant_key || "").trim() === myPk);
+      const hostWs = String(hostRow?.wallet_state || "").trim();
+      if (hostWs !== "committed" && (phase === "pending_start" || phase === "pending_stakes")) {
+        const cr = await commitStakeForParticipant(canon, myPk);
+        if (!cr.ok) {
+          setMsg(cr.error);
+          return;
+        }
+        const again = await refreshRummyEconomySnapshot();
+        canon = again.canon;
+        ledger = again.ledger;
+      }
+
+      const blockers = seatedPlayersNotStakeCommitted(ledger);
+      if (blockers.length) {
+        setMsg(`Waiting for seated players to join (stake): ${formatSeatedStakeBlockers(blockers)}`);
+        return;
+      }
+
+      const out = await hostStartOv2Room({
+        room_id: roomId,
+        host_participant_key: myPk,
+      });
+      setRuntimeHandoff(out.runtime_handoff || null);
+      await reload();
+
+      const open = await openOv2Rummy51Session(roomId, myPk);
+      if (!open?.ok) {
+        setMsg(open?.error || "Could not open Rummy 51 session.");
+        return;
+      }
+      didRouteToLiveRef.current = true;
+      setLaunchingLive(true);
+      await router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
     } catch (e) {
       setMsg(e?.message || String(e));
     } finally {
@@ -186,6 +297,14 @@ export default function Ov2SharedRoomScreen({
     try {
       await claimOv2Seat({ room_id: roomId, participant_key: participantId, seat_index: seatIndex });
       await reload();
+      if (isRummy51Room) {
+        try {
+          await setOv2MemberReady({ room_id: roomId, participant_key: participantId, is_ready: true });
+        } catch {
+          /* lobby-only */
+        }
+        await refreshRummyEconomySnapshot();
+      }
     } catch (e) {
       setMsg(e?.message || String(e));
     } finally {
@@ -218,49 +337,11 @@ export default function Ov2SharedRoomScreen({
     }
   }
 
-  async function onOpenRummy51InGame() {
-    if (!isHost) {
-      setMsg("Only the host can open the match.");
-      return;
-    }
-    setBusy(true);
-    setMsg("");
-    try {
-      const { blockers } = await reloadLedgerAndSeatedStakeBlockers();
-      if (blockers.length) {
-        setMsg(
-          `Cannot open match: one or more seated players have not committed stakes on the server. ${formatSeatedStakeBlockers(blockers)}`
-        );
-        return;
-      }
-      const open = await openOv2Rummy51Session(roomId, participantId);
-      if (!open?.ok) {
-        setMsg(open?.error || "Could not open Rummy 51 session.");
-        return;
-      }
-      didRouteToLiveRef.current = true;
-      setLaunchingLive(true);
-      await router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
-    } catch (e) {
-      setMsg(e?.message || String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function onHostStart() {
+    if (isRummy51Room) return;
     setBusy(true);
     setMsg("");
     try {
-      if (isRummy51Room) {
-        const { blockers } = await reloadLedgerAndSeatedStakeBlockers();
-        if (blockers.length) {
-          setMsg(
-            `Cannot start: every seated player must commit stake on the server first. ${formatSeatedStakeBlockers(blockers)}`
-          );
-          return;
-        }
-      }
       const out = await hostStartOv2Room({
         room_id: roomId,
         host_participant_key: participantId,
@@ -277,26 +358,6 @@ export default function Ov2SharedRoomScreen({
         didRouteToLiveRef.current = true;
         setLaunchingLive(true);
         await router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
-        return;
-      }
-      if (isRummy51Room) {
-        await reload();
-        const { ledger } = await refreshRummyEconomySnapshot();
-        const blockers = seatedPlayersNotStakeCommitted(ledger);
-        if (blockers.length) {
-          setMsg(
-            `Cannot open match: stake state on the server is still incomplete for this room. ${formatSeatedStakeBlockers(blockers)} Leave and recreate the room, or resolve stakes from the main room lobby.`
-          );
-          return;
-        }
-        const open = await openOv2Rummy51Session(roomId, participantId);
-        if (!open?.ok) {
-          setMsg(open?.error || "Could not open Rummy 51 session.");
-          return;
-        }
-        didRouteToLiveRef.current = true;
-        setLaunchingLive(true);
-        await router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
         return;
       }
       await reload();
@@ -323,7 +384,6 @@ export default function Ov2SharedRoomScreen({
     if (didRouteToLiveRef.current) return;
     if (room?.status !== "IN_GAME") return;
 
-    // Rummy51: shared snapshot JSON omits `active_session_id`; only navigate once canonical `ov2_rooms` has a session.
     if (isRummy51Room) {
       let cancelled = false;
       let intervalId = null;
@@ -338,7 +398,7 @@ export default function Ov2SharedRoomScreen({
             void router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
           }
         } catch {
-          // ignore transient read errors; next tick retries
+          // ignore
         }
       };
       void tick();
@@ -393,17 +453,62 @@ export default function Ov2SharedRoomScreen({
     );
   }
 
-  const rummyHostStartBlocked =
+  const rummySeated = me?.seat_index != null && me?.seat_index !== "";
+  const showNonHostJoinBtn =
     isRummy51Room &&
-    isHost &&
-    sharedStatusUpper === "OPEN" &&
-    (!rummyLedgerSynced || Boolean(ledgerErr) || seatedStakeBlockersPreview.length > 0);
+    rummyPreStartStrict &&
+    !isHost &&
+    rummySeated &&
+    !myWalletCommitted &&
+    phaseOpen &&
+    rummyLedgerSynced &&
+    !ledgerErr;
 
-  const rummyHostOpenBlocked =
-    isRummy51Room &&
-    isHost &&
-    sharedStatusUpper === "IN_GAME" &&
-    (!rummyLedgerSynced || seatedStakeBlockersPreview.length > 0);
+  const showNonHostWaitingLobby =
+    isRummy51Room && rummyPreStartStrict && !isHost && rummySeated && !myWalletCommitted && !phaseOpen && rummyLedgerSynced;
+
+  const showHostStartBtn =
+    isRummy51Room && rummyPreStartStrict && isHost && rummySeated && rummyLedgerSynced && !ledgerErr;
+
+  const rummySecondFooterSlot =
+    isRummy51Room && sharedStatusUpper === "OPEN" ? (
+      !rummySeated ? (
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-500">
+          Pick a seat
+        </div>
+      ) : isHost ? (
+        <button
+          type="button"
+          disabled={busy || !showHostStartBtn}
+          title={!rummyLedgerSynced || ledgerErr ? "Syncing room state…" : undefined}
+          onClick={() => void onHostStartMatch()}
+          className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-900/40 py-2 text-xs font-bold text-emerald-100 disabled:opacity-45"
+        >
+          {busy ? "Working…" : "Start match"}
+        </button>
+      ) : showNonHostJoinBtn ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void onNonHostJoinMatchStake()}
+          className="flex-1 rounded-lg border border-violet-500/45 bg-violet-900/40 py-2 text-xs font-bold text-violet-100 disabled:opacity-45"
+        >
+          {busy ? "Working…" : "Join match (stake)"}
+        </button>
+      ) : myWalletCommitted ? (
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-950/25 py-2 text-[10px] font-medium text-emerald-200/90">
+          Stake committed — waiting
+        </div>
+      ) : showNonHostWaitingLobby ? (
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 px-2 py-2 text-center text-[10px] font-medium text-zinc-400">
+          Waiting for host to start match
+        </div>
+      ) : (
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-500">
+          Loading…
+        </div>
+      )
+    ) : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
@@ -450,7 +555,7 @@ export default function Ov2SharedRoomScreen({
                   ? "stake committed"
                   : ws
                     ? `stake: ${ws}`
-                    : "stake: (loading…)"
+                    : "stake: …"
                 : null;
             return (
               <li key={m.id} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-zinc-100">
@@ -469,13 +574,7 @@ export default function Ov2SharedRoomScreen({
             );
           })}
         </ul>
-        {isRummy51Room && ledgerErr ? <p className="mt-2 text-[11px] text-red-300">Stake sync: {ledgerErr}</p> : null}
-        {isRummy51Room && rummyPreStartStrict && seatedStakeBlockersPreview.length ? (
-          <p className="mt-2 text-[11px] text-amber-200/90">
-            Before Start: {formatSeatedStakeBlockers(seatedStakeBlockersPreview)} — each seated player must commit stake here or
-            in the main room lobby.
-          </p>
-        ) : null}
+        {isRummy51Room && ledgerErr ? <p className="mt-2 text-[11px] text-red-300">Room sync: {ledgerErr}</p> : null}
       </div>
 
       {room ? (
@@ -489,30 +588,10 @@ export default function Ov2SharedRoomScreen({
         />
       ) : null}
 
-      {isRummy51Room && rummyPreStartStrict && me?.seat_index != null ? (
-        String(ledgerByParticipant.get(String(participantId).trim())?.wallet_state || "").trim() !== "committed" ? (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-[11px] text-amber-100">
-            <p className="font-semibold text-amber-50">Commit your stake</p>
-            <p className="mt-1 text-amber-200/85">Required before the host can start the room.</p>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void onCommitStakeFromShared()}
-              className="mt-2 w-full rounded-lg border border-amber-500/45 bg-amber-900/40 py-2 text-xs font-bold text-amber-50 disabled:opacity-45"
-            >
-              Commit stake ({fmtStake(canonicalRoom.stake_per_seat)})
-            </button>
-          </div>
-        ) : null
-      ) : null}
-
       {isRummy51Room && sharedStatusUpper === "IN_GAME" && seatedStakeBlockersPreview.length ? (
         <div className="rounded-xl border border-rose-500/35 bg-rose-950/25 p-3 text-[11px] text-rose-100">
-          <p className="font-semibold text-rose-50">Stake commit incomplete on the server</p>
-          <p className="mt-1 text-rose-200/90">
-            This room is already started, but seated players are not all marked committed: {formatSeatedStakeBlockers(seatedStakeBlockersPreview)}.
-            The host cannot open the match from here. Use the main room lobby if available, or leave and start a new room.
-          </p>
+          <p className="font-semibold text-rose-50">Stake state incomplete</p>
+          <p className="mt-1 text-rose-200/90">{formatSeatedStakeBlockers(seatedStakeBlockersPreview)}</p>
         </div>
       ) : null}
 
@@ -528,17 +607,10 @@ export default function Ov2SharedRoomScreen({
       ) : null}
       {sharedStatusUpper === "IN_GAME" && isRummy51Room && !launchingLive ? (
         <div className="rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
-          {isHost ? (
-            <>
-              <p className="font-semibold text-teal-50">Room started — open the Rummy match</p>
-              <p className="mt-1 text-teal-200/90">The table is not live until the host opens the session (authoritative RPC).</p>
-            </>
-          ) : (
-            <>
-              <p className="font-semibold text-teal-50">Waiting for host</p>
-              <p className="mt-1 text-teal-200/90">The host must open the Rummy 51 match before you can join the live table.</p>
-            </>
-          )}
+          <p className="font-semibold text-teal-50">Match starting</p>
+          <p className="mt-1 text-teal-200/90">
+            Heading to the live table when the session is ready. If nothing happens, use Refresh or wait a few seconds.
+          </p>
         </div>
       ) : null}
 
@@ -551,36 +623,21 @@ export default function Ov2SharedRoomScreen({
         >
           Leave room
         </button>
-        {sharedStatusUpper === "OPEN" ? (
+        {isRummy51Room && sharedStatusUpper === "OPEN" ? (
+          rummySecondFooterSlot
+        ) : sharedStatusUpper === "OPEN" ? (
           <button
             type="button"
-            disabled={busy || !isHost || rummyHostStartBlocked}
-            title={rummyHostStartBlocked ? "All seated players must commit stake on the server before Start." : undefined}
+            disabled={busy || !isHost}
             onClick={() => void onHostStart()}
             className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-900/40 py-2 text-xs font-bold text-emerald-100 disabled:opacity-45"
           >
             Start
           </button>
         ) : sharedStatusUpper === "IN_GAME" && isRummy51Room ? (
-          isHost ? (
-            <button
-              type="button"
-              disabled={busy || launchingLive || rummyHostOpenBlocked}
-              title={
-                rummyHostOpenBlocked
-                  ? "Cannot open until every seated player is committed on the server (see list above)."
-                  : undefined
-              }
-              onClick={() => void onOpenRummy51InGame()}
-              className="flex-1 rounded-lg border border-teal-500/45 bg-teal-900/45 py-2 text-xs font-bold text-teal-100 disabled:opacity-45"
-            >
-              {busy || launchingLive ? "Opening…" : "Open match"}
-            </button>
-          ) : (
-            <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-400">
-              Waiting for host…
-            </div>
-          )
+          <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-400">
+            {launchingLive ? "Opening…" : "Waiting for live session…"}
+          </div>
         ) : (
           <button
             type="button"
@@ -605,4 +662,3 @@ export default function Ov2SharedRoomScreen({
     </div>
   );
 }
-
