@@ -29,7 +29,7 @@ function MidDiscardSlot({ card, showHint, highlight }) {
   const red = Boolean(card && !card.isJoker && (card.suit === "H" || card.suit === "D"));
   return (
     <div
-      className={`shrink-0 rounded border px-0.5 py-px sm:px-1 sm:py-0.5 ${
+      className={`shrink-0 self-start rounded border px-0.5 py-px sm:px-1 sm:py-0.5 ${
         highlight
           ? "border-amber-400/45 bg-gradient-to-b from-amber-950/40 to-zinc-950/85 shadow-[0_0_12px_rgba(245,158,11,0.08)]"
           : "border-white/[0.06] bg-black/25"
@@ -516,7 +516,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     (pendingDraw && isMyTurn && isPlaying);
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-0 overflow-hidden">
       <Ov2SeatStrip
         count={4}
         labels={seatLabels}
@@ -555,13 +555,13 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
-        <div className="flex min-h-0 shrink-0 flex-col gap-0.5 sm:flex-row sm:items-start sm:gap-1">
+        <div className="flex min-h-0 flex-1 flex-col gap-0.5 sm:flex-row sm:items-stretch sm:gap-1">
           <MidDiscardSlot
             card={isMyTurn && isPlaying && pendingDraw ? pickedDiscardCard : null}
             showHint={Boolean(isMyTurn && isPlaying && pendingDraw && !pickedDiscardCard)}
             highlight={Boolean(isMyTurn && isPlaying && pendingDraw && pickedDiscardCard)}
           />
-          <div className="min-h-0 min-w-0 flex-1">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <Ov2Rummy51TableMelds
               tableMeldsRaw={snapshot.tableMelds || []}
               selectedTargetMeldId={targetMeldId}

@@ -286,7 +286,7 @@ export default function Ov2Rummy51LiveShell() {
               {openErr ? <p className="text-[10px] text-red-300">{openErr}</p> : null}
             </div>
           ) : null}
-          <div className="min-h-0 flex-1 overflow-hidden px-0.5 pb-1 pt-1">
+          <div className="min-h-0 flex-1 overflow-hidden px-0.5 pb-0.5 pt-0.5">
             <Ov2Rummy51Screen contextInput={contextInput} />
           </div>
         </div>
