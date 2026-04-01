@@ -115,10 +115,14 @@ DECLARE
   nj int := 0;
   vals int[] := ARRAY[]::int[];
   v int;
-  span int;
   mn int;
   mx int;
-  need int;
+  holes_inside int;
+  vv int;
+  l_lo int;
+  l_hi int;
+  min_bound int;
+  max_bound int;
   suit0 text;
   su text;
 BEGIN
@@ -159,15 +163,25 @@ BEGIN
     RETURN false;
   END IF;
   SELECT min(x), max(x) INTO mn, mx FROM unnest(vals) x;
-  span := mx - mn + 1;
-  IF span <> n THEN
+  holes_inside := 0;
+  FOR vv IN mn..mx LOOP
+    IF NOT vv = ANY (vals) THEN
+      holes_inside := holes_inside + 1;
+    END IF;
+  END LOOP;
+  IF nj < holes_inside THEN
     RETURN false;
   END IF;
-  need := span - cardinality(vals);
-  IF need <> nj THEN
-    RETURN false;
+  IF p_low THEN
+    min_bound := 1;
+    max_bound := 13;
+  ELSE
+    min_bound := 2;
+    max_bound := 14;
   END IF;
-  RETURN true;
+  l_lo := GREATEST(min_bound, mx - n + 1);
+  l_hi := LEAST(mn, max_bound - n + 1);
+  RETURN l_lo <= l_hi;
 END;
 $$;
 
@@ -284,11 +298,15 @@ DECLARE
   mode_low boolean;
   vals int[];
   nj int;
+  n_tot int;
   mn int;
   mx int;
-  span int;
+  mn_nat int;
+  mx_nat int;
+  l_start int;
+  min_bound int;
+  max_bound int;
   v int;
-  ji int := 0;
   jr int[];
   s int := 0;
   jix int;
@@ -317,7 +335,8 @@ BEGIN
   mode_low := public._ov2_r51_run_ok_mode(p_cards, true);
   vals := ARRAY[]::int[];
   nj := 0;
-  FOR i IN 0..(jsonb_array_length(p_cards) - 1) LOOP
+  n_tot := jsonb_array_length(p_cards);
+  FOR i IN 0..(n_tot - 1) LOOP
     c := p_cards -> i;
     IF coalesce((c ->> 'isJoker')::boolean, false) THEN
       nj := nj + 1;
@@ -334,12 +353,25 @@ BEGIN
     END IF;
   END LOOP;
   IF cardinality(vals) = 0 THEN
-    mn := 2;
-    mx := 2 + nj - 1;
+    IF mode_low THEN
+      mn := 1;
+    ELSE
+      mn := 2;
+    END IF;
+    mx := mn + n_tot - 1;
   ELSE
-    SELECT min(x), max(x) INTO mn, mx FROM unnest(vals) x;
+    SELECT min(x), max(x) INTO mn_nat, mx_nat FROM unnest(vals) x;
+    IF mode_low THEN
+      min_bound := 1;
+      max_bound := 13;
+    ELSE
+      min_bound := 2;
+      max_bound := 14;
+    END IF;
+    l_start := GREATEST(min_bound, mx_nat - n_tot + 1);
+    mn := l_start;
+    mx := l_start + n_tot - 1;
   END IF;
-  span := mx - mn + 1;
   jr := ARRAY[]::int[];
   FOR v IN mn..mx LOOP
     IF NOT v = ANY (vals) THEN

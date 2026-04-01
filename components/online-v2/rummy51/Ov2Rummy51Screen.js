@@ -329,12 +329,15 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
 
   const onNewMeldFromSelection = useCallback(() => {
     if (selectedCards.length < 3) return;
+    const played = new Set(selectedCards.map(c => c.id));
     setDraftNewMelds(prev => [...prev, [...selectedCards]]);
     setSelectedIds(new Set());
+    setDiscardCardId(prev => (prev && played.has(prev) ? null : prev));
   }, [selectedCards]);
 
   const onAddSelectionToTarget = useCallback(() => {
     if (!targetMeldId || selectedCards.length < 1) return;
+    const played = new Set(selectedCards.map(c => c.id));
     setDraftTableAdds(prev => {
       const idx = prev.findIndex(x => x.meldId === targetMeldId);
       if (idx >= 0) {
@@ -345,6 +348,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
       return [...prev, { meldId: targetMeldId, cards: [...selectedCards] }];
     });
     setSelectedIds(new Set());
+    setDiscardCardId(prev => (prev && played.has(prev) ? null : prev));
   }, [targetMeldId, selectedCards]);
 
   const tableMeldById = useMemo(() => {
@@ -436,7 +440,9 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     for (const meld of draftNewMelds) for (const c of meld) playedIds.add(c.id);
     for (const row of draftTableAdds) for (const c of row.cards) playedIds.add(c.id);
     const after = handCards.filter(c => !playedIds.has(c.id));
-    if (!after.some(c => c.id === discardCardId)) return "Discard must stay in hand until submit (after melds).";
+    if (!after.some(c => c.id === discardCardId)) {
+      return "The card you marked to discard (orange “out”) is also in a Meld/Tbl draft — remove it from the draft (Clr) or mark a different discard. The discard must stay in your hand until you submit.";
+    }
 
     const initialOpen =
       !hasEverOpened && draftNewMelds.length
