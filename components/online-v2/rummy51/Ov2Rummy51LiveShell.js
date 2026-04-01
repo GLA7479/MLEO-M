@@ -6,6 +6,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { ONLINE_V2_GAME_IDS } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { openOv2Rummy51Session } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
 import { fetchOv2RoomById, fetchOv2RoomMembers, leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
+import {
+  formatSeatedStakeBlockers,
+  seatedPlayersNotStakeCommitted,
+} from "../../../lib/online-v2/shared-rooms/ov2SharedRoomStakeFromLedger";
 import { getOv2ParticipantId } from "../../../lib/online-v2/ov2ParticipantId";
 import { supabaseMP } from "../../../lib/supabaseClients";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
@@ -184,9 +188,13 @@ export default function Ov2Rummy51LiveShell() {
     if (!isHost) return "Only the host can open the session.";
     if (seatedCount < 2) return "Need at least two seated players.";
     if (seatedCount > 4) return "At most four players.";
-    if (!seatedAllCommitted) return "Every seated player must commit stake.";
+    if (!seatedAllCommitted) {
+      const b = seatedPlayersNotStakeCommitted(members);
+      const detail = b.length ? ` ${formatSeatedStakeBlockers(b)}` : "";
+      return `Every seated player must commit stake.${detail}`;
+    }
     return "";
-  }, [room, roomLifecycle, sharedInGame, isRoomMember, isHost, seatedCount, seatedAllCommitted]);
+  }, [room, roomLifecycle, sharedInGame, isRoomMember, isHost, seatedCount, seatedAllCommitted, members]);
 
   const onLeaveTable = useCallback(async () => {
     if (!roomId || !participantId) return;
@@ -216,6 +224,14 @@ export default function Ov2Rummy51LiveShell() {
     setOpenBusy(true);
     setOpenErr("");
     try {
+      await reloadContext();
+      const freshMembers = await fetchOv2RoomMembers(roomId);
+      setMembers(freshMembers);
+      const blockers = seatedPlayersNotStakeCommitted(freshMembers);
+      if (blockers.length) {
+        setOpenErr(`All seated players must commit stakes. ${formatSeatedStakeBlockers(blockers)}`);
+        return;
+      }
       const res = await openOv2Rummy51Session(roomId, participantId);
       if (!res.ok) {
         setOpenErr(res.error || "Could not open session.");
@@ -325,8 +341,13 @@ export default function Ov2Rummy51LiveShell() {
           ) : null}
           {showNonHostWaitingForSession ? (
             <div className="shrink-0 border-b border-cyan-500/25 bg-cyan-950/20 px-2 py-2 text-[10px] leading-snug text-cyan-100 sm:text-[11px]">
-              <strong className="font-semibold text-cyan-50">Waiting for host</strong> — the live match is not open yet.
-              Use Refresh room or wait; the table appears once the host opens the session.
+              <strong className="font-semibold text-cyan-50">Waiting for host</strong> — there is no live session yet (
+              <span className="font-mono text-cyan-200/90">active_session_id</span> is empty). This screen will load the table
+              automatically after the host opens the match. If you landed here early, use{" "}
+              <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
+                Refresh room
+              </button>{" "}
+              or return to the shared room until the host finishes opening.
             </div>
           ) : null}
           {canShellHostOpen ? (
