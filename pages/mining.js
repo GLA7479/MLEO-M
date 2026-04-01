@@ -1,5 +1,5 @@
 // pages/mining.js
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/router";
 import Layout from "../components/Layout";
@@ -222,6 +222,13 @@ const TEXT = {
     menuUsernameFallback: "User",
     termsAccept: "Accept",
     termsDecline: "Decline",
+    leaderboardButton: "Leaderboard",
+    leaderboardTitle: "Leaderboard",
+    leaderboardSubtitle: "Top 100 by global vault balance",
+    leaderboardEmpty: "No entries yet.",
+    leaderboardLoading: "Loading…",
+    leaderboardErrorGeneric: "Could not load leaderboard.",
+    leaderboardPlayer: "Player",
   },
   ar: {
     name: "العربية", dir: "rtl", code: "ar",
@@ -3583,6 +3590,15 @@ function Modal({ isOpen, onClose, children, maxWidth = "2xl", padding = "6", clo
   );
 }
 
+function formatLeaderboardBalance(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x) || x < 0) return "0";
+  if (x >= 1_000_000) {
+    return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(x);
+  }
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(Math.floor(x));
+}
+
 // ===== How to Play Component =====
 function HowToPlay({ lang, onClose, gameType = "miners" }) {
   const safeLang = SUPPORTED_LOCALES.has(lang) ? lang : "en";
@@ -4312,6 +4328,10 @@ export default function GamesHub() {
   const [modal, setModal] = useState(null);
   const [policyModal, setPolicyModal] = useState(null); // 'terms', 'privacy', 'cookies', 'risk', or null
   const [poolModalOpen, setPoolModalOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [leaderboardRows, setLeaderboardRows] = useState([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [lang, setLang] = useState(() => {
@@ -4351,6 +4371,58 @@ export default function GamesHub() {
   const safeLang = useMemo(() => (SUPPORTED_LOCALES.has(lang) ? lang : "en"), [lang]);
   const text = useMemo(() => TEXT[safeLang], [safeLang]);
   const dir = text.dir || "ltr";
+  const lt = useMemo(
+    () => ({
+      leaderboardButton: text.leaderboardButton ?? TEXT.en.leaderboardButton,
+      leaderboardTitle: text.leaderboardTitle ?? TEXT.en.leaderboardTitle,
+      leaderboardSubtitle: text.leaderboardSubtitle ?? TEXT.en.leaderboardSubtitle,
+      leaderboardEmpty: text.leaderboardEmpty ?? TEXT.en.leaderboardEmpty,
+      leaderboardLoading: text.leaderboardLoading ?? TEXT.en.leaderboardLoading,
+      leaderboardPlayer: text.leaderboardPlayer ?? TEXT.en.leaderboardPlayer,
+    }),
+    [text]
+  );
+
+  const fetchLeaderboard = useCallback(async (isInitial = false) => {
+    if (isInitial) setLeaderboardLoading(true);
+    try {
+      const r = await fetch("/api/vault/leaderboard", { cache: "no-store" });
+      const raw = await r.text();
+      let j;
+      try {
+        j = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error(TEXT.en.leaderboardErrorGeneric);
+      }
+      if (typeof j !== "object" || j === null || typeof j.success !== "boolean") {
+        throw new Error(TEXT.en.leaderboardErrorGeneric);
+      }
+      if (!r.ok || !j.success) {
+        throw new Error(
+          typeof j.message === "string" && j.message.trim()
+            ? j.message
+            : TEXT.en.leaderboardErrorGeneric
+        );
+      }
+      setLeaderboardRows(Array.isArray(j.entries) ? j.entries : []);
+      setLeaderboardError(null);
+    } catch (e) {
+      if (isInitial) {
+        setLeaderboardError(e.message || TEXT.en.leaderboardErrorGeneric);
+      }
+    } finally {
+      if (isInitial) setLeaderboardLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!leaderboardOpen) return undefined;
+    fetchLeaderboard(true);
+    const id = setInterval(() => {
+      fetchLeaderboard(false);
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [leaderboardOpen, fetchLeaderboard]);
   
   const open = (id) => setModal(id);
   const close = () => setModal(null);
@@ -4874,6 +4946,16 @@ export default function GamesHub() {
               </section>
               </div>
 
+              <div className="flex shrink-0 justify-center pt-1.5">
+                <button
+                  type="button"
+                  onClick={() => setLeaderboardOpen(true)}
+                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-bold text-zinc-200 hover:bg-white/10"
+                >
+                  {lt.leaderboardButton}
+                </button>
+              </div>
+
               <footer className="mt-auto flex shrink-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-white/10 pt-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] text-[10px] leading-tight text-white/55">
                 <span>© {new Date().getFullYear()} MLEO</span>
                 <button type="button" onClick={() => setPoolModalOpen(true)} className="underline hover:text-white/90">
@@ -5096,6 +5178,16 @@ export default function GamesHub() {
                 </article>
               </section>
 
+              <div className="flex shrink-0 justify-center pt-1.5">
+                <button
+                  type="button"
+                  onClick={() => setLeaderboardOpen(true)}
+                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-bold text-zinc-200 hover:bg-white/10"
+                >
+                  {lt.leaderboardButton}
+                </button>
+              </div>
+
               <footer className="mt-2 flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-white/10 pt-2 text-[11px] leading-tight text-white/55">
                 <span>© {new Date().getFullYear()} MLEO</span>
                 <button type="button" onClick={() => setPoolModalOpen(true)} className="underline hover:text-white/90">
@@ -5145,6 +5237,42 @@ export default function GamesHub() {
           <p className="text-center text-sm font-bold text-white/90 mb-2">{text.poolStatus}</p>
           <GamePoolStats />
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={leaderboardOpen}
+        onClose={() => setLeaderboardOpen(false)}
+        maxWidth="lg"
+        padding="4"
+        closeAriaLabel={text.closeModalAria}
+        dir={dir}
+      >
+        <h2 className="mb-1 pr-8 text-xl font-bold">{lt.leaderboardTitle}</h2>
+        <p className="mb-3 text-sm text-gray-600">{lt.leaderboardSubtitle}</p>
+        {leaderboardLoading && leaderboardRows.length === 0 ? (
+          <p className="text-sm text-gray-600">{lt.leaderboardLoading}</p>
+        ) : leaderboardError ? (
+          <p className="text-sm text-red-600">{leaderboardError}</p>
+        ) : leaderboardRows.length === 0 ? (
+          <p className="text-sm text-gray-600">{lt.leaderboardEmpty}</p>
+        ) : (
+          <ul className="max-h-[min(55vh,28rem)] space-y-0 overflow-y-auto pr-1">
+            {leaderboardRows.map((row) => (
+              <li
+                key={`${row.rank}-${row.publicIdSuffix}`}
+                className="grid grid-cols-[2.75rem_minmax(0,1fr)_auto] items-center gap-x-2 border-b border-gray-100 py-2 text-sm last:border-b-0"
+              >
+                <span className="shrink-0 font-bold text-gray-900">#{row.rank}</span>
+                <span className="min-w-0 truncate text-gray-700" title={`${lt.leaderboardPlayer} • ${row.publicIdSuffix}`}>
+                  {lt.leaderboardPlayer} • {row.publicIdSuffix}
+                </span>
+                <span className="shrink-0 text-end font-semibold tabular-nums text-gray-900">
+                  {formatLeaderboardBalance(row.balance)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Modal>
 
       <Modal isOpen={modal === "terms"} onClose={close} closeAriaLabel={text.closeModalAria} dir={dir}>
