@@ -484,7 +484,7 @@ export default function Ov2CcScreen({
           <button
             type="button"
             disabled={operateBusy}
-            className="min-h-[48px] rounded-lg border border-rose-600/45 bg-rose-950/50 py-2.5 text-xs font-bold text-rose-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.34] disabled:saturate-50"
+            className="min-h-[48px] rounded-lg border border-rose-600/45 bg-rose-950/50 py-2.5 text-xs font-bold text-rose-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
             onClick={() => void runGameOp("fold")}
           >
             Fold
@@ -492,7 +492,7 @@ export default function Ov2CcScreen({
           <button
             type="button"
             disabled={operateBusy || canCallChips}
-            className="min-h-[48px] rounded-lg border border-zinc-500/40 bg-zinc-800/50 py-2.5 text-xs font-bold text-zinc-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.34] disabled:saturate-50"
+            className="min-h-[48px] rounded-lg border border-emerald-600/45 bg-emerald-950/50 py-2.5 text-xs font-bold text-emerald-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
             onClick={() => void runGameOp("check")}
           >
             Check
@@ -500,7 +500,7 @@ export default function Ov2CcScreen({
           <button
             type="button"
             disabled={operateBusy || !canCallChips}
-            className="min-h-[48px] rounded-lg border border-blue-600/45 bg-blue-950/50 py-2.5 text-xs font-bold text-blue-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3] disabled:saturate-[0.55]"
+            className="min-h-[48px] rounded-lg border border-blue-600/45 bg-blue-950/50 py-2.5 text-xs font-bold text-blue-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3] disabled:saturate-[0.55] disabled:brightness-95"
             onClick={() => {
               if (!canCallChips) return;
               void runGameOp("call");
@@ -512,7 +512,7 @@ export default function Ov2CcScreen({
             <button
               type="button"
               disabled={operateBusy}
-              className="min-h-[48px] rounded-lg border border-purple-600/45 bg-purple-950/50 py-2.5 text-xs font-bold text-purple-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.34] disabled:saturate-50"
+              className="min-h-[48px] rounded-lg border border-purple-600/45 bg-purple-950/50 py-2.5 text-xs font-bold text-purple-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
               onClick={() => void runGameOp("bet", { amount: bb })}
             >
               Bet {bb}
@@ -521,7 +521,7 @@ export default function Ov2CcScreen({
             <button
               type="button"
               disabled={operateBusy || !canMinRaiseBtn}
-              className="min-h-[48px] rounded-lg border border-violet-600/45 bg-violet-950/50 py-2.5 text-xs font-bold text-violet-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.34] disabled:saturate-50"
+              className="min-h-[48px] rounded-lg border border-violet-600/45 bg-violet-950/50 py-2.5 text-xs font-bold text-violet-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
               onClick={() => void runGameOp("raise", { amount: minRaiseChips })}
             >
               Raise +{minRaiseChips}
@@ -530,7 +530,7 @@ export default function Ov2CcScreen({
           <button
             type="button"
             disabled={operateBusy || !canQuickBumpBtn}
-            className="min-h-[48px] rounded-lg border border-indigo-600/45 bg-indigo-950/50 py-2.5 text-xs font-bold text-indigo-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.34] disabled:saturate-50"
+            className="min-h-[48px] rounded-lg border border-indigo-600/45 bg-indigo-950/50 py-2.5 text-xs font-bold text-indigo-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
             onClick={() => {
               const op = curBet === 0 && toCall === 0 ? "bet" : "raise";
               void runGameOp(op, { amount: quickAmount });
@@ -541,7 +541,7 @@ export default function Ov2CcScreen({
           <button
             type="button"
             disabled={operateBusy}
-            className="min-h-[48px] rounded-lg border border-orange-500/45 bg-orange-950/45 py-2.5 text-xs font-bold text-orange-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.34] disabled:saturate-50"
+            className="min-h-[48px] rounded-lg border border-amber-500/45 bg-amber-950/50 py-2.5 text-xs font-bold text-amber-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
             onClick={() => void runGameOp("all_in")}
           >
             All-in
