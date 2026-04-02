@@ -10,6 +10,7 @@ import {
   fetchOv2LudoAuthoritativeSnapshot,
   requestOv2LudoOpenSession,
 } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
+import { openOv2BingoSession, OV2_BINGO_PRODUCT_GAME_ID } from "../../../lib/online-v2/bingo/ov2BingoSessionAdapter";
 import { openOv2Rummy51Session, OV2_RUMMY51_PRODUCT_GAME_ID } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
 import {
   commitOv2RoomStake,
@@ -86,6 +87,8 @@ export default function Ov2SharedRoomScreen({
   const joinedCount = useMemo(() => members.length, [members]);
   const isLudoRoom = room?.product_game_id === "ov2_ludo";
   const isRummy51Room = String(room?.product_game_id || "").trim() === OV2_RUMMY51_PRODUCT_GAME_ID;
+  const isBingoRoom = String(room?.product_game_id || "").trim() === OV2_BINGO_PRODUCT_GAME_ID;
+  const isStakeSharedRoom = isRummy51Room || isLudoRoom || isBingoRoom;
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
 
   const ledgerByParticipant = useMemo(() => {
@@ -100,15 +103,15 @@ export default function Ov2SharedRoomScreen({
   const seatedStakeBlockersPreview = useMemo(() => seatedPlayersNotStakeCommitted(ledgerMembers), [ledgerMembers]);
 
   const sharedLedgerSynced = useMemo(() => {
-    if (!(isRummy51Room || isLudoRoom) || ledgerErr) return false;
+    if (!isStakeSharedRoom || ledgerErr) return false;
     if (!members.length) return true;
     return ledgerMembers.length >= members.length;
-  }, [isRummy51Room, isLudoRoom, ledgerErr, members.length, ledgerMembers.length]);
+  }, [isStakeSharedRoom, ledgerErr, members.length, ledgerMembers.length]);
 
   useEffect(() => {
-    if (!roomId || !(isRummy51Room || isLudoRoom)) return;
+    if (!roomId || !isStakeSharedRoom) return;
     void refreshSharedEconomySnapshot();
-  }, [roomId, isRummy51Room, isLudoRoom, lastLoadedAt, refreshSharedEconomySnapshot]);
+  }, [roomId, isStakeSharedRoom, lastLoadedAt, refreshSharedEconomySnapshot]);
 
   useEffect(() => {
     autoJoinPublicAttemptedRef.current = false;
@@ -151,11 +154,11 @@ export default function Ov2SharedRoomScreen({
 
   const sharedPreStartStrict = useMemo(
     () =>
-      (isRummy51Room || isLudoRoom) &&
+      isStakeSharedRoom &&
       sharedStatusUpper === "OPEN" &&
       canonicalStatusUpper === "OPEN" &&
       Boolean(canonicalRoom),
-    [isRummy51Room, isLudoRoom, sharedStatusUpper, canonicalStatusUpper, canonicalRoom]
+    [isStakeSharedRoom, sharedStatusUpper, canonicalStatusUpper, canonicalRoom]
   );
 
   const myPk = String(participantId || "").trim();
@@ -368,7 +371,7 @@ export default function Ov2SharedRoomScreen({
     try {
       await claimOv2Seat({ room_id: roomId, participant_key: participantId, seat_index: seatIndex });
       await reload();
-      if (isRummy51Room || isLudoRoom) {
+      if (isStakeSharedRoom) {
         try {
           await setOv2MemberReady({ room_id: roomId, participant_key: participantId, is_ready: true });
         } catch {
@@ -422,7 +425,7 @@ export default function Ov2SharedRoomScreen({
     setBusy(true);
     setMsg("");
     try {
-      if (isLudoRoom) {
+      if (isLudoRoom || isBingoRoom) {
         const prep = await prepareSharedHostPreStartStakes();
         if (!prep.ok) {
           setMsg(prep.error);
@@ -445,6 +448,17 @@ export default function Ov2SharedRoomScreen({
         didRouteToLiveRef.current = true;
         setLaunchingLive(true);
         await router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isBingoRoom) {
+        const open = await openOv2BingoSession(roomId, participantId);
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Bingo session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-bingo?room=${encodeURIComponent(roomId)}`);
         return;
       }
       await reload();
@@ -496,6 +510,31 @@ export default function Ov2SharedRoomScreen({
       };
     }
 
+    if (isBingoRoom) {
+      let cancelled = false;
+      let intervalId = null;
+      const tick = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId);
+          if (cancelled || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalId) clearInterval(intervalId);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-bingo?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tick();
+      intervalId = setInterval(() => void tick(), 2500);
+      return () => {
+        cancelled = true;
+        if (intervalId) clearInterval(intervalId);
+      };
+    }
+
     if (!liveRuntimeId) return;
     if (isLudoRoom) {
       const ludoSid = room?.active_session_id || null;
@@ -522,6 +561,7 @@ export default function Ov2SharedRoomScreen({
   }, [
     isLudoRoom,
     isRummy51Room,
+    isBingoRoom,
     room?.status,
     room?.active_session_id,
     liveRuntimeId,
@@ -542,7 +582,7 @@ export default function Ov2SharedRoomScreen({
 
   const sharedSeated = me?.seat_index != null && me?.seat_index !== "";
   const showNonHostJoinBtn =
-    (isRummy51Room || isLudoRoom) &&
+    isStakeSharedRoom &&
     sharedPreStartStrict &&
     !isHost &&
     sharedSeated &&
@@ -552,7 +592,7 @@ export default function Ov2SharedRoomScreen({
     !ledgerErr;
 
   const showNonHostWaitingLobby =
-    (isRummy51Room || isLudoRoom) &&
+    isStakeSharedRoom &&
     sharedPreStartStrict &&
     !isHost &&
     sharedSeated &&
@@ -561,7 +601,7 @@ export default function Ov2SharedRoomScreen({
     sharedLedgerSynced;
 
   const showHostStartBtn =
-    (isRummy51Room || isLudoRoom) &&
+    isStakeSharedRoom &&
     sharedPreStartStrict &&
     isHost &&
     sharedSeated &&
@@ -569,7 +609,7 @@ export default function Ov2SharedRoomScreen({
     !ledgerErr;
 
   const sharedSecondFooterSlot =
-    (isRummy51Room || isLudoRoom) && sharedStatusUpper === "OPEN" ? (
+    isStakeSharedRoom && sharedStatusUpper === "OPEN" ? (
       !sharedSeated ? (
         <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-500">
           Pick a seat
@@ -658,7 +698,7 @@ export default function Ov2SharedRoomScreen({
             const ledgerRow = pk ? ledgerByParticipant.get(pk) : null;
             const ws = ledgerRow ? String(ledgerRow.wallet_state ?? "").trim() : "";
             const stakeLabel =
-              (isRummy51Room || isLudoRoom) && m.seat_index != null
+              isStakeSharedRoom && m.seat_index != null
                 ? ws === "committed"
                   ? "stake committed"
                   : ws
@@ -682,7 +722,7 @@ export default function Ov2SharedRoomScreen({
             );
           })}
         </ul>
-        {(isRummy51Room || isLudoRoom) && ledgerErr ? (
+        {isStakeSharedRoom && ledgerErr ? (
           <p className="mt-2 text-[11px] text-red-300">Room sync: {ledgerErr}</p>
         ) : null}
 
@@ -699,7 +739,7 @@ export default function Ov2SharedRoomScreen({
           </div>
         ) : null}
 
-        {(isRummy51Room || isLudoRoom) && sharedStatusUpper === "IN_GAME" && seatedStakeBlockersPreview.length ? (
+        {isStakeSharedRoom && sharedStatusUpper === "IN_GAME" && seatedStakeBlockersPreview.length ? (
           <div className="mt-3 rounded-xl border border-rose-500/35 bg-rose-950/25 p-3 text-[11px] text-rose-100">
             <p className="font-semibold text-rose-50">Stake state incomplete</p>
             <p className="mt-1 text-rose-200/90">{formatSeatedStakeBlockers(seatedStakeBlockersPreview)}</p>
@@ -707,7 +747,7 @@ export default function Ov2SharedRoomScreen({
         ) : null}
 
         {runtimeHandoff && !isRummy51Room ? (
-          !isLudoRoom ? (
+          !isLudoRoom && !isBingoRoom ? (
             <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
               <div className="font-bold">Runtime handoff ready</div>
               <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
@@ -716,7 +756,7 @@ export default function Ov2SharedRoomScreen({
             </div>
           ) : null
         ) : null}
-        {sharedStatusUpper === "IN_GAME" && isRummy51Room && !launchingLive ? (
+        {sharedStatusUpper === "IN_GAME" && (isRummy51Room || isBingoRoom) && !launchingLive ? (
           <div className="mt-3 rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
             <p className="font-semibold text-teal-50">Match starting</p>
             <p className="mt-1 text-teal-200/90">
@@ -735,7 +775,7 @@ export default function Ov2SharedRoomScreen({
         >
           Leave room
         </button>
-        {sharedStatusUpper === "OPEN" && (isRummy51Room || isLudoRoom) ? (
+        {sharedStatusUpper === "OPEN" && isStakeSharedRoom ? (
           sharedSecondFooterSlot
         ) : sharedStatusUpper === "OPEN" ? (
           <button
@@ -746,7 +786,7 @@ export default function Ov2SharedRoomScreen({
           >
             Start
           </button>
-        ) : sharedStatusUpper === "IN_GAME" && (isRummy51Room || isLudoRoom) ? (
+        ) : sharedStatusUpper === "IN_GAME" && isStakeSharedRoom ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-400">
             {launchingLive ? "Opening…" : "Waiting for live session…"}
           </div>
@@ -765,7 +805,7 @@ export default function Ov2SharedRoomScreen({
         {loading ? <p className="text-[11px] text-zinc-500">Loading room...</p> : null}
         {launchingLive ? (
           <p className="text-[11px] text-sky-300">
-            {isRummy51Room ? "Opening live Rummy 51 game..." : "Opening live Ludo game..."}
+            {isRummy51Room ? "Opening live Rummy 51 game..." : isBingoRoom ? "Opening live Bingo..." : "Opening live Ludo game..."}
           </p>
         ) : null}
         {error ? <p className="text-[11px] text-red-300">{error}</p> : null}

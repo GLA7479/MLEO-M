@@ -26,7 +26,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
   const isRoomShell = vm.playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
   const isLiveMatch = vm.playMode === OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE;
   const stripTone = isLiveMatch ? "emerald" : isRoomShell ? "amber" : "neutral";
-  const stripTitle = isLiveMatch ? "Bingo · live" : isRoomShell ? "Bingo · room" : "Bingo · local preview";
+  const stripTitle = isLiveMatch ? "Bingo · live" : isRoomShell ? "Bingo · room" : "Bingo";
 
   const prizeLabels = useMemo(
     () => ({
@@ -188,11 +188,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 rounded-lg border border-white/10 bg-black/30 px-1.5 py-1">
           <div className="mr-auto text-[10px] text-zinc-500">
             Deck {vm.deckRemaining}/{vm.deckTotal}
-            {vm.previewLine?.isFull
-              ? " · board full (preview)"
-              : vm.previewLine?.hasAnyRow
-                ? " · row complete (preview)"
-                : ""}
+            {vm.previewLine?.isFull ? " · board full" : vm.previewLine?.hasAnyRow ? " · row complete" : ""}
           </div>
           <button
             type="button"
@@ -254,7 +250,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
                 </div>
               ) : (
                 <p className="text-[9px] text-zinc-500 sm:text-[10px]">
-                  {vm.isLive ? "Waiting for the caller to draw." : "Use “Call next” in preview to draw numbers."}
+                  {vm.isLive ? "Waiting for the caller to draw." : "Join a Bingo room from Shared rooms to play live."}
                 </p>
               )}
             </div>

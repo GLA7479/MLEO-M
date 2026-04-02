@@ -10,7 +10,10 @@ export function useOv2LiveShellFatalRoomRedirect(router, roomId, loadError) {
     if (!router.isReady || !roomId || !loadError) return;
     const err = String(loadError).toLowerCase();
     const fatal =
-      err.includes("not found") || err.includes("not a ludo") || err.includes("not a rummy");
+      err.includes("not found") ||
+      err.includes("not a ludo") ||
+      err.includes("not a rummy") ||
+      err.includes("not a bingo");
     if (!fatal) return;
     clearOv2SharedLastRoomSessionKey();
     const t = window.setTimeout(() => void router.replace("/online-v2/rooms"), 700);

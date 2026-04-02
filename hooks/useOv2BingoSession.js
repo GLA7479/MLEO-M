@@ -27,6 +27,7 @@ import {
   startOv2BingoNextMatch,
   subscribeOv2BingoAuthoritativeSnapshot,
 } from "../lib/online-v2/bingo/ov2BingoSessionAdapter";
+import { creditOnlineV2VaultForSettlementLine } from "../lib/online-v2/onlineV2VaultBridge";
 
 /** @typedef {import("../lib/online-v2/bingo/ov2BingoSessionAdapter").Ov2BingoAuthoritativeSnapshot} Ov2BingoAuthoritativeSnapshot */
 
@@ -197,6 +198,7 @@ export function useOv2BingoSession(baseContext) {
   }, [liveSnapshot, nextCallDue]);
 
   useEffect(() => {
+    if (!roomId) return;
     if (playMode !== OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE || !liveSnapshot || !selfKey) return;
     if (liveSnapshot.sessionPhase !== "playing") return;
     if (!canCallNextNow || callInFlightRef.current) return;
@@ -240,7 +242,7 @@ export function useOv2BingoSession(baseContext) {
 
   const onCellClick = useCallback(
     n => {
-      if (playMode === OV2_BINGO_PLAY_MODE.PREVIEW_LOCAL || playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET) {
+      if (playMode === OV2_BINGO_PLAY_MODE.PREVIEW_LOCAL) {
         setPreviewRound(prev => {
           const { marks: next, changed } = applyPreviewMark(previewCard, prev.marks, n, new Set(prev.called));
           if (!changed) return prev;
@@ -284,8 +286,20 @@ export function useOv2BingoSession(baseContext) {
   const claimPrize = useCallback(
     async prizeKey => {
       if (!roomId || !selfKey || !liveSnapshot) return { ok: false, error: "Not ready" };
-      const r = await claimOv2BingoPrize(roomId, prizeKey, selfKey, liveSnapshot.revision);
-      if (r.ok && "snapshot" in r && r.snapshot) setLiveSnapshot(r.snapshot);
+      const pk = String(prizeKey ?? "").trim();
+      const r = await claimOv2BingoPrize(roomId, pk, selfKey, liveSnapshot.revision);
+      if (r.ok && "snapshot" in r && r.snapshot) {
+        setLiveSnapshot(r.snapshot);
+        const snap = r.snapshot;
+        const claims = Array.isArray(snap.claims) ? snap.claims : [];
+        const just = claims.filter(c => c.claimedByParticipantKey === selfKey && c.prizeKey === pk).pop();
+        const amt = just && typeof just.amount === "number" ? just.amount : Number(just?.amount);
+        const cid = just?.id != null ? String(just.id).trim() : "";
+        if (cid && Number.isFinite(amt) && amt > 0) {
+          const idem = `ov2:bingo:settle:${cid}`;
+          void creditOnlineV2VaultForSettlementLine(Math.floor(amt), OV2_BINGO_PRODUCT_GAME_ID, idem);
+        }
+      }
       await refreshLiveSnapshot();
       return r;
     },
@@ -332,39 +346,82 @@ export function useOv2BingoSession(baseContext) {
   }, [liveSnapshot, members]);
 
   const vm = useMemo(() => {
-    const previewCalledSet = new Set(previewRound.called);
-    const previewLast = previewRound.called.length ? previewRound.called[previewRound.called.length - 1] : null;
-
-    /** @type {Record<string, string|null>} */
-    const previewPrizeDisabled = {};
-    for (const pk of BINGO_PRIZE_KEYS) {
-      previewPrizeDisabled[pk] = "Claims are validated in live matches only";
+    if (playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET) {
+      const life = room?.lifecycle_phase != null ? String(room.lifecycle_phase) : "";
+      let phaseLine = "Waiting for the host to open a Bingo match.";
+      if (life === "lobby") phaseLine = "Waiting for players — the host must start the match from the lobby.";
+      else if (life === "pending_start" || life === "pending_stakes") phaseLine = "Waiting for stake commits from all players.";
+      else if (life === "active")
+        phaseLine = liveSnapshot?.canOpenSession
+          ? "Room is ready — the host can open Bingo when at least two players are seated and staked."
+          : "Waiting for the host to open Bingo.";
+      /** @type {Record<string, string|null>} */
+      const roomNoMatchPrizeDisabled = {};
+      for (const pk of BINGO_PRIZE_KEYS) {
+        roomNoMatchPrizeDisabled[pk] = "No active Bingo round yet";
+      }
+      const emptyMarks = makeEmptyMarks();
+      return {
+        playMode,
+        isLive: true,
+        card: previewCard,
+        marks: emptyMarks,
+        called: /** @type {number[]} */ ([]),
+        calledSet: new Set(),
+        lastCalled: null,
+        phaseLine,
+        deckRemaining: previewDeck.length,
+        deckTotal: previewDeck.length,
+        previewLine: { completedRowIndexes: [], hasAnyRow: false, isFull: false },
+        authoritativeSnapshot: liveSnapshot,
+        revision: liveSnapshot?.revision ?? 0,
+        nextCallAtIso: liveSnapshot?.nextCallAtIso ?? null,
+        msUntilNextCall: null,
+        announcement: null,
+        winner: null,
+        availablePrizeKeys: [],
+        claims: [],
+        membersVm,
+        wonPrizeKeys: [],
+        selfClaimedPrizeKeys: [],
+        prizeDisabledByKey: roomNoMatchPrizeDisabled,
+        roomLifecyclePhase: life || null,
+        roomActiveSessionId: room?.active_session_id != null ? String(room.active_session_id) : null,
+        callerSeatIndex: liveSnapshot?.callerSeatIndex ?? null,
+        callerParticipantKey: liveSnapshot?.callerParticipantKey ?? null,
+        sessionPhase: liveSnapshot?.sessionPhase ?? null,
+        canOpenSession: liveSnapshot?.canOpenSession ?? false,
+        canCallNext: false,
+        canCallNextNow: false,
+        canClaimAnyPrize: false,
+        canRequestRematch: false,
+        canCancelRematch: false,
+        canStartNextMatch: false,
+        cardIsAuthoritative: false,
+        disabledReasons: {
+          openSession: !selfKey ? "No participant id" : liveSnapshot && !liveSnapshot.canOpenSession ? "Cannot open now" : null,
+          callNext: "Calls start after the host opens the round.",
+          claim: "No live match",
+          rematch: "No finished match",
+          startNextMatch: "Not host or not ready",
+        },
+      };
     }
 
-    if (playMode === OV2_BINGO_PLAY_MODE.PREVIEW_LOCAL || playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET) {
+    if (playMode === OV2_BINGO_PLAY_MODE.PREVIEW_LOCAL) {
       const linePreview = computePreviewLineCompletion(previewRound.marks);
-      const life = room?.lifecycle_phase != null ? String(room.lifecycle_phase) : "";
-      let phaseLine =
-        playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET
-          ? "Waiting for the host to open a Bingo match."
-          : "Local preview — practice board and calls only (not authoritative).";
-      if (playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET) {
-        if (life === "lobby") phaseLine = "Waiting for players — the host must start the match from the lobby.";
-        else if (life === "pending_start" || life === "pending_stakes") phaseLine = "Waiting for stake commits from all players.";
-        else if (life === "active")
-          phaseLine = liveSnapshot?.canOpenSession
-            ? "Room is ready — the host can open Bingo when at least two players are seated and staked."
-            : "Waiting for the host to open Bingo.";
-      }
+      const previewCalledSet = new Set(previewRound.called);
+      const previewLast = previewRound.called.length ? previewRound.called[previewRound.called.length - 1] : null;
+      let phaseLine = "Open Shared rooms to play Bingo online.";
       const previewAvail = getAvailablePrizeKeys({
         card: previewCard,
         called: previewRound.called,
         existingClaims: [],
       });
       /** @type {Record<string, string|null>} */
-      const roomNoMatchPrizeDisabled = {};
+      const previewPrizeDisabled = {};
       for (const pk of BINGO_PRIZE_KEYS) {
-        roomNoMatchPrizeDisabled[pk] = "No active Bingo round yet";
+        previewPrizeDisabled[pk] = "Not in a live Bingo room";
       }
       const wonPreview = new Set(getWonRowKeys(previewCard, previewRound.called));
       if (isFullWonByCalls(previewCard, previewRound.called)) wonPreview.add("full");
@@ -387,18 +444,18 @@ export function useOv2BingoSession(baseContext) {
         msUntilNextCall: null,
         announcement: null,
         winner: null,
-        availablePrizeKeys: playMode === OV2_BINGO_PLAY_MODE.PREVIEW_LOCAL ? previewAvail : [],
+        availablePrizeKeys: previewAvail,
         claims: [],
         membersVm,
         wonPrizeKeys: [...wonPreview],
         selfClaimedPrizeKeys: [],
-        prizeDisabledByKey: playMode === OV2_BINGO_PLAY_MODE.PREVIEW_LOCAL ? previewPrizeDisabled : roomNoMatchPrizeDisabled,
-        roomLifecyclePhase: life || null,
-        roomActiveSessionId: room?.active_session_id != null ? String(room.active_session_id) : null,
+        prizeDisabledByKey: previewPrizeDisabled,
+        roomLifecyclePhase: null,
+        roomActiveSessionId: null,
         callerSeatIndex: liveSnapshot?.callerSeatIndex ?? null,
         callerParticipantKey: liveSnapshot?.callerParticipantKey ?? null,
         sessionPhase: liveSnapshot?.sessionPhase ?? null,
-        canOpenSession: liveSnapshot?.canOpenSession ?? false,
+        canOpenSession: false,
         canCallNext: false,
         canCallNextNow: false,
         canClaimAnyPrize: false,
@@ -407,8 +464,8 @@ export function useOv2BingoSession(baseContext) {
         canStartNextMatch: false,
         cardIsAuthoritative: false,
         disabledReasons: {
-          openSession: !selfKey ? "No participant id" : liveSnapshot && !liveSnapshot.canOpenSession ? "Cannot open now" : null,
-          callNext: "Use preview Call next in this mode",
+          openSession: "Not connected to a room",
+          callNext: "Not connected to a room",
           claim: "No live match",
           rematch: "No finished match",
           startNextMatch: "Not host or not ready",
