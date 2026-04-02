@@ -22,6 +22,10 @@ function parseRoomQueryParam(q) {
   return String(s).trim();
 }
 
+/** Bingo-only: suppress accidental text selection / iOS long-press callout; keep inputs editable. */
+const OV2_BINGO_NONSELECT_ROOT =
+  "select-none [-webkit-touch-callout:none] [-webkit-user-select:none] [&_input]:select-text [&_textarea]:select-text [&_[contenteditable]]:select-text";
+
 /**
  * Route shell: requires `?room=` (Bingo product). No valid room → shared rooms.
  */
@@ -165,69 +169,73 @@ export default function Ov2BingoLiveShell() {
 
   if (!roomId) {
     return (
-      <OnlineV2GamePageShell title="Bingo" showSubtitle={false} infoPanel={null}>
-        <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-sm text-zinc-400">
-          {router.isReady ? "Opening rooms…" : "Loading…"}
-        </div>
-      </OnlineV2GamePageShell>
+      <div className={OV2_BINGO_NONSELECT_ROOT}>
+        <OnlineV2GamePageShell title="Bingo" showSubtitle={false} infoPanel={null}>
+          <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-sm text-zinc-400">
+            {router.isReady ? "Opening rooms…" : "Loading…"}
+          </div>
+        </OnlineV2GamePageShell>
+      </div>
     );
   }
 
   return (
-    <OnlineV2GamePageShell
-      title="Bingo"
-      showSubtitle={false}
-      infoPanel={
-        <>
-          <p>
-            Live Bingo for this room. Calls and claims are validated on the server. The host opens the round when the room
-            is active and seated players are ready.
-          </p>
-          <p className="mt-2 text-[11px] text-zinc-500">
-            <Link href="/online-v2/rooms" className="text-sky-300 underline">
-              Lobby
+    <div className={OV2_BINGO_NONSELECT_ROOT}>
+      <OnlineV2GamePageShell
+        title="Bingo"
+        showSubtitle={false}
+        infoPanel={
+          <>
+            <p>
+              Live Bingo for this room. Calls and claims are validated on the server. The host opens the round when the room
+              is active and seated players are ready.
+            </p>
+            <p className="mt-2 text-[11px] text-zinc-500">
+              <Link href="/online-v2/rooms" className="text-sky-300 underline">
+                Lobby
+              </Link>
+              {" · "}
+              <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
+                Refresh
+              </button>
+              {" · "}
+              <button
+                type="button"
+                disabled={leaveBusy || !participantId}
+                className="text-sky-300 underline disabled:opacity-45"
+                onClick={() => void onLeaveTable()}
+              >
+                {leaveBusy ? "Leaving…" : "Leave game"}
+              </button>
+              {leaveErr ? <span className="ml-1 text-red-300">{leaveErr}</span> : null}
+            </p>
+          </>
+        }
+      >
+        {roomId && loadError && !room ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-2 text-center">
+            <p className="text-sm text-red-200">{loadError}</p>
+            <Link href="/online-v2/rooms" className="text-xs text-sky-300 underline">
+              Back to rooms
             </Link>
-            {" · "}
-            <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
-              Refresh
-            </button>
-            {" · "}
-            <button
-              type="button"
-              disabled={leaveBusy || !participantId}
-              className="text-sky-300 underline disabled:opacity-45"
-              onClick={() => void onLeaveTable()}
-            >
-              {leaveBusy ? "Leaving…" : "Leave game"}
-            </button>
-            {leaveErr ? <span className="ml-1 text-red-300">{leaveErr}</span> : null}
-          </p>
-        </>
-      }
-    >
-      {roomId && loadError && !room ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-2 text-center">
-          <p className="text-sm text-red-200">{loadError}</p>
-          <Link href="/online-v2/rooms" className="text-xs text-sky-300 underline">
-            Back to rooms
-          </Link>
-        </div>
-      ) : roomId && loading && !room ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-zinc-400">Loading room…</div>
-      ) : room && contextInput ? (
-        <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <Ov2BingoScreen contextInput={contextInput} />
           </div>
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-sm text-zinc-400">
-          Could not load this Bingo room.
-          <Link href="/online-v2/rooms" className="mt-2 block text-xs text-sky-300 underline">
-            Back to rooms
-          </Link>
-        </div>
-      )}
-    </OnlineV2GamePageShell>
+        ) : roomId && loading && !room ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-zinc-400">Loading room…</div>
+        ) : room && contextInput ? (
+          <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <Ov2BingoScreen contextInput={contextInput} />
+            </div>
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-sm text-zinc-400">
+            Could not load this Bingo room.
+            <Link href="/online-v2/rooms" className="mt-2 block text-xs text-sky-300 underline">
+              Back to rooms
+            </Link>
+          </div>
+        )}
+      </OnlineV2GamePageShell>
+    </div>
   );
 }
