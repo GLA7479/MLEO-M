@@ -1,10 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatCardShort, handTotal, splitCardCode } from "../../../lib/solo-v2/challenge21HandMath";
+import { handTotal, splitCardCode } from "../../../lib/solo-v2/challenge21HandMath";
 import { getOv2C21LegalFlags } from "../../../lib/online-v2/c21/ov2C21LegalMoves";
-
-const SEAT_RING = ["ring-emerald-400", "ring-sky-400", "ring-violet-400", "ring-fuchsia-400", "ring-amber-400", "ring-slate-400"];
 
 function fmt(n) {
   const x = Math.floor(Number(n) || 0);
@@ -82,8 +80,8 @@ function PlayingCardOv2({ code, hidden, handCardCount = 1, seatFit = null }) {
     const n = Math.max(0, Math.floor(Number(handCardCount) || 0));
     const crowded = n >= 4;
     classSize = crowded
-      ? "h-[2.95rem] w-[2.05rem] sm:h-[3.2rem] sm:w-[2.35rem]"
-      : "h-[4.2rem] w-[2.95rem] sm:h-[4rem] sm:w-[2.85rem]";
+      ? "h-[2.95rem] w-[2.05rem] sm:h-[3.35rem] sm:w-[2.45rem]"
+      : "h-[4.35rem] w-[3.05rem] sm:h-[4.55rem] sm:w-[3.2rem]";
     compactFallback = crowded;
   }
 
@@ -140,7 +138,7 @@ function PlayingCardOv2({ code, hidden, handCardCount = 1, seatFit = null }) {
   );
 }
 
-/** Width/height in rem + gap/overlap px for seat row auto-fit. */
+/** Width/height in rem + gap/overlap px for hand row auto-fit. */
 const SEAT_HAND_TIERS = [
   { wRem: 3.02, hRem: 4.45, compactFallback: false },
   { wRem: 2.68, hRem: 3.92, compactFallback: false },
@@ -150,16 +148,37 @@ const SEAT_HAND_TIERS = [
   { wRem: 1.5, hRem: 2.14, compactFallback: true },
 ];
 
-function pickSeatHandLayout(availPx, cardCount) {
+/** Primary player hand under HOUSE — larger tiers than table seats. */
+const MY_HAND_TIERS = [
+  { wRem: 3.45, hRem: 5.05, compactFallback: false },
+  { wRem: 3.05, hRem: 4.45, compactFallback: false },
+  { wRem: 2.65, hRem: 3.88, compactFallback: true },
+  { wRem: 2.3, hRem: 3.35, compactFallback: true },
+  { wRem: 2.0, hRem: 2.9, compactFallback: true },
+  { wRem: 1.72, hRem: 2.5, compactFallback: true },
+];
+
+/** Other players — compact observer windows. */
+const OTHER_HAND_TIERS = [
+  { wRem: 2.38, hRem: 3.45, compactFallback: false },
+  { wRem: 2.08, hRem: 3.02, compactFallback: true },
+  { wRem: 1.82, hRem: 2.62, compactFallback: true },
+  { wRem: 1.58, hRem: 2.28, compactFallback: true },
+  { wRem: 1.38, hRem: 1.98, compactFallback: true },
+  { wRem: 1.2, hRem: 1.72, compactFallback: true },
+];
+
+function pickSeatHandLayout(availPx, cardCount, tiers = SEAT_HAND_TIERS) {
   const n = Math.max(0, Math.floor(cardCount) || 0);
+  const first = tiers[0] || SEAT_HAND_TIERS[0];
   if (n <= 0 || availPx <= 4) {
-    return { wRem: 3.02, hRem: 4.45, gapPx: 3, overlapPx: 0, compactFallback: false };
+    return { wRem: first.wRem, hRem: first.hRem, gapPx: 3, overlapPx: 0, compactFallback: Boolean(first.compactFallback) };
   }
   const gaps = Math.max(0, n - 1);
   const rootPx = typeof window !== "undefined" ? parseFloat(getComputedStyle(document.documentElement).fontSize) || 16 : 16;
 
   for (let g = 4; g >= 2; g -= 2) {
-    for (const tier of SEAT_HAND_TIERS) {
+    for (const tier of tiers) {
       const wPx = tier.wRem * rootPx;
       const total = n * wPx + gaps * g;
       if (total <= availPx) {
@@ -168,7 +187,7 @@ function pickSeatHandLayout(availPx, cardCount) {
     }
   }
 
-  const smallest = SEAT_HAND_TIERS[SEAT_HAND_TIERS.length - 1];
+  const smallest = tiers[tiers.length - 1];
   let wRem = smallest.wRem;
   let hRem = smallest.hRem;
   const wPx0 = wRem * rootPx;
@@ -194,9 +213,9 @@ function pickSeatHandLayout(availPx, cardCount) {
   return { wRem, hRem, gapPx: minGap, overlapPx, compactFallback: true };
 }
 
-function SeatHandRow({ hand, handKey }) {
+function SeatHandRow({ hand, handKey, tiers = SEAT_HAND_TIERS }) {
   const rowRef = useRef(null);
-  const [layout, setLayout] = useState(() => pickSeatHandLayout(200, (hand || []).length));
+  const [layout, setLayout] = useState(() => pickSeatHandLayout(200, (hand || []).length, tiers));
   const cards = hand || [];
   const n = cards.length;
 
@@ -205,13 +224,13 @@ function SeatHandRow({ hand, handKey }) {
     if (!el || n < 1) return undefined;
     const run = () => {
       const w = el.clientWidth;
-      setLayout(pickSeatHandLayout(w, n));
+      setLayout(pickSeatHandLayout(w, n, tiers));
     };
     run();
     const ro = new ResizeObserver(run);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [n, handKey]);
+  }, [n, handKey, tiers]);
 
   if (n < 1) return null;
 
@@ -297,6 +316,14 @@ export default function Ov2C21Screen({
     if (!participantKey) return null;
     return seatsForUi.find(s => s.participantKey === participantKey) || null;
   }, [seatsForUi, participantKey]);
+
+  const mySeatIndex = mySeat?.seatIndex;
+  const otherSeatIndices = useMemo(() => {
+    if (mySeatIndex != null && mySeatIndex >= 0 && mySeatIndex < 6) {
+      return [0, 1, 2, 3, 4, 5].filter(i => i !== mySeatIndex);
+    }
+    return [0, 1, 2, 3, 4, 5];
+  }, [mySeatIndex]);
 
   const intendedBetFloor = Math.floor(Number(mySeat?.intendedBet) || 0);
 
@@ -498,8 +525,8 @@ export default function Ov2C21Screen({
       ) : null}
       {/* Board scrolls on small viewports; controls stay in bottom dock */}
       <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden overscroll-y-contain sm:overflow-hidden">
-        {/* Dealer — +50% height on mobile vs prior 5.85rem; fixed per breakpoint */}
-        <div className="relative flex h-[8.775rem] shrink-0 flex-col rounded-xl border border-amber-900/40 bg-gradient-to-b from-zinc-900/90 to-black/60 px-1.5 py-1 sm:h-[5.85rem]">
+        {/* HOUSE — same height as MY HAND; larger on desktop */}
+        <div className="relative flex h-[8.775rem] shrink-0 flex-col rounded-xl border border-amber-900/40 bg-gradient-to-b from-zinc-900/90 to-black/60 px-1.5 py-1 sm:h-[7.75rem]">
           <div
             className="pointer-events-none absolute right-1.5 top-0.5 z-10 min-w-[1.75rem] text-right tabular-nums text-[17px] font-black leading-none tracking-tight text-amber-100 drop-shadow-md sm:text-xl"
             aria-live="polite"
@@ -540,41 +567,62 @@ export default function Ov2C21Screen({
           )}
         </div>
 
-        {/* Seats — +25% height on mobile vs prior 9.25rem; fixed grid */}
-        <div className="grid h-[11.5625rem] shrink-0 grid-cols-3 gap-1 sm:h-[9.25rem] sm:grid-cols-6 sm:gap-1.5">
-          {seatsForUi.map((seat, idx) => {
-            const taken = Boolean(seat.participantKey);
-            const mine = seat.participantKey === participantKey;
-            const ring = SEAT_RING[idx % SEAT_RING.length];
+        {/* MY HAND — fixed height = HOUSE; primary card area */}
+        <div className="relative flex h-[8.775rem] shrink-0 flex-col rounded-xl border border-emerald-800/35 bg-gradient-to-b from-zinc-900/88 to-black/58 px-1.5 py-1 sm:h-[7.75rem]">
+          <div className="shrink-0 text-center text-[10px] font-bold uppercase tracking-wide text-emerald-200/85">Your hand</div>
+          <div className="flex min-h-0 flex-1 flex-col justify-center gap-px overflow-hidden px-0.5">
+            {mySeat ? (
+              mySeat.hands?.length ? (
+                mySeat.hands.map((h, hi) => (
+                  <SeatHandRow
+                    key={hi}
+                    hand={h}
+                    handKey={`mine-${hi}-${(h || []).join("|")}`}
+                    tiers={MY_HAND_TIERS}
+                  />
+                ))
+              ) : (
+                <div className="text-center text-[9px] text-zinc-500">—</div>
+              )
+            ) : (
+              <div className="text-center text-[9px] leading-tight text-zinc-500">Take a seat below</div>
+            )}
+          </div>
+        </div>
+
+        {/* Other seats only — 5 when seated, 6 when spectating */}
+        <div
+          className={
+            otherSeatIndices.length <= 5
+              ? "grid h-[5.5rem] shrink-0 grid-cols-5 gap-0.5 min-h-0 sm:h-[6rem] sm:gap-1"
+              : "grid h-[10.5rem] shrink-0 grid-cols-3 grid-rows-2 gap-1 min-h-0 sm:h-[6rem] sm:grid-cols-6 sm:grid-rows-1 sm:gap-1"
+          }
+        >
+          {otherSeatIndices.map(idx => {
+            const seat = seatsForUi[idx];
+            const taken = Boolean(seat?.participantKey);
             const isActingSeat = phase === "acting" && currentTurn?.seatIndex === idx;
             const actingHere = isActingSeat ? `ring-2 ring-sky-400 ring-offset-1 ring-offset-black/80` : "";
-            const mineRing = mine ? `ring-2 ${ring} ring-offset-1 ring-offset-black/80` : "";
             const ariaSeat = taken
-              ? `${String(seat.displayName || "Player").trim() || "Player"}${mine ? " — you" : ""}${isActingSeat ? " — turn to act" : ""}`
+              ? `${String(seat.displayName || "Player").trim() || "Player"}${isActingSeat ? " — turn to act" : ""}`
               : `Open seat ${idx + 1}`;
             return (
               <button
                 key={idx}
                 type="button"
                 aria-label={ariaSeat}
-                disabled={operateBusy || (taken && !mine)}
+                disabled={operateBusy || taken}
                 onClick={() => {
                   if (!taken) trySit(idx);
                 }}
-                className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-lg border border-white/10 bg-black/35 px-0.5 py-0 text-left transition ${mineRing} ${actingHere} disabled:opacity-40`}
+                className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-md border border-white/10 bg-black/40 px-px py-0 text-left transition ${actingHere} disabled:opacity-40`}
               >
-                {/* Fixed header — same occupied / empty */}
-                <div className="flex h-[11px] max-h-[11px] shrink-0 items-center gap-px overflow-hidden leading-none">
+                <div className="flex h-[10px] max-h-[10px] shrink-0 items-center gap-px overflow-hidden leading-none">
                   {taken ? (
                     <>
-                      <span className="min-w-0 flex-1 truncate text-left text-[7px] font-semibold leading-none text-white/95">
+                      <span className="min-w-0 flex-1 truncate text-left text-[6px] font-semibold leading-none text-white/90">
                         {String(seat.displayName || "").trim() || "…"}
                       </span>
-                      {mine ? (
-                        <span className="shrink-0 rounded px-px text-[5px] font-extrabold uppercase leading-none text-emerald-200">
-                          You
-                        </span>
-                      ) : null}
                       {isActingSeat ? (
                         <span className="shrink-0 rounded px-px text-[5px] font-extrabold uppercase leading-none text-sky-200">
                           Turn
@@ -582,14 +630,18 @@ export default function Ov2C21Screen({
                       ) : null}
                     </>
                   ) : (
-                    <span className="w-full text-center text-[7px] font-medium leading-none text-white/55">Open</span>
+                    <span className="w-full text-center text-[6px] font-medium leading-none text-white/50">Open</span>
                   )}
                 </div>
-                {/* Fixed-height card frame: remainder of seat; center hands — no flex-1 growth artifact */}
-                <div className="flex h-[calc(100%-11px)] min-h-0 w-full shrink-0 flex-col justify-center gap-px overflow-hidden">
+                <div className="flex h-[calc(100%-10px)] min-h-0 w-full shrink-0 flex-col justify-center gap-px overflow-hidden">
                   {seat.hands?.length ? (
                     seat.hands.map((h, hi) => (
-                      <SeatHandRow key={hi} hand={h} handKey={`${idx}-${hi}-${(h || []).join("|")}`} />
+                      <SeatHandRow
+                        key={hi}
+                        hand={h}
+                        handKey={`o-${idx}-${hi}-${(h || []).join("|")}`}
+                        tiers={OTHER_HAND_TIERS}
+                      />
                     ))
                   ) : null}
                 </div>
