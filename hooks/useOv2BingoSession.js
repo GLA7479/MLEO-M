@@ -13,7 +13,6 @@ import {
 } from "../lib/online-v2/bingo/ov2BingoEngine";
 import {
   callOv2BingoNext,
-  cancelOv2BingoRematch,
   claimOv2BingoPrize,
   fetchOv2BingoLiveRoundSnapshot,
   normalizeOv2BingoAuthoritativeSnapshot,
@@ -22,9 +21,7 @@ import {
   resolveOv2BingoSeatCard,
   OV2_BINGO_PLAY_MODE,
   OV2_BINGO_PRODUCT_GAME_ID,
-  requestOv2BingoRematch,
   resolveOv2BingoPlayMode,
-  startOv2BingoNextMatch,
   subscribeOv2BingoAuthoritativeSnapshot,
 } from "../lib/online-v2/bingo/ov2BingoSessionAdapter";
 import { creditOnlineV2VaultForSettlementLine } from "../lib/online-v2/onlineV2VaultBridge";
@@ -139,6 +136,33 @@ export function useOv2BingoSession(baseContext) {
     const t = window.setInterval(() => setNowMs(Date.now()), 250);
     return () => window.clearInterval(t);
   }, []);
+
+  const walkoverVaultKeyRef = useRef("");
+
+  useEffect(() => {
+    walkoverVaultKeyRef.current = "";
+  }, [roomId]);
+
+  useEffect(() => {
+    if (!roomId || roomProductId !== OV2_BINGO_PRODUCT_GAME_ID) return;
+    if (!liveSnapshot || !selfKey) return;
+    if (String(liveSnapshot.sessionPhase || "").toLowerCase() !== "finished") return;
+    const w = liveSnapshot.walkoverPayoutAmount;
+    if (w == null || !Number.isFinite(Number(w)) || Number(w) <= 0) return;
+    if (String(liveSnapshot.winner?.participantKey || "").trim() !== selfKey) return;
+    const sid = String(liveSnapshot.sessionId || "").trim();
+    if (!sid) return;
+    const k = `${sid}:${w}`;
+    if (walkoverVaultKeyRef.current === k) return;
+    walkoverVaultKeyRef.current = k;
+    const idem = `ov2:bingo:walkover:${sid}`;
+    void creditOnlineV2VaultForSettlementLine(Math.floor(Number(w)), OV2_BINGO_PRODUCT_GAME_ID, idem);
+  }, [
+    roomId,
+    roomProductId,
+    liveSnapshot,
+    selfKey,
+  ]);
 
   const myLiveSeatIndex = useMemo(() => {
     if (!liveSnapshot || !selfKey) return null;
@@ -310,32 +334,6 @@ export function useOv2BingoSession(baseContext) {
     },
     [roomId, selfKey, liveSnapshot, refreshLiveSnapshot]
   );
-
-  const requestRematch = useCallback(async () => {
-    if (!roomId || !selfKey) return { ok: false, error: "Not ready" };
-    const r = await requestOv2BingoRematch(roomId, selfKey);
-    await refreshLiveSnapshot();
-    if (typeof reloadRoomContext === "function") void Promise.resolve(reloadRoomContext());
-    return r;
-  }, [roomId, selfKey, refreshLiveSnapshot, reloadRoomContext]);
-
-  const cancelRematch = useCallback(async () => {
-    if (!roomId || !selfKey) return { ok: false, error: "Not ready" };
-    const r = await cancelOv2BingoRematch(roomId, selfKey);
-    await refreshLiveSnapshot();
-    if (typeof reloadRoomContext === "function") void Promise.resolve(reloadRoomContext());
-    return r;
-  }, [roomId, selfKey, refreshLiveSnapshot, reloadRoomContext]);
-
-  const startNextMatch = useCallback(async () => {
-    if (!roomId || !selfKey) return { ok: false, error: "Not ready" };
-    const seq = liveSnapshot?.roomMatchSeq ?? null;
-    const r = await startOv2BingoNextMatch(roomId, selfKey, seq);
-    setLiveSnapshot(null);
-    await refreshLiveSnapshot();
-    if (typeof reloadRoomContext === "function") void Promise.resolve(reloadRoomContext());
-    return r;
-  }, [roomId, selfKey, liveSnapshot?.roomMatchSeq, refreshLiveSnapshot, reloadRoomContext]);
 
   const rebindSnapshotFromServerPayload = useCallback(
     raw => {
@@ -617,9 +615,6 @@ export function useOv2BingoSession(baseContext) {
       openSession,
       callNextManual,
       claimPrize,
-      requestRematch,
-      cancelRematch,
-      startNextMatch,
     },
     rebindSnapshotFromServerPayload,
   };

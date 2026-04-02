@@ -350,10 +350,61 @@ export default function Ov2LudoLiveShell() {
       showSubtitle={false}
       infoPanel={
         <>
-          <p>
-            Live Ludo for this room. The room host opens the match when 2–4 seats are claimed and stakes are committed;
-            turns and dice are enforced on the server.
-          </p>
+          <div className="space-y-2 text-[11px] leading-snug text-zinc-300">
+            <section>
+              <p className="font-semibold text-zinc-100">Goal</p>
+              <p className="mt-0.5">
+                Move all four of your pieces around the board into your home before anyone else. You can also win if you are
+                the last active seat after eliminations, a double decline, or a forfeit leaves only you in the match.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-zinc-100">How to play</p>
+              <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+                <li>The room must be <span className="text-zinc-200">active</span> and every seated player must{" "}
+                  <span className="text-zinc-200">commit stake</span> in the lobby. The <span className="text-zinc-200">host</span>{" "}
+                  opens the Ludo table here when 2–4 seats are filled.</li>
+                <li>On your turn, <span className="text-zinc-200">roll</span> (server-authoritative), then{" "}
+                  <span className="text-zinc-200">move</span> a legal piece. Extra turns apply when the rules allow (e.g. captures /
+                  finishes), as enforced by the server.</li>
+                <li>
+                  <span className="text-zinc-200">Offer double</span> on your turn to raise the stake multiplier; the next seat must{" "}
+                  <span className="text-zinc-200">accept</span> or <span className="text-zinc-200">decline</span>. Declining ends the
+                  match with the <span className="text-zinc-200">proposer</span> as winner. Each seat can only start one double offer
+                  per double cycle.</li>
+                <li>
+                  Watch the <span className="text-zinc-200">turn timer</span>. Missing your turn adds strikes;{" "}
+                  <span className="text-zinc-200">three strikes</span> removes you from the live match.</li>
+                <li>After a finished match, seated players can toggle <span className="text-zinc-200">rematch</span>; the host{" "}
+                  <span className="text-zinc-200">starts the next match</span>, then everyone must <span className="text-zinc-200">commit stake again</span> in the room lobby before opening Ludo again.</li>
+              </ul>
+            </section>
+            <section>
+              <p className="font-semibold text-zinc-100">How to win</p>
+              <p className="mt-0.5">
+                The match ends with a single <span className="text-zinc-200">winner seat</span> when someone finishes all pieces,
+                or when the server declares a result after strikes, double decline, or forfeit (as applicable).
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-zinc-100">Stake &amp; payout</p>
+              <p className="mt-0.5">
+                Everyone risks the room&apos;s <span className="text-zinc-200">stake per seat</span>. The finished match records a{" "}
+                <span className="text-zinc-200">prize pool</span> and <span className="text-zinc-200">loss per seat</span>; the
+                winner receives <span className="text-zinc-200">net credit</span> (pool minus the winner&apos;s seat loss share) via
+                settlement lines. After the match shows <span className="text-zinc-200">finished</span>, the app delivers your vault
+                credit by claiming those lines automatically when you&apos;re on this screen.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-zinc-100">Leave / forfeit</p>
+              <p className="mt-0.5">
+                <span className="text-zinc-200">Leave table</span> during a live match may require a server{" "}
+                <span className="text-zinc-200">forfeit</span> (shared rooms in play). You are removed from the session; if only one
+                player remains, they win. Use the lobby link after leaving if you need to commit stake for a rematch.
+              </p>
+            </section>
+          </div>
           <p className="mt-2 text-[11px] text-zinc-500">
             <Link href="/online-v2/rooms" className="text-sky-300 underline">
               Lobby

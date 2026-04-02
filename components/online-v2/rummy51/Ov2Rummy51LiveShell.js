@@ -301,10 +301,71 @@ export default function Ov2Rummy51LiveShell() {
       showSubtitle={false}
       infoPanel={
         <>
-          <p>
-            Live table for room <span className="font-mono text-zinc-300">{roomId.slice(0, 8)}…</span>. Turns, melds, and
-            scoring are enforced on the server.
-          </p>
+          <div className="space-y-2 text-[11px] leading-snug text-zinc-300">
+            <section>
+              <p className="font-semibold text-zinc-100">Goal</p>
+              <p className="mt-0.5">
+                Win the <span className="text-zinc-200">match</span> by being the last player who is not{" "}
+                <span className="text-zinc-200">eliminated</span>. Elimination happens when your running penalty total reaches{" "}
+                <span className="text-zinc-200">251</span> or more.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-zinc-100">How to play</p>
+              <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+                <li>
+                  <span className="text-zinc-200">2–4</span> seated players. The host opens the match when the room is{" "}
+                  <span className="text-zinc-200">active</span> and stakes are <span className="text-zinc-200">committed</span>.</li>
+                <li>
+                  On your turn: <span className="text-zinc-200">draw</span> from the stock or take the face-up{" "}
+                  <span className="text-zinc-200">discard</span> (follow on-screen controls). If you take the discard, you must play
+                  that card into melds on the same turn.</li>
+                <li>
+                  Lay <span className="text-zinc-200">melds</span> (runs or sets of at least three cards). The first time you lay
+                  cards from your hand in a round, those new melds must total at least <span className="text-zinc-200">51 points</span>{" "}
+                  (server-validated).</li>
+                <li>
+                  Add to existing table melds when allowed, then <span className="text-zinc-200">discard</span> one card to end your
+                  turn.</li>
+                <li>
+                  When someone <span className="text-zinc-200">goes out</span> (empty hand), everyone else scores a{" "}
+                  <span className="text-zinc-200">round penalty</span>: <span className="text-zinc-200">100</span> if you never opened
+                  this round, otherwise the sum of card penalties left in your hand (jokers count extra). Penalties add to your running
+                  total; at <span className="text-zinc-200">251+</span> you are eliminated. A new round deals until the match ends.</li>
+              </ul>
+            </section>
+            <section>
+              <p className="font-semibold text-zinc-100">How to win</p>
+              <p className="mt-0.5">
+                The server ends the match when only <span className="text-zinc-200">one</span> non-eliminated player remains. That
+                player is the match winner (even if rounds were won by different people along the way).
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-zinc-100">Stake &amp; payout</p>
+              <p className="mt-0.5">
+                Each player commits the same <span className="text-zinc-200">stake per seat</span>. The table shows the{" "}
+                <span className="text-zinc-200">full pool</span> as stake × seat count when the match finishes. Settlement credits the
+                winner with <span className="text-zinc-200">net winnings</span> (pool minus one stake share); other players receive
+                bookkeeping loss lines. The client applies vault credits automatically after <span className="text-zinc-200">finished</span>{" "}
+                when you are on this screen.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-zinc-100">Leave / forfeit</p>
+              <p className="mt-0.5">
+                Leaving during an active playing match may require a server <span className="text-zinc-200">forfeit</span>: you take a
+                penalty like a lost round (including the <span className="text-zinc-200">100</span> flat penalty if you had not opened
+                this hand), can be eliminated at <span className="text-zinc-200">251+</span>, and the table updates for everyone else.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-zinc-100">Important</p>
+              <p className="mt-0.5">
+                All melds, draws, and scoring are enforced on the server—illegal plays are rejected with an error message.
+              </p>
+            </section>
+          </div>
           <p className="mt-2 text-[11px] text-zinc-500">
             <Link href="/online-v2/rooms" className="text-sky-300 underline">
               Lobby

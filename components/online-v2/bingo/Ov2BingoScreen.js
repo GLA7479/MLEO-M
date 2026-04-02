@@ -39,7 +39,6 @@ export default function Ov2BingoScreen({ contextInput = null }) {
   const leaveToLobbyBusy = Boolean(
     contextInput && typeof contextInput === "object" && contextInput.leaveToLobbyBusy
   );
-  const [claimToast, setClaimToast] = useState(/** @type {{ kind: "ok"|"err", text: string }|null} */ (null));
   const [claimPendingKey, setClaimPendingKey] = useState(/** @type {string|null} */ (null));
   const claimFlightRef = useRef(false);
 
@@ -63,17 +62,28 @@ export default function Ov2BingoScreen({ contextInput = null }) {
   const claimByPrizeKey = useMemo(() => {
     /** @type {Record<string, { seatIndex: number, amount: number, claimedByName: string }>} */
     const m = {};
+    const seatByPk = new Map(
+      (vm.membersVm || []).map(mem => [String(mem?.participantKey || "").trim(), mem?.seatIndex])
+    );
     for (const c of vm.claims || []) {
       const pk = String(c.prizeKey || "").trim();
       if (!pk) continue;
+      const claimer = String(c.claimedByParticipantKey || "").trim();
+      let seatIndex = Number(c.seatIndex);
+      const memSeat = claimer ? seatByPk.get(claimer) : null;
+      if (memSeat != null && Number.isInteger(memSeat) && memSeat >= 0 && memSeat <= 7) {
+        seatIndex = memSeat;
+      } else if (!Number.isInteger(seatIndex) || seatIndex < 0 || seatIndex > 7) {
+        seatIndex = 0;
+      }
       m[pk] = {
-        seatIndex: Number(c.seatIndex),
+        seatIndex,
         amount: Number(c.amount) || 0,
         claimedByName: String(c.claimedByName || "").trim(),
       };
     }
     return m;
-  }, [vm.claims]);
+  }, [vm.claims, vm.membersVm]);
 
   const seatSlots = useMemo(() => {
     const slots = [];
@@ -89,12 +99,9 @@ export default function Ov2BingoScreen({ contextInput = null }) {
       const pk = String(prizeKey ?? "").trim();
       if (!pk || claimFlightRef.current) return;
       claimFlightRef.current = true;
-      setClaimToast(null);
       setClaimPendingKey(pk);
       try {
-        const r = await actions.claimPrize(pk);
-        if (r.ok) setClaimToast({ kind: "ok", text: `Claim recorded: ${prizeLabels[pk] || pk}` });
-        else setClaimToast({ kind: "err", text: String(r.error || "Claim failed") });
+        await actions.claimPrize(pk);
       } finally {
         claimFlightRef.current = false;
         setClaimPendingKey(null);
@@ -158,7 +165,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
                 key={seatIndex}
                 className={[
                   "flex min-h-[2.5rem] w-[5.25rem] shrink-0 flex-col justify-center rounded-md border px-1.5 py-1 text-[9px] leading-tight sm:min-h-[2.8125rem] sm:w-[6rem] sm:py-1.5 sm:text-[10px]",
-                  member ? [seatStyle.border, seatStyle.bg].join(" ") : ["border-white/10 bg-black/20 text-zinc-500", seatStyle.border].join(" "),
+                  member ? [seatStyle.border, seatStyle.bg].join(" ") : "border-white/15 bg-black/30 text-zinc-500",
                   you ? "ring-1 ring-sky-400/80" : "",
                   isCaller ? "ring-1 ring-amber-300/70" : "",
                   isWinner ? "ring-1 ring-emerald-400/60" : "",
@@ -351,58 +358,15 @@ export default function Ov2BingoScreen({ contextInput = null }) {
                 );
               })}
             </div>
-            {claimToast ? (
-              <div
-                className={`mt-2 rounded border px-2 py-1 text-[10px] ${
-                  claimToast.kind === "ok"
-                    ? "border-emerald-500/35 bg-emerald-950/30 text-emerald-100"
-                    : "border-red-500/35 bg-red-950/30 text-red-200"
-                }`}
-                role="status"
-              >
-                {claimToast.text}
-              </div>
-            ) : null}
           </div>
         </div>
       </div>
 
-      {(vm.sessionPhase === "finished" || (vm.announcement && isLiveMatch)) && (
+      {(vm.sessionPhase === "finished" || (vm.announcement && isLiveMatch)) && vm.announcement ? (
         <div className="shrink-0 space-y-1 rounded-lg border border-white/15 bg-black/35 px-2 py-2 text-[10px]">
-          {vm.announcement ? <p className="text-center text-zinc-200">{vm.announcement}</p> : null}
-          {isLiveMatch && vm.sessionPhase === "finished" ? (
-            <div className="flex flex-col gap-1 sm:flex-row sm:justify-center">
-              <button
-                type="button"
-                disabled={!vm.canRequestRematch || Boolean(vm.disabledReasons.rematch)}
-                title={vm.disabledReasons.rematch || undefined}
-                onClick={() => void actions.requestRematch()}
-                className="rounded-md border border-amber-500/40 bg-amber-950/35 px-2 py-1.5 font-semibold text-amber-100 disabled:opacity-40"
-              >
-                Request rematch
-              </button>
-              <button
-                type="button"
-                disabled={!vm.canCancelRematch || Boolean(vm.disabledReasons.cancelRematch)}
-                title={vm.disabledReasons.cancelRematch || undefined}
-                onClick={() => void actions.cancelRematch()}
-                className="rounded-md border border-white/20 bg-white/10 px-2 py-1.5 font-semibold text-zinc-200 disabled:opacity-40"
-              >
-                Cancel rematch
-              </button>
-              <button
-                type="button"
-                disabled={!vm.canStartNextMatch || Boolean(vm.disabledReasons.startNextMatch)}
-                title={vm.disabledReasons.startNextMatch || undefined}
-                onClick={() => void actions.startNextMatch()}
-                className="rounded-md border border-emerald-500/40 bg-emerald-950/35 px-2 py-1.5 font-semibold text-emerald-100 disabled:opacity-40"
-              >
-                Start next match (host)
-              </button>
-            </div>
-          ) : null}
+          <p className="text-center text-zinc-200">{vm.announcement}</p>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

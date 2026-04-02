@@ -186,10 +186,62 @@ export default function Ov2BingoLiveShell() {
         showSubtitle={false}
         infoPanel={
           <>
-            <p>
-              Live Bingo for this room. Calls and claims are validated on the server. The host opens the round when the room
-              is active and seated players are ready.
-            </p>
+            <div className="space-y-2 text-[11px] leading-snug text-zinc-300">
+              <section>
+                <p className="font-semibold text-zinc-100">Goal</p>
+                <p className="mt-0.5">
+                  Mark called numbers on your card and be first to earn a <span className="text-zinc-200">valid server-approved claim</span>{" "}
+                  for a <span className="text-zinc-200">row</span> or the <span className="text-zinc-200">full card</span>. Each of those
+                  prizes can only be won once per session.
+                </p>
+              </section>
+              <section>
+                <p className="font-semibold text-zinc-100">How to play</p>
+                <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+                  <li>
+                    The room must be <span className="text-zinc-200">active</span>, seated players must{" "}
+                    <span className="text-zinc-200">commit stake</span>, and the <span className="text-zinc-200">host</span> opens the
+                    Bingo session (at least two seated players).</li>
+                  <li>
+                    <span className="text-zinc-200">Called numbers are global</span> for the room—the same sequence applies to every
+                    card. New calls appear on a server timer (about every ten seconds when the session advances).</li>
+                  <li>
+                    You must <span className="text-zinc-200">manually tap</span> only numbers that have actually been called to mark
+                    your card. Marks are <span className="text-zinc-200">one-way</span> (no undo). The UI does{" "}
+                    <span className="text-zinc-200">not</span> auto-mark for you and does <span className="text-zinc-200">not</span> hint
+                    that a row or card is “ready”—you need to watch the call list yourself.</li>
+                  <li>
+                    When your marks truly complete a horizontal row or the entire card using <span className="text-zinc-200">only called</span>{" "}
+                    numbers, you must <span className="text-zinc-200">manually declare</span> that prize (Row 1–5 or Full). There is{" "}
+                    <span className="text-zinc-200">no auto-claim</span>.</li>
+                </ul>
+              </section>
+              <section>
+                <p className="font-semibold text-zinc-100">How to win a prize</p>
+                <p className="mt-0.5">
+                  The server checks your seat&apos;s card against the official called list.{" "}
+                  <span className="text-zinc-200">First valid claim wins</span> that prize key; later claims for the same key are rejected.
+                  Claimed prizes cannot be won again in the same session.
+                </p>
+              </section>
+              <section>
+                <p className="font-semibold text-zinc-100">Prize amounts (locked)</p>
+                <p className="mt-0.5">
+                  When the session opens, the server locks the session <span className="text-zinc-200">pot</span> to the sum of committed
+                  stakes from seated players. Prizes are fixed shares of that <span className="text-zinc-200">original pot</span> (not
+                  “whatever is left”): <span className="text-zinc-200">Row 1 = 15%</span>, <span className="text-zinc-200">Row 2 = 15%</span>,{" "}
+                  <span className="text-zinc-200">Row 3 = 15%</span>, <span className="text-zinc-200">Row 4 = 15%</span>,{" "}
+                  <span className="text-zinc-200">Row 5 = 15%</span>, <span className="text-zinc-200">Full card = 25%</span> (totals 100%).
+                </p>
+              </section>
+              <section>
+                <p className="font-semibold text-zinc-100">Leave</p>
+                <p className="mt-0.5">
+                  Use <span className="text-zinc-200">Leave game</span> (or Lobby) to exit the room. Mid-session stake and membership
+                  changes follow the server rules for your room.
+                </p>
+              </section>
+            </div>
             <p className="mt-2 text-[11px] text-zinc-500">
               <Link href="/online-v2/rooms" className="text-sky-300 underline">
                 Lobby
