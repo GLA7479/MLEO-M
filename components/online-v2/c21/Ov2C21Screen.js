@@ -1006,7 +1006,7 @@ export default function Ov2C21Screen({
             )}
           </div>
           {mySeat && mySplitHandCount > 1 ? (
-            <div className="absolute bottom-1 left-1 right-1 z-20 flex items-center justify-between gap-1">
+            <div className="absolute bottom-1 left-1 right-1 z-20 flex items-center justify-between gap-0.5">
               {displayMySeat.hands.map((_, hi) => {
                 const isActionHere =
                   phase === "acting" && isMyTurn && currentTurn?.seatIndex === mySeat?.seatIndex && currentTurn?.handIndex === hi;
@@ -1014,10 +1014,12 @@ export default function Ov2C21Screen({
                   <button
                     key={hi}
                     type="button"
+                    aria-current={isActionHere ? "step" : undefined}
+                    title={isActionHere ? "Play this hand now" : `View hand ${hi + 1}`}
                     onClick={() => setSplitViewIdx(hi)}
                     className={`min-h-[22px] min-w-0 flex-1 touch-manipulation rounded border px-0.5 py-px text-[7px] font-extrabold uppercase leading-none ${
                       isActionHere
-                        ? "border-sky-400 bg-sky-950/55 text-sky-100 shadow-[0_0_0_1px_rgba(56,189,248,0.35)]"
+                        ? "z-[1] border-2 border-sky-300 bg-sky-900/70 text-sky-50 shadow-[0_0_0_2px_rgba(14,165,233,0.45),0_2px_8px_rgba(0,0,0,0.5)]"
                         : splitViewIdx === hi
                           ? "border-emerald-500/45 bg-emerald-950/35 text-emerald-100"
                           : "border-white/12 bg-black/45 text-zinc-400"
