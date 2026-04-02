@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   applyPreviewMark,
   BINGO_PRIZE_KEYS,
@@ -25,6 +25,12 @@ import {
   subscribeOv2BingoAuthoritativeSnapshot,
 } from "../lib/online-v2/bingo/ov2BingoSessionAdapter";
 import { creditOnlineV2VaultForSettlementLine } from "../lib/online-v2/onlineV2VaultBridge";
+import {
+  loadOv2BingoMarks,
+  ov2BingoMarksStorageKey,
+  reconcileBingoMarksToCalled,
+  saveOv2BingoMarks,
+} from "../lib/online-v2/bingo/ov2BingoMarksStorage";
 
 /** @typedef {import("../lib/online-v2/bingo/ov2BingoSessionAdapter").Ov2BingoAuthoritativeSnapshot} Ov2BingoAuthoritativeSnapshot */
 
@@ -62,6 +68,8 @@ export function useOv2BingoSession(baseContext) {
   /** @type {Ov2BingoAuthoritativeSnapshot|null} */
   const [liveSnapshot, setLiveSnapshot] = useState(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const callInFlightRef = useRef(false);
+  const lastAutoCallKeyRef = useRef(/** @type {string|null} */ (null));
 
   const playMode = useMemo(() => {
     return resolveOv2BingoPlayMode(
@@ -76,30 +84,21 @@ export function useOv2BingoSession(baseContext) {
 
   const [previewRound, setPreviewRound] = useState(initialRoundState);
   const [liveMarks, setLiveMarks] = useState(() => makeEmptyMarks());
+  const loadedMarksStorageKeyRef = useRef("");
 
   useEffect(() => {
     setPreviewRound(initialRoundState());
   }, [previewSeed]);
 
-  const liveIdentity = useMemo(() => {
-    if (!liveSnapshot?.sessionId || !liveSnapshot.roundId || liveSnapshot.seed == null) return "";
-    const m = liveSnapshot.members.find(mm => selfKey && mm.participantKey === selfKey);
-    const seat = m?.seatIndex;
-    if (seat == null) return "";
-    return `${liveSnapshot.sessionId}:${liveSnapshot.roundId}:${liveSnapshot.matchSeq}:${seat}`;
-  }, [liveSnapshot, selfKey]);
-
-  useEffect(() => {
-    if (!liveIdentity) {
-      setLiveMarks(makeEmptyMarks());
-      return;
-    }
-    setLiveMarks(makeEmptyMarks());
-  }, [liveIdentity]);
+  const marksStorageKey = useMemo(() => {
+    if (!roomId || !selfKey || !liveSnapshot?.sessionId) return "";
+    return ov2BingoMarksStorageKey(roomId, liveSnapshot.sessionId, selfKey);
+  }, [roomId, selfKey, liveSnapshot?.sessionId]);
 
   useEffect(() => {
     if (!roomId || roomProductId !== OV2_BINGO_PRODUCT_GAME_ID) {
       setLiveSnapshot(null);
+      lastAutoCallKeyRef.current = null;
       return undefined;
     }
     let cancelled = false;
@@ -154,6 +153,32 @@ export function useOv2BingoSession(baseContext) {
     );
   }, [liveSnapshot, myLiveSeatIndex]);
 
+  useEffect(() => {
+    const activeLive =
+      playMode === OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE && Boolean(marksStorageKey) && Boolean(liveCard);
+
+    if (!activeLive) {
+      if (playMode !== OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE) {
+        loadedMarksStorageKeyRef.current = "";
+      }
+      if (!marksStorageKey || !liveCard) {
+        setLiveMarks(makeEmptyMarks());
+      }
+      return;
+    }
+
+    const called = liveSnapshot?.calledNumbers ?? [];
+    if (loadedMarksStorageKeyRef.current !== marksStorageKey) {
+      loadedMarksStorageKeyRef.current = marksStorageKey;
+      const raw = loadOv2BingoMarks(marksStorageKey);
+      const base = raw && raw.length === 25 ? [...raw] : makeEmptyMarks();
+      setLiveMarks(reconcileBingoMarksToCalled(liveCard, base, called));
+      return;
+    }
+
+    setLiveMarks(prev => reconcileBingoMarksToCalled(liveCard, prev, called));
+  }, [playMode, marksStorageKey, liveCard, liveSnapshot?.calledNumbers]);
+
   const nextCallDue = useMemo(() => {
     if (!liveSnapshot?.nextCallAtIso) return true;
     const t = Date.parse(liveSnapshot.nextCallAtIso);
@@ -165,6 +190,33 @@ export function useOv2BingoSession(baseContext) {
     if (!liveSnapshot || !nextCallDue) return false;
     return Boolean(liveSnapshot.canCallNext);
   }, [liveSnapshot, nextCallDue]);
+
+  useEffect(() => {
+    if (!roomId) return;
+    if (playMode !== OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE || !liveSnapshot || !selfKey) return;
+    if (liveSnapshot.sessionPhase !== "playing") return;
+    if (!canCallNextNow || callInFlightRef.current) return;
+
+    const key = `${liveSnapshot.sessionId}:${liveSnapshot.revision}:${liveSnapshot.deckPosition}`;
+    if (lastAutoCallKeyRef.current === key) return;
+
+    callInFlightRef.current = true;
+    lastAutoCallKeyRef.current = key;
+    void (async () => {
+      try {
+        const r = await callOv2BingoNext(roomId, selfKey, liveSnapshot.revision);
+        if (r.ok && "snapshot" in r && r.snapshot) {
+          setLiveSnapshot(r.snapshot);
+        } else {
+          lastAutoCallKeyRef.current = null;
+        }
+      } catch {
+        lastAutoCallKeyRef.current = null;
+      } finally {
+        callInFlightRef.current = false;
+      }
+    })();
+  }, [playMode, liveSnapshot, selfKey, roomId, canCallNextNow]);
 
   const callNextPreviewNumber = useCallback(() => {
     setPreviewRound(prev => {
@@ -192,15 +244,19 @@ export function useOv2BingoSession(baseContext) {
         });
         return;
       }
-      if (playMode === OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE && liveCard) {
+      if (playMode === OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE && liveCard && liveSnapshot) {
+        const calledSet = new Set(liveSnapshot.calledNumbers ?? []);
+        if (!calledSet.has(n)) return;
         setLiveMarks(prev => {
           const { marks: next, changed } = toggleManualPlayerMark(liveCard, prev, n);
           if (!changed) return prev;
+          const key = ov2BingoMarksStorageKey(roomId ?? "", liveSnapshot.sessionId ?? "", selfKey ?? "");
+          if (key) saveOv2BingoMarks(key, next);
           return next;
         });
       }
     },
-    [playMode, previewCard, liveCard]
+    [playMode, previewCard, liveCard, liveSnapshot, roomId, selfKey]
   );
 
   const refreshLiveSnapshot = useCallback(async () => {
@@ -325,7 +381,6 @@ export function useOv2BingoSession(baseContext) {
         availablePrizeKeys: [],
         claims: [],
         membersVm,
-        wonPrizeKeys: [],
         selfClaimedPrizeKeys: [],
         prizeDisabledByKey: roomNoMatchPrizeDisabled,
         roomLifecyclePhase: life || null,
@@ -383,7 +438,6 @@ export function useOv2BingoSession(baseContext) {
         availablePrizeKeys: [],
         claims: [],
         membersVm,
-        wonPrizeKeys: [],
         selfClaimedPrizeKeys: [],
         prizeDisabledByKey: previewPrizeDisabled,
         roomLifecyclePhase: null,
@@ -454,8 +508,6 @@ export function useOv2BingoSession(baseContext) {
       else prizeDisabledByKey[pk] = null;
     }
 
-    const wonPrizeKeysFromClaims = [...takenPrizeKeys];
-
     let phaseLine = "Playing — numbers are called on the server.";
     if (snap?.sessionPhase === "playing") phaseLine = "Playing";
     else if (snap?.sessionPhase === "finished") phaseLine = announcement || "Finished";
@@ -481,7 +533,6 @@ export function useOv2BingoSession(baseContext) {
       availablePrizeKeys: [],
       claims: snap?.claims ?? [],
       membersVm,
-      wonPrizeKeys: wonPrizeKeysFromClaims,
       selfClaimedPrizeKeys,
       prizeDisabledByKey,
       roomLifecyclePhase: snap?.roomLifecyclePhase ?? null,

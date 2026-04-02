@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { BINGO_PRIZE_KEYS } from "../../../lib/online-v2/bingo/ov2BingoEngine";
 import { getOv2BingoSeatStyle } from "../../../lib/online-v2/bingo/ov2BingoSeatColors";
 import { OV2_BINGO_PLAY_MODE } from "../../../lib/online-v2/bingo/ov2BingoSessionAdapter";
@@ -40,6 +40,8 @@ export default function Ov2BingoScreen({ contextInput = null }) {
     contextInput && typeof contextInput === "object" && contextInput.leaveToLobbyBusy
   );
   const [claimToast, setClaimToast] = useState(/** @type {{ kind: "ok"|"err", text: string }|null} */ (null));
+  const [claimPendingKey, setClaimPendingKey] = useState(/** @type {string|null} */ (null));
+  const claimFlightRef = useRef(false);
 
   const isRoomShell = vm.playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
   const isLiveMatch = vm.playMode === OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE;
@@ -59,12 +61,16 @@ export default function Ov2BingoScreen({ contextInput = null }) {
   );
 
   const claimByPrizeKey = useMemo(() => {
-    /** @type {Record<string, { seatIndex: number, amount: number }>} */
+    /** @type {Record<string, { seatIndex: number, amount: number, claimedByName: string }>} */
     const m = {};
     for (const c of vm.claims || []) {
       const pk = String(c.prizeKey || "").trim();
       if (!pk) continue;
-      m[pk] = { seatIndex: Number(c.seatIndex), amount: Number(c.amount) || 0 };
+      m[pk] = {
+        seatIndex: Number(c.seatIndex),
+        amount: Number(c.amount) || 0,
+        claimedByName: String(c.claimedByName || "").trim(),
+      };
     }
     return m;
   }, [vm.claims]);
@@ -80,10 +86,19 @@ export default function Ov2BingoScreen({ contextInput = null }) {
 
   const onClaim = useCallback(
     async prizeKey => {
+      const pk = String(prizeKey ?? "").trim();
+      if (!pk || claimFlightRef.current) return;
+      claimFlightRef.current = true;
       setClaimToast(null);
-      const r = await actions.claimPrize(prizeKey);
-      if (r.ok) setClaimToast({ kind: "ok", text: `Claim recorded: ${prizeLabels[prizeKey] || prizeKey}` });
-      else setClaimToast({ kind: "err", text: String(r.error || "Claim failed") });
+      setClaimPendingKey(pk);
+      try {
+        const r = await actions.claimPrize(pk);
+        if (r.ok) setClaimToast({ kind: "ok", text: `Claim recorded: ${prizeLabels[pk] || pk}` });
+        else setClaimToast({ kind: "err", text: String(r.error || "Claim failed") });
+      } finally {
+        claimFlightRef.current = false;
+        setClaimPendingKey(null);
+      }
     },
     [actions, prizeLabels]
   );
@@ -150,7 +165,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
                 ].join(" ")}
                 title={member ? `${label}${member.isReady ? " · Ready" : ""}` : `Seat ${seatIndex + 1} · Open`}
               >
-                <div className="truncate font-semibold text-zinc-100">{label}</div>
+                <div className={`truncate font-semibold ${member ? seatStyle.text : "text-zinc-100"}`}>{label}</div>
                 <div className="mt-1 text-[8px]">
                   {member ? (
                     <span className={member.isReady ? "text-emerald-300" : "text-zinc-500"}>
@@ -185,17 +200,6 @@ export default function Ov2BingoScreen({ contextInput = null }) {
               {vm.deckRemaining}/{vm.deckTotal}
             </span>
           </span>
-          {vm.canCallNext ? (
-            <button
-              type="button"
-              disabled={!vm.canCallNextNow || Boolean(vm.disabledReasons.callNext)}
-              title={vm.disabledReasons.callNext || "Draw the next ball"}
-              onClick={() => void actions.callNextManual()}
-              className="flex h-[2.25rem] max-h-[2.25rem] min-w-[6.5rem] shrink-0 items-center justify-center rounded-md border border-amber-500/45 bg-amber-950/40 px-2 text-[10px] font-semibold text-amber-100 disabled:cursor-not-allowed disabled:opacity-45 sm:h-[2.5rem] sm:max-h-[2.5rem] sm:min-w-0 sm:flex-1 sm:px-3 sm:text-xs"
-            >
-              Draw next
-            </button>
-          ) : null}
         </div>
       ) : null}
 
@@ -268,12 +272,10 @@ export default function Ov2BingoScreen({ contextInput = null }) {
           <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-hidden py-0.5 sm:overflow-y-auto sm:py-1">
             <Ov2BingoCard
               card={vm.card}
-              called={vm.isLive && vm.cardIsAuthoritative ? [] : vm.called}
+              called={vm.called}
               marks={vm.marks}
-              wonPrizeKeys={playingLive ? [] : vm.wonPrizeKeys}
               onToggleMark={onToggleMark}
               disabled={vm.isLive && !vm.cardIsAuthoritative}
-              manualDabOnly={Boolean(vm.isLive && vm.cardIsAuthoritative)}
             />
           </div>
           {cardFooterHint ? (
@@ -321,7 +323,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
                   !isLiveMatch ||
                   vm.sessionPhase !== "playing" ||
                   (Boolean(reason) && reason !== "Already claimed");
-                const disabled = hardBlocked || Boolean(claimed);
+                const disabled = hardBlocked || Boolean(claimed) || claimPendingKey !== null;
                 return (
                   <button
                     key={pk}
@@ -329,7 +331,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
                     disabled={disabled}
                     title={
                       claimed
-                        ? `Claimed · seat ${claimed.seatIndex + 1}`
+                        ? `Won · seat ${claimed.seatIndex + 1}${claimed.claimedByName ? ` · ${claimed.claimedByName}` : ""}`
                         : reason
                           ? reason
                           : `Claim ${prizeLabels[pk]}`

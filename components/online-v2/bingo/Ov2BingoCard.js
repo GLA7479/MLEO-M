@@ -3,54 +3,23 @@
 import { useMemo } from "react";
 import { normalizeCalledNumbers } from "../../../lib/online-v2/bingo/ov2BingoEngine";
 
-/** @param {string} prizeKey */
-function rowIndexFromPrizeKey(prizeKey) {
-  const m = /^row([1-5])$/.exec(String(prizeKey || ""));
-  if (!m) return null;
-  const n = Number(m[1]) - 1;
-  return Number.isInteger(n) && n >= 0 && n < 5 ? n : null;
-}
-
 /**
  * Presentational 5×5 Bingo card.
- * Preview: marks toggle only on numbers in `called`.
- * Live manual (`manualDabOnly`): no called-based styling; player toggles any cell (except FREE).
+ * Marks toggle only on numbers present in authoritative `called` (preview: local called list; live: server list).
+ * No called-based “highlight” styling — only neutral unmarked vs neutral marked.
  *
  * @param {{
  *   card: number[][],
  *   called: unknown,
  *   marks: boolean[],
- *   wonPrizeKeys?: string[],
  *   onToggleMark?: ((n: number) => void) | null,
  *   disabled?: boolean,
- *   manualDabOnly?: boolean,
  * }} props
  */
-export default function Ov2BingoCard({
-  card,
-  called,
-  marks,
-  wonPrizeKeys = [],
-  onToggleMark = null,
-  disabled = false,
-  manualDabOnly = false,
-}) {
+export default function Ov2BingoCard({ card, called, marks, onToggleMark = null, disabled = false }) {
   const headers = ["B", "I", "N", "G", "O"];
   const calledSet = useMemo(() => new Set(normalizeCalledNumbers(called)), [called]);
   const canInteract = typeof onToggleMark === "function" && !disabled;
-
-  const rowEmphasis = useMemo(() => {
-    const rows = new Set();
-    let full = false;
-    for (const k of wonPrizeKeys) {
-      if (k === "full") full = true;
-      else {
-        const ri = rowIndexFromPrizeKey(k);
-        if (ri != null) rows.add(ri);
-      }
-    }
-    return { rows, full };
-  }, [wonPrizeKeys]);
 
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-none flex-col sm:max-w-2xl lg:max-w-3xl">
@@ -64,14 +33,9 @@ export default function Ov2BingoCard({
 
       <div className={`mt-0.5 grid min-h-0 flex-1 grid-cols-5 gap-0.5 sm:gap-1 ${!canInteract ? "pointer-events-none opacity-85" : ""}`}>
         {card.flat().map((n, idx) => {
-          const row = Math.floor(idx / 5);
           const isFree = n === 0 && idx === 12;
           const isMarked = marks[idx];
-          const isCalled = isFree || calledSet.has(n);
-          const shouldShowYellow =
-            !manualDabOnly && isMarked && isCalled && !isFree;
-          const rowWin = rowEmphasis.rows.has(row) || rowEmphasis.full;
-          const canClickCell = manualDabOnly ? !isFree : !isFree && calledSet.has(n);
+          const canClickCell = !isFree && calledSet.has(n);
 
           return (
             <button
@@ -87,15 +51,14 @@ export default function Ov2BingoCard({
                 "grid min-h-[1.85rem] place-items-center rounded-lg border text-xs font-semibold transition sm:min-h-[2.25rem] sm:text-sm",
                 isFree
                   ? "border-cyan-400/80 bg-gradient-to-br from-cyan-700/50 to-sky-900/40 text-cyan-50 shadow-inner shadow-cyan-900/40"
-                  : shouldShowYellow
-                    ? "border-yellow-400 bg-yellow-500 shadow-lg shadow-yellow-500/60"
-                    : "",
-                !isFree && isMarked && !shouldShowYellow ? "border-emerald-400 bg-emerald-600/55 shadow-md shadow-emerald-900/50" : "",
+                  : "",
+                !isFree && isMarked
+                  ? "border-zinc-400/90 bg-zinc-600/50 text-zinc-50 shadow-inner shadow-black/20"
+                  : "",
                 !isFree && !isMarked ? "border-white/15 bg-white/5 text-zinc-100" : "",
-                rowWin && !isFree ? "ring-1 ring-amber-400/70 ring-offset-1 ring-offset-black/20" : "",
               ].join(" ")}
             >
-              <span className={shouldShowYellow || (isMarked && !isFree) ? "font-bold text-white" : ""}>{isFree ? "FREE" : n}</span>
+              <span className={isMarked && !isFree ? "font-semibold text-white" : ""}>{isFree ? "FREE" : n}</span>
             </button>
           );
         })}
