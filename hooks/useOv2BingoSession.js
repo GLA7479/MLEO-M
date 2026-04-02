@@ -1,15 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   applyPreviewMark,
   BINGO_PRIZE_KEYS,
   buildDeck,
   computePreviewLineCompletion,
   generateCard,
-  getAvailablePrizeKeys,
-  getCardForSeat,
-  getWonRowKeys,
-  isFullWonByCalls,
   makeEmptyMarks,
+  toggleManualPlayerMark,
 } from "../lib/online-v2/bingo/ov2BingoEngine";
 import {
   callOv2BingoNext,
@@ -65,13 +62,6 @@ export function useOv2BingoSession(baseContext) {
   /** @type {Ov2BingoAuthoritativeSnapshot|null} */
   const [liveSnapshot, setLiveSnapshot] = useState(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const liveSnapshotRef = useRef(/** @type {Ov2BingoAuthoritativeSnapshot|null} */ (null));
-  const callInFlightRef = useRef(false);
-  const lastAutoCallKeyRef = useRef(/** @type {string|null} */ (null));
-
-  useEffect(() => {
-    liveSnapshotRef.current = liveSnapshot;
-  }, [liveSnapshot]);
 
   const playMode = useMemo(() => {
     return resolveOv2BingoPlayMode(
@@ -110,7 +100,6 @@ export function useOv2BingoSession(baseContext) {
   useEffect(() => {
     if (!roomId || roomProductId !== OV2_BINGO_PRODUCT_GAME_ID) {
       setLiveSnapshot(null);
-      lastAutoCallKeyRef.current = null;
       return undefined;
     }
     let cancelled = false;
@@ -165,26 +154,6 @@ export function useOv2BingoSession(baseContext) {
     );
   }, [liveSnapshot, myLiveSeatIndex]);
 
-  const liveCalledSet = useMemo(() => {
-    const arr = liveSnapshot?.calledNumbers ?? [];
-    return new Set(arr);
-  }, [liveSnapshot]);
-
-  const previewLineLive = useMemo(() => {
-    if (!liveCard || !liveSnapshot) return { completedRowIndexes: [], hasAnyRow: false, isFull: false };
-    const mask = liveMarks;
-    return computePreviewLineCompletion(mask);
-  }, [liveCard, liveSnapshot, liveMarks]);
-
-  const availablePrizeKeysLive = useMemo(() => {
-    if (!liveSnapshot || !liveCard || liveSnapshot.sessionPhase !== "playing") return [];
-    return getAvailablePrizeKeys({
-      card: liveCard,
-      called: liveSnapshot.calledNumbers,
-      existingClaims: liveSnapshot.claims.map(c => ({ prize_key: c.prizeKey, amount: c.amount })),
-    });
-  }, [liveSnapshot, liveCard]);
-
   const nextCallDue = useMemo(() => {
     if (!liveSnapshot?.nextCallAtIso) return true;
     const t = Date.parse(liveSnapshot.nextCallAtIso);
@@ -196,33 +165,6 @@ export function useOv2BingoSession(baseContext) {
     if (!liveSnapshot || !nextCallDue) return false;
     return Boolean(liveSnapshot.canCallNext);
   }, [liveSnapshot, nextCallDue]);
-
-  useEffect(() => {
-    if (!roomId) return;
-    if (playMode !== OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE || !liveSnapshot || !selfKey) return;
-    if (liveSnapshot.sessionPhase !== "playing") return;
-    if (!canCallNextNow || callInFlightRef.current) return;
-
-    const key = `${liveSnapshot.sessionId}:${liveSnapshot.revision}:${liveSnapshot.deckPosition}`;
-    if (lastAutoCallKeyRef.current === key) return;
-
-    callInFlightRef.current = true;
-    lastAutoCallKeyRef.current = key;
-    void (async () => {
-      try {
-        const r = await callOv2BingoNext(roomId, selfKey, liveSnapshot.revision);
-        if (r.ok && "snapshot" in r && r.snapshot) {
-          setLiveSnapshot(r.snapshot);
-        } else {
-          lastAutoCallKeyRef.current = null;
-        }
-      } catch {
-        lastAutoCallKeyRef.current = null;
-      } finally {
-        callInFlightRef.current = false;
-      }
-    })();
-  }, [playMode, liveSnapshot, selfKey, roomId, canCallNextNow]);
 
   const callNextPreviewNumber = useCallback(() => {
     setPreviewRound(prev => {
@@ -252,13 +194,13 @@ export function useOv2BingoSession(baseContext) {
       }
       if (playMode === OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE && liveCard) {
         setLiveMarks(prev => {
-          const { marks: next, changed } = applyPreviewMark(liveCard, prev, n, liveCalledSet);
+          const { marks: next, changed } = toggleManualPlayerMark(liveCard, prev, n);
           if (!changed) return prev;
           return next;
         });
       }
     },
-    [playMode, previewCard, liveCard, liveCalledSet]
+    [playMode, previewCard, liveCard]
   );
 
   const refreshLiveSnapshot = useCallback(async () => {
@@ -414,18 +356,11 @@ export function useOv2BingoSession(baseContext) {
       const previewCalledSet = new Set(previewRound.called);
       const previewLast = previewRound.called.length ? previewRound.called[previewRound.called.length - 1] : null;
       let phaseLine = "Open Shared rooms to play Bingo online.";
-      const previewAvail = getAvailablePrizeKeys({
-        card: previewCard,
-        called: previewRound.called,
-        existingClaims: [],
-      });
       /** @type {Record<string, string|null>} */
       const previewPrizeDisabled = {};
       for (const pk of BINGO_PRIZE_KEYS) {
         previewPrizeDisabled[pk] = "Not in a live Bingo room";
       }
-      const wonPreview = new Set(getWonRowKeys(previewCard, previewRound.called));
-      if (isFullWonByCalls(previewCard, previewRound.called)) wonPreview.add("full");
 
       return {
         playMode,
@@ -445,10 +380,10 @@ export function useOv2BingoSession(baseContext) {
         msUntilNextCall: null,
         announcement: null,
         winner: null,
-        availablePrizeKeys: previewAvail,
+        availablePrizeKeys: [],
         claims: [],
         membersVm,
-        wonPrizeKeys: [...wonPreview],
+        wonPrizeKeys: [],
         selfClaimedPrizeKeys: [],
         prizeDisabledByKey: previewPrizeDisabled,
         roomLifecyclePhase: null,
@@ -497,12 +432,7 @@ export function useOv2BingoSession(baseContext) {
     const dr = {
       openSession: snap?.canOpenSession ? null : snap?.roomLifecyclePhase !== "active" ? "Room not active" : "Session already active or not eligible",
       callNext: snap?.canCallNext ? (nextCallDue ? null : "Waiting for call timer") : "Only the caller can draw",
-      claim:
-        snap?.sessionPhase === "playing" && availablePrizeKeysLive.length === 0
-          ? "No claimable prizes yet"
-          : !liveCard
-            ? "No card (seat required)"
-            : null,
+      claim: snap?.sessionPhase === "playing" ? (!liveCard ? "No card (seat required)" : null) : "Match not in play",
       rematch: snap?.canRequestRematch ? null : "Rematch not available",
       cancelRematch: snap?.canCancelRematch ? null : "Nothing to cancel",
       startNextMatch: snap?.canStartNextMatch ? null : "Host only — all players must rematch first",
@@ -513,19 +443,18 @@ export function useOv2BingoSession(baseContext) {
         ? snap.claims.filter(c => c.claimedByParticipantKey === selfKey).map(c => c.prizeKey)
         : [];
 
+    const takenPrizeKeys = new Set((snap?.claims ?? []).map(c => c.prizeKey));
+
     /** @type {Record<string, string|null>} */
     const prizeDisabledByKey = {};
     for (const pk of BINGO_PRIZE_KEYS) {
       if (snap?.sessionPhase === "finished") prizeDisabledByKey[pk] = "Match finished";
       else if (dr.claim) prizeDisabledByKey[pk] = dr.claim;
-      else if (!availablePrizeKeysLive.includes(pk)) prizeDisabledByKey[pk] = "Not yet claimable";
+      else if (takenPrizeKeys.has(pk)) prizeDisabledByKey[pk] = "Already claimed";
       else prizeDisabledByKey[pk] = null;
     }
 
-    const cardForEmphasis = liveCard || previewCard;
-    const wonEmphasis = new Set(selfClaimedPrizeKeys);
-    for (const k of getWonRowKeys(cardForEmphasis, called)) wonEmphasis.add(k);
-    if (isFullWonByCalls(cardForEmphasis, called)) wonEmphasis.add("full");
+    const wonPrizeKeysFromClaims = [...takenPrizeKeys];
 
     let phaseLine = "Playing — numbers are called on the server.";
     if (snap?.sessionPhase === "playing") phaseLine = "Playing";
@@ -537,22 +466,22 @@ export function useOv2BingoSession(baseContext) {
       card: liveCard || previewCard,
       marks: liveMarks,
       called,
-      calledSet: liveCalledSet,
+      calledSet: new Set(called),
       lastCalled: lastCalledLive,
       phaseLine,
       deckRemaining: deckRem,
       deckTotal,
-      previewLine: previewLineLive,
+      previewLine: { completedRowIndexes: [], hasAnyRow: false, isFull: false },
       authoritativeSnapshot: snap,
       revision: snap?.revision ?? 0,
       nextCallAtIso: snap?.nextCallAtIso ?? null,
       msUntilNextCall,
       announcement,
       winner: snap?.winner ?? null,
-      availablePrizeKeys: availablePrizeKeysLive,
+      availablePrizeKeys: [],
       claims: snap?.claims ?? [],
       membersVm,
-      wonPrizeKeys: [...wonEmphasis],
+      wonPrizeKeys: wonPrizeKeysFromClaims,
       selfClaimedPrizeKeys,
       prizeDisabledByKey,
       roomLifecyclePhase: snap?.roomLifecyclePhase ?? null,
@@ -563,7 +492,7 @@ export function useOv2BingoSession(baseContext) {
       canOpenSession: snap?.canOpenSession ?? false,
       canCallNext: snap?.canCallNext ?? false,
       canCallNextNow,
-      canClaimAnyPrize: availablePrizeKeysLive.length > 0 && snap?.sessionPhase === "playing",
+      canClaimAnyPrize: false,
       canRequestRematch: snap?.canRequestRematch ?? false,
       canCancelRematch: snap?.canCancelRematch ?? false,
       canStartNextMatch: snap?.canStartNextMatch ?? false,
@@ -580,9 +509,6 @@ export function useOv2BingoSession(baseContext) {
     liveSnapshot,
     liveCard,
     liveMarks,
-    liveCalledSet,
-    previewLineLive,
-    availablePrizeKeysLive,
     canCallNextNow,
     nextCallDue,
     nowMs,

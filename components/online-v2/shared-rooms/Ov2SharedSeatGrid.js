@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { getOv2BingoSeatStyle } from "../../../lib/online-v2/bingo/ov2BingoSeatColors";
+import { OV2_BINGO_PRODUCT_GAME_ID } from "../../../lib/online-v2/bingo/ov2BingoSessionAdapter";
 
 export default function Ov2SharedSeatGrid({
   room,
@@ -15,6 +17,7 @@ export default function Ov2SharedSeatGrid({
   );
   const mySeat = myMember?.seat_index ?? null;
   const seatsDisabled = busy || room?.status !== "OPEN";
+  const bingoSeats = String(room?.product_game_id || "").trim() === OV2_BINGO_PRODUCT_GAME_ID;
 
   return (
     <div className="rounded-xl border border-white/10 bg-black/25 p-3">
@@ -24,6 +27,10 @@ export default function Ov2SharedSeatGrid({
           const holder = members.find(m => m.seat_index === seatIndex) || null;
           const mine = holder?.participant_key === participantId;
           const disabled = seatsDisabled || (holder && !mine);
+          const seatStyle = bingoSeats ? getOv2BingoSeatStyle(seatIndex) : null;
+          const bingoMine = bingoSeats && seatStyle && mine;
+          const bingoOther = bingoSeats && seatStyle && holder && !mine;
+          const bingoOpen = bingoSeats && seatStyle && !holder;
           return (
             <button
               key={`seat-${seatIndex}`}
@@ -32,11 +39,17 @@ export default function Ov2SharedSeatGrid({
               onClick={() => void onClaimSeat(seatIndex)}
               className={[
                 "rounded-lg border px-2 py-2 text-xs font-semibold transition disabled:opacity-45",
-                mine
-                  ? "border-emerald-400 bg-emerald-900/40 text-emerald-100"
-                  : holder
-                    ? "border-zinc-600 bg-zinc-800/60 text-zinc-300"
-                    : "border-white/20 bg-white/5 text-white hover:bg-white/10",
+                bingoMine
+                  ? [seatStyle.border, seatStyle.bg, seatStyle.text, "ring-1 ring-sky-400/85"].join(" ")
+                  : bingoOther
+                    ? [seatStyle.border, seatStyle.bg, seatStyle.text].join(" ")
+                    : bingoOpen
+                      ? [seatStyle.border, "bg-black/25 text-zinc-200 hover:bg-white/10"].join(" ")
+                      : mine
+                        ? "border-emerald-400 bg-emerald-900/40 text-emerald-100"
+                        : holder
+                          ? "border-zinc-600 bg-zinc-800/60 text-zinc-300"
+                          : "border-white/20 bg-white/5 text-white hover:bg-white/10",
               ].join(" ")}
             >
               <div>Seat {seatIndex + 1}</div>

@@ -12,7 +12,9 @@ function rowIndexFromPrizeKey(prizeKey) {
 }
 
 /**
- * Presentational 5×5 Bingo card. Marks toggle only on numbers that appear in `called`.
+ * Presentational 5×5 Bingo card.
+ * Preview: marks toggle only on numbers in `called`.
+ * Live manual (`manualDabOnly`): no called-based styling; player toggles any cell (except FREE).
  *
  * @param {{
  *   card: number[][],
@@ -21,6 +23,7 @@ function rowIndexFromPrizeKey(prizeKey) {
  *   wonPrizeKeys?: string[],
  *   onToggleMark?: ((n: number) => void) | null,
  *   disabled?: boolean,
+ *   manualDabOnly?: boolean,
  * }} props
  */
 export default function Ov2BingoCard({
@@ -30,6 +33,7 @@ export default function Ov2BingoCard({
   wonPrizeKeys = [],
   onToggleMark = null,
   disabled = false,
+  manualDabOnly = false,
 }) {
   const headers = ["B", "I", "N", "G", "O"];
   const calledSet = useMemo(() => new Set(normalizeCalledNumbers(called)), [called]);
@@ -64,8 +68,10 @@ export default function Ov2BingoCard({
           const isFree = n === 0 && idx === 12;
           const isMarked = marks[idx];
           const isCalled = isFree || calledSet.has(n);
-          const shouldShowYellow = isMarked && isCalled && !isFree;
+          const shouldShowYellow =
+            !manualDabOnly && isMarked && isCalled && !isFree;
           const rowWin = rowEmphasis.rows.has(row) || rowEmphasis.full;
+          const canClickCell = manualDabOnly ? !isFree : !isFree && calledSet.has(n);
 
           return (
             <button
@@ -73,10 +79,10 @@ export default function Ov2BingoCard({
               type="button"
               onClick={() => {
                 if (!canInteract || isFree) return;
-                if (!calledSet.has(n)) return;
+                if (!canClickCell) return;
                 onToggleMark?.(n);
               }}
-              disabled={!canInteract || isFree || !calledSet.has(n)}
+              disabled={!canInteract || isFree || !canClickCell}
               className={[
                 "grid min-h-[1.85rem] place-items-center rounded-lg border text-xs font-semibold transition sm:min-h-[2.25rem] sm:text-sm",
                 isFree

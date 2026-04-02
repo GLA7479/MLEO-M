@@ -129,7 +129,7 @@ export default function Ov2BingoLiveShell() {
   }, [roomId, reloadContext]);
 
   const onLeaveTable = useCallback(async () => {
-    if (!roomId || !participantId) return;
+    if (!roomId || !participantId || leaveBusy) return;
     setLeaveErr("");
     setLeaveBusy(true);
     try {
@@ -145,7 +145,7 @@ export default function Ov2BingoLiveShell() {
     } finally {
       setLeaveBusy(false);
     }
-  }, [roomId, participantId, room, router]);
+  }, [roomId, participantId, room, router, leaveBusy]);
 
   const contextInput = useMemo(() => {
     if (!roomId) return null;
@@ -158,8 +158,10 @@ export default function Ov2BingoLiveShell() {
         display_name: selfDisplayName,
       },
       reloadRoomContext: reloadContext,
+      onLeaveToLobby: onLeaveTable,
+      leaveToLobbyBusy: leaveBusy,
     };
-  }, [roomId, room, members, participantId, selfDisplayName, reloadContext]);
+  }, [roomId, room, members, participantId, selfDisplayName, reloadContext, onLeaveTable, leaveBusy]);
 
   if (!roomId) {
     return (
@@ -196,7 +198,7 @@ export default function Ov2BingoLiveShell() {
               className="text-sky-300 underline disabled:opacity-45"
               onClick={() => void onLeaveTable()}
             >
-              {leaveBusy ? "Leaving…" : "Leave table"}
+              {leaveBusy ? "Leaving…" : "Leave game"}
             </button>
             {leaveErr ? <span className="ml-1 text-red-300">{leaveErr}</span> : null}
           </p>

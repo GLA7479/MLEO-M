@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { BINGO_PRIZE_KEYS } from "../../../lib/online-v2/bingo/ov2BingoEngine";
+import { getOv2BingoSeatStyle } from "../../../lib/online-v2/bingo/ov2BingoSeatColors";
 import { OV2_BINGO_PLAY_MODE } from "../../../lib/online-v2/bingo/ov2BingoSessionAdapter";
 import { useOv2BingoSession } from "../../../hooks/useOv2BingoSession";
 import Ov2BingoCard from "./Ov2BingoCard";
@@ -16,11 +17,28 @@ function fmtCountdown(ms) {
   return `${s}s`;
 }
 
-/** @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null }} props */
+/**
+ * @param {{
+ *   contextInput?: {
+ *     room?: object,
+ *     members?: unknown[],
+ *     self?: { participant_key?: string },
+ *     onLeaveToLobby?: (() => void | Promise<void>) | null,
+ *     leaveToLobbyBusy?: boolean,
+ *   } | null,
+ * }} props
+ */
 export default function Ov2BingoScreen({ contextInput = null }) {
   const session = useOv2BingoSession(contextInput ?? undefined);
   const { vm, actions, selfKey, callNextPreviewNumber, resetPreviewRound, onToggleMark, previewDisabledReasonCallNext } =
     session;
+  const onLeaveToLobby =
+    contextInput && typeof contextInput === "object" && typeof contextInput.onLeaveToLobby === "function"
+      ? contextInput.onLeaveToLobby
+      : null;
+  const leaveToLobbyBusy = Boolean(
+    contextInput && typeof contextInput === "object" && contextInput.leaveToLobbyBusy
+  );
   const [claimToast, setClaimToast] = useState(/** @type {{ kind: "ok"|"err", text: string }|null} */ (null));
 
   const isRoomShell = vm.playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
@@ -39,6 +57,17 @@ export default function Ov2BingoScreen({ contextInput = null }) {
     }),
     []
   );
+
+  const claimByPrizeKey = useMemo(() => {
+    /** @type {Record<string, { seatIndex: number, amount: number }>} */
+    const m = {};
+    for (const c of vm.claims || []) {
+      const pk = String(c.prizeKey || "").trim();
+      if (!pk) continue;
+      m[pk] = { seatIndex: Number(c.seatIndex), amount: Number(c.amount) || 0 };
+    }
+    return m;
+  }, [vm.claims]);
 
   const seatSlots = useMemo(() => {
     const slots = [];
@@ -84,12 +113,26 @@ export default function Ov2BingoScreen({ contextInput = null }) {
     <div className="flex h-full min-h-0 w-full flex-col gap-0.5 overflow-hidden px-0.5 sm:gap-1 sm:px-1">
       <Ov2GameStatusStrip title={stripTitle} subtitle={vm.phaseLine} tone={stripTone} compact={Boolean(vm.isLive)} />
 
+      {vm.isLive && onLeaveToLobby ? (
+        <div className="flex shrink-0 justify-end px-0.5 pt-0.5">
+          <button
+            type="button"
+            disabled={leaveToLobbyBusy}
+            onClick={() => void onLeaveToLobby()}
+            className="text-[10px] font-semibold text-red-200/95 underline decoration-red-400/50 disabled:opacity-45 sm:text-[11px]"
+          >
+            {leaveToLobbyBusy ? "Leaving…" : "Leave game"}
+          </button>
+        </div>
+      ) : null}
+
       <div
         className="shrink-0 overflow-x-auto rounded-lg border border-white/10 bg-black/35 py-0.5 [scrollbar-width:thin] sm:py-1"
         aria-label="Seats"
       >
         <div className="flex min-w-max gap-1 px-1">
           {seatSlots.map(({ seatIndex, member }) => {
+            const seatStyle = getOv2BingoSeatStyle(seatIndex);
             const you = Boolean(selfKey && member?.participantKey === selfKey);
             const isCaller = vm.callerSeatIndex != null && vm.callerSeatIndex === seatIndex;
             const isWinner =
@@ -100,10 +143,10 @@ export default function Ov2BingoScreen({ contextInput = null }) {
                 key={seatIndex}
                 className={[
                   "flex min-h-[2.5rem] w-[5.25rem] shrink-0 flex-col justify-center rounded-md border px-1.5 py-1 text-[9px] leading-tight sm:min-h-[2.8125rem] sm:w-[6rem] sm:py-1.5 sm:text-[10px]",
-                  member ? "border-white/20 bg-white/10" : "border-white/10 bg-black/20 text-zinc-500",
+                  member ? [seatStyle.border, seatStyle.bg].join(" ") : ["border-white/10 bg-black/20 text-zinc-500", seatStyle.border].join(" "),
                   you ? "ring-1 ring-sky-400/80" : "",
-                  isCaller ? "border-amber-400/50 bg-amber-950/35" : "",
-                  isWinner ? "border-emerald-400/50 bg-emerald-950/30" : "",
+                  isCaller ? "ring-1 ring-amber-300/70" : "",
+                  isWinner ? "ring-1 ring-emerald-400/60" : "",
                 ].join(" ")}
                 title={member ? `${label}${member.isReady ? " · Ready" : ""}` : `Seat ${seatIndex + 1} · Open`}
               >
@@ -142,6 +185,17 @@ export default function Ov2BingoScreen({ contextInput = null }) {
               {vm.deckRemaining}/{vm.deckTotal}
             </span>
           </span>
+          {vm.canCallNext ? (
+            <button
+              type="button"
+              disabled={!vm.canCallNextNow || Boolean(vm.disabledReasons.callNext)}
+              title={vm.disabledReasons.callNext || "Draw the next ball"}
+              onClick={() => void actions.callNextManual()}
+              className="flex h-[2.25rem] max-h-[2.25rem] min-w-[6.5rem] shrink-0 items-center justify-center rounded-md border border-amber-500/45 bg-amber-950/40 px-2 text-[10px] font-semibold text-amber-100 disabled:cursor-not-allowed disabled:opacity-45 sm:h-[2.5rem] sm:max-h-[2.5rem] sm:min-w-0 sm:flex-1 sm:px-3 sm:text-xs"
+            >
+              Draw next
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -188,7 +242,6 @@ export default function Ov2BingoScreen({ contextInput = null }) {
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1 rounded-lg border border-white/10 bg-black/30 px-1.5 py-1">
           <div className="mr-auto text-[10px] text-zinc-500">
             Deck {vm.deckRemaining}/{vm.deckTotal}
-            {vm.previewLine?.isFull ? " · board full" : vm.previewLine?.hasAnyRow ? " · row complete" : ""}
           </div>
           <button
             type="button"
@@ -215,11 +268,12 @@ export default function Ov2BingoScreen({ contextInput = null }) {
           <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-hidden py-0.5 sm:overflow-y-auto sm:py-1">
             <Ov2BingoCard
               card={vm.card}
-              called={vm.called}
+              called={vm.isLive && vm.cardIsAuthoritative ? [] : vm.called}
               marks={vm.marks}
-              wonPrizeKeys={vm.wonPrizeKeys}
+              wonPrizeKeys={playingLive ? [] : vm.wonPrizeKeys}
               onToggleMark={onToggleMark}
               disabled={vm.isLive && !vm.cardIsAuthoritative}
+              manualDabOnly={Boolean(vm.isLive && vm.cardIsAuthoritative)}
             />
           </div>
           {cardFooterHint ? (
@@ -261,19 +315,34 @@ export default function Ov2BingoScreen({ contextInput = null }) {
             <div className="mt-0.5 grid grid-cols-3 gap-0.5 sm:grid-cols-6 sm:gap-1">
               {BINGO_PRIZE_KEYS.map(pk => {
                 const reason = vm.prizeDisabledByKey[pk] ?? "Unavailable";
-                const blocked = Boolean(reason);
+                const claimed = claimByPrizeKey[pk];
+                const winStyle = claimed ? getOv2BingoSeatStyle(claimed.seatIndex).prize : "";
+                const hardBlocked =
+                  !isLiveMatch ||
+                  vm.sessionPhase !== "playing" ||
+                  (Boolean(reason) && reason !== "Already claimed");
+                const disabled = hardBlocked || Boolean(claimed);
                 return (
                   <button
                     key={pk}
                     type="button"
-                    disabled={blocked || !isLiveMatch || vm.sessionPhase !== "playing"}
-                    title={blocked ? reason : `Claim ${prizeLabels[pk]}`}
+                    disabled={disabled}
+                    title={
+                      claimed
+                        ? `Claimed · seat ${claimed.seatIndex + 1}`
+                        : reason
+                          ? reason
+                          : `Claim ${prizeLabels[pk]}`
+                    }
                     onClick={() => void onClaim(pk)}
-                    className={`rounded-md border px-1 py-1 text-[9px] font-semibold sm:py-1.5 sm:text-[10px] ${
-                      !blocked && isLiveMatch && vm.sessionPhase === "playing"
-                        ? "border-emerald-500/40 bg-emerald-950/35 text-emerald-100 hover:bg-emerald-900/40"
-                        : "cursor-not-allowed border-white/10 bg-white/5 text-zinc-500 opacity-80"
-                    }`}
+                    className={[
+                      "rounded-md border px-1 py-1 text-[9px] font-semibold sm:py-1.5 sm:text-[10px]",
+                      claimed
+                        ? `${winStyle} cursor-not-allowed opacity-95`
+                        : hardBlocked
+                          ? "cursor-not-allowed border-white/10 bg-white/5 text-zinc-500 opacity-80"
+                          : "border-white/15 bg-black/30 text-zinc-200 hover:bg-white/10",
+                    ].join(" ")}
                   >
                     {prizeLabels[pk]}
                   </button>
