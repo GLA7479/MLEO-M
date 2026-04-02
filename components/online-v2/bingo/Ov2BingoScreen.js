@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BINGO_PRIZE_KEYS } from "../../../lib/online-v2/bingo/ov2BingoEngine";
 import { getOv2BingoSeatStyle } from "../../../lib/online-v2/bingo/ov2BingoSeatColors";
 import { OV2_BINGO_PLAY_MODE } from "../../../lib/online-v2/bingo/ov2BingoSessionAdapter";
 import { useOv2BingoSession } from "../../../hooks/useOv2BingoSession";
 import Ov2BingoCard from "./Ov2BingoCard";
+import Ov2BingoFinishModal from "./Ov2BingoFinishModal";
 import Ov2GameStatusStrip from "../shared/Ov2GameStatusStrip";
 
 /** @param {number|null|undefined} ms */
@@ -41,6 +42,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
   );
   const [claimPendingKey, setClaimPendingKey] = useState(/** @type {string|null} */ (null));
   const claimFlightRef = useRef(false);
+  const [finishModalDismissedForSessionId, setFinishModalDismissedForSessionId] = useState("");
 
   const isRoomShell = vm.playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
   const isLiveMatch = vm.playMode === OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE;
@@ -57,6 +59,32 @@ export default function Ov2BingoScreen({ contextInput = null }) {
       full: "Full",
     }),
     []
+  );
+
+  const finishSessionId = useMemo(() => {
+    const s = vm.authoritativeSnapshot?.sessionId;
+    return s != null && String(s).trim() ? String(s).trim() : "";
+  }, [vm.authoritativeSnapshot?.sessionId]);
+
+  useEffect(() => {
+    setFinishModalDismissedForSessionId("");
+  }, [finishSessionId]);
+
+  const finishModalClaims = useMemo(() => {
+    return (vm.claims || []).map(c => ({
+      prizeKey: String(c.prizeKey || "").trim(),
+      claimedByName: String(c.claimedByName || "").trim() || "Player",
+      amount: Math.floor(Number(c.amount) || 0),
+      seatIndex: c.seatIndex,
+    }));
+  }, [vm.claims]);
+
+  const showFinishModal = Boolean(
+    vm.isLive &&
+      isLiveMatch &&
+      vm.sessionPhase === "finished" &&
+      finishSessionId &&
+      finishModalDismissedForSessionId !== finishSessionId
   );
 
   const claimByPrizeKey = useMemo(() => {
@@ -107,7 +135,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
         setClaimPendingKey(null);
       }
     },
-    [actions, prizeLabels]
+    [actions]
   );
 
   const cardFooterHint = useMemo(() => {
@@ -129,7 +157,8 @@ export default function Ov2BingoScreen({ contextInput = null }) {
   }, [isLiveMatch, vm.roomLifecyclePhase, vm.sessionPhase, vm.roomActiveSessionId]);
 
   const playingLive = Boolean(vm.isLive && isLiveMatch && vm.sessionPhase === "playing");
-  const liveExceptionUi = Boolean(vm.isLive && !playingLive);
+  const isFinishedLive = Boolean(vm.isLive && isLiveMatch && vm.sessionPhase === "finished");
+  const liveExceptionUi = Boolean(vm.isLive && !playingLive && !isFinishedLive);
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-0.5 overflow-hidden px-0.5 sm:gap-1 sm:px-1">
@@ -202,6 +231,28 @@ export default function Ov2BingoScreen({ contextInput = null }) {
             <span className="font-mono font-semibold text-zinc-100">{fmtCountdown(vm.msUntilNextCall)}</span>
           </span>
           <span className="flex h-[2.25rem] max-h-[2.25rem] min-w-[5.5rem] flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-white/10 bg-black/40 px-3 py-0 text-xs leading-tight text-zinc-400 sm:h-[2.5rem] sm:max-h-[2.5rem] sm:min-w-0 sm:px-4 sm:text-sm">
+            <span className="font-semibold text-zinc-500">Deck</span>
+            <span className="font-mono font-semibold text-zinc-200">
+              {vm.deckRemaining}/{vm.deckTotal}
+            </span>
+          </span>
+        </div>
+      ) : null}
+
+      {isFinishedLive ? (
+        <div
+          className="flex shrink-0 flex-nowrap items-stretch gap-2 overflow-x-auto rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 [scrollbar-width:thin] sm:gap-3 sm:px-3 sm:py-2"
+          aria-label="Match result summary"
+        >
+          <span className="flex h-[2rem] max-h-[2rem] min-w-[5rem] flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-white/10 bg-black/40 px-2 py-0 text-[10px] leading-tight text-zinc-400 sm:h-[2.25rem] sm:max-h-[2.25rem] sm:min-w-0 sm:text-xs">
+            <span className="font-semibold text-zinc-500">Last</span>
+            <span className="font-mono font-semibold text-amber-100">{vm.lastCalled ?? "—"}</span>
+          </span>
+          <span className="flex h-[2rem] max-h-[2rem] min-w-[5rem] flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-white/10 bg-black/40 px-2 py-0 text-[10px] leading-tight text-zinc-400 sm:h-[2.25rem] sm:max-h-[2.25rem] sm:min-w-0 sm:text-xs">
+            <span className="font-semibold text-zinc-500">Next</span>
+            <span className="font-mono font-semibold text-zinc-300">—</span>
+          </span>
+          <span className="flex h-[2rem] max-h-[2rem] min-w-[5rem] flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-white/10 bg-black/40 px-2 py-0 text-[10px] leading-tight text-zinc-400 sm:h-[2.25rem] sm:max-h-[2.25rem] sm:min-w-0 sm:text-xs">
             <span className="font-semibold text-zinc-500">Deck</span>
             <span className="font-mono font-semibold text-zinc-200">
               {vm.deckRemaining}/{vm.deckTotal}
@@ -291,7 +342,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
         </div>
 
         <div className="flex min-h-0 min-w-0 shrink-0 flex-col gap-0.5 sm:gap-1 lg:col-span-2 lg:flex lg:min-h-0 lg:h-full lg:flex-col lg:overflow-hidden">
-          <div className="flex h-[7.875rem] max-h-[7.875rem] shrink-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 px-1.5 py-1 sm:h-[11.5rem] sm:max-h-[11.5rem] sm:px-2 sm:py-1.5 lg:h-auto lg:max-h-none lg:min-h-0 lg:flex-1">
+          <div className="flex h-[7.875rem] max-h-[7.875rem] shrink-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 px-1.5 py-1 sm:h-[11.5rem] sm:max-h-[11.5rem] sm:px-2 sm:py-1.5 lg:max-h-[min(30vh,10.5rem)] lg:shrink-0">
             <div className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">
               Called numbers
             </div>
@@ -362,11 +413,14 @@ export default function Ov2BingoScreen({ contextInput = null }) {
         </div>
       </div>
 
-      {(vm.sessionPhase === "finished" || (vm.announcement && isLiveMatch)) && vm.announcement ? (
-        <div className="shrink-0 space-y-1 rounded-lg border border-white/15 bg-black/35 px-2 py-2 text-[10px]">
-          <p className="text-center text-zinc-200">{vm.announcement}</p>
-        </div>
-      ) : null}
+      <Ov2BingoFinishModal
+        open={showFinishModal}
+        onClose={() => setFinishModalDismissedForSessionId(finishSessionId)}
+        prizeLabels={prizeLabels}
+        claims={finishModalClaims}
+        winner={vm.winner}
+        walkoverPayoutAmount={vm.walkoverPayoutAmount ?? null}
+      />
     </div>
   );
 }

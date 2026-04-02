@@ -381,6 +381,7 @@ export function useOv2BingoSession(baseContext) {
         nextCallAtIso: liveSnapshot?.nextCallAtIso ?? null,
         msUntilNextCall: null,
         announcement: null,
+        walkoverPayoutAmount: null,
         winner: null,
         availablePrizeKeys: [],
         claims: [],
@@ -438,6 +439,7 @@ export function useOv2BingoSession(baseContext) {
         nextCallAtIso: liveSnapshot?.nextCallAtIso ?? null,
         msUntilNextCall: null,
         announcement: null,
+        walkoverPayoutAmount: null,
         winner: null,
         availablePrizeKeys: [],
         claims: [],
@@ -478,22 +480,13 @@ export function useOv2BingoSession(baseContext) {
       if (Number.isFinite(t)) msUntilNextCall = Math.max(0, t - nowMs);
     }
 
-    let announcement = null;
-    if (snap?.sessionPhase === "finished") {
-      if (snap.winner?.participantKey) {
-        announcement = `Match finished — winner: ${snap.winner.name || snap.winner.participantKey}`;
-      } else {
-        announcement = "Match finished.";
-      }
-    }
-
     const dr = {
       openSession: snap?.canOpenSession ? null : snap?.roomLifecyclePhase !== "active" ? "Room not active" : "Session already active or not eligible",
       callNext: snap?.canCallNext ? (nextCallDue ? null : "Waiting for call timer") : "Only the caller can draw",
       claim: snap?.sessionPhase === "playing" ? (!liveCard ? "No card (seat required)" : null) : "Match not in play",
-      rematch: snap?.canRequestRematch ? null : "Rematch not available",
-      cancelRematch: snap?.canCancelRematch ? null : "Nothing to cancel",
-      startNextMatch: snap?.canStartNextMatch ? null : "Host only — all players must rematch first",
+      rematch: "Rematch not available",
+      cancelRematch: "Nothing to cancel",
+      startNextMatch: "Not available",
     };
 
     const selfClaimedPrizeKeys =
@@ -535,7 +528,7 @@ export function useOv2BingoSession(baseContext) {
 
     let phaseLine = "Playing — numbers are called on the server.";
     if (snap?.sessionPhase === "playing") phaseLine = "Playing";
-    else if (snap?.sessionPhase === "finished") phaseLine = announcement || "Finished";
+    else if (snap?.sessionPhase === "finished") phaseLine = "Finished";
 
     return {
       playMode,
@@ -553,7 +546,8 @@ export function useOv2BingoSession(baseContext) {
       revision: snap?.revision ?? 0,
       nextCallAtIso: snap?.nextCallAtIso ?? null,
       msUntilNextCall,
-      announcement,
+      announcement: null,
+      walkoverPayoutAmount: snap?.walkoverPayoutAmount ?? null,
       winner: snap?.winner ?? null,
       availablePrizeKeys: [],
       claims: snap?.claims ?? [],
@@ -569,9 +563,9 @@ export function useOv2BingoSession(baseContext) {
       canCallNext: snap?.canCallNext ?? false,
       canCallNextNow,
       canClaimAnyPrize: false,
-      canRequestRematch: snap?.canRequestRematch ?? false,
-      canCancelRematch: snap?.canCancelRematch ?? false,
-      canStartNextMatch: snap?.canStartNextMatch ?? false,
+      canRequestRematch: false,
+      canCancelRematch: false,
+      canStartNextMatch: false,
       cardIsAuthoritative: Boolean(liveCard),
       disabledReasons: dr,
     };
