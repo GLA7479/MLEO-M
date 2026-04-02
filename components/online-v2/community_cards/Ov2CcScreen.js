@@ -35,7 +35,7 @@ export default function Ov2CcScreen({
   }, [minBuy]);
 
   const mySeat = useMemo(() => {
-    if (!engine?.seats || !participantKey) return null;
+    if (!Array.isArray(engine?.seats) || !participantKey) return null;
     return engine.seats.find(s => s.participantKey === participantKey) || null;
   }, [engine, participantKey]);
 
@@ -85,6 +85,7 @@ export default function Ov2CcScreen({
 
   const { maxSeats, pot, communityCards, phase, currentBet, sb, bb } = engine;
   const betweenHands = phase === "idle" || phase === "between_hands";
+  const seats = Array.isArray(engine.seats) ? engine.seats : [];
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden text-white">
@@ -94,39 +95,45 @@ export default function Ov2CcScreen({
       </div>
 
       <div className="grid shrink-0 grid-cols-5 gap-1 sm:grid-cols-9">
-        {engine.seats.map((s, i) => {
-          const isYou = s.participantKey === participantKey;
-          const isAct = engine.actionSeat === i;
-          return (
-            <button
-              key={i}
-              type="button"
-              disabled={operateBusy || Boolean(s.participantKey)}
-              onClick={() => !s.participantKey && setPickSeat(i)}
-              className={`flex min-h-[52px] flex-col items-center justify-center rounded-lg border px-0.5 py-1 text-[9px] leading-tight transition touch-manipulation ${
-                s.participantKey
-                  ? "border-white/20 bg-white/[0.06]"
-                  : "border-dashed border-emerald-500/40 bg-emerald-950/20"
-              } ${isYou ? "ring-1 ring-sky-400/60" : ""} ${isAct ? "ring-1 ring-amber-400/70" : ""} disabled:opacity-60`}
-            >
-              <span className="font-bold text-zinc-200">S{i + 1}</span>
-              {s.participantKey ? (
-                <>
-                  <span className="truncate text-[8px] text-zinc-400">
-                    {isYou ? "You" : s.displayName || "…"}
-                  </span>
-                  <span className="text-[9px] text-emerald-200">{Math.floor(s.stack || 0)}</span>
-                  {s.waitBb ? <span className="text-[7px] text-amber-300">Waiting for BB</span> : null}
-                  {s.pendingSitOutAfterHand ? <span className="text-[7px] text-amber-400/90">Sit out next</span> : null}
-                  {s.sitOut ? <span className="text-[7px] text-zinc-500">Sit out</span> : null}
-                  {s.folded ? <span className="text-[7px] text-rose-400">Out</span> : null}
-                </>
-              ) : (
-                <span className="text-[8px] text-emerald-300/80">Open</span>
-              )}
-            </button>
-          );
-        })}
+        {seats.length === 0 ? (
+          <div className="col-span-full rounded-lg border border-white/10 bg-black/20 px-2 py-3 text-center text-[11px] text-zinc-500">
+            Seat layout not available yet. If this stays empty, run the Community Cards SQL migration and refresh.
+          </div>
+        ) : (
+          seats.map((s, i) => {
+            const isYou = s.participantKey === participantKey;
+            const isAct = engine.actionSeat === i;
+            return (
+              <button
+                key={i}
+                type="button"
+                disabled={operateBusy || Boolean(s.participantKey)}
+                onClick={() => !s.participantKey && setPickSeat(i)}
+                className={`flex min-h-[52px] flex-col items-center justify-center rounded-lg border px-0.5 py-1 text-[9px] leading-tight transition touch-manipulation ${
+                  s.participantKey
+                    ? "border-white/20 bg-white/[0.06]"
+                    : "border-dashed border-emerald-500/40 bg-emerald-950/20"
+                } ${isYou ? "ring-1 ring-sky-400/60" : ""} ${isAct ? "ring-1 ring-amber-400/70" : ""} disabled:opacity-60`}
+              >
+                <span className="font-bold text-zinc-200">S{i + 1}</span>
+                {s.participantKey ? (
+                  <>
+                    <span className="truncate text-[8px] text-zinc-400">
+                      {isYou ? "You" : s.displayName || "…"}
+                    </span>
+                    <span className="text-[9px] text-emerald-200">{Math.floor(s.stack || 0)}</span>
+                    {s.waitBb ? <span className="text-[7px] text-amber-300">Waiting for BB</span> : null}
+                    {s.pendingSitOutAfterHand ? <span className="text-[7px] text-amber-400/90">Sit out next</span> : null}
+                    {s.sitOut ? <span className="text-[7px] text-zinc-500">Sit out</span> : null}
+                    {s.folded ? <span className="text-[7px] text-rose-400">Out</span> : null}
+                  </>
+                ) : (
+                  <span className="text-[8px] text-emerald-300/80">Open</span>
+                )}
+              </button>
+            );
+          })
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/30 px-2 py-3">
