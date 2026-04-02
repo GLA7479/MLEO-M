@@ -1,11 +1,13 @@
 import { getSupabaseAdmin } from "../../../lib/server/supabaseAdmin";
+import { getArcadeDevice } from "../../../lib/server/arcadeDeviceCookie";
+import { upsertOv2C21ParticipantDevice } from "../../../lib/server/ov2C21ParticipantDevice";
 import { normalizeEngine, mutateEngine } from "../../../lib/online-v2/c21/ov2C21MultiEngine";
 import { OV2_C21_PRODUCT_GAME_ID } from "../../../lib/online-v2/c21/ov2C21TableIds";
 import { buildIdemCommit, buildIdemSettle } from "../../../lib/online-v2/c21/ov2C21EconomyIds";
 import {
-  applyC21ServerVaultForCaller,
+  applyC21EconomyOpsToVault,
   getArcadeVaultBalanceForRequest,
-  reverseC21ServerVaultForCaller,
+  reverseC21EconomyOps,
 } from "../../../lib/server/ov2C21VaultAuthority";
 
 /**
@@ -128,6 +130,18 @@ export default async function handler(req, res) {
       }
     }
 
+    const callerDeviceId = getArcadeDevice(req);
+    if (participantKey && callerDeviceId) {
+      const bind = await upsertOv2C21ParticipantDevice(admin, roomId, participantKey, callerDeviceId);
+      if (!bind.ok) {
+        return res.status(500).json({
+          ok: false,
+          code: "C21_DEVICE_BINDING_FAILED",
+          message: bind.message || "Failed to persist participant device binding",
+        });
+      }
+    }
+
     const maxAttempts = 4;
     let lastConflict = false;
 
@@ -184,15 +198,8 @@ export default async function handler(req, res) {
         continue;
       }
 
-      if (economyOps.length && participantKey) {
-        const vaultRes = await applyC21ServerVaultForCaller(
-          admin,
-          req,
-          roomId,
-          roundForEconomy,
-          participantKey,
-          economyOps,
-        );
+      if (economyOps.length) {
+        const vaultRes = await applyC21EconomyOpsToVault(admin, roomId, roundForEconomy, economyOps);
         if (!vaultRes.ok) {
           const { error: revErr } = await admin
             .from("ov2_c21_live_state")
@@ -224,7 +231,7 @@ export default async function handler(req, res) {
         try {
           vaultEffects = await persistEconomyOps(admin, roomId, roundForEconomy, economyOps, participantKey);
         } catch (e) {
-          await reverseC21ServerVaultForCaller(admin, req, roomId, roundForEconomy, participantKey, economyOps);
+          await reverseC21EconomyOps(admin, roomId, roundForEconomy, economyOps);
           const { error: revErr } = await admin
             .from("ov2_c21_live_state")
             .update({
