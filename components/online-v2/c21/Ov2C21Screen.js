@@ -80,8 +80,8 @@ function PlayingCardOv2({ code, hidden, handCardCount = 1, seatFit = null }) {
     const n = Math.max(0, Math.floor(Number(handCardCount) || 0));
     const crowded = n >= 4;
     classSize = crowded
-      ? "h-[2.95rem] w-[2.05rem] sm:h-[3.35rem] sm:w-[2.45rem]"
-      : "h-[4.35rem] w-[3.05rem] sm:h-[4.55rem] sm:w-[3.2rem]";
+      ? "h-[3.25rem] w-[2.25rem] sm:h-[3.55rem] sm:w-[2.65rem]"
+      : "h-[4.85rem] w-[3.35rem] sm:h-[5.15rem] sm:w-[3.6rem]";
     compactFallback = crowded;
   }
 
@@ -150,9 +150,9 @@ const SEAT_HAND_TIERS = [
 
 /** Primary player hand under HOUSE — larger tiers than table seats. */
 const MY_HAND_TIERS = [
-  { wRem: 3.45, hRem: 5.05, compactFallback: false },
-  { wRem: 3.05, hRem: 4.45, compactFallback: false },
-  { wRem: 2.65, hRem: 3.88, compactFallback: true },
+  { wRem: 3.75, hRem: 5.45, compactFallback: false },
+  { wRem: 3.28, hRem: 4.78, compactFallback: false },
+  { wRem: 2.82, hRem: 4.1, compactFallback: true },
   { wRem: 2.3, hRem: 3.35, compactFallback: true },
   { wRem: 2.0, hRem: 2.9, compactFallback: true },
   { wRem: 1.72, hRem: 2.5, compactFallback: true },
@@ -326,6 +326,14 @@ export default function Ov2C21Screen({
   }, [mySeatIndex]);
 
   const intendedBetFloor = Math.floor(Number(mySeat?.intendedBet) || 0);
+
+  const myPlayAmountLabel = useMemo(() => {
+    if (!mySeat) return null;
+    const rb = Math.floor(Number(mySeat.roundBet) || 0);
+    if (mySeat.inRound && rb > 0) return fmt(rb);
+    if (phase === "betting") return fmt(Math.max(minBet, intendedBetFloor));
+    return null;
+  }, [mySeat, phase, intendedBetFloor, minBet]);
 
   useEffect(() => {
     if (phase !== "betting" || !mySeat) return;
@@ -525,17 +533,24 @@ export default function Ov2C21Screen({
       ) : null}
       {/* Board: no vertical scroll — flex fits within shell viewport */}
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden overflow-x-hidden sm:gap-1">
-        {/* HOUSE — same height as MY HAND; larger on desktop */}
-        <div className="relative flex h-[8.775rem] shrink-0 flex-col rounded-xl border border-amber-900/40 bg-gradient-to-b from-zinc-900/90 to-black/60 px-1.5 py-1 sm:h-[7.75rem]">
+        {/* HOUSE — fixed height; labels in corners; center = cards only */}
+        <div className="relative h-[9.5rem] shrink-0 overflow-hidden rounded-xl border border-amber-900/40 bg-gradient-to-b from-zinc-900/90 to-black/60 px-1.5 sm:h-[8.5rem]">
+          <span className="pointer-events-none absolute left-1.5 top-1 z-10 text-[9px] font-bold uppercase leading-none tracking-wide text-amber-200/85">
+            House
+          </span>
           <div
-            className="pointer-events-none absolute right-1.5 top-0.5 z-10 min-w-[1.75rem] text-right tabular-nums text-[17px] font-black leading-none tracking-tight text-amber-100 drop-shadow-md sm:text-xl"
+            className="pointer-events-none absolute right-1.5 top-0.5 z-10 min-w-[1.5rem] text-right tabular-nums text-[17px] font-black leading-none tracking-tight text-amber-100 drop-shadow-md sm:text-xl"
             aria-live="polite"
             aria-atomic="true"
           >
             {houseCountdownSeconds}
           </div>
-          <div className="shrink-0 text-center text-[10px] font-bold uppercase tracking-wide text-amber-200/80">House</div>
-          <div className={`flex min-h-0 flex-1 items-center justify-center overflow-x-auto py-0.5 ${dealerGap}`}>
+          <div className="pointer-events-none absolute bottom-0.5 left-0 right-0 z-10 h-3 text-center text-[9px] leading-3 text-zinc-400">
+            {!dealerHidden && dealer.length > 0 && dealerTotalLive != null ? `Total ${dealerTotalLive}` : "\u00a0"}
+          </div>
+          <div
+            className={`absolute inset-x-1.5 top-[1.125rem] bottom-[0.95rem] flex items-center justify-center overflow-x-auto ${dealerGap}`}
+          >
             {dealer.length === 0 ? (
               <span className="text-xs text-white/50">—</span>
             ) : dealerHidden ? (
@@ -558,13 +573,6 @@ export default function Ov2C21Screen({
               })
             )}
           </div>
-          {!dealerHidden && dealer.length > 0 ? (
-            <div className="h-[14px] shrink-0 text-center text-[10px] leading-[14px] text-zinc-400">
-              {dealerTotalLive != null ? `Total ${dealerTotalLive}` : "\u00a0"}
-            </div>
-          ) : (
-            <div className="h-[14px] shrink-0" aria-hidden />
-          )}
         </div>
 
         {/* Other seats — mobile: compact fixed height (no scroll); sm+: grows in middle */}
@@ -601,12 +609,17 @@ export default function Ov2C21Screen({
                 }}
                 className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-md border border-white/10 bg-black/40 px-px py-0 text-left transition ${actingHere} disabled:opacity-40`}
               >
-                <div className="flex h-[10px] max-h-[10px] shrink-0 items-center gap-px overflow-hidden leading-none">
+                <div className="flex h-[11px] max-h-[11px] shrink-0 items-center gap-px overflow-hidden leading-none">
                   {taken ? (
                     <>
                       <span className="min-w-0 flex-1 truncate text-left text-[6px] font-semibold leading-none text-white/90">
                         {String(seat.displayName || "").trim() || "…"}
                       </span>
+                      {seat.inRound && Math.floor(Number(seat.roundBet) || 0) > 0 ? (
+                        <span className="shrink-0 text-[5px] font-semibold tabular-nums leading-none text-emerald-300/85">
+                          Play {fmt(seat.roundBet)}
+                        </span>
+                      ) : null}
                       {isActingSeat ? (
                         <span className="shrink-0 rounded px-px text-[5px] font-extrabold uppercase leading-none text-sky-200">
                           Turn
@@ -617,7 +630,7 @@ export default function Ov2C21Screen({
                     <span className="w-full text-center text-[6px] font-medium leading-none text-white/50">Open</span>
                   )}
                 </div>
-                <div className="flex h-[calc(100%-10px)] min-h-0 w-full shrink-0 flex-col justify-center gap-px overflow-hidden">
+                <div className="flex h-[calc(100%-11px)] min-h-0 w-full shrink-0 flex-col justify-center gap-px overflow-hidden">
                   {seat.hands?.length ? (
                     seat.hands.map((h, hi) => (
                       <SeatHandRow
@@ -635,10 +648,38 @@ export default function Ov2C21Screen({
           </div>
         </div>
 
-        {/* MY HAND — fixed height = HOUSE; below other players */}
-        <div className="relative flex h-[8.775rem] shrink-0 flex-col rounded-xl border border-emerald-800/35 bg-gradient-to-b from-zinc-900/88 to-black/58 px-1.5 py-1 sm:h-[7.75rem]">
-          <div className="shrink-0 text-center text-[10px] font-bold uppercase tracking-wide text-emerald-200/85">Your hand</div>
-          <div className="flex min-h-0 flex-1 flex-col justify-center gap-px overflow-hidden px-0.5">
+        {/* YOUR HAND — fixed height = HOUSE; edges = labels / Play / Surrender */}
+        <div className="relative h-[9.5rem] shrink-0 overflow-hidden rounded-xl border border-emerald-800/35 bg-gradient-to-b from-zinc-900/88 to-black/58 px-1.5 sm:h-[8.5rem]">
+          <span className="pointer-events-none absolute left-1 top-0.5 z-10 text-[9px] font-bold uppercase leading-none tracking-wide text-emerald-200/85">
+            Your hand
+          </span>
+          <div className="absolute right-1 top-0.5 z-20 flex max-w-[72%] flex-row flex-nowrap items-center justify-end gap-1">
+            {myPlayAmountLabel ? (
+              <span className="shrink-0 text-[7px] font-semibold tabular-nums leading-none text-emerald-300/90">
+                Play {myPlayAmountLabel}
+              </span>
+            ) : null}
+            {phase === "acting" && isMyTurn && legal.surrender ? (
+              <button
+                type="button"
+                disabled={operateBusy || actionLock}
+                onClick={guardAction(async () => {
+                  const e = engineRef.current;
+                  const ct = e?.currentTurn;
+                  const ms = e?.seats?.find(s => s.participantKey === participantKey);
+                  if (e?.phase !== "acting" || !ms || ct?.seatIndex !== ms.seatIndex) return;
+                  await onOperate("surrender");
+                })}
+                className="shrink-0 touch-manipulation rounded border border-rose-500/35 bg-rose-950/40 px-1 py-px text-[6px] font-extrabold uppercase leading-none text-rose-100 disabled:opacity-25"
+              >
+                Surrender
+              </button>
+            ) : null}
+            {phase === "acting" && isMyTurn ? (
+              <span className="shrink-0 text-[6px] font-extrabold uppercase leading-none text-sky-300/95">Turn</span>
+            ) : null}
+          </div>
+          <div className="absolute inset-x-1 top-[1.125rem] bottom-1 flex flex-col items-center justify-center gap-px overflow-hidden">
             {mySeat ? (
               mySeat.hands?.length ? (
                 mySeat.hands.map((h, hi) => (
@@ -650,17 +691,17 @@ export default function Ov2C21Screen({
                   />
                 ))
               ) : (
-                <div className="text-center text-[9px] text-zinc-500">—</div>
+                <span className="text-[9px] text-zinc-500">—</span>
               )
             ) : (
-              <div className="text-center text-[9px] leading-tight text-zinc-500">Pick an open seat above</div>
+              <span className="px-1 text-center text-[8px] leading-tight text-zinc-500">Pick an open seat above</span>
             )}
           </div>
         </div>
       </div>
 
       {/* Bottom controls — fixed height; mobile dock + safe-area */}
-      <div className="flex h-[11rem] shrink-0 flex-col justify-start gap-1 overflow-hidden border-t border-white/5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:h-[7rem] sm:pb-2">
+      <div className="flex h-[9.5rem] shrink-0 flex-col justify-start gap-0.5 overflow-hidden border-t border-white/5 pt-0.5 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:h-[6.25rem] sm:gap-1 sm:pb-2 sm:pt-1">
         {phase === "betting" && mySeat ? (
           <div className="flex h-full min-h-0 flex-col justify-center rounded-lg border border-white/10 bg-black/25 px-2 py-1 sm:py-1.5">
             <div className="shrink-0 text-[10px] text-zinc-400">
@@ -701,15 +742,13 @@ export default function Ov2C21Screen({
             )}
           </div>
         ) : phase === "acting" && isMyTurn ? (
-          <div className="flex h-full min-h-0 flex-col justify-center rounded-lg border border-sky-500/30 bg-sky-950/30 px-1 py-1 sm:py-1.5">
-            <div className="mb-0.5 shrink-0 text-center text-[11px] font-bold text-sky-200">Your move</div>
-            <div className="grid shrink-0 grid-cols-3 gap-1 sm:grid-cols-6">
+          <div className="flex h-full min-h-0 flex-col justify-center rounded-lg border border-sky-500/30 bg-sky-950/30 px-1 py-0.5 sm:py-1">
+            <div className="grid shrink-0 grid-cols-2 gap-1 sm:grid-cols-4">
               {[
                 ["hit", "HIT", legal.hit],
                 ["stand", "STAND", legal.stand],
                 ["double", "DOUBLE", legal.double],
                 ["split", "SPLIT", legal.split],
-                ["surrender", "SURRENDER", legal.surrender],
               ].map(([op, label, ok]) => (
                 <button
                   key={op}
@@ -722,7 +761,7 @@ export default function Ov2C21Screen({
                     if (e?.phase !== "acting" || !ms || ct?.seatIndex !== ms.seatIndex) return;
                     await onOperate(op);
                   })}
-                  className="min-h-[40px] touch-manipulation rounded-md bg-white/10 py-2 text-[10px] font-bold tracking-wide disabled:opacity-35 active:scale-[0.98] sm:min-h-[40px]"
+                  className="min-h-[36px] touch-manipulation rounded-md bg-white/10 py-1.5 text-[10px] font-bold tracking-wide disabled:opacity-35 active:scale-[0.98] sm:min-h-[38px] sm:py-2"
                 >
                   {label}
                 </button>
@@ -770,7 +809,7 @@ export default function Ov2C21Screen({
       ) : null}
 
       {resultToastOpen && mySummary ? (
-        <div className="pointer-events-none fixed bottom-[calc(11rem+0.65rem+env(safe-area-inset-bottom,0px))] left-2 right-2 z-30 mx-auto max-w-lg sm:bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+        <div className="pointer-events-none fixed bottom-[calc(9.5rem+0.5rem+env(safe-area-inset-bottom,0px))] left-2 right-2 z-30 mx-auto max-w-lg sm:bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
           <div className="rounded-xl border border-emerald-500/35 bg-zinc-950/95 px-3 py-2 shadow-lg backdrop-blur-sm">
             <div className="text-center text-[10px] font-bold uppercase tracking-wide text-emerald-300/90">Round result</div>
             <div className="mt-0.5 text-center text-sm font-black text-white">{mySummary.headline}</div>
