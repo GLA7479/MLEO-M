@@ -120,7 +120,7 @@ export default function Ov2C21LiveShell() {
                     }}
                   >
                     <span>{formatTierLabel(tier)}</span>
-                    <span className="text-[9px] font-normal text-emerald-200/70">Min play {formatTierLabel(tier)}</span>
+                    <span className="text-[9px] font-normal text-emerald-200/70">Table level {formatTierLabel(tier)}</span>
                   </button>
                 );
               })}

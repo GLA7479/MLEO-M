@@ -40,6 +40,15 @@ function phaseDurationMs(phase) {
   return 0;
 }
 
+/** Visible phase label (internal `phase` stays server-shaped). */
+function phaseDisplayLabel(phase) {
+  if (phase === "betting") return "Play window";
+  if (phase === "between_rounds") return "Reveal";
+  if (phase === "insurance") return "Side cover";
+  if (phase === "acting") return "Play";
+  return String(phase || "").replace(/_/g, " ") || "—";
+}
+
 function CardFace({ code, small }) {
   if (!code) return <span className="text-white/40">—</span>;
   const s = formatCardShort(code);
@@ -62,14 +71,16 @@ export default function Ov2C21Screen({
   onOperate,
   operateBusy,
 }) {
-  const [betInput, setBetInput] = useState("");
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [actionLock, setActionLock] = useState(false);
-  const [resultDismissedSeq, setResultDismissedSeq] = useState(0);
-  const lastHandledSummaryRoundRef = useRef(null);
+  const [resultToastOpen, setResultToastOpen] = useState(false);
+  const lastToastRoundRef = useRef(null);
+  const resultToastTimerRef = useRef(null);
   const actionLockRef = useRef(false);
   const betLockRef = useRef(false);
   const sitLockRef = useRef(false);
+  const engineRef = useRef(engine);
+  engineRef.current = engine;
 
   useEffect(() => {
     const id = window.setInterval(() => setNowTick(Date.now()), 500);
@@ -120,31 +131,46 @@ export default function Ov2C21Screen({
     return sr === er;
   }, [mySummary, engine?.roundSeq]);
 
+  const shouldShowResultToast =
+    Boolean(mySummary) &&
+    summaryMatchesEngineRound &&
+    phase === "between_rounds" &&
+    Boolean(participantKey);
+
   useEffect(() => {
-    if (!roomId || !mySummary || !summaryDismissRound) return;
-    if (lastHandledSummaryRoundRef.current !== summaryDismissRound) {
-      lastHandledSummaryRoundRef.current = summaryDismissRound;
-      try {
-        const k = `ov2_c21_dismiss_${roomId}_${summaryDismissRound}`;
-        setResultDismissedSeq(sessionStorage.getItem(k) === "1" ? summaryDismissRound : 0);
-      } catch {
-        setResultDismissedSeq(0);
-      }
-      return;
+    if (!shouldShowResultToast || !roomId || !summaryDismissRound) {
+      setResultToastOpen(false);
+      return undefined;
     }
     try {
-      const k = `ov2_c21_dismiss_${roomId}_${summaryDismissRound}`;
-      if (sessionStorage.getItem(k) === "1") setResultDismissedSeq(summaryDismissRound);
+      const storageKey = `ov2_c21_rt_${roomId}_${summaryDismissRound}`;
+      if (sessionStorage.getItem(storageKey) === "1") {
+        lastToastRoundRef.current = summaryDismissRound;
+        return undefined;
+      }
     } catch {
       /* ignore */
     }
-  }, [roomId, mySummary, summaryDismissRound]);
-
-  const showResultModal =
-    Boolean(mySummary) &&
-    summaryMatchesEngineRound &&
-    (phase === "between_rounds" || phase === "betting") &&
-    resultDismissedSeq !== summaryDismissRound;
+    if (lastToastRoundRef.current === summaryDismissRound) return undefined;
+    lastToastRoundRef.current = summaryDismissRound;
+    setResultToastOpen(true);
+    if (resultToastTimerRef.current) window.clearTimeout(resultToastTimerRef.current);
+    resultToastTimerRef.current = window.setTimeout(() => {
+      setResultToastOpen(false);
+      try {
+        if (roomId) sessionStorage.setItem(`ov2_c21_rt_${roomId}_${summaryDismissRound}`, "1");
+      } catch {
+        /* ignore */
+      }
+      resultToastTimerRef.current = null;
+    }, 2000);
+    return () => {
+      if (resultToastTimerRef.current) {
+        window.clearTimeout(resultToastTimerRef.current);
+        resultToastTimerRef.current = null;
+      }
+    };
+  }, [shouldShowResultToast, roomId, summaryDismissRound]);
 
   const guardAction = useCallback(
     fn => async () => {
@@ -166,14 +192,15 @@ export default function Ov2C21Screen({
   const timerLabel = useMemo(() => {
     const left = secsLeft(engine?.phaseEndsAt);
     const dur = phaseDurationMs(phase) / 1000;
+    const label = phaseDisplayLabel(phase);
     if (phase === "acting" && engine?.turnDeadline) {
       const tl = Math.max(0, Math.ceil((phaseEndsMs(engine.turnDeadline) - nowTick) / 1000));
       const si = engine?.currentTurn?.seatIndex;
       const seatBit = typeof si === "number" ? ` · Seat ${si + 1}` : "";
       return `Turn${seatBit} · ${tl}s / ${Math.round(OV2_C21_TURN_MS / 1000)}s`;
     }
-    if (dur > 0) return `${phase.replace(/_/g, " ")} · ${left}s / ${dur}s`;
-    return phase.replace(/_/g, " ");
+    if (dur > 0) return `${label} · ${left}s / ${dur}s`;
+    return label;
   }, [engine, phase, nowTick]);
 
   const currentTurn = engine?.currentTurn;
@@ -193,14 +220,14 @@ export default function Ov2C21Screen({
   const roleLabel = useMemo(() => {
     if (!participantKey) return "";
     if (!mySeat) {
-      return "Spectating · open seat to play · no seat held (two missed min plays unseats)";
+      return "Spectating · open seat to play · no seat held (two missed table minimum plays unseats)";
     }
     if (mySeat.inRound) {
       if (phase === "acting" && isMyTurn) return "Acting now · your hand · in this round";
       if (phase === "acting") return "In this round · waiting for another seat";
       if (phase === "insurance") return "In this round · side cover choice";
-      if (phase === "betting") return "Seated · in this round · set play before lock";
-      if (phase === "between_rounds") return "Seated · in this round · break before next lock";
+      if (phase === "betting") return "Seated · in this round · choose play before lock";
+      if (phase === "between_rounds") return "Seated · in this round · reveal (cards stay until next play window)";
       return "In this round";
     }
     return "Seated · not in this round · you join on next lock";
@@ -209,32 +236,29 @@ export default function Ov2C21Screen({
   const dealer = engine?.dealerHand || [];
   const dealerHidden = Boolean(engine?.dealerHidden);
 
-  const submitBet = useCallback(async () => {
-    if (betLockRef.current || operateBusy) return;
-    betLockRef.current = true;
-    try {
-      const n = Math.floor(Number(String(betInput).replace(/\D/g, "")) || 0);
-      await onOperate("set_bet", { amount: n });
-    } finally {
-      window.setTimeout(() => {
-        betLockRef.current = false;
-      }, 360);
-    }
-  }, [betInput, onOperate, operateBusy]);
+  const playAmountOptions = useMemo(() => {
+    const mults = [1, 2, 5, 10];
+    const amounts = mults.map(m => Math.min(maxBet, minBet * m));
+    return [...new Set(amounts)];
+  }, [maxBet, minBet]);
 
   const applyQuickBet = useCallback(
-    async units => {
-      if (betLockRef.current || operateBusy) return;
+    async amount => {
+      const e = engineRef.current;
+      if (e?.phase !== "betting" || betLockRef.current || operateBusy) return;
+      const n = Math.max(0, Math.floor(Number(amount) || 0));
+      if (n < minBet || n > maxBet) return;
+      if (!playAmountOptions.includes(n)) return;
       betLockRef.current = true;
       try {
-        await onOperate("set_bet", { amount: Math.min(maxBet, minBet * units) });
+        await onOperate("set_bet", { amount: n });
       } finally {
         window.setTimeout(() => {
           betLockRef.current = false;
-        }, 360);
+        }, 380);
       }
     },
-    [maxBet, minBet, onOperate, operateBusy],
+    [maxBet, minBet, onOperate, operateBusy, playAmountOptions],
   );
 
   const trySit = useCallback(
@@ -313,7 +337,7 @@ export default function Ov2C21Screen({
                 <div className="text-emerald-300/90">Play {fmt(seat.roundBet)}</div>
               ) : null}
               {phase === "betting" && mine ? (
-                <div className="text-[9px] text-zinc-500">Bet: {fmt(seat.intendedBet || 0)}</div>
+                <div className="text-[9px] text-zinc-500">Chosen play: {fmt(seat.intendedBet || 0)}</div>
               ) : null}
               {seat.hands?.length ? (
                 <div className="mt-0.5 space-y-0.5">
@@ -331,42 +355,32 @@ export default function Ov2C21Screen({
         })}
       </div>
 
-      {/* Bet + actions */}
+      {/* Play window + actions */}
       <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
         {phase === "betting" && mySeat ? (
           <div className="shrink-0 rounded-lg border border-white/10 bg-black/25 p-2">
             <div className="text-[10px] text-zinc-400">
-              Set play amount ({fmt(minBet)} – {fmt(maxBet)}). You can change it until time runs out.
+              Choose play amount (tap one). You can change until the play window ends.
             </div>
-            <div className="mt-1 flex flex-wrap gap-1">
-              <input
-                value={betInput}
-                onChange={e => setBetInput(e.target.value)}
-                inputMode="numeric"
-                placeholder={String(minBet)}
-                className="min-w-0 flex-1 rounded-md border border-white/15 bg-black/40 px-2 py-1.5 text-sm"
-              />
-              <button
-                type="button"
-                disabled={operateBusy || actionLock}
-                onClick={() => void submitBet()}
-                className="min-h-[40px] touch-manipulation rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-bold disabled:opacity-40"
-              >
-                Apply
-              </button>
-            </div>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {[1, 2, 5, 10].map(m => (
-                <button
-                  key={m}
-                  type="button"
-                  disabled={operateBusy || actionLock}
-                  onClick={() => void applyQuickBet(m)}
-                  className="min-h-[36px] touch-manipulation rounded border border-white/15 px-2 py-0.5 text-[10px] text-zinc-200"
-                >
-                  {fmt(minBet * m)}
-                </button>
-              ))}
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {playAmountOptions.map(amt => {
+                const chosen = Math.floor(Number(mySeat.intendedBet) || 0) === amt;
+                return (
+                  <button
+                    key={amt}
+                    type="button"
+                    disabled={operateBusy || actionLock || phase !== "betting"}
+                    onClick={() => void applyQuickBet(amt)}
+                    className={`min-h-[40px] min-w-[3.25rem] touch-manipulation rounded-lg border px-2 py-1.5 text-[11px] font-bold disabled:opacity-35 ${
+                      chosen
+                        ? "border-emerald-400/80 bg-emerald-900/50 text-emerald-100"
+                        : "border-white/15 bg-black/40 text-zinc-200"
+                    }`}
+                  >
+                    {fmt(amt)}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : null}
@@ -376,18 +390,24 @@ export default function Ov2C21Screen({
             <div className="mb-1 text-center text-[11px] font-bold text-sky-200">Your move</div>
             <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
               {[
-                ["hit", "Draw", legal.hit],
-                ["stand", "Stay", legal.stand],
-                ["double", "Match stake", legal.double],
-                ["split", "Split pair", legal.split],
-                ["surrender", "Yield half", legal.surrender],
+                ["hit", "HIT", legal.hit],
+                ["stand", "STAND", legal.stand],
+                ["double", "DOUBLE", legal.double],
+                ["split", "SPLIT", legal.split],
+                ["surrender", "SURRENDER", legal.surrender],
               ].map(([op, label, ok]) => (
                 <button
                   key={op}
                   type="button"
-                  disabled={operateBusy || actionLock || !ok}
-                  onClick={guardAction(() => onOperate(op))}
-                  className="min-h-[44px] touch-manipulation rounded-md bg-white/10 py-2 text-[10px] font-semibold disabled:opacity-35 active:scale-[0.98]"
+                  disabled={operateBusy || actionLock || !ok || phase !== "acting" || !isMyTurn}
+                  onClick={guardAction(async () => {
+                    const e = engineRef.current;
+                    const ct = e?.currentTurn;
+                    const ms = e?.seats?.find(s => s.participantKey === participantKey);
+                    if (e?.phase !== "acting" || !ms || ct?.seatIndex !== ms.seatIndex) return;
+                    await onOperate(op);
+                  })}
+                  className="min-h-[44px] touch-manipulation rounded-md bg-white/10 py-2 text-[10px] font-bold tracking-wide disabled:opacity-35 active:scale-[0.98]"
                 >
                   {label}
                 </button>
@@ -403,118 +423,76 @@ export default function Ov2C21Screen({
         <p className="mt-1 leading-snug">
           Persistent live table · six seats · spectate anytime. Vault moves only after server confirmation.{" "}
           <span className="text-zinc-500">
-            Auto-unseat: two consecutive rounds without meeting min play clears your seat (Tables does not vacate you).
+            Auto-unseat: two consecutive rounds without meeting table minimum play clears your seat (Tables does not vacate
+            you).
           </span>
         </p>
       </div>
 
       {showInsuranceModal ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center pointer-events-auto">
           <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-zinc-900 p-4 shadow-xl">
-            <div className="text-center text-sm font-bold text-white">Side cover offer</div>
+            <div className="text-center text-sm font-bold text-white">Side cover</div>
             <p className="mt-2 text-center text-[11px] text-zinc-400">
-              The house start card is an ace. You may take optional side cover for half of your main play.
+              The house start card is an ace. Optional cover is up to half of your main play.
             </p>
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
-                disabled={operateBusy || actionLock || !legal.insuranceYes}
-                onClick={guardAction(() => onOperate("insurance_yes"))}
-                className="min-h-[44px] flex-1 touch-manipulation rounded-xl bg-amber-600 py-2 text-xs font-bold disabled:opacity-35"
+                disabled={operateBusy || actionLock || !legal.insuranceYes || phase !== "insurance"}
+                onClick={guardAction(async () => {
+                  if (engineRef.current?.phase !== "insurance") return;
+                  await onOperate("insurance_yes");
+                })}
+                className="min-h-[44px] flex-1 touch-manipulation rounded-xl bg-amber-600 py-2 text-xs font-bold tracking-wide disabled:opacity-35"
               >
-                Take cover
+                INSURANCE
               </button>
               <button
                 type="button"
-                disabled={operateBusy || actionLock || !legal.insuranceNo}
-                onClick={guardAction(() => onOperate("insurance_no"))}
+                disabled={operateBusy || actionLock || !legal.insuranceNo || phase !== "insurance"}
+                onClick={guardAction(async () => {
+                  if (engineRef.current?.phase !== "insurance") return;
+                  await onOperate("insurance_no");
+                })}
                 className="min-h-[44px] flex-1 touch-manipulation rounded-xl border border-white/20 py-2 text-xs font-bold disabled:opacity-35"
               >
-                Decline
+                DECLINE
               </button>
             </div>
           </div>
         </div>
       ) : null}
 
-      {showResultModal ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:items-center">
-          <div className="max-h-[min(85dvh,32rem)] w-full max-w-md overflow-hidden rounded-2xl border border-white/15 bg-zinc-950 shadow-xl">
-            <div className="border-b border-white/10 px-3 py-2 text-center text-sm font-bold text-white">
-              Round result
+      {resultToastOpen && mySummary ? (
+        <div className="pointer-events-none fixed bottom-[max(5.5rem,env(safe-area-inset-bottom,0px))] left-2 right-2 z-30 mx-auto max-w-lg">
+          <div className="rounded-xl border border-emerald-500/35 bg-zinc-950/95 px-3 py-2 shadow-lg backdrop-blur-sm">
+            <div className="text-center text-[10px] font-bold uppercase tracking-wide text-emerald-300/90">Round result</div>
+            <div className="mt-0.5 text-center text-sm font-black text-white">{mySummary.headline}</div>
+            <div className="mt-0.5 text-center text-[11px] text-zinc-300">
+              Net vault · <span className="font-semibold text-white">{fmt(mySummary.vaultDelta)}</span>
+              {mySummary.totalReturned > 0 ? (
+                <span className="text-zinc-500">
+                  {" "}
+                  · back {fmt(mySummary.totalReturned)}
+                  {mySummary.totalRisked > 0 ? ` · in play ${fmt(mySummary.totalRisked)}` : ""}
+                </span>
+              ) : mySummary.totalRisked > 0 ? (
+                <span className="text-zinc-500"> · in play {fmt(mySummary.totalRisked)}</span>
+              ) : null}
             </div>
-            <div className="max-h-[min(52dvh,18rem)] overflow-y-auto overscroll-y-contain px-3 py-3 text-sm">
-              <div className="rounded-lg border border-emerald-500/25 bg-emerald-950/20 p-2">
-                <div className="text-xs font-bold text-emerald-200/90">Your result</div>
-                <div className="mt-1 text-lg font-black text-white">{mySummary.headline}</div>
-                <div className="mt-1 text-xs text-zinc-300">
-                  Net vault change this round:{" "}
-                  <span className="font-semibold text-white">{fmt(mySummary.vaultDelta)}</span>
-                </div>
-                {mySummary.totalReturned > 0 ? (
-                  <div className="mt-0.5 text-[11px] text-zinc-400">
-                    Credited back this settle: <span className="font-mono text-zinc-200">{fmt(mySummary.totalReturned)}</span>
-                    {mySummary.totalRisked > 0 ? (
-                      <span className="text-zinc-500"> (risked {fmt(mySummary.totalRisked)})</span>
-                    ) : null}
-                  </div>
-                ) : mySummary.totalRisked > 0 ? (
-                  <div className="mt-0.5 text-[11px] text-zinc-400">
-                    At risk this round: <span className="font-mono text-zinc-200">{fmt(mySummary.totalRisked)}</span>
-                  </div>
-                ) : null}
-                {mySummary.resultShort ? (
-                  <p className="mt-1 text-[11px] text-zinc-400">Outcome: {mySummary.resultShort}</p>
-                ) : null}
-                <ul className="mt-2 space-y-0.5 text-[11px] leading-snug text-zinc-300">
-                  {mySummary.detailLines?.map((line, i) => (
-                    <li key={i}>{line}</li>
-                  ))}
-                </ul>
+            {mySummary.resultShort ? (
+              <div className="mt-0.5 text-center text-[10px] text-zinc-500">{mySummary.resultShort}</div>
+            ) : null}
+            {(mySummary.othersCompact || []).length > 0 ? (
+              <div className="mt-1 border-t border-white/10 pt-1 text-[9px] leading-tight text-zinc-500">
+                {(mySummary.othersCompact || [])
+                  .slice(0, 4)
+                  .map(o => `S${o.seatIndex + 1} ${o.status}`)
+                  .join(" · ")}
+                {(mySummary.othersCompact || []).length > 4 ? "…" : ""}
               </div>
-              <div className="mt-3 rounded-lg border border-white/10 bg-black/25 p-2">
-                <div className="text-[10px] font-bold uppercase tracking-wide text-zinc-500">
-                  Other players (compact)
-                </div>
-                <ul className="mt-1.5 space-y-1.5">
-                  {(mySummary.othersCompact || []).length === 0 ? (
-                    <li className="text-[11px] text-zinc-500">No other active plays this round.</li>
-                  ) : (
-                    (mySummary.othersCompact || []).map(o => (
-                      <li
-                        key={o.seatIndex}
-                        className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-0.5 border-b border-white/[0.06] pb-1.5 text-[11px] last:border-0 last:pb-0"
-                      >
-                        <span className="min-w-0 truncate text-zinc-200" title={`Seat ${o.seatIndex + 1} · ${o.name}`}>
-                          S{o.seatIndex + 1} · {o.name}
-                        </span>
-                        <span className="shrink-0 text-right font-mono text-zinc-400">{o.status}</span>
-                        <span className="col-span-2 min-w-0 break-words text-[10px] leading-snug text-zinc-500">
-                          {o.resultShort || o.headline}
-                        </span>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-            </div>
-            <div className="border-t border-white/10 p-2">
-              <button
-                type="button"
-                className="min-h-[44px] w-full touch-manipulation rounded-xl bg-white/10 py-2 text-sm font-bold"
-                onClick={() => {
-                  const rs = summaryDismissRound;
-                  try {
-                    if (roomId) sessionStorage.setItem(`ov2_c21_dismiss_${roomId}_${rs}`, "1");
-                  } catch {
-                    /* ignore */
-                  }
-                  setResultDismissedSeq(rs);
-                }}
-              >
-                Close
-              </button>
-            </div>
+            ) : null}
           </div>
         </div>
       ) : null}
