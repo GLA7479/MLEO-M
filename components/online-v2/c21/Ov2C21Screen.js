@@ -1006,29 +1006,40 @@ export default function Ov2C21Screen({
             )}
           </div>
           {mySeat && mySplitHandCount > 1 ? (
-            <div className="absolute bottom-1 left-1 right-1 z-20 flex items-center justify-between gap-0.5">
-              {displayMySeat.hands.map((_, hi) => {
-                const isActionHere =
-                  phase === "acting" && isMyTurn && currentTurn?.seatIndex === mySeat?.seatIndex && currentTurn?.handIndex === hi;
-                return (
-                  <button
-                    key={hi}
-                    type="button"
-                    aria-current={isActionHere ? "step" : undefined}
-                    title={isActionHere ? "Play this hand now" : `View hand ${hi + 1}`}
-                    onClick={() => setSplitViewIdx(hi)}
-                    className={`min-h-[22px] min-w-0 flex-1 touch-manipulation rounded border px-0.5 py-px text-[7px] font-extrabold uppercase leading-none ${
-                      isActionHere
-                        ? "z-[1] border-2 border-sky-300 bg-sky-900/70 text-sky-50 shadow-[0_0_0_2px_rgba(14,165,233,0.45),0_2px_8px_rgba(0,0,0,0.5)]"
-                        : splitViewIdx === hi
-                          ? "border-emerald-500/45 bg-emerald-950/35 text-emerald-100"
-                          : "border-white/12 bg-black/45 text-zinc-400"
-                    }`}
-                  >
-                    Hand {hi + 1}
-                  </button>
-                );
-              })}
+            <div className="absolute bottom-1 left-1 right-1 z-20 min-w-0 overflow-x-auto overflow-y-visible overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div
+                className="mx-auto flex w-max min-w-full flex-nowrap items-center justify-center gap-0.5"
+                role="tablist"
+                aria-label="Split hands"
+              >
+                {displayMySeat.hands.map((_, hi) => {
+                  const isActionHere =
+                    phase === "acting" &&
+                    isMyTurn &&
+                    currentTurn?.seatIndex === mySeat?.seatIndex &&
+                    currentTurn?.handIndex === hi;
+                  return (
+                    <button
+                      key={`hand-tab-${hi}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={splitViewIdx === hi}
+                      aria-current={isActionHere ? "step" : undefined}
+                      title={isActionHere ? "Play this hand now" : `View hand ${hi + 1}`}
+                      onClick={() => setSplitViewIdx(hi)}
+                      className={`min-h-[22px] shrink-0 touch-manipulation rounded border px-1 py-px text-[7px] font-extrabold uppercase leading-none whitespace-nowrap min-w-[3.1rem] ${
+                        isActionHere
+                          ? "z-[1] border-2 border-sky-300 bg-sky-900/70 text-sky-50 shadow-[0_0_0_2px_rgba(14,165,233,0.45),0_2px_8px_rgba(0,0,0,0.5)]"
+                          : splitViewIdx === hi
+                            ? "border-emerald-500/45 bg-emerald-950/35 text-emerald-100"
+                            : "border-white/12 bg-black/45 text-zinc-400"
+                      }`}
+                    >
+                      Hand {hi + 1}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
         </div>
@@ -1237,29 +1248,31 @@ export default function Ov2C21Screen({
                     )}
                   </div>
                   {nh > 1 ? (
-                    <div className="flex shrink-0 gap-1 border-t border-zinc-700/80 bg-black px-1 py-1">
-                      {(s.hands || []).map((_, b) => {
-                        const isAct =
-                          phase === "acting" &&
-                          currentTurn?.seatIndex === inspectorSeatIdx &&
-                          currentTurn?.handIndex === b;
-                        return (
-                          <button
-                            key={b}
-                            type="button"
-                            onClick={() => setInspectorSplitIdx(b)}
-                            className={`min-h-[24px] min-w-0 flex-1 touch-manipulation rounded border px-0.5 py-px text-[8px] font-extrabold uppercase leading-none ${
-                              isAct
-                                ? "border-sky-400 bg-sky-950 text-sky-100"
-                                : inspectorSplitIdx === b
-                                  ? "border-emerald-500/70 bg-emerald-950/80 text-emerald-100"
-                                  : "border-zinc-600 bg-zinc-950 text-zinc-300"
-                            }`}
-                          >
-                            H{b + 1}
-                          </button>
-                        );
-                      })}
+                    <div className="min-w-0 shrink-0 overflow-x-auto overflow-y-visible border-t border-zinc-700/80 bg-black px-1 py-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      <div className="flex w-max min-w-full flex-nowrap justify-center gap-1">
+                        {(s.hands || []).map((_, b) => {
+                          const isAct =
+                            phase === "acting" &&
+                            currentTurn?.seatIndex === inspectorSeatIdx &&
+                            currentTurn?.handIndex === b;
+                          return (
+                            <button
+                              key={`insp-hand-${b}`}
+                              type="button"
+                              onClick={() => setInspectorSplitIdx(b)}
+                              className={`min-h-[24px] shrink-0 touch-manipulation rounded border px-1 py-px text-[8px] font-extrabold uppercase leading-none whitespace-nowrap min-w-[2.75rem] ${
+                                isAct
+                                  ? "border-sky-400 bg-sky-950 text-sky-100"
+                                  : inspectorSplitIdx === b
+                                    ? "border-emerald-500/70 bg-emerald-950/80 text-emerald-100"
+                                    : "border-zinc-600 bg-zinc-950 text-zinc-300"
+                              }`}
+                            >
+                              Hand {b + 1}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   ) : null}
                 </div>

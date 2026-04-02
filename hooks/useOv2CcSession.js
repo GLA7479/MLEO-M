@@ -30,6 +30,24 @@ async function pullAuthoritativeVaultAfterCc() {
   }
 }
 
+function ingestOperateJson(json, lastRevisionRef, setEngine, setViewerHoleCards) {
+  const revRaw = json?.revision;
+  const rev = revRaw == null ? null : Math.max(0, Math.floor(Number(revRaw) || 0));
+  if (rev != null && rev < lastRevisionRef.current) {
+    return { applied: false, stale: true };
+  }
+  if (rev != null) {
+    lastRevisionRef.current = rev;
+  }
+  if (json?.engine && typeof json.engine === "object") {
+    setEngine(json.engine);
+  }
+  if (Array.isArray(json?.viewerHoleCards)) {
+    setViewerHoleCards(json.viewerHoleCards.length ? json.viewerHoleCards : []);
+  }
+  return { applied: true, stale: false };
+}
+
 export function useOv2CcSession(roomId) {
   const [engine, setEngine] = useState(null);
   const [viewerHoleCards, setViewerHoleCards] = useState([]);
@@ -38,7 +56,20 @@ export function useOv2CcSession(roomId) {
   const participantKey = useMemo(() => getOv2ParticipantId(), []);
   const tickBusyRef = useRef(false);
   const lastTickAtRef = useRef(0);
-  const operateInFlightRef = useRef(false);
+  const lastRevisionRef = useRef(-1);
+  const operateDepthRef = useRef(0);
+
+  const pushOperateBusy = useCallback(() => {
+    operateDepthRef.current += 1;
+    setOperateBusy(true);
+  }, []);
+
+  const popOperateBusy = useCallback(() => {
+    operateDepthRef.current = Math.max(0, operateDepthRef.current - 1);
+    if (operateDepthRef.current === 0) {
+      setOperateBusy(false);
+    }
+  }, []);
 
   const reloadFromDb = useCallback(async () => {
     if (!roomId) return;
@@ -53,6 +84,8 @@ export function useOv2CcSession(roomId) {
       return;
     }
     if (data?.engine && typeof data.engine === "object") {
+      const rev = Math.max(0, Math.floor(Number(data.revision) || 0));
+      lastRevisionRef.current = rev;
       setEngine(data.engine);
     }
   }, [roomId]);
@@ -73,10 +106,7 @@ export function useOv2CcSession(roomId) {
           payload: {},
         });
         if (cancelled) return;
-        if (json?.engine) setEngine(json.engine);
-        if (Array.isArray(json?.viewerHoleCards)) {
-          setViewerHoleCards(json.viewerHoleCards.length ? json.viewerHoleCards : []);
-        }
+        ingestOperateJson(json, lastRevisionRef, setEngine, setViewerHoleCards);
         if (json?.vaultEffects?.length) {
           await applyVaultEffects(json.vaultEffects, participantKey);
         }
@@ -109,9 +139,16 @@ export function useOv2CcSession(roomId) {
         },
         payload => {
           const row = payload.new || payload.old;
-          if (row?.engine && typeof row.engine === "object") {
-            setEngine(row.engine);
+          if (!row?.engine || typeof row.engine !== "object") return;
+          const revRaw = row.revision;
+          const rev = revRaw == null ? null : Math.max(0, Math.floor(Number(revRaw) || 0));
+          if (rev != null && rev < lastRevisionRef.current) {
+            return;
           }
+          if (rev != null) {
+            lastRevisionRef.current = rev;
+          }
+          setEngine(row.engine);
         },
       )
       .subscribe();
@@ -123,35 +160,62 @@ export function useOv2CcSession(roomId) {
   const operate = useCallback(
     async (op, payload = {}) => {
       if (!roomId) return { ok: false };
-      if (operateInFlightRef.current) return { ok: false, skipped: true };
-      operateInFlightRef.current = true;
-      setOperateBusy(true);
-      try {
-        const json = await postOv2CcOperate({
+
+      const runPost = () =>
+        postOv2CcOperate({
           roomId,
           participantKey,
           op,
           payload,
         });
-        if (json?.engine) setEngine(json.engine);
-        if (Array.isArray(json?.viewerHoleCards)) {
-          setViewerHoleCards(json.viewerHoleCards.length ? json.viewerHoleCards : []);
-        }
+
+      const finishOk = async json => {
         if (json?.vaultEffects?.length) {
           await applyVaultEffects(json.vaultEffects, participantKey);
         }
         if (json?.ok) {
           await pullAuthoritativeVaultAfterCc();
         }
-        return { ok: Boolean(json?.ok), json };
-      } catch (e) {
-        return { ok: false, error: e };
+      };
+
+      pushOperateBusy();
+      try {
+        try {
+          const json = await runPost();
+          ingestOperateJson(json, lastRevisionRef, setEngine, setViewerHoleCards);
+          await finishOk(json);
+          return { ok: Boolean(json?.ok), json };
+        } catch (e) {
+          const code = e?.payload?.code ?? e?.code;
+          const status = e?.status ?? e?.payload?.status;
+
+          if (e?.payload && typeof e.payload === "object" && e.payload.engine && typeof e.payload.engine === "object") {
+            ingestOperateJson(e.payload, lastRevisionRef, setEngine, setViewerHoleCards);
+          }
+
+          if (code === "REVISION_CONFLICT" || status === 409) {
+            await reloadFromDb();
+            try {
+              const json2 = await runPost();
+              ingestOperateJson(json2, lastRevisionRef, setEngine, setViewerHoleCards);
+              await finishOk(json2);
+              return { ok: Boolean(json2?.ok), json: json2, retried: true };
+            } catch (e2) {
+              const code2 = e2?.payload?.code ?? e2?.code;
+              if (e2?.payload?.engine && typeof e2.payload.engine === "object") {
+                ingestOperateJson(e2.payload, lastRevisionRef, setEngine, setViewerHoleCards);
+              }
+              return { ok: false, error: e2, code: code2 };
+            }
+          }
+
+          return { ok: false, error: e, code };
+        }
       } finally {
-        operateInFlightRef.current = false;
-        setOperateBusy(false);
+        popOperateBusy();
       }
     },
-    [roomId, participantKey],
+    [roomId, participantKey, pushOperateBusy, popOperateBusy, reloadFromDb],
   );
 
   useEffect(() => {
@@ -170,10 +234,7 @@ export function useOv2CcSession(roomId) {
             op: "tick",
             payload: {},
           });
-          if (json?.engine) setEngine(json.engine);
-          if (Array.isArray(json?.viewerHoleCards)) {
-            setViewerHoleCards(json.viewerHoleCards.length ? json.viewerHoleCards : []);
-          }
+          ingestOperateJson(json, lastRevisionRef, setEngine, setViewerHoleCards);
           if (json?.vaultEffects?.length) {
             await applyVaultEffects(json.vaultEffects, participantKey);
           }

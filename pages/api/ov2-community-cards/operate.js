@@ -210,7 +210,15 @@ export default async function handler(req, res) {
       });
 
       if (result.error) {
-        return res.status(400).json({ ok: false, code: result.error });
+        const publicEngine = buildPublicEngineView(engine, privatePayload);
+        const viewerHoleCardsErr = extractViewerHoleCards(privatePayload, engine, participantKey);
+        return res.status(400).json({
+          ok: false,
+          code: result.error,
+          engine: publicEngine,
+          viewerHoleCards: viewerHoleCardsErr,
+          revision: prevRevision,
+        });
       }
 
       const nextEngine = result.engine;

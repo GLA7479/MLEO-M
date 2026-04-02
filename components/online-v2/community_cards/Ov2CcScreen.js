@@ -68,12 +68,7 @@ export default function Ov2CcScreen({
     return Math.max(0, Math.ceil((Number(engine.actionDeadline) - Date.now()) / 1000));
   }, [canAct, engine?.actionDeadline, clock]);
 
-  const doOp = useCallback(
-    async (op, payload = {}) => {
-      await onOperate(op, payload);
-    },
-    [onOperate],
-  );
+  const doOp = useCallback(async (op, payload = {}) => onOperate(op, payload), [onOperate]);
 
   if (!engine) {
     return (
@@ -86,6 +81,23 @@ export default function Ov2CcScreen({
   const { maxSeats, pot, communityCards, phase, currentBet, sb, bb } = engine;
   const betweenHands = phase === "idle" || phase === "between_hands";
   const seats = Array.isArray(engine.seats) ? engine.seats : [];
+
+  const curBet = Math.floor(Number(currentBet) || 0);
+  const minR = Math.floor(Number(engine.minRaise) || bb);
+  const myStreet = Math.floor(Number(mySeat?.streetContrib) || 0);
+  const stackFloor = Math.floor(Number(mySeat?.stack) || 0);
+  const minTotalTarget = curBet + (toCall > 0 ? minR : bb);
+  const minRaiseChips = Math.max(0, minTotalTarget - myStreet);
+  const canOpenBet = curBet === 0 && toCall === 0;
+  const canBetOpen = Boolean(canAct && canOpenBet && stackFloor >= bb);
+  const canMinRaiseBtn = Boolean(canAct && !canOpenBet && minRaiseChips > 0 && minRaiseChips <= stackFloor);
+  const quickBump = Math.max(minRaiseChips, bb * 2);
+  const quickAmount = Math.min(quickBump, stackFloor);
+  const canQuickBumpBtn = Boolean(
+    canAct &&
+      quickAmount > 0 &&
+      (canOpenBet ? quickAmount >= bb : quickAmount >= minRaiseChips || quickAmount >= stackFloor),
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden text-white">
@@ -108,7 +120,12 @@ export default function Ov2CcScreen({
                 key={i}
                 type="button"
                 disabled={operateBusy || Boolean(s.participantKey)}
-                onClick={() => !s.participantKey && setPickSeat(i)}
+                onClick={() => {
+                  if (!s.participantKey) {
+                    setFormHint("");
+                    setPickSeat(i);
+                  }
+                }}
                 className={`flex min-h-[52px] flex-col items-center justify-center rounded-lg border px-0.5 py-1 text-[9px] leading-tight transition touch-manipulation ${
                   s.participantKey
                     ? "border-white/20 bg-white/[0.06]"
@@ -136,7 +153,7 @@ export default function Ov2CcScreen({
         )}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-white/10 bg-black/30 px-2 py-3">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-y-auto overflow-x-hidden rounded-xl border border-white/10 bg-black/30 px-2 py-3 [-webkit-overflow-scrolling:touch]">
         <div className="text-[11px] text-zinc-400">
           Phase: <span className="text-zinc-100">{phase}</span>
           {currentBet > 0 ? (
@@ -188,7 +205,7 @@ export default function Ov2CcScreen({
         ) : null}
       </div>
 
-      <div className="shrink-0 rounded-xl border border-white/10 bg-black/25 px-2 py-2">
+      <div className="relative z-10 shrink-0 rounded-xl border border-white/10 bg-black/25 px-2 py-2">
         <p className="text-center text-[10px] text-zinc-500">Your stack</p>
         {mySeat ? (
           <div className="mt-1 space-y-2">
@@ -216,8 +233,8 @@ export default function Ov2CcScreen({
                   <button
                     type="button"
                     disabled={operateBusy}
-                    className="rounded-lg border border-emerald-500/40 bg-emerald-900/30 px-2 py-1 text-xs font-bold text-emerald-100"
-                    onClick={() => {
+                    className="min-h-[44px] rounded-lg border border-emerald-500/40 bg-emerald-900/30 px-3 py-2 text-xs font-bold text-emerald-100 touch-manipulation"
+                    onClick={async () => {
                       setFormHint("");
                       const cap = maxBuy - Math.floor(mySeat.stack || 0);
                       const n = Math.max(0, Math.floor(Number(topUpDraft) || 0));
@@ -229,8 +246,16 @@ export default function Ov2CcScreen({
                         setFormHint(`Top-up cannot exceed ${cap}.`);
                         return;
                       }
-                      setTopUpDraft("");
-                      void doOp("top_up", { amount: n });
+                      const r = await doOp("top_up", { amount: n });
+                      if (r?.ok) {
+                        setTopUpDraft("");
+                        setFormHint("");
+                      } else {
+                        setTopUpDraft(String(n));
+                        setFormHint(
+                          String(r?.code || r?.json?.code || r?.error?.payload?.code || "Top-up failed."),
+                        );
+                      }
                     }}
                   >
                     Top-up
@@ -242,7 +267,7 @@ export default function Ov2CcScreen({
                   <button
                     type="button"
                     disabled={operateBusy}
-                    className="rounded border border-zinc-500/40 bg-zinc-800/50 px-2 py-1 text-[10px] font-semibold text-zinc-200"
+                    className="min-h-[40px] rounded border border-zinc-500/40 bg-zinc-800/50 px-3 py-2 text-[10px] font-semibold text-zinc-200 touch-manipulation"
                     onClick={() => void doOp("sit_out")}
                   >
                     {betweenHands ? "Sit out" : "Sit out next hand"}
@@ -252,7 +277,7 @@ export default function Ov2CcScreen({
                   <button
                     type="button"
                     disabled={operateBusy || mySeat.pendingSitOutAfterHand}
-                    className="rounded border border-sky-500/40 bg-sky-950/40 px-2 py-1 text-[10px] font-semibold text-sky-100 disabled:opacity-40"
+                    className="min-h-[40px] rounded border border-sky-500/40 bg-sky-950/40 px-3 py-2 text-[10px] font-semibold text-sky-100 touch-manipulation disabled:opacity-40"
                     onClick={() => void doOp("sit_in")}
                     title={mySeat.pendingSitOutAfterHand ? "Wait until this hand ends" : undefined}
                   >
@@ -272,7 +297,7 @@ export default function Ov2CcScreen({
       </div>
 
       {pickSeat != null ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center">
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 p-3 sm:items-center">
           <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-zinc-900 p-4 shadow-xl">
             <p className="text-sm font-bold text-white">Seat {pickSeat + 1}</p>
             <p className="mt-1 text-[11px] text-zinc-400">
@@ -284,33 +309,60 @@ export default function Ov2CcScreen({
               onChange={e => setBuyInDraft(e.target.value.replace(/[^\d]/g, ""))}
               inputMode="numeric"
             />
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                className="min-h-[44px] flex-1 rounded-lg border border-white/20 py-2 text-xs font-semibold touch-manipulation"
+                onClick={() => setBuyInDraft(String(minBuy))}
+              >
+                Min
+              </button>
+              <button
+                type="button"
+                className="min-h-[44px] flex-1 rounded-lg border border-white/20 py-2 text-xs font-semibold touch-manipulation"
+                onClick={() => setBuyInDraft(String(maxBuy))}
+              >
+                Max
+              </button>
+            </div>
+            {formHint ? (
+              <p className="mt-2 text-center text-[11px] text-rose-400/90">{formHint}</p>
+            ) : null}
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
-                className="flex-1 rounded-lg border border-white/20 py-2 text-sm"
-                onClick={() => setPickSeat(null)}
+                className="min-h-[48px] flex-1 rounded-lg border border-white/20 py-2 text-sm touch-manipulation"
+                onClick={() => {
+                  setFormHint("");
+                  setPickSeat(null);
+                }}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-800/40 py-2 text-sm font-bold text-emerald-100"
+                className="min-h-[48px] flex-1 rounded-lg border border-emerald-500/40 bg-emerald-800/40 py-2 text-sm font-bold text-emerald-100 touch-manipulation"
                 disabled={operateBusy}
-                onClick={() => {
+                onClick={async () => {
                   setFormHint("");
                   const n = Math.floor(Number(buyInDraft) || 0);
                   if (n < minBuy || n > maxBuy) {
                     setFormHint(`Use ${minBuy}–${maxBuy}.`);
                     return;
                   }
-                  void (async () => {
-                    await doOp("sit", {
-                      seatIndex: pickSeat,
-                      buyIn: n,
-                      displayName,
-                    });
+                  const r = await doOp("sit", {
+                    seatIndex: pickSeat,
+                    buyIn: n,
+                    displayName,
+                  });
+                  if (r?.ok) {
+                    setFormHint("");
                     setPickSeat(null);
-                  })();
+                  } else {
+                    setFormHint(
+                      String(r?.code || r?.json?.code || r?.error?.payload?.code || "Could not take seat."),
+                    );
+                  }
                 }}
               >
                 Join table
@@ -321,11 +373,11 @@ export default function Ov2CcScreen({
       ) : null}
 
       {mySeat && canAct ? (
-        <div className="grid shrink-0 grid-cols-3 gap-1.5 pb-1 sm:grid-cols-6">
+        <div className="relative z-10 grid shrink-0 grid-cols-3 gap-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] sm:grid-cols-6">
           <button
             type="button"
             disabled={operateBusy}
-            className="rounded-lg border border-rose-500/35 bg-rose-950/35 py-2 text-xs font-bold text-rose-100"
+            className="min-h-[48px] rounded-lg border border-rose-500/35 bg-rose-950/35 py-2.5 text-xs font-bold text-rose-100 touch-manipulation active:opacity-90"
             onClick={() => void doOp("fold")}
           >
             Fold
@@ -333,7 +385,7 @@ export default function Ov2CcScreen({
           <button
             type="button"
             disabled={operateBusy || toCall > 0}
-            className="rounded-lg border border-zinc-500/35 bg-zinc-800/40 py-2 text-xs font-bold"
+            className="min-h-[48px] rounded-lg border border-zinc-500/35 bg-zinc-800/40 py-2.5 text-xs font-bold touch-manipulation active:opacity-90"
             onClick={() => void doOp("check")}
           >
             Check
@@ -341,31 +393,45 @@ export default function Ov2CcScreen({
           <button
             type="button"
             disabled={operateBusy || toCall <= 0}
-            className="rounded-lg border border-sky-500/35 bg-sky-950/35 py-2 text-xs font-bold text-sky-100"
+            className="min-h-[48px] rounded-lg border border-sky-500/35 bg-sky-950/35 py-2.5 text-xs font-bold text-sky-100 touch-manipulation active:opacity-90"
             onClick={() => void doOp("call")}
           >
             Call {toCall > 0 ? toCall : ""}
           </button>
+          {canBetOpen ? (
+            <button
+              type="button"
+              disabled={operateBusy}
+              className="min-h-[48px] rounded-lg border border-violet-500/35 bg-violet-950/35 py-2.5 text-xs font-bold text-violet-100 touch-manipulation active:opacity-90"
+              onClick={() => void doOp("bet", { amount: bb })}
+            >
+              Bet {bb}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={operateBusy || !canMinRaiseBtn}
+              className="min-h-[48px] rounded-lg border border-violet-500/35 bg-violet-950/35 py-2.5 text-xs font-bold text-violet-100 touch-manipulation active:opacity-90 disabled:opacity-40"
+              onClick={() => void doOp("raise", { amount: minRaiseChips })}
+            >
+              Raise +{minRaiseChips}
+            </button>
+          )}
           <button
             type="button"
-            disabled={operateBusy}
-            className="rounded-lg border border-violet-500/35 bg-violet-950/35 py-2 text-xs font-bold text-violet-100"
-            onClick={() => void doOp("bet", { amount: bb })}
+            disabled={operateBusy || !canQuickBumpBtn}
+            className="min-h-[48px] rounded-lg border border-violet-500/35 bg-violet-950/35 py-2.5 text-xs font-bold text-violet-100 touch-manipulation active:opacity-90 disabled:opacity-40"
+            onClick={() => {
+              const op = curBet === 0 && toCall === 0 ? "bet" : "raise";
+              void doOp(op, { amount: quickAmount });
+            }}
           >
-            Open {bb}
+            +{quickAmount}
           </button>
           <button
             type="button"
             disabled={operateBusy}
-            className="rounded-lg border border-violet-500/35 bg-violet-950/35 py-2 text-xs font-bold text-violet-100"
-            onClick={() => void doOp("raise", { amount: bb * 2 })}
-          >
-            +{bb * 2}
-          </button>
-          <button
-            type="button"
-            disabled={operateBusy}
-            className="rounded-lg border border-amber-500/40 bg-amber-950/35 py-2 text-xs font-bold text-amber-100"
+            className="min-h-[48px] rounded-lg border border-amber-500/40 bg-amber-950/35 py-2.5 text-xs font-bold text-amber-100 touch-manipulation active:opacity-90"
             onClick={() => void doOp("all_in")}
           >
             All-in
