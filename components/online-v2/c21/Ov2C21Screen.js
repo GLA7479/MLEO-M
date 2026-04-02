@@ -16,6 +16,35 @@ function fmt(n) {
   return String(x);
 }
 
+/** Play amount for other-seat UI / inspector (committed or in-round only). */
+function otherSeatCommittedPlayLabel(seat, phase, minBet) {
+  if (!seat) return null;
+  const rb = Math.floor(Number(seat.roundBet) || 0);
+  if (seat.inRound && rb > 0 && phase !== "betting") return fmt(rb);
+  if (phase === "betting") {
+    const ib = Math.floor(Number(seat.intendedBet) || 0);
+    if (seat.betCommitRecorded && ib >= minBet) return fmt(ib);
+  }
+  return null;
+}
+
+function otherSeatHandStatusLabel(phase, seatIndex, handIndex, seat, currentTurn) {
+  const m = seat?.handMeta?.[handIndex];
+  if (!m) return "—";
+  if (m.surrendered) return "Yield";
+  if (m.busted) return "Bust";
+  if (m.stood) return "Stand";
+  if (phase === "acting" && currentTurn?.seatIndex === seatIndex && currentTurn?.handIndex === handIndex) {
+    return "Turn";
+  }
+  if (phase === "betting") return "Betting";
+  if (phase === "insurance" && seat?.inRound && seat?.insuranceChoice == null) return "Cover?";
+  if (phase === "insurance") return "—";
+  if (seat?.inRound && phase === "acting") return "Wait";
+  if (phase === "between_rounds") return "Settled";
+  return "—";
+}
+
 function phaseEndsMs(v) {
   if (v == null) return 0;
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -162,6 +191,13 @@ const MY_HAND_TIERS = [
   { wRem: 2.0, hRem: 2.9, compactFallback: true },
   { wRem: 1.72, hRem: 2.5, compactFallback: true },
 ];
+
+/** Player inspector popup — same ladder as main hand, scaled up for readability on near-black UI. */
+const INSPECTOR_HAND_TIERS = MY_HAND_TIERS.map(t => ({
+  wRem: Math.round(t.wRem * 1.14 * 100) / 100,
+  hRem: Math.round(t.hRem * 1.14 * 100) / 100,
+  compactFallback: t.compactFallback,
+}));
 
 /** Other players — compact observer windows. */
 const OTHER_HAND_TIERS = [
@@ -529,6 +565,9 @@ export default function Ov2C21Screen({
   const [splitViewIdx, setSplitViewIdx] = useState(0);
   const splitTurnKeyRef = useRef("");
 
+  const [inspectorSeatIdx, setInspectorSeatIdx] = useState(null);
+  const [inspectorSplitIdx, setInspectorSplitIdx] = useState(0);
+
   useEffect(() => {
     if (mySplitHandCount <= 1) {
       setSplitViewIdx(0);
@@ -546,6 +585,40 @@ export default function Ov2C21Screen({
       }
     }
   }, [phase, mySeat, currentTurn, mySplitHandCount]);
+
+  useEffect(() => {
+    if (inspectorSeatIdx == null) return;
+    const s = seatsForUi[inspectorSeatIdx];
+    if (!s?.participantKey || s.participantKey === participantKey) {
+      setInspectorSeatIdx(null);
+    }
+  }, [inspectorSeatIdx, seatsForUi, participantKey]);
+
+  useEffect(() => {
+    if (inspectorSeatIdx != null) setInspectorSplitIdx(0);
+  }, [inspectorSeatIdx]);
+
+  useEffect(() => {
+    if (inspectorSeatIdx == null) return;
+    const seat = engine?.seats?.[inspectorSeatIdx];
+    const n = seat?.hands?.length || 0;
+    if (n <= 1) {
+      setInspectorSplitIdx(0);
+      return;
+    }
+    if (phase === "acting" && currentTurn?.seatIndex === inspectorSeatIdx) {
+      setInspectorSplitIdx(Math.min(Math.max(0, Number(currentTurn.handIndex) || 0), n - 1));
+    }
+  }, [inspectorSeatIdx, phase, currentTurn?.seatIndex, currentTurn?.handIndex, engine?.seats, engine?.roundSeq]);
+
+  useEffect(() => {
+    if (inspectorSeatIdx == null) return;
+    const onKey = e => {
+      if (e.key === "Escape") setInspectorSeatIdx(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [inspectorSeatIdx]);
 
   const myHandTotalLabel = useMemo(() => {
     if (!displayMySeat?.hands?.length) return null;
@@ -758,6 +831,7 @@ export default function Ov2C21Screen({
           {otherSeatIndices.map(idx => {
             const seat = seatsForDisplay[idx];
             const taken = Boolean(seat?.participantKey);
+            const otherPlayLbl = otherSeatCommittedPlayLabel(seat, phase, minBet);
             const isActingSeat = phase === "acting" && currentTurn?.seatIndex === idx;
             const actingHere = isActingSeat ? `ring-2 ring-sky-400 ring-offset-1 ring-offset-black/80` : "";
             const ariaSeat = taken
@@ -768,11 +842,16 @@ export default function Ov2C21Screen({
                 key={idx}
                 type="button"
                 aria-label={ariaSeat}
-                disabled={operateBusy || taken || (!taken && !canSitToPlay)}
+                disabled={!taken && (operateBusy || !canSitToPlay)}
                 onClick={() => {
-                  if (!taken) trySit(idx);
+                  if (operateBusy && !taken) return;
+                  if (taken) {
+                    setInspectorSeatIdx(prev => (prev === idx ? null : idx));
+                    return;
+                  }
+                  trySit(idx);
                 }}
-                className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-md border border-white/10 bg-black/40 px-px py-0 text-left transition ${actingHere} disabled:opacity-40`}
+                className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-md border border-white/10 bg-black/40 px-px py-0 text-left transition ${actingHere} ${inspectorSeatIdx === idx ? "ring-1 ring-emerald-500/45 ring-offset-1 ring-offset-black/60" : ""} ${!taken && (operateBusy || !canSitToPlay) ? "opacity-40" : ""}`}
               >
                 <div className="grid h-[11px] max-h-[11px] shrink-0 grid-cols-3 items-center gap-px overflow-hidden leading-none">
                   {taken ? (
@@ -787,27 +866,11 @@ export default function Ov2C21Screen({
                         })()}
                       </span>
                       <span className="flex min-w-0 justify-end gap-px overflow-hidden">
-                        {(() => {
-                          const rb = Math.floor(Number(seat.roundBet) || 0);
-                          if (seat.inRound && rb > 0 && phase !== "betting") {
-                            return (
-                              <span className="shrink-0 text-[7px] font-semibold tabular-nums leading-none text-emerald-300/85">
-                                Play {fmt(rb)}
-                              </span>
-                            );
-                          }
-                          if (phase === "betting") {
-                            const ib = Math.floor(Number(seat.intendedBet) || 0);
-                            if (seat.betCommitRecorded && ib >= minBet) {
-                              return (
-                                <span className="shrink-0 text-[7px] font-semibold tabular-nums leading-none text-emerald-300/85">
-                                  Play {fmt(ib)}
-                                </span>
-                              );
-                            }
-                          }
-                          return null;
-                        })()}
+                        {otherPlayLbl ? (
+                          <span className="shrink-0 text-[7px] font-semibold tabular-nums leading-none text-emerald-300/85">
+                            Play {otherPlayLbl}
+                          </span>
+                        ) : null}
                         {isActingSeat ? (
                           <span className="shrink-0 rounded px-px text-[7px] font-extrabold uppercase leading-none text-sky-200">
                             Turn
@@ -1041,6 +1104,98 @@ export default function Ov2C21Screen({
           </div>
         </div>
       ) : null}
+
+      {inspectorSeatIdx != null && seatsForDisplay[inspectorSeatIdx]?.participantKey
+        ? (() => {
+            const s = seatsForDisplay[inspectorSeatIdx];
+            const nh = s.hands?.length || 0;
+            const hi = nh > 1 ? Math.min(Math.max(0, inspectorSplitIdx), nh - 1) : 0;
+            const h = s.hands?.[hi] || [];
+            const inspPlay = otherSeatCommittedPlayLabel(s, phase, minBet);
+            const inspStatus = otherSeatHandStatusLabel(phase, inspectorSeatIdx, hi, s, currentTurn);
+            const inspTotal = h.length ? handTotal(h) : null;
+            const name = String(s.displayName || "").trim() || "Player";
+            return (
+              <div
+                className="fixed inset-0 z-[55] flex items-center justify-center p-3 pointer-events-auto"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`${name} — hand detail`}
+              >
+                <button
+                  type="button"
+                  className="absolute inset-0 bg-black/50"
+                  aria-label="Close"
+                  onClick={() => setInspectorSeatIdx(null)}
+                />
+                <div
+                  className="relative z-10 flex max-h-[min(72vh,24rem)] w-[min(92vw,17.75rem)] flex-col overflow-hidden rounded-xl border border-zinc-500/50 bg-black shadow-[0_20px_50px_rgba(0,0,0,0.75),0_0_0_1px_rgba(255,255,255,0.06)_inset]"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex shrink-0 items-start justify-between gap-1 border-b border-zinc-600/70 bg-black px-2 py-1">
+                    <div className="grid min-w-0 flex-1 grid-cols-3 items-center gap-0.5 leading-none">
+                      <span className="min-w-0 truncate text-left text-[10px] font-bold text-white">{name}</span>
+                      <span className="min-w-0 truncate text-center text-[10px] font-semibold tabular-nums text-zinc-100">
+                        {inspTotal != null ? `Total ${inspTotal}` : "—"}
+                      </span>
+                      <span className="flex min-w-0 flex-col items-end gap-px text-right">
+                        {inspPlay ? (
+                          <span className="text-[8px] font-semibold tabular-nums text-emerald-400">Play {inspPlay}</span>
+                        ) : null}
+                        <span className="text-[8px] font-extrabold uppercase text-sky-300">{inspStatus}</span>
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setInspectorSeatIdx(null)}
+                      className="shrink-0 rounded border border-zinc-500/70 bg-zinc-950 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white hover:bg-zinc-900"
+                      aria-label="Close"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-neutral-950 px-2 py-3">
+                    {h.length ? (
+                      <SeatHandRow
+                        hand={h}
+                        handKey={`insp-${inspectorSeatIdx}-${hi}-${h.join("|")}`}
+                        tiers={INSPECTOR_HAND_TIERS}
+                      />
+                    ) : (
+                      <span className="text-[10px] text-zinc-400">No cards yet</span>
+                    )}
+                  </div>
+                  {nh > 1 ? (
+                    <div className="flex shrink-0 gap-1 border-t border-zinc-700/80 bg-black px-1 py-1">
+                      {(s.hands || []).map((_, b) => {
+                        const isAct =
+                          phase === "acting" &&
+                          currentTurn?.seatIndex === inspectorSeatIdx &&
+                          currentTurn?.handIndex === b;
+                        return (
+                          <button
+                            key={b}
+                            type="button"
+                            onClick={() => setInspectorSplitIdx(b)}
+                            className={`min-h-[24px] min-w-0 flex-1 touch-manipulation rounded border px-0.5 py-px text-[8px] font-extrabold uppercase leading-none ${
+                              isAct
+                                ? "border-sky-400 bg-sky-950 text-sky-100"
+                                : inspectorSplitIdx === b
+                                  ? "border-emerald-500/70 bg-emerald-950/80 text-emerald-100"
+                                  : "border-zinc-600 bg-zinc-950 text-zinc-300"
+                            }`}
+                          >
+                            H{b + 1}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })()
+        : null}
 
       {resultToastOpen && mySummary ? (
         <div className="pointer-events-none fixed bottom-[calc(5.75rem+0.25rem+env(safe-area-inset-bottom,0px))] left-2 right-2 z-30 mx-auto max-w-lg sm:bottom-[calc(4.25rem+0.25rem+env(safe-area-inset-bottom,0px))]">

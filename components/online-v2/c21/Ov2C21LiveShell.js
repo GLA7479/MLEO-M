@@ -7,6 +7,12 @@ import { OV2_HUD_CHROME_BTN } from "../OnlineV2GameHudOverlays";
 import Ov2C21Screen from "./Ov2C21Screen";
 import { useOv2C21Session } from "../../../hooks/useOv2C21Session";
 import { OV2_C21_STAKE_TIERS, OV2_C21_ROOM_ID_BY_STAKE } from "../../../lib/online-v2/c21/ov2C21TableIds";
+import {
+  OV2_C21_BETTING_MS,
+  OV2_C21_BETWEEN_MS,
+  OV2_C21_INSURANCE_MS,
+  OV2_C21_TURN_MS,
+} from "../../../lib/online-v2/c21/ov2C21ClientConstants";
 import { isOv2RoomIdQueryParam } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { supabaseMP } from "../../../lib/supabaseClients";
 
@@ -26,22 +32,121 @@ function formatTierLabel(tier) {
   return String(tier);
 }
 
-const C21_INFO_PANEL = (
-  <div className="space-y-2 text-[11px] leading-snug text-zinc-300">
-    <p>
-      <span className="font-semibold text-zinc-200">House</span> (top-right number): seconds left in the current step
-      (play window, side cover, someone&apos;s turn, or reveal pause).
-    </p>
-    <p>
-      Visitor: you can watch without a seat. Take an open seat to join; use <span className="text-zinc-200">Tables</span>{" "}
-      to browse other levels without giving up your seat. <span className="text-zinc-200">Leave</span> vacates your seat
-      and returns here.
-    </p>
-    <p className="text-zinc-500">
-      Two consecutive rounds without meeting this table&apos;s minimum play clears your seat (using Tables does not).
-    </p>
-  </div>
-);
+function secs(ms) {
+  return Math.round(Number(ms) / 1000);
+}
+
+/** Full rules / UX copy — same structure as Ludo & Rummy 51 info panels. */
+function C21InfoPanelBody() {
+  const betS = secs(OV2_C21_BETTING_MS);
+  const betweenS = secs(OV2_C21_BETWEEN_MS);
+  const insS = secs(OV2_C21_INSURANCE_MS);
+  const turnS = secs(OV2_C21_TURN_MS);
+  return (
+    <div className="space-y-2 text-[11px] leading-snug text-zinc-300">
+      <section>
+        <p className="font-semibold text-zinc-100">Goal</p>
+        <p className="mt-0.5">
+          Beat the dealer&apos;s hand without going over <span className="text-zinc-200">21</span>. This is a shared live table:
+          up to <span className="text-zinc-200">six</span> seats, one dealer shoe, rounds run on a server clock.
+        </p>
+      </section>
+      <section>
+        <p className="font-semibold text-zinc-100">Tables &amp; stakes</p>
+        <p className="mt-0.5">
+          Five <span className="text-zinc-200">always-on</span> tables at fixed stake levels (100 · 1K · 10K · 100K · 1M). Each table
+          has its own <span className="text-zinc-200">minimum play</span> equal to that stake. Your product vault must cover the
+          table minimum to <span className="text-zinc-200">take a seat</span>.
+        </p>
+      </section>
+      <section>
+        <p className="font-semibold text-zinc-100">How to play</p>
+        <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+          <li>
+            <span className="text-zinc-200">Spectate</span> without sitting, or tap an open seat to join (if your vault meets the
+            minimum).
+          </li>
+          <li>
+            Set your <span className="text-zinc-200">display name</span> on the lobby or at the table; others see it on your seat.
+          </li>
+          <li>
+            <span className="text-zinc-200">Tables</span> returns to the stake picker <strong>without</strong> vacating your seat.{" "}
+            <span className="text-zinc-200">Leave</span> vacates your seat and returns to the lobby.
+          </li>
+          <li>
+            <span className="font-semibold text-zinc-200">Betting</span> (~{betS}s): choose an amount between the table minimum
+            and the server cap, then <span className="text-zinc-200">Commit play</span>. The server debits your vault when commit
+            succeeds; until then you are not in the upcoming deal.
+          </li>
+          <li>
+            After the deal, if the dealer shows an ace you may get a short{" "}
+            <span className="text-zinc-200">side cover</span> window (~{insS}s): accept costs half your main play (server debit);
+            decline is free.
+          </li>
+          <li>
+            <span className="font-semibold text-zinc-200">Your turn</span> (~{turnS}s each):{" "}
+            <span className="text-zinc-200">Hit</span>, <span className="text-zinc-200">Stand</span>,{" "}
+            <span className="text-zinc-200">Double</span> (one extra card, double stake),{" "}
+            <span className="text-zinc-200">Split</span> matching ranks once (extra stake), or{" "}
+            <span className="text-zinc-200">Surrender</span> where rules allow (refund half). Illegal moves are rejected by the server.
+          </li>
+          <li>
+            The dealer reveals hidden cards and draws by fixed rules; then the round settles. A short{" "}
+            <span className="text-zinc-200">between-rounds</span> pause (~{betweenS}s) follows before the next betting window.
+          </li>
+        </ul>
+      </section>
+      <section>
+        <p className="font-semibold text-zinc-100">House row &amp; timer</p>
+        <p className="mt-0.5">
+          <span className="text-zinc-200">House</span> shows the dealer&apos;s cards. The large number on the same header line is
+          seconds left: betting window, side-cover window, current player&apos;s turn, or pause between rounds — whichever applies.
+          Your <span className="text-zinc-200">Total</span> sits in the center of that line; your main play amount appears on the
+          right only after a successful commit (or during the round for your active stake).
+        </p>
+      </section>
+      <section>
+        <p className="font-semibold text-zinc-100">Outcomes</p>
+        <p className="mt-0.5">
+          Closest to <span className="text-zinc-200">21</span> without busting wins against the dealer; over <span className="text-zinc-200">21</span>{" "}
+          is a bust. A two-card <span className="text-zinc-200">natural 21</span> pays better than a regular win when the dealer does
+          not also have natural 21. Ties can push (stake returned per server rules). Each split hand is settled separately.
+        </p>
+      </section>
+      <section>
+        <p className="font-semibold text-zinc-100">Stake, vault &amp; payout</p>
+        <p className="mt-0.5">
+          All debits and refunds run through the <span className="text-zinc-200">server</span> (commit, double, split, side cover,
+          payouts, surrender refund). Settlement credits every winner&apos;s vault from the server; your on-screen vault should
+          refresh after successful actions without reloading the page (product vault adapter enabled).
+        </p>
+      </section>
+      <section>
+        <p className="font-semibold text-zinc-100">AFK &amp; seat loss</p>
+        <p className="mt-0.5">
+          <span className="text-zinc-200">Two</span> consecutive rounds where you do not put up at least the table minimum (after
+          betting closes) clears your seat. Browsing other tables with <span className="text-zinc-200">Tables</span> does{" "}
+          <strong>not</strong> count as missing a round.
+        </p>
+      </section>
+      <section>
+        <p className="font-semibold text-zinc-100">Leave &amp; reconnect</p>
+        <p className="mt-0.5">
+          Mid-round leave follows server rules (hands may be forfeited; settlement may still run for others). Refreshing the page
+          or coming back with the same browser keeps your <span className="text-zinc-200">participant id</span> and usually your
+          seat until you leave or miss two rounds.
+        </p>
+      </section>
+      <section>
+        <p className="font-semibold text-zinc-100">Important</p>
+        <p className="mt-0.5">
+          Card dealing, timers, legal moves, and money are <span className="text-zinc-200">authoritative on the server</span>. The UI
+          only reflects engine state from the API and live updates.
+        </p>
+      </section>
+    </div>
+  );
+}
 
 export default function Ov2C21LiveShell() {
   const router = useRouter();
@@ -50,6 +155,28 @@ export default function Ov2C21LiveShell() {
   const [nameDraft, setNameDraft] = useState("");
   const [leaveBusy, setLeaveBusy] = useState(false);
   const leaveInFlightRef = useRef(false);
+
+  const session = useOv2C21Session(roomId, tableStake);
+
+  const infoPanel = useMemo(
+    () => (
+      <>
+        <C21InfoPanelBody />
+        <p className="mt-2 text-[11px] text-zinc-500">
+          {roomId ? (
+            <button
+              type="button"
+              className="text-sky-300 underline"
+              onClick={() => void session.reloadFromDb()}
+            >
+              Refresh state
+            </button>
+          ) : null}
+        </p>
+      </>
+    ),
+    [roomId, session.reloadFromDb],
+  );
 
   useEffect(() => {
     try {
@@ -75,7 +202,6 @@ export default function Ov2C21LiveShell() {
   }, [roomId]);
 
   const displayName = String(nameDraft || "").trim() || "Guest";
-  const session = useOv2C21Session(roomId, tableStake);
   const runC21Op = session.operate;
   const c21OpBusy = session.operateBusy;
 
@@ -122,7 +248,7 @@ export default function Ov2C21LiveShell() {
         title="21 Challenge"
         subtitle="Five permanent live tables"
         useAppViewportHeight
-        infoPanel={C21_INFO_PANEL}
+        infoPanel={infoPanel}
       >
         <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
           <div className="shrink-0">
@@ -173,7 +299,7 @@ export default function Ov2C21LiveShell() {
         title="21 Challenge"
         subtitle={`Live · table play ${formatTierLabel(tableStake)}`}
         useAppViewportHeight
-        infoPanel={C21_INFO_PANEL}
+        infoPanel={infoPanel}
       >
       <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
         <div className="flex shrink-0 flex-wrap items-center gap-2">
