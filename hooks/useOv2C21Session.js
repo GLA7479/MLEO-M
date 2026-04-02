@@ -2,20 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase } from "../lib/supabaseClients";
 import { getOv2ParticipantId } from "../lib/online-v2/ov2ParticipantId";
 import { postOv2C21Operate } from "../lib/online-v2/c21/ov2C21Api";
-import {
-  creditOnlineV2VaultForSettlementLine,
-  debitOnlineV2Vault,
-} from "../lib/online-v2/onlineV2VaultBridge";
+import { creditOnlineV2VaultForSettlementLine, readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import { OV2_C21_PRODUCT_GAME_ID } from "../lib/online-v2/c21/ov2C21TableIds";
 
-async function applyVaultEffects(effects) {
+async function applyVaultEffects(effects, selfParticipantKey) {
+  const selfPk = String(selfParticipantKey || "").trim();
   for (const e of effects || []) {
     if (!e || typeof e !== "object") continue;
     const gid = String(e.gameId || OV2_C21_PRODUCT_GAME_ID);
     if (e.kind === "debit") {
-      const amt = Math.max(0, Math.floor(Number(e.amount) || 0));
-      if (amt > 0) await debitOnlineV2Vault(amt, gid);
-    } else if (e.kind === "credit") {
+      /** Main and action debits are applied server-side in `/api/ov2-c21/operate`. */
+      continue;
+    }
+    if (e.kind === "credit") {
+      const pk = String(e.participantKey || "").trim();
+      if (pk && selfPk && pk !== selfPk) continue;
       const amt = Math.max(0, Math.floor(Number(e.amount) || 0));
       if (amt > 0) {
         await creditOnlineV2VaultForSettlementLine(amt, gid, e.idempotencyKey);
@@ -69,7 +70,14 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
         if (cancelled) return;
         if (json?.engine) setEngine(json.engine);
         if (json?.vaultEffects?.length) {
-          await applyVaultEffects(json.vaultEffects);
+          await applyVaultEffects(json.vaultEffects, participantKey);
+        }
+        if (json?.localVaultRefreshHint) {
+          try {
+            await readOnlineV2Vault({ fresh: true });
+          } catch {
+            /* ignore */
+          }
         }
       } catch {
         /* table may not exist until migration */
@@ -115,7 +123,14 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
         });
         if (json?.engine) setEngine(json.engine);
         if (json?.vaultEffects?.length) {
-          await applyVaultEffects(json.vaultEffects);
+          await applyVaultEffects(json.vaultEffects, participantKey);
+        }
+        if (json?.localVaultRefreshHint) {
+          try {
+            await readOnlineV2Vault({ fresh: true });
+          } catch {
+            /* ignore */
+          }
         }
         return { ok: true, json };
       } catch (e) {
@@ -146,7 +161,14 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
           });
           if (json?.engine) setEngine(json.engine);
           if (json?.vaultEffects?.length) {
-            await applyVaultEffects(json.vaultEffects);
+            await applyVaultEffects(json.vaultEffects, participantKey);
+          }
+          if (json?.localVaultRefreshHint) {
+            try {
+              await readOnlineV2Vault({ fresh: true });
+            } catch {
+              /* ignore */
+            }
           }
         } catch {
           /* ignore tick errors — next poll retries */

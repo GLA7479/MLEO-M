@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { handTotal, splitCardCode } from "../../../lib/solo-v2/challenge21HandMath";
 import { getOv2C21LegalFlags } from "../../../lib/online-v2/c21/ov2C21LegalMoves";
+import {
+  peekOnlineV2Vault,
+  readOnlineV2Vault,
+  subscribeOnlineV2Vault,
+} from "../../../lib/online-v2/onlineV2VaultBridge";
 
 function fmt(n) {
   const x = Math.floor(Number(n) || 0);
@@ -272,6 +277,7 @@ export default function Ov2C21Screen({
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [actionLock, setActionLock] = useState(false);
   const [resultToastOpen, setResultToastOpen] = useState(false);
+  const [lossBoardHold, setLossBoardHold] = useState(null);
   const lastToastRoundRef = useRef(null);
   const resultToastTimerRef = useRef(null);
   const actionLockRef = useRef(false);
@@ -281,6 +287,8 @@ export default function Ov2C21Screen({
   const engineRef = useRef(engine);
   engineRef.current = engine;
   const [playDraftStr, setPlayDraftStr] = useState("");
+  const [economyHint, setEconomyHint] = useState("");
+  const [vaultBalance, setVaultBalance] = useState(() => Math.max(0, Math.floor(Number(peekOnlineV2Vault().balance) || 0)));
   const [dealerRevealN, setDealerRevealN] = useState(0);
   const dealerRevealTimersRef = useRef([]);
 
@@ -289,11 +297,24 @@ export default function Ov2C21Screen({
     return () => window.clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    let c = true;
+    void readOnlineV2Vault({ fresh: true }).then(s => {
+      if (c) setVaultBalance(Math.max(0, Math.floor(Number(s.balance) || 0)));
+    });
+    return () => {
+      c = false;
+    };
+  }, [roomId]);
+
+  useEffect(() => subscribeOnlineV2Vault(() => setVaultBalance(Math.max(0, Math.floor(Number(peekOnlineV2Vault().balance) || 0)))), []);
+
   const phase = engine?.phase || "betting";
 
   useEffect(() => {
     actionLockRef.current = false;
     setActionLock(false);
+    setEconomyHint("");
   }, [phase]);
   const minBet = Math.max(100, Math.floor(Number(tableStakeUnits) || 100));
   const maxBet = Math.min(minBet * 200, 10_000_000);
@@ -327,13 +348,17 @@ export default function Ov2C21Screen({
 
   const intendedBetFloor = Math.floor(Number(mySeat?.intendedBet) || 0);
 
-  /** Committed round play only — no betting preview / intended-only. */
+  /** After successful set_bet: show intended during play window; after deal, roundBet as before. */
   const myPlayAmountLabel = useMemo(() => {
     if (!mySeat) return null;
     const rb = Math.floor(Number(mySeat.roundBet) || 0);
     if (mySeat.inRound && rb > 0) return fmt(rb);
+    if (phase === "betting") {
+      const ib = Math.floor(Number(mySeat.intendedBet) || 0);
+      if (ib >= minBet) return fmt(ib);
+    }
     return null;
-  }, [mySeat]);
+  }, [mySeat, phase, minBet, engine?.roundSeq]);
 
   useEffect(() => {
     if (phase !== "betting" || !mySeat) return;
@@ -374,6 +399,59 @@ export default function Ov2C21Screen({
   const shouldShowResultToastAfterReveal = shouldShowResultToast && dealerRevealComplete;
 
   useEffect(() => {
+    if (!mySummary) return;
+    const vd = Number(mySummary.vaultDelta);
+    if (vd >= 0) {
+      setLossBoardHold(null);
+      return;
+    }
+    if (phase !== "between_rounds" || !dealerRevealComplete) return;
+    const rk = summaryDismissRound;
+    const srcSeats = Array.isArray(engine?.seats) && engine.seats.length === 6 ? engine.seats : seatsForUi;
+    setLossBoardHold(prev => {
+      if (prev?.roundKey === rk) return prev;
+      return {
+        roundKey: rk,
+        until: Date.now() + 10000,
+        dealerHand: [...(engine?.dealerHand || [])],
+        dealerHiddenVal: Boolean(engine?.dealerHidden),
+        seatsSnap: srcSeats.map(s => ({
+          hands: Array.isArray(s.hands) ? s.hands.map(h => [...h]) : [],
+        })),
+      };
+    });
+  }, [
+    phase,
+    dealerRevealComplete,
+    mySummary,
+    summaryDismissRound,
+    engine?.dealerHand,
+    engine?.dealerHidden,
+    engine?.seats,
+    seatsForUi,
+  ]);
+
+  useEffect(() => {
+    if (!lossBoardHold) return;
+    if (nowTick < lossBoardHold.until) return;
+    setLossBoardHold(null);
+  }, [nowTick, lossBoardHold]);
+
+  const seatsForDisplay = useMemo(() => {
+    const h = lossBoardHold && nowTick < lossBoardHold.until ? lossBoardHold.seatsSnap : null;
+    if (!h) return seatsForUi;
+    return seatsForUi.map((s, i) => ({
+      ...s,
+      hands: h[i]?.hands != null ? h[i].hands : s.hands,
+    }));
+  }, [seatsForUi, lossBoardHold, nowTick]);
+
+  const displayMySeat = useMemo(
+    () => (participantKey ? seatsForDisplay.find(s => s.participantKey === participantKey) : null),
+    [seatsForDisplay, participantKey],
+  );
+
+  useEffect(() => {
     if (!shouldShowResultToastAfterReveal || !roomId || !summaryDismissRound) {
       setResultToastOpen(false);
       return undefined;
@@ -390,6 +468,7 @@ export default function Ov2C21Screen({
     if (lastToastRoundRef.current === summaryDismissRound) return undefined;
     lastToastRoundRef.current = summaryDismissRound;
     setResultToastOpen(true);
+    const toastMs = Number(mySummary?.vaultDelta) < 0 ? 10000 : 2000;
     if (resultToastTimerRef.current) window.clearTimeout(resultToastTimerRef.current);
     resultToastTimerRef.current = window.setTimeout(() => {
       setResultToastOpen(false);
@@ -399,14 +478,14 @@ export default function Ov2C21Screen({
         /* ignore */
       }
       resultToastTimerRef.current = null;
-    }, 2000);
+    }, toastMs);
     return () => {
       if (resultToastTimerRef.current) {
         window.clearTimeout(resultToastTimerRef.current);
         resultToastTimerRef.current = null;
       }
     };
-  }, [shouldShowResultToastAfterReveal, roomId, summaryDismissRound]);
+  }, [shouldShowResultToastAfterReveal, roomId, summaryDismissRound, mySummary?.vaultDelta]);
 
   const guardAction = useCallback(
     fn => async () => {
@@ -441,9 +520,31 @@ export default function Ov2C21Screen({
     phase === "acting";
 
   const legal = useMemo(
-    () => getOv2C21LegalFlags({ phase, engine, participantKey }),
-    [phase, engine, participantKey],
+    () => getOv2C21LegalFlags({ phase, engine, participantKey, vaultBalance }),
+    [phase, engine, participantKey, vaultBalance],
   );
+
+  const mySplitHandCount = displayMySeat?.hands?.length || 0;
+  const [splitViewIdx, setSplitViewIdx] = useState(0);
+  const splitTurnKeyRef = useRef("");
+
+  useEffect(() => {
+    if (mySplitHandCount <= 1) {
+      setSplitViewIdx(0);
+      splitTurnKeyRef.current = "";
+    }
+  }, [mySplitHandCount]);
+
+  useEffect(() => {
+    if (mySplitHandCount <= 1) return;
+    if (phase === "acting" && mySeat && currentTurn?.seatIndex === mySeat.seatIndex) {
+      const k = `${currentTurn.seatIndex}-${currentTurn.handIndex}`;
+      if (splitTurnKeyRef.current !== k) {
+        splitTurnKeyRef.current = k;
+        setSplitViewIdx(Math.min(Math.max(0, currentTurn.handIndex), mySplitHandCount - 1));
+      }
+    }
+  }, [phase, mySeat, currentTurn, mySplitHandCount]);
 
   const showInsuranceModal = Boolean(legal.insuranceYes || legal.insuranceNo);
 
@@ -475,6 +576,8 @@ export default function Ov2C21Screen({
 
   const parsedDraftPlay = Math.floor(Number(String(playDraftStr).replace(/\D/g, "")) || 0);
   const draftPlayValid = parsedDraftPlay >= minBet && parsedDraftPlay <= maxBet;
+  const vaultOkForCommit = vaultBalance >= parsedDraftPlay;
+  const canSitToPlay = vaultBalance >= minBet;
 
   const bumpDraftByTableMin = useCallback(() => {
     if (engineRef.current?.phase !== "betting" || operateBusy || quickAddLockRef.current) return;
@@ -495,34 +598,72 @@ export default function Ov2C21Screen({
     if (e?.phase !== "betting" || betLockRef.current || operateBusy) return;
     const raw = Math.floor(Number(String(playDraftStr).replace(/\D/g, "")) || 0);
     if (raw < minBet || raw > maxBet) return;
+    if (vaultBalance < raw) {
+      setEconomyHint("Not enough vault for this play.");
+      return;
+    }
     betLockRef.current = true;
     try {
-      await onOperate("set_bet", { amount: raw });
+      const r = await onOperate("set_bet", { amount: raw });
+      if (!r?.ok) {
+        const code = r?.error?.code || r?.error?.payload?.code || "";
+        setEconomyHint(
+          code === "insufficient_vault"
+            ? "Not enough vault for this play."
+            : code === "DEVICE_REQUIRED"
+              ? "Session required to commit play."
+              : "Could not commit play. Try again.",
+        );
+      }
     } finally {
       window.setTimeout(() => {
         betLockRef.current = false;
       }, 400);
     }
-  }, [playDraftStr, maxBet, minBet, onOperate, operateBusy]);
+  }, [playDraftStr, maxBet, minBet, onOperate, operateBusy, vaultBalance]);
 
   const trySit = useCallback(
     idx => {
       if (sitLockRef.current || operateBusy) return;
+      if (vaultBalance < minBet) {
+        setEconomyHint("Not enough vault for this table minimum.");
+        return;
+      }
       sitLockRef.current = true;
-      void onOperate("sit", { seatIndex: idx, displayName: displayName || "Guest" }).finally(() => {
-        window.setTimeout(() => {
-          sitLockRef.current = false;
-        }, 450);
-      });
+      void onOperate("sit", { seatIndex: idx, displayName: displayName || "Guest" })
+        .then(r => {
+          if (!r?.ok) {
+            const code = r?.error?.code || r?.error?.payload?.code || "";
+            setEconomyHint(
+              code === "insufficient_vault_for_table"
+                ? "Not enough vault for this table."
+                : code === "DEVICE_REQUIRED"
+                  ? "Session required to take a seat."
+                  : "",
+            );
+          }
+        })
+        .finally(() => {
+          window.setTimeout(() => {
+            sitLockRef.current = false;
+          }, 450);
+        });
     },
-    [displayName, onOperate, operateBusy],
+    [displayName, minBet, onOperate, operateBusy, vaultBalance],
   );
 
-  const visibleDealerCards = !dealerHidden && dealerRevealN > 0 ? dealer.slice(0, dealerRevealN) : [];
+  const lossHoldActive = Boolean(lossBoardHold && nowTick < lossBoardHold.until);
+  const dealerRender = lossHoldActive ? lossBoardHold.dealerHand : dealer;
+  const dealerHiddenRender = lossHoldActive ? lossBoardHold.dealerHiddenVal : dealerHidden;
+  const dealerRevealNRender = lossHoldActive ? dealerRender.length : dealerRevealN;
+
+  const visibleDealerCards =
+    !dealerHiddenRender && dealerRevealNRender > 0 ? dealerRender.slice(0, dealerRevealNRender) : [];
   const dealerTotalLive =
-    !dealerHidden && visibleDealerCards.length > 0 ? handTotal(visibleDealerCards) : null;
-  const dealerHandCount = dealer.length;
-  const dealerRevealVisibleCount = dealerHidden ? Math.min(2, dealerHandCount) : dealerRevealN;
+    !dealerHiddenRender && visibleDealerCards.length > 0 ? handTotal(visibleDealerCards) : null;
+  const dealerHandCount = dealerRender.length;
+  const dealerRevealVisibleCount = dealerHiddenRender ? Math.min(2, dealerHandCount) : dealerRevealNRender;
+  const dealerSigRender = dealerRender.join("|");
   const dealerGap = dealerRevealVisibleCount >= 4 ? "gap-0.5" : "gap-1";
 
   return (
@@ -539,7 +680,7 @@ export default function Ov2C21Screen({
           <div className="pointer-events-none absolute left-1 right-1 top-0.5 z-10 flex h-[1.05rem] items-center justify-between gap-1 leading-none">
             <span className="shrink-0 text-[8px] font-bold uppercase tracking-wide text-amber-200/85">House</span>
             <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
-              {!dealerHidden && dealer.length > 0 && dealerTotalLive != null ? (
+              {!dealerHiddenRender && dealerRender.length > 0 && dealerTotalLive != null ? (
                 <span className="truncate text-[8px] font-medium tabular-nums text-zinc-400">Total {dealerTotalLive}</span>
               ) : null}
               <span
@@ -554,20 +695,20 @@ export default function Ov2C21Screen({
           <div
             className={`absolute inset-x-1 top-[1.2rem] bottom-px flex items-center justify-center overflow-x-auto ${dealerGap}`}
           >
-            {dealer.length === 0 ? (
+            {dealerRender.length === 0 ? (
               <span className="text-xs text-white/50">—</span>
-            ) : dealerHidden ? (
-              dealer.map((c, i) => {
+            ) : dealerHiddenRender ? (
+              dealerRender.map((c, i) => {
                 if (i === 0) return <PlayingCardOv2 key="dh0" code={c} handCardCount={dealerHandCount} />;
                 if (i === 1) return <PlayingCardOv2 key="dh1" hidden handCardCount={dealerHandCount} />;
                 return null;
               })
             ) : (
-              dealer.slice(0, dealerRevealN).map((c, i) => (
+              dealerRender.slice(0, dealerRevealNRender).map((c, i) => (
                 <PlayingCardOv2
-                  key={`d-${dealerSig}-${i}`}
+                  key={`d-${dealerSigRender}-${i}`}
                   code={c}
-                  handCardCount={Math.max(1, dealerRevealN)}
+                  handCardCount={Math.max(1, dealerRevealNRender)}
                 />
               ))
             )}
@@ -590,7 +731,7 @@ export default function Ov2C21Screen({
             }
           >
           {otherSeatIndices.map(idx => {
-            const seat = seatsForUi[idx];
+            const seat = seatsForDisplay[idx];
             const taken = Boolean(seat?.participantKey);
             const isActingSeat = phase === "acting" && currentTurn?.seatIndex === idx;
             const actingHere = isActingSeat ? `ring-2 ring-sky-400 ring-offset-1 ring-offset-black/80` : "";
@@ -602,7 +743,7 @@ export default function Ov2C21Screen({
                 key={idx}
                 type="button"
                 aria-label={ariaSeat}
-                disabled={operateBusy || taken}
+                disabled={operateBusy || taken || (!taken && !canSitToPlay)}
                 onClick={() => {
                   if (!taken) trySit(idx);
                 }}
@@ -614,11 +755,27 @@ export default function Ov2C21Screen({
                       <span className="min-w-0 flex-1 truncate text-left text-[6px] font-semibold leading-none text-white/90">
                         {String(seat.displayName || "").trim() || "…"}
                       </span>
-                      {seat.inRound && Math.floor(Number(seat.roundBet) || 0) > 0 && phase !== "betting" ? (
-                        <span className="shrink-0 text-[5px] font-semibold tabular-nums leading-none text-emerald-300/85">
-                          Play {fmt(seat.roundBet)}
-                        </span>
-                      ) : null}
+                      {(() => {
+                        const rb = Math.floor(Number(seat.roundBet) || 0);
+                        if (seat.inRound && rb > 0 && phase !== "betting") {
+                          return (
+                            <span className="shrink-0 text-[5px] font-semibold tabular-nums leading-none text-emerald-300/85">
+                              Play {fmt(rb)}
+                            </span>
+                          );
+                        }
+                        if (phase === "betting") {
+                          const ib = Math.floor(Number(seat.intendedBet) || 0);
+                          if (ib >= minBet) {
+                            return (
+                              <span className="shrink-0 text-[5px] font-semibold tabular-nums leading-none text-emerald-300/85">
+                                Play {fmt(ib)}
+                              </span>
+                            );
+                          }
+                        }
+                        return null;
+                      })()}
                       {isActingSeat ? (
                         <span className="shrink-0 rounded px-px text-[5px] font-extrabold uppercase leading-none text-sky-200">
                           Turn
@@ -678,17 +835,25 @@ export default function Ov2C21Screen({
               <span className="shrink-0 text-[6px] font-extrabold uppercase leading-none text-sky-300/95">Turn</span>
             ) : null}
           </div>
-          <div className="absolute inset-x-1 top-[1.2rem] bottom-px flex flex-col items-center justify-center gap-px overflow-hidden">
+          <div className="absolute inset-x-1 top-[1.2rem] bottom-[1.65rem] flex flex-col items-center justify-center gap-px overflow-hidden">
             {mySeat ? (
-              mySeat.hands?.length ? (
-                mySeat.hands.map((h, hi) => (
+              displayMySeat?.hands?.length ? (
+                mySplitHandCount > 1 ? (
                   <SeatHandRow
-                    key={hi}
-                    hand={h}
-                    handKey={`mine-${hi}-${(h || []).join("|")}`}
+                    hand={displayMySeat.hands[Math.min(splitViewIdx, mySplitHandCount - 1)] || []}
+                    handKey={`mine-sv-${splitViewIdx}-${(displayMySeat.hands[Math.min(splitViewIdx, mySplitHandCount - 1)] || []).join("|")}`}
                     tiers={MY_HAND_TIERS}
                   />
-                ))
+                ) : (
+                  displayMySeat.hands.map((h, hi) => (
+                    <SeatHandRow
+                      key={hi}
+                      hand={h}
+                      handKey={`mine-${hi}-${(h || []).join("|")}`}
+                      tiers={MY_HAND_TIERS}
+                    />
+                  ))
+                )
               ) : (
                 <span className="text-[9px] text-zinc-500">—</span>
               )
@@ -696,6 +861,30 @@ export default function Ov2C21Screen({
               <span className="px-1 text-center text-[8px] leading-tight text-zinc-500">Pick an open seat above</span>
             )}
           </div>
+          {mySeat && mySplitHandCount > 1 ? (
+            <div className="absolute bottom-1 left-1 right-1 z-20 flex items-center justify-between gap-1">
+              {displayMySeat.hands.map((_, hi) => {
+                const isActionHere =
+                  phase === "acting" && isMyTurn && currentTurn?.seatIndex === mySeat?.seatIndex && currentTurn?.handIndex === hi;
+                return (
+                  <button
+                    key={hi}
+                    type="button"
+                    onClick={() => setSplitViewIdx(hi)}
+                    className={`min-h-[22px] min-w-0 flex-1 touch-manipulation rounded border px-0.5 py-px text-[7px] font-extrabold uppercase leading-none ${
+                      isActionHere
+                        ? "border-sky-400 bg-sky-950/55 text-sky-100 shadow-[0_0_0_1px_rgba(56,189,248,0.35)]"
+                        : splitViewIdx === hi
+                          ? "border-emerald-500/45 bg-emerald-950/35 text-emerald-100"
+                          : "border-white/12 bg-black/45 text-zinc-400"
+                    }`}
+                  >
+                    Hand {hi + 1}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -725,7 +914,7 @@ export default function Ov2C21Screen({
               </button>
               <button
                 type="button"
-                disabled={operateBusy || actionLock || phase !== "betting" || !draftPlayValid}
+                disabled={operateBusy || actionLock || phase !== "betting" || !draftPlayValid || !vaultOkForCommit}
                 onClick={() => void commitPlayAmount()}
                 className="h-7 shrink-0 touch-manipulation rounded bg-emerald-600 px-2 text-[9px] font-bold text-white disabled:opacity-35"
               >
@@ -736,6 +925,14 @@ export default function Ov2C21Screen({
               <div className="mt-px shrink-0 text-[7px] leading-tight text-amber-200/90">
                 {fmt(minBet)}–{fmt(maxBet)}
               </div>
+            ) : null}
+            {economyHint ? (
+              <div className="mt-px shrink-0 text-[7px] leading-tight text-rose-200/95" role="status">
+                {economyHint}
+              </div>
+            ) : null}
+            {draftPlayValid && !vaultOkForCommit ? (
+              <div className="mt-px shrink-0 text-[7px] leading-tight text-amber-200/90">Vault too low for this amount.</div>
             ) : null}
           </div>
         ) : phase === "acting" && isMyTurn ? (
@@ -805,11 +1002,46 @@ export default function Ov2C21Screen({
 
       {resultToastOpen && mySummary ? (
         <div className="pointer-events-none fixed bottom-[calc(5.75rem+0.25rem+env(safe-area-inset-bottom,0px))] left-2 right-2 z-30 mx-auto max-w-lg sm:bottom-[calc(4.25rem+0.25rem+env(safe-area-inset-bottom,0px))]">
-          <div className="rounded-xl border border-emerald-500/35 bg-zinc-950/95 px-3 py-2 shadow-lg backdrop-blur-sm">
-            <div className="text-center text-[10px] font-bold uppercase tracking-wide text-emerald-300/90">Round result</div>
-            <div className="mt-0.5 text-center text-sm font-black text-white">{mySummary.headline}</div>
+          <div
+            className={`rounded-xl border bg-zinc-950/95 px-3 py-2 shadow-lg backdrop-blur-sm ${
+              Number(mySummary.vaultDelta) < 0
+                ? "border-rose-500/45"
+                : Number(mySummary.vaultDelta) > 0
+                  ? "border-emerald-500/35"
+                  : "border-zinc-500/35"
+            }`}
+          >
+            <div
+              className={`text-center text-[10px] font-bold uppercase tracking-wide ${
+                Number(mySummary.vaultDelta) < 0
+                  ? "text-rose-300/95"
+                  : Number(mySummary.vaultDelta) > 0
+                    ? "text-emerald-300/90"
+                    : "text-zinc-400"
+              }`}
+            >
+              Round result
+            </div>
+            <div
+              className={`mt-0.5 text-center text-sm font-black ${
+                Number(mySummary.vaultDelta) < 0 ? "text-rose-100" : "text-white"
+              }`}
+            >
+              {mySummary.headline}
+            </div>
             <div className="mt-0.5 text-center text-[11px] text-zinc-300">
-              Net vault · <span className="font-semibold text-white">{fmt(mySummary.vaultDelta)}</span>
+              Net vault ·{" "}
+              <span
+                className={`font-semibold ${
+                  Number(mySummary.vaultDelta) < 0
+                    ? "text-rose-200"
+                    : Number(mySummary.vaultDelta) > 0
+                      ? "text-emerald-200"
+                      : "text-white"
+                }`}
+              >
+                {fmt(mySummary.vaultDelta)}
+              </span>
               {mySummary.totalReturned > 0 ? (
                 <span className="text-zinc-500">
                   {" "}

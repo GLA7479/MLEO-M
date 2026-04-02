@@ -1,16 +1,19 @@
 import { getSupabaseAdmin } from "../../../lib/server/supabaseAdmin";
 import { normalizeEngine, mutateEngine } from "../../../lib/online-v2/c21/ov2C21MultiEngine";
 import { OV2_C21_PRODUCT_GAME_ID } from "../../../lib/online-v2/c21/ov2C21TableIds";
+import { buildIdemCommit, buildIdemSettle } from "../../../lib/online-v2/c21/ov2C21EconomyIds";
+import {
+  applyC21ServerVaultForCaller,
+  getArcadeVaultBalanceForRequest,
+  reverseC21ServerVaultForCaller,
+} from "../../../lib/server/ov2C21VaultAuthority";
 
-function buildIdemCommit(roomId, matchSeq, suffix) {
-  return `ov2:c21:commit:${roomId}:${matchSeq}:${suffix}`;
-}
-
-function buildIdemSettle(roomId, matchSeq, suffix) {
-  return `ov2:c21:settle:${roomId}:${matchSeq}:${suffix}`;
-}
-
-async function persistEconomyOps(admin, roomId, matchSeq, economyOps) {
+/**
+ * Persist ledger rows. Client vault mirror only receives credits for *other* participants
+ * (caller effects are applied server-side). Debits are never mirrored client-side.
+ */
+async function persistEconomyOps(admin, roomId, matchSeq, economyOps, callerParticipantKey) {
+  const callerPk = String(callerParticipantKey || "").trim();
   const vaultEffects = [];
   for (const op of economyOps) {
     if (op.type === "commit") {
@@ -29,14 +32,6 @@ async function persistEconomyOps(admin, roomId, matchSeq, economyOps) {
         (error.code === "23505" || String(error.message || "").toLowerCase().includes("duplicate"));
       if (error && !dup) {
         throw new Error(error.message || "economy_commit_failed");
-      }
-      if (!error) {
-        vaultEffects.push({
-          kind: "debit",
-          amount: Math.max(0, Math.floor(Number(op.amount) || 0)),
-          gameId: OV2_C21_PRODUCT_GAME_ID,
-          idempotencyKey: idem,
-        });
       }
     } else if (op.type === "credit") {
       const idem = buildIdemSettle(roomId, matchSeq, op.suffix);
@@ -58,12 +53,13 @@ async function persistEconomyOps(admin, roomId, matchSeq, economyOps) {
       if (error && !dup) {
         throw new Error(error.message || "settlement_insert_failed");
       }
-      if (!error) {
+      if (!error && String(op.participantKey || "").trim() !== callerPk) {
         vaultEffects.push({
           kind: "credit",
           amount: amt,
           gameId: OV2_C21_PRODUCT_GAME_ID,
           idempotencyKey: idem,
+          participantKey: String(op.participantKey || "").trim(),
         });
       }
     }
@@ -116,6 +112,22 @@ export default async function handler(req, res) {
 
     const tableStake = Math.max(100, Math.floor(Number(roomRow.stake_per_seat) || 100));
 
+    if (op === "sit") {
+      if (!participantKey) {
+        return res.status(400).json({ ok: false, code: "participant_required" });
+      }
+      const bal = await getArcadeVaultBalanceForRequest(req);
+      if (bal.code === "device_required") {
+        return res.status(401).json({ ok: false, code: "DEVICE_REQUIRED" });
+      }
+      if (!bal.ok) {
+        return res.status(400).json({ ok: false, code: bal.code || "VAULT_READ_FAILED" });
+      }
+      if (bal.balance < tableStake) {
+        return res.status(400).json({ ok: false, code: "insufficient_vault_for_table" });
+      }
+    }
+
     const maxAttempts = 4;
     let lastConflict = false;
 
@@ -131,6 +143,7 @@ export default async function handler(req, res) {
       }
 
       const engine = normalizeEngine(liveRow.engine, tableStake);
+      const beforeEngine = JSON.parse(JSON.stringify(engine));
       const prevRevision = Math.max(0, Math.floor(Number(liveRow.revision) || 0));
       const matchSeqBefore = Math.max(0, Math.floor(Number(liveRow.match_seq) || 0));
 
@@ -171,20 +184,75 @@ export default async function handler(req, res) {
         continue;
       }
 
+      if (economyOps.length && participantKey) {
+        const vaultRes = await applyC21ServerVaultForCaller(
+          admin,
+          req,
+          roomId,
+          roundForEconomy,
+          participantKey,
+          economyOps,
+        );
+        if (!vaultRes.ok) {
+          const { error: revErr } = await admin
+            .from("ov2_c21_live_state")
+            .update({
+              engine: beforeEngine,
+              match_seq: Math.max(0, Math.floor(Number(beforeEngine.roundSeq) || 0)),
+              revision: prevRevision + 2,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("room_id", roomId)
+            .eq("revision", prevRevision + 1);
+          if (revErr) {
+            return res.status(500).json({
+              ok: false,
+              code: "VAULT_AND_REVERT_FAILED",
+              message: revErr.message,
+            });
+          }
+          return res.status(400).json({
+            ok: false,
+            code: vaultRes.code || "vault_failed",
+            message: vaultRes.message,
+          });
+        }
+      }
+
       let vaultEffects = [];
       if (economyOps.length) {
         try {
-          vaultEffects = await persistEconomyOps(admin, roomId, roundForEconomy, economyOps);
+          vaultEffects = await persistEconomyOps(admin, roomId, roundForEconomy, economyOps, participantKey);
         } catch (e) {
+          await reverseC21ServerVaultForCaller(admin, req, roomId, roundForEconomy, participantKey, economyOps);
+          const { error: revErr } = await admin
+            .from("ov2_c21_live_state")
+            .update({
+              engine: beforeEngine,
+              match_seq: Math.max(0, Math.floor(Number(beforeEngine.roundSeq) || 0)),
+              revision: prevRevision + 2,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("room_id", roomId)
+            .eq("revision", prevRevision + 1);
+          if (revErr) {
+            return res.status(500).json({
+              ok: false,
+              code: "ECONOMY_ROLLBACK_FAILED",
+              message: revErr.message,
+            });
+          }
           return res.status(500).json({
             ok: false,
             code: "ECONOMY_PERSIST_FAILED",
             message: e?.message || String(e),
-            engine: nextEngine,
-            revision: updated.revision,
           });
         }
       }
+
+      const localVaultRefreshHint = economyOps.some(
+        o => o && o.type === "credit" && String(o.participantKey || "").trim() !== participantKey,
+      );
 
       return res.status(200).json({
         ok: true,
@@ -192,6 +260,7 @@ export default async function handler(req, res) {
         revision: updated.revision,
         matchSeq: updated.match_seq,
         vaultEffects,
+        localVaultRefreshHint,
       });
     }
 
