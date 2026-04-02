@@ -6,7 +6,7 @@ import { normalizeCalledNumbers } from "../../../lib/online-v2/bingo/ov2BingoEng
 /**
  * Presentational 5×5 Bingo card.
  * Marks toggle only on numbers present in authoritative `called` (preview: local called list; live: server list).
- * No called-based “highlight” styling — only neutral unmarked vs neutral marked.
+ * Marked cells use a clear dab style; no seat colors on the card.
  *
  * @param {{
  *   card: number[][],
@@ -46,19 +46,19 @@ export default function Ov2BingoCard({ card, called, marks, onToggleMark = null,
                 if (!canClickCell) return;
                 onToggleMark?.(n);
               }}
-              disabled={!canInteract || isFree || !canClickCell}
+              disabled={!canInteract || isFree || !canClickCell || (isMarked && !isFree)}
               className={[
                 "grid min-h-[1.85rem] place-items-center rounded-lg border text-xs font-semibold transition sm:min-h-[2.25rem] sm:text-sm",
                 isFree
                   ? "border-cyan-400/80 bg-gradient-to-br from-cyan-700/50 to-sky-900/40 text-cyan-50 shadow-inner shadow-cyan-900/40"
                   : "",
                 !isFree && isMarked
-                  ? "border-zinc-400/90 bg-zinc-600/50 text-zinc-50 shadow-inner shadow-black/20"
+                  ? "border-emerald-400 bg-emerald-600/55 shadow-md shadow-emerald-900/50"
                   : "",
                 !isFree && !isMarked ? "border-white/15 bg-white/5 text-zinc-100" : "",
               ].join(" ")}
             >
-              <span className={isMarked && !isFree ? "font-semibold text-white" : ""}>{isFree ? "FREE" : n}</span>
+              <span className={isMarked && !isFree ? "font-bold text-white" : ""}>{isFree ? "FREE" : n}</span>
             </button>
           );
         })}

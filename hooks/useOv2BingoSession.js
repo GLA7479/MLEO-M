@@ -5,8 +5,8 @@ import {
   buildDeck,
   computePreviewLineCompletion,
   generateCard,
+  applyMark,
   makeEmptyMarks,
-  toggleManualPlayerMark,
 } from "../lib/online-v2/bingo/ov2BingoEngine";
 import {
   callOv2BingoNext,
@@ -172,11 +172,14 @@ export function useOv2BingoSession(baseContext) {
       loadedMarksStorageKeyRef.current = marksStorageKey;
       const raw = loadOv2BingoMarks(marksStorageKey);
       const base = raw && raw.length === 25 ? [...raw] : makeEmptyMarks();
-      setLiveMarks(reconcileBingoMarksToCalled(liveCard, base, called));
+      // Avoid stripping persisted marks while `called` is still empty (e.g. first snapshot after refresh).
+      setLiveMarks(called.length > 0 ? reconcileBingoMarksToCalled(liveCard, base, called) : base);
       return;
     }
 
-    setLiveMarks(prev => reconcileBingoMarksToCalled(liveCard, prev, called));
+    setLiveMarks(prev =>
+      called.length > 0 ? reconcileBingoMarksToCalled(liveCard, prev, called) : prev
+    );
   }, [playMode, marksStorageKey, liveCard, liveSnapshot?.calledNumbers]);
 
   const nextCallDue = useMemo(() => {
@@ -248,7 +251,7 @@ export function useOv2BingoSession(baseContext) {
         const calledSet = new Set(liveSnapshot.calledNumbers ?? []);
         if (!calledSet.has(n)) return;
         setLiveMarks(prev => {
-          const { marks: next, changed } = toggleManualPlayerMark(liveCard, prev, n);
+          const { marks: next, changed } = applyMark(liveCard, prev, n);
           if (!changed) return prev;
           const key = ov2BingoMarksStorageKey(roomId ?? "", liveSnapshot.sessionId ?? "", selfKey ?? "");
           if (key) saveOv2BingoMarks(key, next);
