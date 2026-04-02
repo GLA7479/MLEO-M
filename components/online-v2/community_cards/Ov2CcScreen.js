@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const SUIT_SYM = { c: "♣", d: "♦", h: "♥", s: "♠" };
 
@@ -30,6 +30,8 @@ export default function Ov2CcScreen({
   const [pickSeat, setPickSeat] = useState(null);
   const [formHint, setFormHint] = useState("");
   const [actionHint, setActionHint] = useState("");
+  const [betweenTick, setBetweenTick] = useState(0);
+  const prevHandSeqRef = useRef(null);
 
   useEffect(() => {
     setBuyInDraft(String(minBuy));
@@ -95,6 +97,29 @@ export default function Ov2CcScreen({
     [onOperate],
   );
 
+  useEffect(() => {
+    if (!engine) return;
+    const hs = Math.floor(Number(engine.handSeq) || 0);
+    if (prevHandSeqRef.current != null && hs !== prevHandSeqRef.current) {
+      setActionHint("");
+      setTopUpDraft("");
+    }
+    prevHandSeqRef.current = hs;
+  }, [engine]);
+
+  useEffect(() => {
+    if (!engine) return;
+    if (engine.phase === "between_hands" || engine.phase === "idle") {
+      setActionHint("");
+    }
+  }, [engine?.phase]);
+
+  useEffect(() => {
+    if (!engine || engine.phase !== "between_hands" || typeof engine.phaseEndsAt !== "number") return undefined;
+    const id = window.setInterval(() => setBetweenTick(c => c + 1), 500);
+    return () => window.clearInterval(id);
+  }, [engine?.phase, engine?.phaseEndsAt]);
+
   if (!engine) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center text-sm text-zinc-400">
@@ -120,6 +145,11 @@ export default function Ov2CcScreen({
   const handSeqN = Math.floor(Number(engine.handSeq) || 0);
   const likelyBoardRunout =
     handBettingLive && engine.actionSeat == null && Math.floor(Number(pot) || 0) > 0;
+  void betweenTick;
+  const nextHandInSec =
+    phase === "between_hands" && typeof engine.phaseEndsAt === "number"
+      ? Math.max(0, Math.ceil((Number(engine.phaseEndsAt) - Date.now()) / 1000))
+      : null;
 
   const curBet = Math.floor(Number(currentBet) || 0);
   const minR = Math.floor(Number(engine.minRaise) || bb);
@@ -218,6 +248,14 @@ export default function Ov2CcScreen({
             <span className="mt-0.5 block text-[10px] text-zinc-500">
               BTN S{engine.buttonSeat + 1} · SB S{engine.sbSeat + 1} · BB S{engine.bbSeat + 1}
             </span>
+          ) : null}
+          {phase === "between_hands" && nextHandInSec != null ? (
+            <span className="mt-0.5 block text-[10px] text-amber-200/90">
+              Next hand in ~{nextHandInSec}s
+            </span>
+          ) : null}
+          {engine.tableNotice ? (
+            <span className="mt-0.5 block text-[10px] text-amber-200/85">{engine.tableNotice}</span>
           ) : null}
         </div>
         <div className="text-lg font-bold text-amber-200">Pot (table) {Math.floor(pot || 0)}</div>

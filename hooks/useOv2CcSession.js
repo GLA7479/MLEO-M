@@ -30,7 +30,7 @@ async function pullAuthoritativeVaultAfterCc() {
   }
 }
 
-function ingestOperateJson(json, lastRevisionRef, setEngine, setViewerHoleCards) {
+function ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards) {
   const revRaw = json?.revision;
   const rev = revRaw == null ? null : Math.max(0, Math.floor(Number(revRaw) || 0));
   if (rev != null && rev < lastRevisionRef.current) {
@@ -40,9 +40,19 @@ function ingestOperateJson(json, lastRevisionRef, setEngine, setViewerHoleCards)
     lastRevisionRef.current = rev;
   }
   if (json?.engine && typeof json.engine === "object") {
-    setEngine(json.engine);
-  }
-  if (Array.isArray(json?.viewerHoleCards)) {
+    const eng = json.engine;
+    setEngine(eng);
+    const hs = Math.floor(Number(eng.handSeq) || 0);
+    const handBumped = lastHandSeqRef.current >= 0 && hs !== lastHandSeqRef.current;
+    lastHandSeqRef.current = hs;
+    const ph = eng.phase;
+    if (ph === "between_hands" || ph === "idle" || handBumped) {
+      setViewerHoleCards([]);
+    }
+    if (ph !== "between_hands" && ph !== "idle" && Array.isArray(json?.viewerHoleCards)) {
+      setViewerHoleCards(json.viewerHoleCards.length ? json.viewerHoleCards : []);
+    }
+  } else if (Array.isArray(json?.viewerHoleCards)) {
     setViewerHoleCards(json.viewerHoleCards.length ? json.viewerHoleCards : []);
   }
   return { applied: true, stale: false };
@@ -57,6 +67,7 @@ export function useOv2CcSession(roomId) {
   const tickBusyRef = useRef(false);
   const lastTickAtRef = useRef(0);
   const lastRevisionRef = useRef(-1);
+  const lastHandSeqRef = useRef(-1);
   const operateDepthRef = useRef(0);
 
   const pushOperateBusy = useCallback(() => {
@@ -86,7 +97,16 @@ export function useOv2CcSession(roomId) {
     if (data?.engine && typeof data.engine === "object") {
       const rev = Math.max(0, Math.floor(Number(data.revision) || 0));
       lastRevisionRef.current = rev;
-      setEngine(data.engine);
+      const eng = data.engine;
+      const hs = Math.floor(Number(eng.handSeq) || 0);
+      if (lastHandSeqRef.current >= 0 && hs !== lastHandSeqRef.current) {
+        setViewerHoleCards([]);
+      }
+      lastHandSeqRef.current = hs;
+      if (eng.phase === "between_hands" || eng.phase === "idle") {
+        setViewerHoleCards([]);
+      }
+      setEngine(eng);
     }
   }, [roomId]);
 
@@ -106,7 +126,7 @@ export function useOv2CcSession(roomId) {
           payload: {},
         });
         if (cancelled) return;
-        ingestOperateJson(json, lastRevisionRef, setEngine, setViewerHoleCards);
+        ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
         if (json?.vaultEffects?.length) {
           await applyVaultEffects(json.vaultEffects, participantKey);
         }
@@ -148,7 +168,16 @@ export function useOv2CcSession(roomId) {
           if (rev != null) {
             lastRevisionRef.current = rev;
           }
-          setEngine(row.engine);
+          const eng = row.engine;
+          setEngine(eng);
+          const hs = Math.floor(Number(eng.handSeq) || 0);
+          if (lastHandSeqRef.current >= 0 && hs !== lastHandSeqRef.current) {
+            setViewerHoleCards([]);
+          }
+          lastHandSeqRef.current = hs;
+          if (eng.phase === "between_hands" || eng.phase === "idle") {
+            setViewerHoleCards([]);
+          }
         },
       )
       .subscribe();
@@ -182,7 +211,7 @@ export function useOv2CcSession(roomId) {
       try {
         try {
           const json = await runPost();
-          ingestOperateJson(json, lastRevisionRef, setEngine, setViewerHoleCards);
+          ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
           await finishOk(json);
           return { ok: Boolean(json?.ok), json };
         } catch (e) {
@@ -190,20 +219,20 @@ export function useOv2CcSession(roomId) {
           const status = e?.status ?? e?.payload?.status;
 
           if (e?.payload && typeof e.payload === "object" && e.payload.engine && typeof e.payload.engine === "object") {
-            ingestOperateJson(e.payload, lastRevisionRef, setEngine, setViewerHoleCards);
+            ingestOperateJson(e.payload, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
           }
 
           if (code === "REVISION_CONFLICT" || status === 409) {
             await reloadFromDb();
             try {
               const json2 = await runPost();
-              ingestOperateJson(json2, lastRevisionRef, setEngine, setViewerHoleCards);
+              ingestOperateJson(json2, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
               await finishOk(json2);
               return { ok: Boolean(json2?.ok), json: json2, retried: true };
             } catch (e2) {
               const code2 = e2?.payload?.code ?? e2?.code;
               if (e2?.payload?.engine && typeof e2.payload.engine === "object") {
-                ingestOperateJson(e2.payload, lastRevisionRef, setEngine, setViewerHoleCards);
+                ingestOperateJson(e2.payload, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
               }
               return { ok: false, error: e2, code: code2 };
             }
@@ -234,7 +263,7 @@ export function useOv2CcSession(roomId) {
             op: "tick",
             payload: {},
           });
-          ingestOperateJson(json, lastRevisionRef, setEngine, setViewerHoleCards);
+          ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
           if (json?.vaultEffects?.length) {
             await applyVaultEffects(json.vaultEffects, participantKey);
           }
