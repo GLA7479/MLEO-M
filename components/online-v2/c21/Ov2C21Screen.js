@@ -142,8 +142,8 @@ function PlayingCardOv2({ code, hidden, handCardCount = 1, seatFit = null }) {
 
 /** Width/height in rem + gap/overlap px for seat row auto-fit. */
 const SEAT_HAND_TIERS = [
-  { wRem: 2.95, hRem: 4.2, compactFallback: false },
-  { wRem: 2.62, hRem: 3.72, compactFallback: false },
+  { wRem: 3.02, hRem: 4.45, compactFallback: false },
+  { wRem: 2.68, hRem: 3.92, compactFallback: false },
   { wRem: 2.28, hRem: 3.25, compactFallback: true },
   { wRem: 1.98, hRem: 2.82, compactFallback: true },
   { wRem: 1.72, hRem: 2.45, compactFallback: true },
@@ -153,7 +153,7 @@ const SEAT_HAND_TIERS = [
 function pickSeatHandLayout(availPx, cardCount) {
   const n = Math.max(0, Math.floor(cardCount) || 0);
   if (n <= 0 || availPx <= 4) {
-    return { wRem: 2.95, hRem: 4.2, gapPx: 3, overlapPx: 0, compactFallback: false };
+    return { wRem: 3.02, hRem: 4.45, gapPx: 3, overlapPx: 0, compactFallback: false };
   }
   const gaps = Math.max(0, n - 1);
   const rootPx = typeof window !== "undefined" ? parseFloat(getComputedStyle(document.documentElement).fontSize) || 16 : 16;
@@ -224,7 +224,7 @@ function SeatHandRow({ hand, handKey }) {
   return (
     <div
       ref={rowRef}
-      className="flex w-full min-w-0 flex-row flex-nowrap items-end justify-center"
+      className="flex w-full min-w-0 flex-row flex-nowrap items-center justify-center"
       style={{ gap: layout.gapPx }}
     >
       {cards.map((c, ci) => (
@@ -328,8 +328,18 @@ export default function Ov2C21Screen({
     phase === "between_rounds" &&
     Boolean(participantKey);
 
+  const dealer = engine?.dealerHand || [];
+  const dealerHidden = Boolean(engine?.dealerHidden);
+  const dealerSig = dealer.join("|");
+  const dealerRevealComplete =
+    dealer.length === 0 ||
+    dealerHidden ||
+    (dealer.length > 0 && dealerRevealN >= dealer.length);
+
+  const shouldShowResultToastAfterReveal = shouldShowResultToast && dealerRevealComplete;
+
   useEffect(() => {
-    if (!shouldShowResultToast || !roomId || !summaryDismissRound) {
+    if (!shouldShowResultToastAfterReveal || !roomId || !summaryDismissRound) {
       setResultToastOpen(false);
       return undefined;
     }
@@ -361,7 +371,7 @@ export default function Ov2C21Screen({
         resultToastTimerRef.current = null;
       }
     };
-  }, [shouldShowResultToast, roomId, summaryDismissRound]);
+  }, [shouldShowResultToastAfterReveal, roomId, summaryDismissRound]);
 
   const guardAction = useCallback(
     fn => async () => {
@@ -402,10 +412,6 @@ export default function Ov2C21Screen({
 
   const showInsuranceModal = Boolean(legal.insuranceYes || legal.insuranceNo);
 
-  const dealer = engine?.dealerHand || [];
-  const dealerHidden = Boolean(engine?.dealerHidden);
-  const dealerSig = dealer.join("|");
-
   useEffect(() => {
     dealerRevealTimersRef.current.forEach(clearTimeout);
     dealerRevealTimersRef.current = [];
@@ -417,9 +423,12 @@ export default function Ov2C21Screen({
       setDealerRevealN(1);
       return undefined;
     }
+    /** Readable sequential reveal: pause after up card, then each hole/extra card. */
+    const PAUSE_AFTER_UP_MS = 980;
+    const PAUSE_BETWEEN_CARDS_MS = 920;
     setDealerRevealN(1);
     for (let k = 2; k <= dealer.length; k++) {
-      const delay = 420 + (k - 2) * 480;
+      const delay = PAUSE_AFTER_UP_MS + (k - 2) * PAUSE_BETWEEN_CARDS_MS;
       const t = window.setTimeout(() => setDealerRevealN(k), delay);
       dealerRevealTimersRef.current.push(t);
     }
@@ -474,7 +483,9 @@ export default function Ov2C21Screen({
     [displayName, onOperate, operateBusy],
   );
 
-  const showDealerTotal = !dealerHidden && dealer.length > 0 && dealerRevealN >= dealer.length;
+  const visibleDealerCards = !dealerHidden && dealerRevealN > 0 ? dealer.slice(0, dealerRevealN) : [];
+  const dealerTotalLive =
+    !dealerHidden && visibleDealerCards.length > 0 ? handTotal(visibleDealerCards) : null;
   const dealerHandCount = dealer.length;
   const dealerGap = dealerHandCount >= 4 ? "gap-0.5" : "gap-1";
 
@@ -520,8 +531,10 @@ export default function Ov2C21Screen({
               })
             )}
           </div>
-          {showDealerTotal ? (
-            <div className="shrink-0 text-center text-[10px] text-zinc-400">Total {handTotal(dealer)}</div>
+          {!dealerHidden && dealer.length > 0 ? (
+            <div className="h-[14px] shrink-0 text-center text-[10px] leading-[14px] text-zinc-400">
+              {dealerTotalLive != null ? `Total ${dealerTotalLive}` : "\u00a0"}
+            </div>
           ) : (
             <div className="h-[14px] shrink-0" aria-hidden />
           )}
@@ -548,30 +561,32 @@ export default function Ov2C21Screen({
                 onClick={() => {
                   if (!taken) trySit(idx);
                 }}
-                className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-lg border border-white/10 bg-black/35 px-0.5 pb-0.5 pt-0.5 text-left transition ${mineRing} ${actingHere} disabled:opacity-40`}
+                className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-lg border border-white/10 bg-black/35 px-0.5 py-0 text-left transition ${mineRing} ${actingHere} disabled:opacity-40`}
               >
-                <div className="flex min-h-[13px] shrink-0 items-center gap-0.5 leading-none">
+                {/* Fixed header — same occupied / empty */}
+                <div className="flex h-[11px] max-h-[11px] shrink-0 items-center gap-px overflow-hidden leading-none">
                   {taken ? (
                     <>
-                      <span className="min-w-0 flex-1 truncate text-left text-[8px] font-semibold text-white/95">
+                      <span className="min-w-0 flex-1 truncate text-left text-[7px] font-semibold leading-none text-white/95">
                         {String(seat.displayName || "").trim() || "…"}
                       </span>
                       {mine ? (
-                        <span className="shrink-0 rounded-sm bg-emerald-500/25 px-0.5 py-px text-[6px] font-bold uppercase leading-none text-emerald-200">
+                        <span className="shrink-0 rounded px-px text-[5px] font-extrabold uppercase leading-none text-emerald-200">
                           You
                         </span>
                       ) : null}
                       {isActingSeat ? (
-                        <span className="shrink-0 rounded-sm bg-sky-500/25 px-0.5 py-px text-[6px] font-bold uppercase leading-none text-sky-200">
+                        <span className="shrink-0 rounded px-px text-[5px] font-extrabold uppercase leading-none text-sky-200">
                           Turn
                         </span>
                       ) : null}
                     </>
                   ) : (
-                    <span className="w-full text-center text-[8px] font-medium text-white/55">Open</span>
+                    <span className="w-full text-center text-[7px] font-medium leading-none text-white/55">Open</span>
                   )}
                 </div>
-                <div className="mt-0.5 flex min-h-0 w-full min-w-0 flex-1 flex-col justify-end gap-0.5 overflow-hidden">
+                {/* Fixed-height card frame: remainder of seat; center hands — no flex-1 growth artifact */}
+                <div className="flex h-[calc(100%-11px)] min-h-0 w-full shrink-0 flex-col justify-center gap-px overflow-hidden">
                   {seat.hands?.length ? (
                     seat.hands.map((h, hi) => (
                       <SeatHandRow key={hi} hand={h} handKey={`${idx}-${hi}-${(h || []).join("|")}`} />
