@@ -62,24 +62,40 @@ function FallbackCardFace({ code, compact }) {
 }
 
 /**
- * Card size: large for 1–3 cards per hand; smaller only when that hand has 4+ cards.
- * Applies to house and seat hands.
+ * House: large for small hands; step down when 4+ cards (unchanged rule).
+ * Seat hands: use `seatFit` from measured row width instead.
  */
-function PlayingCardOv2({ code, hidden, handCardCount = 1 }) {
+function PlayingCardOv2({ code, hidden, handCardCount = 1, seatFit = null }) {
   const [imgErr, setImgErr] = useState(false);
   useEffect(() => {
     setImgErr(false);
   }, [code]);
-  const n = Math.max(0, Math.floor(Number(handCardCount) || 0));
-  const crowded = n >= 4;
-  const size = crowded
-    ? "h-[2.95rem] w-[2.05rem] sm:h-[3.2rem] sm:w-[2.35rem]"
-    : "h-[4.2rem] w-[2.95rem] sm:h-[4rem] sm:w-[2.85rem]";
-  const compactFallback = crowded;
+
+  let classSize = "";
+  let styleSize = null;
+  let compactFallback = false;
+
+  if (seatFit && typeof seatFit.wRem === "number" && typeof seatFit.hRem === "number") {
+    styleSize = { width: `${seatFit.wRem}rem`, height: `${seatFit.hRem}rem`, flexShrink: 0 };
+    compactFallback = Boolean(seatFit.compactFallback);
+  } else {
+    const n = Math.max(0, Math.floor(Number(handCardCount) || 0));
+    const crowded = n >= 4;
+    classSize = crowded
+      ? "h-[2.95rem] w-[2.05rem] sm:h-[3.2rem] sm:w-[2.35rem]"
+      : "h-[4.2rem] w-[2.95rem] sm:h-[4rem] sm:w-[2.85rem]";
+    compactFallback = crowded;
+  }
+
+  const baseBox =
+    "shrink-0 overflow-hidden rounded-md border shadow-[0_2px_6px_rgba(0,0,0,0.4)]";
+  const boxClass = `${classSize} ${baseBox}`.trim();
+
   if (hidden) {
     return (
       <div
-        className={`${size} shrink-0 overflow-hidden rounded-md border border-white/30 shadow-[0_2px_6px_rgba(0,0,0,0.45)]`}
+        className={`${boxClass} border-white/30`}
+        style={styleSize || undefined}
       >
         <img
           src="/card-backs/poker-back.jpg"
@@ -90,13 +106,21 @@ function PlayingCardOv2({ code, hidden, handCardCount = 1 }) {
       </div>
     );
   }
-  if (!code) return <div className={`${size} shrink-0 rounded-md border border-white/20 bg-black/40`} />;
+  if (!code) {
+    return (
+      <div
+        className={`${boxClass} border-white/20 bg-black/40`}
+        style={styleSize || undefined}
+      />
+    );
+  }
   const api = toDeckApiImageCode(code);
   const url = api ? `https://deckofcardsapi.com/static/img/${api}.png` : null;
   const showFallback = !url || imgErr;
   return (
     <div
-      className={`${size} relative shrink-0 overflow-hidden rounded-md border border-white/25 shadow-[0_2px_6px_rgba(0,0,0,0.4)]`}
+      className={`${boxClass} relative border-white/25`}
+      style={styleSize || undefined}
     >
       {url && !imgErr ? (
         <img
@@ -112,6 +136,106 @@ function PlayingCardOv2({ code, hidden, handCardCount = 1 }) {
           <FallbackCardFace code={code} compact={compactFallback} />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** Width/height in rem + gap/overlap px for seat row auto-fit. */
+const SEAT_HAND_TIERS = [
+  { wRem: 2.95, hRem: 4.2, compactFallback: false },
+  { wRem: 2.62, hRem: 3.72, compactFallback: false },
+  { wRem: 2.28, hRem: 3.25, compactFallback: true },
+  { wRem: 1.98, hRem: 2.82, compactFallback: true },
+  { wRem: 1.72, hRem: 2.45, compactFallback: true },
+  { wRem: 1.5, hRem: 2.14, compactFallback: true },
+];
+
+function pickSeatHandLayout(availPx, cardCount) {
+  const n = Math.max(0, Math.floor(cardCount) || 0);
+  if (n <= 0 || availPx <= 4) {
+    return { wRem: 2.95, hRem: 4.2, gapPx: 3, overlapPx: 0, compactFallback: false };
+  }
+  const gaps = Math.max(0, n - 1);
+  const rootPx = typeof window !== "undefined" ? parseFloat(getComputedStyle(document.documentElement).fontSize) || 16 : 16;
+
+  for (let g = 4; g >= 2; g -= 2) {
+    for (const tier of SEAT_HAND_TIERS) {
+      const wPx = tier.wRem * rootPx;
+      const total = n * wPx + gaps * g;
+      if (total <= availPx) {
+        return { ...tier, gapPx: g, overlapPx: 0 };
+      }
+    }
+  }
+
+  const smallest = SEAT_HAND_TIERS[SEAT_HAND_TIERS.length - 1];
+  let wRem = smallest.wRem;
+  let hRem = smallest.hRem;
+  const wPx0 = wRem * rootPx;
+  const minGap = 1;
+  const base = n * wPx0 + gaps * minGap;
+  let overlapPx = 0;
+  if (base > availPx && gaps > 0) {
+    overlapPx = Math.ceil((base - availPx) / gaps);
+    const maxOv = Math.max(2, Math.floor(wPx0 * 0.42));
+    overlapPx = Math.min(overlapPx, maxOv);
+  }
+  let lineWidth = n * wRem * rootPx + gaps * minGap - overlapPx * gaps;
+  if (lineWidth > availPx && n > 0) {
+    const scale = Math.max(0.55, availPx / lineWidth);
+    wRem *= scale;
+    hRem *= scale;
+    lineWidth = n * wRem * rootPx + gaps * minGap - overlapPx * gaps;
+    if (lineWidth > availPx && gaps > 0) {
+      const need = Math.ceil((lineWidth - availPx) / gaps);
+      overlapPx = Math.min(overlapPx + need, Math.floor(wRem * rootPx * 0.48));
+    }
+  }
+  return { wRem, hRem, gapPx: minGap, overlapPx, compactFallback: true };
+}
+
+function SeatHandRow({ hand, handKey }) {
+  const rowRef = useRef(null);
+  const [layout, setLayout] = useState(() => pickSeatHandLayout(200, (hand || []).length));
+  const cards = hand || [];
+  const n = cards.length;
+
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el || n < 1) return undefined;
+    const run = () => {
+      const w = el.clientWidth;
+      setLayout(pickSeatHandLayout(w, n));
+    };
+    run();
+    const ro = new ResizeObserver(run);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [n, handKey]);
+
+  if (n < 1) return null;
+
+  const fit = {
+    wRem: layout.wRem,
+    hRem: layout.hRem,
+    compactFallback: layout.compactFallback,
+  };
+
+  return (
+    <div
+      ref={rowRef}
+      className="flex w-full min-w-0 flex-row flex-nowrap items-end justify-center"
+      style={{ gap: layout.gapPx }}
+    >
+      {cards.map((c, ci) => (
+        <div
+          key={`${handKey}-${ci}-${c}`}
+          className="shrink-0"
+          style={ci > 0 && layout.overlapPx > 0 ? { marginLeft: -layout.overlapPx } : undefined}
+        >
+          <PlayingCardOv2 code={c} seatFit={fit} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -412,52 +536,46 @@ export default function Ov2C21Screen({
             const isActingSeat = phase === "acting" && currentTurn?.seatIndex === idx;
             const actingHere = isActingSeat ? `ring-2 ring-sky-400 ring-offset-1 ring-offset-black/80` : "";
             const mineRing = mine ? `ring-2 ${ring} ring-offset-1 ring-offset-black/80` : "";
+            const ariaSeat = taken
+              ? `${String(seat.displayName || "Player").trim() || "Player"}${mine ? " — you" : ""}${isActingSeat ? " — turn to act" : ""}`
+              : `Open seat ${idx + 1}`;
             return (
               <button
                 key={idx}
                 type="button"
+                aria-label={ariaSeat}
                 disabled={operateBusy || (taken && !mine)}
                 onClick={() => {
                   if (!taken) trySit(idx);
                 }}
-                className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-lg border border-white/10 bg-black/35 px-0.5 py-0.5 text-left text-[10px] transition ${mineRing} ${actingHere} disabled:opacity-40`}
+                className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-lg border border-white/10 bg-black/35 px-0.5 pb-0.5 pt-0.5 text-left transition ${mineRing} ${actingHere} disabled:opacity-40`}
               >
-                <div className="shrink-0 font-bold leading-tight text-zinc-400">
-                  S{idx + 1}
-                  {mine ? <span className="text-emerald-300/90"> · You</span> : null}
-                  {isActingSeat ? <span className="text-sky-300/90"> · Turn</span> : null}
-                </div>
-                <div className="line-clamp-1 h-[14px] shrink-0 text-[10px] leading-tight text-white">
-                  {taken ? seat.displayName || "…" : "Open"}
-                </div>
-                <div className="flex h-[12px] shrink-0 items-center text-[9px] leading-none text-emerald-300/90">
-                  {seat.inRound && seat.roundBet > 0 ? `Play ${fmt(seat.roundBet)}` : "\u00a0"}
-                </div>
-                <div className="line-clamp-1 flex h-[14px] shrink-0 items-center text-[8px] leading-tight text-zinc-500">
-                  {phase === "betting" && mine ? (
+                <div className="flex min-h-[13px] shrink-0 items-center gap-0.5 leading-none">
+                  {taken ? (
                     <>
-                      Chosen play {fmt(seat.intendedBet || 0)}
-                      {parsedDraftPlay !== intendedBetFloor && draftPlayValid ? ` → next ${fmt(parsedDraftPlay)}` : ""}
+                      <span className="min-w-0 flex-1 truncate text-left text-[8px] font-semibold text-white/95">
+                        {String(seat.displayName || "").trim() || "…"}
+                      </span>
+                      {mine ? (
+                        <span className="shrink-0 rounded-sm bg-emerald-500/25 px-0.5 py-px text-[6px] font-bold uppercase leading-none text-emerald-200">
+                          You
+                        </span>
+                      ) : null}
+                      {isActingSeat ? (
+                        <span className="shrink-0 rounded-sm bg-sky-500/25 px-0.5 py-px text-[6px] font-bold uppercase leading-none text-sky-200">
+                          Turn
+                        </span>
+                      ) : null}
                     </>
                   ) : (
-                    "\u00a0"
+                    <span className="w-full text-center text-[8px] font-medium text-white/55">Open</span>
                   )}
                 </div>
-                <div className="mt-0.5 flex min-h-0 flex-1 items-end overflow-x-auto overflow-y-hidden">
+                <div className="mt-0.5 flex min-h-0 w-full min-w-0 flex-1 flex-col justify-end gap-0.5 overflow-hidden">
                   {seat.hands?.length ? (
-                    <div className="flex flex-col gap-0.5">
-                      {seat.hands.map((h, hi) => {
-                        const hc = (h || []).length;
-                        const rowGap = hc >= 4 ? "gap-0.5" : "gap-1";
-                        return (
-                          <div key={hi} className={`flex shrink-0 flex-row ${rowGap}`}>
-                            {(h || []).map((c, ci) => (
-                              <PlayingCardOv2 key={`${hi}-${ci}-${c}`} code={c} handCardCount={hc} />
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    seat.hands.map((h, hi) => (
+                      <SeatHandRow key={hi} hand={h} handKey={`${idx}-${hi}-${(h || []).join("|")}`} />
+                    ))
                   ) : null}
                 </div>
               </button>
