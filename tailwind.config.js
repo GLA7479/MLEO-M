@@ -4,6 +4,7 @@ module.exports = {
     "./components/**/*.{js,jsx}",
     "./game/**/*.{js,jsx}",
     "./games-online/**/*.{js,jsx}", // ensure Bingo files are scanned for Tailwind classes
+    "./lib/**/*.{js,jsx}", // e.g. ov2BingoSeatColors — dynamic class strings must be discoverable
   ],
   theme: {
     extend: {

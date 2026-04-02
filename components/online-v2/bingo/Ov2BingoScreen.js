@@ -194,14 +194,16 @@ export default function Ov2BingoScreen({ contextInput = null }) {
                 key={seatIndex}
                 className={[
                   "flex min-h-[2.5rem] w-[5.25rem] shrink-0 flex-col justify-center rounded-md border px-1.5 py-1 text-[9px] leading-tight sm:min-h-[2.8125rem] sm:w-[6rem] sm:py-1.5 sm:text-[10px]",
-                  member ? [seatStyle.border, seatStyle.bg].join(" ") : "border-white/15 bg-black/30 text-zinc-500",
+                  member
+                    ? [seatStyle.border, seatStyle.bg].join(" ")
+                    : [seatStyle.border, "bg-black/35 text-zinc-400"].join(" "),
                   you ? "ring-1 ring-sky-400/80" : "",
                   isCaller ? "ring-1 ring-amber-300/70" : "",
                   isWinner ? "ring-1 ring-emerald-400/60" : "",
                 ].join(" ")}
                 title={member ? `${label}${member.isReady ? " · Ready" : ""}` : `Seat ${seatIndex + 1} · Open`}
               >
-                <div className={`truncate font-semibold ${member ? seatStyle.text : "text-zinc-100"}`}>{label}</div>
+                <div className={`truncate font-semibold ${member ? seatStyle.text : "text-zinc-400"}`}>{label}</div>
                 <div className="mt-1 text-[8px]">
                   {member ? (
                     <span className={member.isReady ? "text-emerald-300" : "text-zinc-500"}>
