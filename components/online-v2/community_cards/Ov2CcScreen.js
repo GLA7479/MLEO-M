@@ -29,6 +29,7 @@ export default function Ov2CcScreen({
   const [topUpDraft, setTopUpDraft] = useState("");
   const [pickSeat, setPickSeat] = useState(null);
   const [formHint, setFormHint] = useState("");
+  const [actionHint, setActionHint] = useState("");
 
   useEffect(() => {
     setBuyInDraft(String(minBuy));
@@ -44,14 +45,24 @@ export default function Ov2CcScreen({
     return Math.max(0, Math.floor(Number(engine.currentBet) || 0) - Math.floor(Number(mySeat.streetContrib) || 0));
   }, [mySeat, engine]);
 
+  const handBettingLive = useMemo(
+    () =>
+      Boolean(
+        engine &&
+          engine.phase === "preflop" &&
+          Math.floor(Number(engine.handSeq) || 0) > 0 &&
+          engine.street,
+      ),
+    [engine],
+  );
+
   const canAct = Boolean(
-    engine &&
+    handBettingLive &&
       mySeat &&
       engine.actionSeat === mySeat.seatIndex &&
       mySeat.inCurrentHand &&
       !mySeat.folded &&
-      !mySeat.allIn &&
-      ["preflop", "flop", "turn", "river"].includes(engine.phase),
+      !mySeat.allIn,
   );
 
   const [clock, setClock] = useState(0);
@@ -70,6 +81,20 @@ export default function Ov2CcScreen({
 
   const doOp = useCallback(async (op, payload = {}) => onOperate(op, payload), [onOperate]);
 
+  const runGameOp = useCallback(
+    async (op, payload = {}) => {
+      setActionHint("");
+      const r = await onOperate(op, payload);
+      if (!r?.ok) {
+        setActionHint(
+          String(r?.code || r?.json?.code || r?.error?.payload?.code || r?.error?.message || "rejected"),
+        );
+      }
+      return r;
+    },
+    [onOperate],
+  );
+
   if (!engine) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center text-sm text-zinc-400">
@@ -79,8 +104,22 @@ export default function Ov2CcScreen({
   }
 
   const { maxSeats, pot, communityCards, phase, currentBet, sb, bb } = engine;
+  const street = engine.street;
   const betweenHands = phase === "idle" || phase === "between_hands";
   const seats = Array.isArray(engine.seats) ? engine.seats : [];
+  const phaseLabel =
+    phase === "between_hands"
+      ? "between hands"
+      : phase === "showdown"
+        ? "showdown"
+        : phase === "idle"
+          ? "idle"
+          : street
+            ? String(street)
+            : String(phase);
+  const handSeqN = Math.floor(Number(engine.handSeq) || 0);
+  const likelyBoardRunout =
+    handBettingLive && engine.actionSeat == null && Math.floor(Number(pot) || 0) > 0;
 
   const curBet = Math.floor(Number(currentBet) || 0);
   const minR = Math.floor(Number(engine.minRaise) || bb);
@@ -133,6 +172,15 @@ export default function Ov2CcScreen({
                 } ${isYou ? "ring-1 ring-sky-400/60" : ""} ${isAct ? "ring-1 ring-amber-400/70" : ""} disabled:opacity-60`}
               >
                 <span className="font-bold text-zinc-200">S{i + 1}</span>
+                {engine.buttonSeat === i ? (
+                  <span className="text-[7px] font-bold text-amber-300/90">D</span>
+                ) : null}
+                {engine.sbSeat === i ? (
+                  <span className="text-[7px] font-bold text-zinc-400">SB</span>
+                ) : null}
+                {engine.bbSeat === i ? (
+                  <span className="text-[7px] font-bold text-zinc-300">BB</span>
+                ) : null}
                 {s.participantKey ? (
                   <>
                     <span className="truncate text-[8px] text-zinc-400">
@@ -155,23 +203,35 @@ export default function Ov2CcScreen({
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-y-auto overflow-x-hidden rounded-xl border border-white/10 bg-black/30 px-2 py-3 [-webkit-overflow-scrolling:touch]">
         <div className="text-[11px] text-zinc-400">
-          Phase: <span className="text-zinc-100">{phase}</span>
+          <span className="text-zinc-100">{phaseLabel}</span>
+          {handSeqN > 0 ? (
+            <span className="ml-1">
+              · hand <span className="text-zinc-200">{handSeqN}</span>
+            </span>
+          ) : null}
           {currentBet > 0 ? (
             <span className="ml-2">
               · level <span className="text-zinc-200">{currentBet}</span>
+            </span>
+          ) : null}
+          {engine.buttonSeat != null && engine.sbSeat != null && engine.bbSeat != null ? (
+            <span className="mt-0.5 block text-[10px] text-zinc-500">
+              BTN S{engine.buttonSeat + 1} · SB S{engine.sbSeat + 1} · BB S{engine.bbSeat + 1}
             </span>
           ) : null}
         </div>
         <div className="text-lg font-bold text-amber-200">Pot (table) {Math.floor(pot || 0)}</div>
         {canAct && turnSecondsLeft != null ? (
           <div className="text-sm font-bold text-amber-300">Your turn · {turnSecondsLeft}s</div>
-        ) : engine.actionSeat != null && ["preflop", "flop", "turn", "river"].includes(phase) ? (
+        ) : handBettingLive && engine.actionSeat != null ? (
           <div className="text-[10px] text-zinc-500">
             Seat {engine.actionSeat + 1} to act
             {engine.actionDeadline
               ? ` · ${Math.max(0, Math.ceil((Number(engine.actionDeadline) - Date.now()) / 1000))}s`
               : ""}
           </div>
+        ) : likelyBoardRunout ? (
+          <div className="text-[10px] text-zinc-500">All-in — dealing remaining board</div>
         ) : null}
         <div className="flex min-h-[36px] flex-wrap items-center justify-center gap-1">
           {(communityCards || []).length ? (
@@ -268,7 +328,7 @@ export default function Ov2CcScreen({
                     type="button"
                     disabled={operateBusy}
                     className="min-h-[40px] rounded border border-zinc-500/40 bg-zinc-800/50 px-3 py-2 text-[10px] font-semibold text-zinc-200 touch-manipulation"
-                    onClick={() => void doOp("sit_out")}
+                    onClick={() => void runGameOp("sit_out")}
                   >
                     {betweenHands ? "Sit out" : "Sit out next hand"}
                   </button>
@@ -278,7 +338,7 @@ export default function Ov2CcScreen({
                     type="button"
                     disabled={operateBusy || mySeat.pendingSitOutAfterHand}
                     className="min-h-[40px] rounded border border-sky-500/40 bg-sky-950/40 px-3 py-2 text-[10px] font-semibold text-sky-100 touch-manipulation disabled:opacity-40"
-                    onClick={() => void doOp("sit_in")}
+                    onClick={() => void runGameOp("sit_in")}
                     title={mySeat.pendingSitOutAfterHand ? "Wait until this hand ends" : undefined}
                   >
                     I&apos;m back
@@ -372,13 +432,16 @@ export default function Ov2CcScreen({
         </div>
       ) : null}
 
+      {actionHint ? (
+        <p className="shrink-0 text-center text-[10px] text-rose-400/90">{actionHint}</p>
+      ) : null}
       {mySeat && canAct ? (
         <div className="relative z-10 grid shrink-0 grid-cols-3 gap-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] sm:grid-cols-6">
           <button
             type="button"
             disabled={operateBusy}
             className="min-h-[48px] rounded-lg border border-rose-500/35 bg-rose-950/35 py-2.5 text-xs font-bold text-rose-100 touch-manipulation active:opacity-90"
-            onClick={() => void doOp("fold")}
+            onClick={() => void runGameOp("fold")}
           >
             Fold
           </button>
@@ -386,7 +449,7 @@ export default function Ov2CcScreen({
             type="button"
             disabled={operateBusy || toCall > 0}
             className="min-h-[48px] rounded-lg border border-zinc-500/35 bg-zinc-800/40 py-2.5 text-xs font-bold touch-manipulation active:opacity-90"
-            onClick={() => void doOp("check")}
+            onClick={() => void runGameOp("check")}
           >
             Check
           </button>
@@ -394,7 +457,7 @@ export default function Ov2CcScreen({
             type="button"
             disabled={operateBusy || toCall <= 0}
             className="min-h-[48px] rounded-lg border border-sky-500/35 bg-sky-950/35 py-2.5 text-xs font-bold text-sky-100 touch-manipulation active:opacity-90"
-            onClick={() => void doOp("call")}
+            onClick={() => void runGameOp("call")}
           >
             Call {toCall > 0 ? toCall : ""}
           </button>
@@ -403,7 +466,7 @@ export default function Ov2CcScreen({
               type="button"
               disabled={operateBusy}
               className="min-h-[48px] rounded-lg border border-violet-500/35 bg-violet-950/35 py-2.5 text-xs font-bold text-violet-100 touch-manipulation active:opacity-90"
-              onClick={() => void doOp("bet", { amount: bb })}
+              onClick={() => void runGameOp("bet", { amount: bb })}
             >
               Bet {bb}
             </button>
@@ -412,7 +475,7 @@ export default function Ov2CcScreen({
               type="button"
               disabled={operateBusy || !canMinRaiseBtn}
               className="min-h-[48px] rounded-lg border border-violet-500/35 bg-violet-950/35 py-2.5 text-xs font-bold text-violet-100 touch-manipulation active:opacity-90 disabled:opacity-40"
-              onClick={() => void doOp("raise", { amount: minRaiseChips })}
+              onClick={() => void runGameOp("raise", { amount: minRaiseChips })}
             >
               Raise +{minRaiseChips}
             </button>
@@ -423,7 +486,7 @@ export default function Ov2CcScreen({
             className="min-h-[48px] rounded-lg border border-violet-500/35 bg-violet-950/35 py-2.5 text-xs font-bold text-violet-100 touch-manipulation active:opacity-90 disabled:opacity-40"
             onClick={() => {
               const op = curBet === 0 && toCall === 0 ? "bet" : "raise";
-              void doOp(op, { amount: quickAmount });
+              void runGameOp(op, { amount: quickAmount });
             }}
           >
             +{quickAmount}
@@ -432,7 +495,7 @@ export default function Ov2CcScreen({
             type="button"
             disabled={operateBusy}
             className="min-h-[48px] rounded-lg border border-amber-500/40 bg-amber-950/35 py-2.5 text-xs font-bold text-amber-100 touch-manipulation active:opacity-90"
-            onClick={() => void doOp("all_in")}
+            onClick={() => void runGameOp("all_in")}
           >
             All-in
           </button>

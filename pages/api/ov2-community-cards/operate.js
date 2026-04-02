@@ -6,6 +6,7 @@ import {
   normalizePrivatePayload,
   buildPublicEngineView,
   extractViewerHoleCards,
+  validateCcEngineInvariants,
 } from "../../../lib/online-v2/community_cards/ov2CcMultiEngine";
 import {
   OV2_CC_PRODUCT_GAME_ID,
@@ -225,6 +226,11 @@ export default async function handler(req, res) {
       const nextPrivate = result.privatePayload;
       const economyOps = result.economyOps || [];
       const roundForEconomy = Math.max(matchSeqBefore, Math.floor(Number(nextEngine.handSeq) || 0));
+
+      const invErr = validateCcEngineInvariants(nextEngine);
+      if (invErr) {
+        return res.status(500).json({ ok: false, code: invErr });
+      }
 
       const { data: updated, error: upErr } = await admin
         .from("ov2_community_cards_live_state")
