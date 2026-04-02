@@ -8,6 +8,7 @@ import {
   readOnlineV2Vault,
   subscribeOnlineV2Vault,
 } from "../../../lib/online-v2/onlineV2VaultBridge";
+import { OV2_C21_BETTING_PRE_LOCK_FREEZE_MS } from "../../../lib/online-v2/c21/ov2C21ClientConstants";
 
 function fmt(n) {
   const x = Math.floor(Number(n) || 0);
@@ -549,6 +550,12 @@ export default function Ov2C21Screen({
     return secsLeft(engine?.phaseEndsAt);
   }, [phase, engine?.turnDeadline, engine?.phaseEndsAt, nowTick]);
 
+  const phaseEndMs = phaseEndsMs(engine?.phaseEndsAt);
+  const bettingPreRoundFreezeActive = useMemo(() => {
+    if (phase !== "betting" || phaseEndMs <= 0) return false;
+    return nowTick >= phaseEndMs - OV2_C21_BETTING_PRE_LOCK_FREEZE_MS;
+  }, [phase, phaseEndMs, nowTick]);
+
   const currentTurn = engine?.currentTurn;
   const isMyTurn =
     currentTurn != null &&
@@ -713,6 +720,38 @@ export default function Ov2C21Screen({
     }
   }, [playDraftStr, maxBet, minBet, onOperate, operateBusy, vaultBalance]);
 
+  const uncommitPlayAmount = useCallback(async () => {
+    const e = engineRef.current;
+    if (e?.phase !== "betting" || betLockRef.current || operateBusy) return;
+    const ms = e?.seats?.find(s => s.participantKey === participantKey);
+    if (!ms?.betCommitRecorded) return;
+    betLockRef.current = true;
+    try {
+      const r = await onOperate("clear_bet", {});
+      if (!r?.ok) {
+        const code = r?.error?.code || r?.error?.payload?.code || "";
+        setEconomyHint(
+          code === "pre_round_freeze"
+            ? "Round is about to start — cannot uncommit now."
+            : code === "DEVICE_REQUIRED"
+              ? "Session required to uncommit."
+              : "Could not uncommit. Try again.",
+        );
+      } else {
+        try {
+          const s = await readOnlineV2Vault({ fresh: true, forceServer: true });
+          setVaultBalance(Math.max(0, Math.floor(Number(s.balance) || 0)));
+        } catch {
+          /* hook reconcile + subscribe */
+        }
+      }
+    } finally {
+      window.setTimeout(() => {
+        betLockRef.current = false;
+      }, 400);
+    }
+  }, [onOperate, operateBusy, participantKey]);
+
   const trySit = useCallback(
     idx => {
       if (sitLockRef.current || operateBusy) return;
@@ -817,8 +856,8 @@ export default function Ov2C21Screen({
         <div
           className={
             otherSeatIndices.length <= 5
-              ? "flex h-[3.875rem] shrink-0 flex-col overflow-hidden sm:min-h-[8.75rem] sm:flex-1"
-              : "flex h-[8rem] shrink-0 flex-col overflow-hidden sm:min-h-[8.75rem] sm:flex-1"
+              ? "flex h-[3.875rem] shrink-0 flex-col overflow-hidden sm:h-[6.125rem] sm:min-h-[6.125rem] sm:max-h-[6.125rem] sm:shrink-0 sm:flex-none"
+              : "flex h-[8rem] shrink-0 flex-col overflow-hidden sm:h-[6.125rem] sm:min-h-[6.125rem] sm:max-h-[6.125rem] sm:shrink-0 sm:flex-none"
           }
         >
           <div
@@ -994,34 +1033,64 @@ export default function Ov2C21Screen({
       </div>
 
       {/* Bottom controls — fixed height; mobile dock + safe-area */}
-      <div className="flex h-[5.75rem] shrink-0 flex-col justify-center gap-0 overflow-hidden border-t border-white/5 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] pt-0 sm:h-[4.25rem] sm:pb-1.5 sm:pt-px">
+      <div className="flex h-[5.35rem] shrink-0 flex-col justify-center gap-0 overflow-hidden border-t border-white/5 pb-[max(0.2rem,env(safe-area-inset-bottom,0px))] pt-0 sm:h-[3.95rem] sm:pb-1 sm:pt-px">
         {phase === "betting" && mySeat ? (
-          <div className="flex h-full min-h-0 flex-col justify-center rounded border border-white/10 bg-black/30 px-1 py-px sm:px-1.5 sm:py-0.5">
-            <div className="shrink-0 text-[10px] leading-none text-zinc-400">
-              Choose play · +{fmt(minBet)} · Commit
-            </div>
-            <div className="mt-px flex shrink-0 flex-wrap items-center gap-0.5">
-              <input
-                value={playDraftStr}
-                onChange={e => setPlayDraftStr(e.target.value)}
-                inputMode="numeric"
-                disabled={operateBusy || actionLock || phase !== "betting"}
-                className="min-w-0 flex-1 rounded border border-white/15 bg-black/50 px-1 py-0.5 text-[11px] font-semibold text-white disabled:opacity-40"
-                aria-label="Play amount"
-              />
+          <div className="flex h-full min-h-0 flex-col justify-center gap-0 rounded border border-white/10 bg-black/30 px-1 py-0 sm:px-1.5 sm:py-0">
+            <div className="flex min-h-0 w-full min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              <div className="relative min-w-0 flex-1">
+                <input
+                  value={playDraftStr}
+                  onChange={e => setPlayDraftStr(e.target.value)}
+                  inputMode="numeric"
+                  disabled={operateBusy || actionLock || phase !== "betting"}
+                  className="h-7 w-full min-w-0 rounded border border-white/15 bg-black/50 py-0 pl-1 pr-6 text-[10px] font-semibold leading-none text-white disabled:opacity-40"
+                  aria-label="Play amount"
+                />
+                <button
+                  type="button"
+                  disabled={operateBusy || actionLock || phase !== "betting"}
+                  onClick={() => setPlayDraftStr(String(minBet))}
+                  className="absolute right-0.5 top-1/2 flex h-5 w-5 -translate-y-1/2 touch-manipulation items-center justify-center rounded text-zinc-400 hover:bg-white/10 hover:text-zinc-100 disabled:pointer-events-none disabled:opacity-35"
+                  aria-label="Reset amount to table minimum"
+                  title="Reset to table minimum"
+                >
+                  <span className="text-[13px] leading-none" aria-hidden>
+                    ↺
+                  </span>
+                </button>
+              </div>
               <button
                 type="button"
                 disabled={operateBusy || actionLock || phase !== "betting"}
                 onClick={() => bumpDraftByTableMin()}
-                className="h-7 shrink-0 touch-manipulation rounded border border-white/20 bg-white/10 px-1.5 text-[9px] font-bold text-zinc-100 disabled:opacity-35"
+                className="h-7 shrink-0 touch-manipulation rounded border border-white/20 bg-white/10 px-1 text-[8px] font-bold leading-none text-zinc-100 disabled:opacity-35"
               >
                 +{fmt(minBet)}
               </button>
+              {mySeat?.betCommitRecorded ? (
+                <button
+                  type="button"
+                  title={
+                    bettingPreRoundFreezeActive
+                      ? "Round about to start — reverse is paused briefly"
+                      : "Reverse committed play and refund vault"
+                  }
+                  disabled={
+                    operateBusy || actionLock || phase !== "betting" || bettingPreRoundFreezeActive
+                  }
+                  onClick={() => void uncommitPlayAmount()}
+                  className="h-7 shrink-0 touch-manipulation rounded border border-rose-500 bg-rose-600 px-1.5 text-[8px] font-extrabold leading-none text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_0_0_1px_rgba(127,29,29,0.45)] disabled:opacity-35"
+                >
+                  Reverse
+                </button>
+              ) : null}
               <button
                 type="button"
-                disabled={operateBusy || actionLock || phase !== "betting" || !draftPlayValid || !vaultOkForCommit}
+                disabled={
+                  operateBusy || actionLock || phase !== "betting" || !draftPlayValid || !vaultOkForCommit
+                }
                 onClick={() => void commitPlayAmount()}
-                className="h-7 shrink-0 touch-manipulation rounded bg-emerald-600 px-2 text-[9px] font-bold text-white disabled:opacity-35"
+                className="h-7 shrink-0 touch-manipulation rounded bg-emerald-600 px-1.5 text-[8px] font-bold leading-none text-white disabled:opacity-35"
               >
                 Commit play
               </button>
@@ -1198,7 +1267,7 @@ export default function Ov2C21Screen({
         : null}
 
       {resultToastOpen && mySummary ? (
-        <div className="pointer-events-none fixed bottom-[calc(5.75rem+0.25rem+env(safe-area-inset-bottom,0px))] left-2 right-2 z-30 mx-auto max-w-lg sm:bottom-[calc(4.25rem+0.25rem+env(safe-area-inset-bottom,0px))]">
+        <div className="pointer-events-none fixed bottom-[calc(5.35rem+0.25rem+env(safe-area-inset-bottom,0px))] left-2 right-2 z-30 mx-auto max-w-lg sm:bottom-[calc(3.95rem+0.25rem+env(safe-area-inset-bottom,0px))]">
           <div
             className={`rounded-xl border bg-zinc-950/95 px-3 py-2 shadow-lg backdrop-blur-sm ${
               Number(mySummary.vaultDelta) < 0

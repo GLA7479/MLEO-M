@@ -10,6 +10,7 @@ import { OV2_C21_STAKE_TIERS, OV2_C21_ROOM_ID_BY_STAKE } from "../../../lib/onli
 import {
   OV2_C21_BETTING_MS,
   OV2_C21_BETWEEN_MS,
+  OV2_C21_BETTING_PRE_LOCK_FREEZE_MS,
   OV2_C21_INSURANCE_MS,
   OV2_C21_TURN_MS,
 } from "../../../lib/online-v2/c21/ov2C21ClientConstants";
@@ -155,8 +156,28 @@ export default function Ov2C21LiveShell() {
   const [nameDraft, setNameDraft] = useState("");
   const [leaveBusy, setLeaveBusy] = useState(false);
   const leaveInFlightRef = useRef(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   const session = useOv2C21Session(roomId, tableStake);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 500);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const bettingPreRoundFreezeActive = useMemo(() => {
+    const eng = session.engine;
+    if (!eng || eng.phase !== "betting") return false;
+    const raw = eng.phaseEndsAt;
+    const end =
+      typeof raw === "number" && Number.isFinite(raw)
+        ? raw
+        : Number.isFinite(Date.parse(String(raw || "")))
+          ? Date.parse(String(raw))
+          : 0;
+    if (end <= 0) return false;
+    return nowTick >= end - OV2_C21_BETTING_PRE_LOCK_FREEZE_MS;
+  }, [session.engine, nowTick]);
 
   const infoPanel = useMemo(
     () => (
@@ -320,8 +341,12 @@ export default function Ov2C21LiveShell() {
           </button>
           <button
             type="button"
-            title="Vacate seat and return to table list"
-            disabled={leaveBusy}
+            title={
+              bettingPreRoundFreezeActive
+                ? "Round about to start — Leave is paused briefly"
+                : "Vacate seat and return to table list"
+            }
+            disabled={leaveBusy || bettingPreRoundFreezeActive}
             onClick={() => void onLeaveTable()}
             className={`${OV2_HUD_CHROME_BTN} border-rose-500/35 bg-rose-950/30 text-rose-100 hover:border-rose-400/40 hover:bg-rose-950/45 disabled:opacity-45`}
           >
