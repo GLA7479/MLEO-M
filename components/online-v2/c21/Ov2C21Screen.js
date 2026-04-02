@@ -329,6 +329,7 @@ export default function Ov2C21Screen({
       inRound: false,
       roundBet: 0,
       intendedBet: 0,
+      betCommitRecorded: false,
       hands: [],
     }));
   }, [engine?.seats]);
@@ -348,14 +349,14 @@ export default function Ov2C21Screen({
 
   const intendedBetFloor = Math.floor(Number(mySeat?.intendedBet) || 0);
 
-  /** After successful set_bet: show intended during play window; after deal, roundBet as before. */
+  /** Only show play after server-secured commit (betting) or active round stake. */
   const myPlayAmountLabel = useMemo(() => {
     if (!mySeat) return null;
     const rb = Math.floor(Number(mySeat.roundBet) || 0);
     if (mySeat.inRound && rb > 0) return fmt(rb);
     if (phase === "betting") {
       const ib = Math.floor(Number(mySeat.intendedBet) || 0);
-      if (ib >= minBet) return fmt(ib);
+      if (mySeat.betCommitRecorded && ib >= minBet) return fmt(ib);
     }
     return null;
   }, [mySeat, phase, minBet, engine?.roundSeq]);
@@ -546,6 +547,16 @@ export default function Ov2C21Screen({
     }
   }, [phase, mySeat, currentTurn, mySplitHandCount]);
 
+  const myHandTotalLabel = useMemo(() => {
+    if (!displayMySeat?.hands?.length) return null;
+    if (mySplitHandCount > 1) {
+      const h = displayMySeat.hands[Math.min(splitViewIdx, mySplitHandCount - 1)] || [];
+      return h.length ? handTotal(h) : null;
+    }
+    const parts = displayMySeat.hands.filter(h => h && h.length).map(h => handTotal(h));
+    return parts.length ? parts.join(" · ") : null;
+  }, [displayMySeat, mySplitHandCount, splitViewIdx]);
+
   const showInsuranceModal = Boolean(legal.insuranceYes || legal.insuranceNo);
 
   useEffect(() => {
@@ -614,6 +625,13 @@ export default function Ov2C21Screen({
               ? "Session required to commit play."
               : "Could not commit play. Try again.",
         );
+      } else {
+        try {
+          const s = await readOnlineV2Vault({ fresh: true, forceServer: true });
+          setVaultBalance(Math.max(0, Math.floor(Number(s.balance) || 0)));
+        } catch {
+          /* hook reconcile + subscribe */
+        }
       }
     } finally {
       window.setTimeout(() => {
@@ -631,7 +649,7 @@ export default function Ov2C21Screen({
       }
       sitLockRef.current = true;
       void onOperate("sit", { seatIndex: idx, displayName: displayName || "Guest" })
-        .then(r => {
+        .then(async r => {
           if (!r?.ok) {
             const code = r?.error?.code || r?.error?.payload?.code || "";
             setEconomyHint(
@@ -659,8 +677,15 @@ export default function Ov2C21Screen({
 
   const visibleDealerCards =
     !dealerHiddenRender && dealerRevealNRender > 0 ? dealerRender.slice(0, dealerRevealNRender) : [];
-  const dealerTotalLive =
-    !dealerHiddenRender && visibleDealerCards.length > 0 ? handTotal(visibleDealerCards) : null;
+  const dealerTotalCenter =
+    dealerRender.length === 0
+      ? null
+      : dealerHiddenRender
+        ? handTotal(dealerRender.slice(0, 1))
+        : visibleDealerCards.length > 0
+          ? handTotal(visibleDealerCards)
+          : null;
+
   const dealerHandCount = dealerRender.length;
   const dealerRevealVisibleCount = dealerHiddenRender ? Math.min(2, dealerHandCount) : dealerRevealNRender;
   const dealerSigRender = dealerRender.join("|");
@@ -675,25 +700,25 @@ export default function Ov2C21Screen({
       ) : null}
       {/* Board: no vertical scroll — flex fits within shell viewport */}
       <div className="flex min-h-0 flex-1 flex-col gap-px overflow-hidden overflow-x-hidden sm:gap-0.5">
-        {/* HOUSE — total + countdown on one top line; no footer under cards */}
+        {/* HOUSE — label + timer corners; total top-center above cards */}
         <div className="relative h-[11.375rem] shrink-0 overflow-hidden rounded-xl border border-amber-900/40 bg-gradient-to-b from-zinc-900/90 to-black/60 px-1 sm:h-[10.375rem]">
           <div className="pointer-events-none absolute left-1 right-1 top-0.5 z-10 flex h-[1.05rem] items-center justify-between gap-1 leading-none">
             <span className="shrink-0 text-[8px] font-bold uppercase tracking-wide text-amber-200/85">House</span>
-            <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
-              {!dealerHiddenRender && dealerRender.length > 0 && dealerTotalLive != null ? (
-                <span className="truncate text-[8px] font-medium tabular-nums text-zinc-400">Total {dealerTotalLive}</span>
-              ) : null}
-              <span
-                className="shrink-0 text-right tabular-nums text-[15px] font-black tracking-tight text-amber-100 drop-shadow-md sm:text-lg"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                {houseCountdownSeconds}
-              </span>
-            </div>
+            <span
+              className="shrink-0 text-right tabular-nums text-[15px] font-black tracking-tight text-amber-100 drop-shadow-md sm:text-lg"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              {houseCountdownSeconds}
+            </span>
           </div>
+          {dealerTotalCenter != null ? (
+            <div className="pointer-events-none absolute left-1/2 top-[1.05rem] z-10 -translate-x-1/2 leading-none">
+              <span className="text-[8px] font-semibold tabular-nums text-zinc-300/95">Total {dealerTotalCenter}</span>
+            </div>
+          ) : null}
           <div
-            className={`absolute inset-x-1 top-[1.2rem] bottom-px flex items-center justify-center overflow-x-auto ${dealerGap}`}
+            className={`absolute inset-x-1 top-[1.48rem] bottom-px flex items-center justify-center overflow-x-auto ${dealerGap}`}
           >
             {dealerRender.length === 0 ? (
               <span className="text-xs text-white/50">—</span>
@@ -766,7 +791,7 @@ export default function Ov2C21Screen({
                         }
                         if (phase === "betting") {
                           const ib = Math.floor(Number(seat.intendedBet) || 0);
-                          if (ib >= minBet) {
+                          if (seat.betCommitRecorded && ib >= minBet) {
                             return (
                               <span className="shrink-0 text-[5px] font-semibold tabular-nums leading-none text-emerald-300/85">
                                 Play {fmt(ib)}
@@ -786,17 +811,30 @@ export default function Ov2C21Screen({
                     <span className="w-full text-center text-[6px] font-medium leading-none text-white/50">Open</span>
                   )}
                 </div>
-                <div className="flex h-[calc(100%-11px)] min-h-0 w-full shrink-0 flex-col justify-center gap-px overflow-hidden">
-                  {seat.hands?.length ? (
-                    seat.hands.map((h, hi) => (
-                      <SeatHandRow
-                        key={hi}
-                        hand={h}
-                        handKey={`o-${idx}-${hi}-${(h || []).join("|")}`}
-                        tiers={OTHER_HAND_TIERS}
-                      />
-                    ))
-                  ) : null}
+                <div className="relative flex h-[calc(100%-11px)] min-h-0 w-full shrink-0 flex-col justify-center gap-px overflow-hidden">
+                  {(() => {
+                    const parts = (seat.hands || []).filter(h => h && h.length).map(h => handTotal(h));
+                    const totalsLabel = parts.length ? parts.join(" · ") : null;
+                    return taken && totalsLabel ? (
+                      <span className="pointer-events-none absolute left-1/2 top-px z-[1] -translate-x-1/2 text-[5px] font-bold tabular-nums leading-none text-zinc-400/95">
+                        {totalsLabel}
+                      </span>
+                    ) : null;
+                  })()}
+                  <div
+                    className={`flex min-h-0 flex-1 flex-col justify-center gap-px overflow-hidden ${taken && (seat.hands || []).some(h => h && h.length) ? "pt-2" : ""}`}
+                  >
+                    {seat.hands?.length ? (
+                      seat.hands.map((h, hi) => (
+                        <SeatHandRow
+                          key={hi}
+                          hand={h}
+                          handKey={`o-${idx}-${hi}-${(h || []).join("|")}`}
+                          tiers={OTHER_HAND_TIERS}
+                        />
+                      ))
+                    ) : null}
+                  </div>
                 </div>
               </button>
             );
@@ -804,12 +842,17 @@ export default function Ov2C21Screen({
           </div>
         </div>
 
-        {/* YOUR HAND — top line only for chrome; cards fill rest */}
+        {/* YOUR HAND — label corner; total top-center above cards */}
         <div className="relative h-[11.375rem] shrink-0 overflow-hidden rounded-xl border border-emerald-800/35 bg-gradient-to-b from-zinc-900/88 to-black/58 px-1 sm:h-[10.375rem]">
           <span className="pointer-events-none absolute left-1 top-0.5 z-10 text-[8px] font-bold uppercase leading-none tracking-wide text-emerald-200/85">
             Your hand
           </span>
-          <div className="absolute right-1 top-0.5 z-20 flex max-w-[75%] flex-row flex-nowrap items-center justify-end gap-0.5">
+          {myHandTotalLabel != null ? (
+            <div className="pointer-events-none absolute left-1/2 top-[1.05rem] z-10 -translate-x-1/2 leading-none">
+              <span className="text-[8px] font-semibold tabular-nums text-emerald-200/90">Total {myHandTotalLabel}</span>
+            </div>
+          ) : null}
+          <div className="absolute right-1 top-0.5 z-20 flex max-w-[70%] flex-row flex-nowrap items-center justify-end gap-0.5">
             {myPlayAmountLabel ? (
               <span className="shrink-0 text-[6px] font-semibold tabular-nums leading-none text-emerald-300/90">
                 Play {myPlayAmountLabel}
@@ -835,7 +878,7 @@ export default function Ov2C21Screen({
               <span className="shrink-0 text-[6px] font-extrabold uppercase leading-none text-sky-300/95">Turn</span>
             ) : null}
           </div>
-          <div className="absolute inset-x-1 top-[1.2rem] bottom-[1.65rem] flex flex-col items-center justify-center gap-px overflow-hidden">
+          <div className="absolute inset-x-1 top-[1.48rem] bottom-[1.65rem] flex flex-col items-center justify-center gap-px overflow-hidden">
             {mySeat ? (
               displayMySeat?.hands?.length ? (
                 mySplitHandCount > 1 ? (

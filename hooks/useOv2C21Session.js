@@ -25,6 +25,15 @@ async function applyVaultEffects(effects, selfParticipantKey) {
   }
 }
 
+/** Align HUD + gating with server wallet after C21 API applied vault RPCs (bypasses pending-delta skip in balance read). */
+async function pullAuthoritativeVaultAfterC21() {
+  try {
+    await readOnlineV2Vault({ fresh: true, forceServer: true });
+  } catch {
+    /* ignore */
+  }
+}
+
 export function useOv2C21Session(roomId, tableStakeUnits) {
   const [engine, setEngine] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -72,12 +81,13 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
         if (json?.vaultEffects?.length) {
           await applyVaultEffects(json.vaultEffects, participantKey);
         }
-        if (json?.localVaultRefreshHint) {
-          try {
-            await readOnlineV2Vault({ fresh: true });
-          } catch {
-            /* ignore */
-          }
+        if (
+          json?.ok &&
+          (json.vaultTouchedForCaller ||
+            json.vaultEffects?.length ||
+            json.localVaultRefreshHint)
+        ) {
+          await pullAuthoritativeVaultAfterC21();
         }
       } catch {
         /* table may not exist until migration */
@@ -125,12 +135,13 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
         if (json?.vaultEffects?.length) {
           await applyVaultEffects(json.vaultEffects, participantKey);
         }
-        if (json?.localVaultRefreshHint) {
-          try {
-            await readOnlineV2Vault({ fresh: true });
-          } catch {
-            /* ignore */
-          }
+        if (
+          json?.ok &&
+          (json.vaultTouchedForCaller ||
+            json.vaultEffects?.length ||
+            json.localVaultRefreshHint)
+        ) {
+          await pullAuthoritativeVaultAfterC21();
         }
         return { ok: true, json };
       } catch (e) {
@@ -163,12 +174,13 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
           if (json?.vaultEffects?.length) {
             await applyVaultEffects(json.vaultEffects, participantKey);
           }
-          if (json?.localVaultRefreshHint) {
-            try {
-              await readOnlineV2Vault({ fresh: true });
-            } catch {
-              /* ignore */
-            }
+          if (
+            json?.ok &&
+            (json.vaultTouchedForCaller ||
+              json.vaultEffects?.length ||
+              json.localVaultRefreshHint)
+          ) {
+            await pullAuthoritativeVaultAfterC21();
           }
         } catch {
           /* ignore tick errors — next poll retries */

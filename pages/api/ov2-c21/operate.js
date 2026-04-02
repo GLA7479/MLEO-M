@@ -254,6 +254,16 @@ export default async function handler(req, res) {
         o => o && o.type === "credit" && String(o.participantKey || "").trim() !== participantKey,
       );
 
+      const pkTrim = String(participantKey || "").trim();
+      const vaultTouchedForCaller =
+        Boolean(pkTrim) &&
+        (economyOps || []).some(
+          o =>
+            o &&
+            (o.type === "commit" || o.type === "credit") &&
+            String(o.participantKey || "").trim() === pkTrim,
+        );
+
       return res.status(200).json({
         ok: true,
         engine: nextEngine,
@@ -261,6 +271,7 @@ export default async function handler(req, res) {
         matchSeq: updated.match_seq,
         vaultEffects,
         localVaultRefreshHint,
+        vaultTouchedForCaller,
       });
     }
 
