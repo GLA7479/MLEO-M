@@ -700,17 +700,17 @@ export default function Ov2C21Screen({
       ) : null}
       {/* Board: no vertical scroll — flex fits within shell viewport */}
       <div className="flex min-h-0 flex-1 flex-col gap-px overflow-hidden overflow-x-hidden sm:gap-0.5">
-        {/* HOUSE — one header line: House | Total | countdown */}
+        {/* HOUSE — single line: left label | centered total | right countdown (equal thirds) */}
         <div className="relative h-[11.375rem] shrink-0 overflow-hidden rounded-xl border border-amber-900/40 bg-gradient-to-b from-zinc-900/90 to-black/60 px-1 sm:h-[10.375rem]">
-          <div className="pointer-events-none absolute left-1 right-1 top-0.5 z-10 grid h-[1.05rem] grid-cols-[1fr_auto_1fr] items-center gap-0.5 leading-none">
-            <span className="justify-self-start text-[9px] font-bold uppercase tracking-wide text-amber-200/85">
+          <div className="pointer-events-none absolute inset-x-1 top-0.5 z-10 grid h-[1.05rem] grid-cols-3 items-center leading-none">
+            <span className="min-w-0 truncate text-left text-[10px] font-bold uppercase tracking-wide text-amber-200/85">
               House
             </span>
-            <span className="justify-self-center text-[9px] font-semibold tabular-nums text-zinc-200/95">
+            <span className="min-w-0 truncate text-center text-[10px] font-semibold tabular-nums text-zinc-200/95">
               {dealerTotalCenter != null ? `Total ${dealerTotalCenter}` : "\u00a0"}
             </span>
             <span
-              className="justify-self-end tabular-nums text-[15px] font-black tracking-tight text-amber-100 drop-shadow-md sm:text-lg"
+              className="min-w-0 truncate text-right tabular-nums text-[15px] font-black tracking-tight text-amber-100 drop-shadow-md sm:text-lg"
               aria-live="polite"
               aria-atomic="true"
             >
@@ -774,24 +774,24 @@ export default function Ov2C21Screen({
                 }}
                 className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-md border border-white/10 bg-black/40 px-px py-0 text-left transition ${actingHere} disabled:opacity-40`}
               >
-                <div className="grid h-[11px] max-h-[11px] shrink-0 grid-cols-[1fr_auto_auto] items-center gap-px overflow-hidden leading-none">
+                <div className="grid h-[11px] max-h-[11px] shrink-0 grid-cols-3 items-center gap-px overflow-hidden leading-none">
                   {taken ? (
                     <>
-                      <span className="min-w-0 truncate text-left text-[7px] font-semibold leading-none text-white/90">
+                      <span className="min-w-0 truncate text-left text-[8px] font-semibold leading-none text-white/90">
                         {String(seat.displayName || "").trim() || "…"}
                       </span>
-                      <span className="shrink-0 justify-self-center text-[6px] font-bold tabular-nums leading-none text-zinc-400/95">
+                      <span className="min-w-0 truncate text-center text-[7px] font-bold tabular-nums leading-none text-zinc-400/95">
                         {(() => {
                           const parts = (seat.hands || []).filter(h => h && h.length).map(h => handTotal(h));
                           return parts.length ? parts.join("·") : "\u00a0";
                         })()}
                       </span>
-                      <span className="flex shrink-0 items-center justify-end gap-px">
+                      <span className="flex min-w-0 justify-end gap-px overflow-hidden">
                         {(() => {
                           const rb = Math.floor(Number(seat.roundBet) || 0);
                           if (seat.inRound && rb > 0 && phase !== "betting") {
                             return (
-                              <span className="text-[6px] font-semibold tabular-nums leading-none text-emerald-300/85">
+                              <span className="shrink-0 text-[7px] font-semibold tabular-nums leading-none text-emerald-300/85">
                                 Play {fmt(rb)}
                               </span>
                             );
@@ -800,7 +800,7 @@ export default function Ov2C21Screen({
                             const ib = Math.floor(Number(seat.intendedBet) || 0);
                             if (seat.betCommitRecorded && ib >= minBet) {
                               return (
-                                <span className="text-[6px] font-semibold tabular-nums leading-none text-emerald-300/85">
+                                <span className="shrink-0 text-[7px] font-semibold tabular-nums leading-none text-emerald-300/85">
                                   Play {fmt(ib)}
                                 </span>
                               );
@@ -809,14 +809,14 @@ export default function Ov2C21Screen({
                           return null;
                         })()}
                         {isActingSeat ? (
-                          <span className="rounded px-px text-[6px] font-extrabold uppercase leading-none text-sky-200">
+                          <span className="shrink-0 rounded px-px text-[7px] font-extrabold uppercase leading-none text-sky-200">
                             Turn
                           </span>
                         ) : null}
                       </span>
                     </>
                   ) : (
-                    <span className="col-span-3 w-full text-center text-[7px] font-medium leading-none text-white/50">
+                    <span className="col-span-3 w-full text-center text-[8px] font-medium leading-none text-white/50">
                       Open
                     </span>
                   )}
@@ -841,18 +841,18 @@ export default function Ov2C21Screen({
           </div>
         </div>
 
-        {/* YOUR HAND — one header line: label | Total | Play / Surrender / Turn */}
+        {/* YOUR HAND — single line: left label | centered total | right Play / Surrender / Turn (equal thirds) */}
         <div className="relative h-[11.375rem] shrink-0 overflow-hidden rounded-xl border border-emerald-800/35 bg-gradient-to-b from-zinc-900/88 to-black/58 px-1 sm:h-[10.375rem]">
-          <div className="absolute left-1 right-1 top-0.5 z-20 grid h-[1.05rem] grid-cols-[1fr_auto_1fr] items-center gap-0.5 leading-none">
-            <span className="pointer-events-none justify-self-start text-[9px] font-bold uppercase leading-none tracking-wide text-emerald-200/85">
+          <div className="absolute inset-x-1 top-0.5 z-20 grid h-[1.05rem] grid-cols-3 items-center leading-none">
+            <span className="pointer-events-none min-w-0 truncate text-left text-[10px] font-bold uppercase leading-none tracking-wide text-emerald-200/85">
               Your hand
             </span>
-            <span className="pointer-events-none justify-self-center text-[9px] font-semibold tabular-nums text-emerald-200/90">
+            <span className="pointer-events-none min-w-0 truncate text-center text-[10px] font-semibold tabular-nums text-emerald-200/90">
               {myHandTotalLabel != null ? `Total ${myHandTotalLabel}` : "\u00a0"}
             </span>
-            <div className="flex max-w-[72%] flex-row flex-nowrap items-center justify-end justify-self-end gap-0.5">
+            <div className="flex min-w-0 flex-row flex-nowrap items-center justify-end gap-0.5 overflow-hidden">
               {myPlayAmountLabel ? (
-                <span className="shrink-0 text-[7px] font-semibold tabular-nums leading-none text-emerald-300/90">
+                <span className="shrink-0 text-[8px] font-semibold tabular-nums leading-none text-emerald-300/90">
                   Play {myPlayAmountLabel}
                 </span>
               ) : null}
@@ -867,13 +867,13 @@ export default function Ov2C21Screen({
                     if (e?.phase !== "acting" || !ms || ct?.seatIndex !== ms.seatIndex) return;
                     await onOperate("surrender");
                   })}
-                  className="shrink-0 touch-manipulation rounded border border-rose-500/35 bg-rose-950/40 px-1 py-px text-[7px] font-extrabold uppercase leading-none text-rose-100 disabled:opacity-25"
+                  className="shrink-0 touch-manipulation rounded border border-rose-500/35 bg-rose-950/40 px-1 py-px text-[8px] font-extrabold uppercase leading-none text-rose-100 disabled:opacity-25"
                 >
                   Surrender
                 </button>
               ) : null}
               {phase === "acting" && isMyTurn ? (
-                <span className="shrink-0 text-[7px] font-extrabold uppercase leading-none text-sky-300/95">Turn</span>
+                <span className="shrink-0 text-[8px] font-extrabold uppercase leading-none text-sky-300/95">Turn</span>
               ) : null}
             </div>
           </div>
@@ -934,7 +934,7 @@ export default function Ov2C21Screen({
       <div className="flex h-[5.75rem] shrink-0 flex-col justify-center gap-0 overflow-hidden border-t border-white/5 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] pt-0 sm:h-[4.25rem] sm:pb-1.5 sm:pt-px">
         {phase === "betting" && mySeat ? (
           <div className="flex h-full min-h-0 flex-col justify-center rounded border border-white/10 bg-black/30 px-1 py-px sm:px-1.5 sm:py-0.5">
-            <div className="shrink-0 text-[9px] leading-none text-zinc-400">
+            <div className="shrink-0 text-[10px] leading-none text-zinc-400">
               Choose play · +{fmt(minBet)} · Commit
             </div>
             <div className="mt-px flex shrink-0 flex-wrap items-center gap-0.5">

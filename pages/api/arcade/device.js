@@ -19,10 +19,13 @@ export default function handler(req, res) {
     const deviceId = ensureArcadeDevice(req, res);
     return res.status(200).json({ success: true, hasDevice: Boolean(deviceId) });
   } catch (err) {
-    console.error("[api/arcade/device]", err?.message || err);
-    return res.status(500).json({
+    const msg = String(err?.message || err || "");
+    console.error("[api/arcade/device]", msg);
+    const config = /missing signing secret/i.test(msg);
+    return res.status(config ? 503 : 500).json({
       success: false,
-      message: err?.message || "Arcade device initialization failed",
+      code: config ? "ARCADE_SIGNING_SECRET_REQUIRED" : "ARCADE_DEVICE_ERROR",
+      message: msg || "Arcade device initialization failed",
     });
   }
 }
