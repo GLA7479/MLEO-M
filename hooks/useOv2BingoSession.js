@@ -3,9 +3,12 @@ import {
   applyPreviewMark,
   BINGO_PRIZE_KEYS,
   buildDeck,
+  canClaimPrize,
   computePreviewLineCompletion,
   generateCard,
   applyMark,
+  isFullComplete,
+  isRowComplete,
   makeEmptyMarks,
 } from "../lib/online-v2/bingo/ov2BingoEngine";
 import {
@@ -501,6 +504,10 @@ export function useOv2BingoSession(baseContext) {
         : [];
 
     const takenPrizeKeys = new Set((snap?.claims ?? []).map(c => c.prizeKey));
+    const existingClaimsForEngine = (snap?.claims ?? []).map(c => ({
+      prize_key: c.prizeKey,
+      amount: c.amount,
+    }));
 
     /** @type {Record<string, string|null>} */
     const prizeDisabledByKey = {};
@@ -508,7 +515,24 @@ export function useOv2BingoSession(baseContext) {
       if (snap?.sessionPhase === "finished") prizeDisabledByKey[pk] = "Match finished";
       else if (dr.claim) prizeDisabledByKey[pk] = dr.claim;
       else if (takenPrizeKeys.has(pk)) prizeDisabledByKey[pk] = "Already claimed";
-      else prizeDisabledByKey[pk] = null;
+      else if (!liveCard) prizeDisabledByKey[pk] = "No card (seat required)";
+      else if (
+        !canClaimPrize({
+          prizeKey: pk,
+          card: liveCard,
+          called,
+          existingClaims: existingClaimsForEngine,
+        })
+      ) {
+        prizeDisabledByKey[pk] = "Not eligible yet";
+      } else if (pk === "full") {
+        prizeDisabledByKey[pk] = isFullComplete(liveMarks) ? null : "Not eligible yet";
+      } else {
+        const m = /^row([1-5])$/.exec(pk);
+        const ri = m ? Number(m[1]) - 1 : -1;
+        prizeDisabledByKey[pk] =
+          ri >= 0 && isRowComplete(liveMarks, ri) ? null : "Not eligible yet";
+      }
     }
 
     let phaseLine = "Playing — numbers are called on the server.";

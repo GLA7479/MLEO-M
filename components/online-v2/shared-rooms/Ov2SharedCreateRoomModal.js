@@ -1,14 +1,28 @@
-import { useMemo, useState } from "react";
-import { ONLINE_V2_MIN_STAKE_UNITS } from "../../../lib/online-v2/ov2Economy";
+import { useEffect, useMemo, useState } from "react";
+import { ONLINE_V2_GAME_KINDS, ONLINE_V2_MIN_STAKE_UNITS } from "../../../lib/online-v2/ov2Economy";
+
+function defaultMaxPlayersForProduct(productId) {
+  return productId === ONLINE_V2_GAME_KINDS.BINGO ? 8 : 4;
+}
 
 export default function Ov2SharedCreateRoomModal({ open, games, selectedGameId, onClose, onSubmit, busy }) {
   const [title, setTitle] = useState("");
   const [productGameId, setProductGameId] = useState(selectedGameId || games[0]?.id || "");
   const [stakeInput, setStakeInput] = useState(String(ONLINE_V2_MIN_STAKE_UNITS));
   const [minPlayers, setMinPlayers] = useState(2);
-  const [maxPlayers, setMaxPlayers] = useState(4);
+  const [maxPlayers, setMaxPlayers] = useState(() =>
+    defaultMaxPlayersForProduct(selectedGameId || games[0]?.id || "")
+  );
   const [visibilityMode, setVisibilityMode] = useState("public");
   const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    const id = selectedGameId || games[0]?.id || "";
+    setProductGameId(id);
+    setMaxPlayers(defaultMaxPlayersForProduct(id));
+    setMinPlayers(2);
+  }, [open, selectedGameId, games]);
 
   const entryParsed = Math.floor(Number(stakeInput));
   const entryOk = stakeInput.trim() !== "" && Number.isFinite(entryParsed) && entryParsed >= ONLINE_V2_MIN_STAKE_UNITS;
@@ -30,7 +44,12 @@ export default function Ov2SharedCreateRoomModal({ open, games, selectedGameId, 
         <div className="space-y-2">
           <select
             value={productGameId}
-            onChange={e => setProductGameId(e.target.value)}
+            onChange={e => {
+              const id = e.target.value;
+              setProductGameId(id);
+              setMaxPlayers(defaultMaxPlayersForProduct(id));
+              setMinPlayers(2);
+            }}
             className="w-full rounded-lg border border-white/15 bg-black/40 px-2 py-2 text-sm text-white"
           >
             {games.map(g => (

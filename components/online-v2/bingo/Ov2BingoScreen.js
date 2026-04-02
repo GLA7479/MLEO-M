@@ -316,13 +316,13 @@ export default function Ov2BingoScreen({ contextInput = null }) {
             <div className="text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">Claim a prize</div>
             <div className="mt-0.5 grid grid-cols-3 gap-0.5 sm:grid-cols-6 sm:gap-1">
               {BINGO_PRIZE_KEYS.map(pk => {
-                const reason = vm.prizeDisabledByKey[pk] ?? "Unavailable";
+                const disableReason = vm.prizeDisabledByKey[pk];
                 const claimed = claimByPrizeKey[pk];
                 const winStyle = claimed ? getOv2BingoSeatStyle(claimed.seatIndex).prize : "";
                 const hardBlocked =
                   !isLiveMatch ||
                   vm.sessionPhase !== "playing" ||
-                  (Boolean(reason) && reason !== "Already claimed");
+                  (disableReason != null && disableReason !== "Already claimed");
                 const disabled = hardBlocked || Boolean(claimed) || claimPendingKey !== null;
                 return (
                   <button
@@ -332,8 +332,8 @@ export default function Ov2BingoScreen({ contextInput = null }) {
                     title={
                       claimed
                         ? `Won · seat ${claimed.seatIndex + 1}${claimed.claimedByName ? ` · ${claimed.claimedByName}` : ""}`
-                        : reason
-                          ? reason
+                        : disableReason != null
+                          ? disableReason
                           : `Claim ${prizeLabels[pk]}`
                     }
                     onClick={() => void onClaim(pk)}
