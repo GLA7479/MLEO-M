@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
 import Ov2C21Screen from "./Ov2C21Screen";
-import { useOv2C21Session } from "../../hooks/useOv2C21Session";
-import { OV2_C21_STAKE_TIERS, OV2_C21_ROOM_ID_BY_STAKE } from "../../lib/online-v2/c21/ov2C21TableIds";
-import { isOv2RoomIdQueryParam } from "../../lib/online-v2/onlineV2GameRegistry";
-import { supabaseMP } from "../../lib/supabaseClients";
+import { useOv2C21Session } from "../../../hooks/useOv2C21Session";
+import { OV2_C21_STAKE_TIERS, OV2_C21_ROOM_ID_BY_STAKE } from "../../../lib/online-v2/c21/ov2C21TableIds";
+import { isOv2RoomIdQueryParam } from "../../../lib/online-v2/onlineV2GameRegistry";
+import { supabaseMP } from "../../../lib/supabaseClients";
 
 const NAME_LS = "ov2_c21_display_name_v1";
 
