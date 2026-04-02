@@ -68,6 +68,10 @@ export default function Ov2SharedRoomScreen({
   const [ledgerMembers, setLedgerMembers] = useState([]);
   const [canonicalRoom, setCanonicalRoom] = useState(null);
   const [ledgerErr, setLedgerErr] = useState("");
+  /** Bingo non-host live handoff: reset only on explicit Refresh (not silent room polls). */
+  const [bingoHandoffResetTick, setBingoHandoffResetTick] = useState(0);
+  const [bingoHandoffTimedOut, setBingoHandoffTimedOut] = useState(false);
+  const bingoHandoffWaitStartRef = useRef(null);
 
   const refreshSharedEconomySnapshot = useCallback(async () => {
     if (!roomId) return { ledger: [], canon: null };
@@ -151,6 +155,32 @@ export default function Ov2SharedRoomScreen({
 
   const sharedStatusUpper = useMemo(() => String(room?.status || "").toUpperCase(), [room?.status]);
   const canonicalStatusUpper = useMemo(() => String(canonicalRoom?.status || "").toUpperCase(), [canonicalRoom?.status]);
+
+  const onHeaderRefreshClick = useCallback(() => {
+    if (isBingoRoom && sharedStatusUpper === "IN_GAME" && !launchingLive) {
+      setBingoHandoffResetTick(t => t + 1);
+    }
+    void reload();
+  }, [isBingoRoom, sharedStatusUpper, launchingLive, reload]);
+
+  useEffect(() => {
+    if (!isBingoRoom || sharedStatusUpper !== "IN_GAME" || launchingLive) {
+      bingoHandoffWaitStartRef.current = null;
+      setBingoHandoffTimedOut(false);
+      return undefined;
+    }
+    bingoHandoffWaitStartRef.current = Date.now();
+    setBingoHandoffTimedOut(false);
+    const budgetMs = 55000;
+    const id = window.setInterval(() => {
+      if (didRouteToLiveRef.current) return;
+      const t0 = bingoHandoffWaitStartRef.current;
+      if (t0 != null && Date.now() - t0 >= budgetMs) {
+        setBingoHandoffTimedOut(true);
+      }
+    }, 1500);
+    return () => window.clearInterval(id);
+  }, [isBingoRoom, sharedStatusUpper, launchingLive, roomId, bingoHandoffResetTick]);
 
   const sharedPreStartStrict = useMemo(
     () =>
@@ -668,7 +698,7 @@ export default function Ov2SharedRoomScreen({
         <button
           type="button"
           disabled={busy}
-          onClick={() => void reload()}
+          onClick={() => void onHeaderRefreshClick()}
           className="rounded border border-white/20 px-2 py-1 text-[11px] text-zinc-300"
         >
           Refresh
@@ -762,6 +792,37 @@ export default function Ov2SharedRoomScreen({
             <p className="mt-1 text-teal-200/90">
               Heading to the live table when the session is ready. If nothing happens, use Refresh or wait a few seconds.
             </p>
+            {isBingoRoom && bingoHandoffTimedOut ? (
+              <div className="mt-2 space-y-2 border-t border-teal-500/25 pt-2 text-[10px] text-amber-100/95">
+                <p>Live Bingo is taking longer than expected — the table may still be opening.</p>
+                <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void onHeaderRefreshClick()}
+                    className="rounded-md border border-teal-400/50 bg-teal-900/35 px-2 py-1.5 font-semibold text-teal-50 disabled:opacity-45"
+                  >
+                    Refresh and retry wait
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void router.push(`/ov2-bingo?room=${encodeURIComponent(roomId)}`)}
+                    className="rounded-md border border-sky-400/50 bg-sky-900/35 px-2 py-1.5 font-semibold text-sky-50 disabled:opacity-45"
+                  >
+                    Open live Bingo
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={onExitRoom}
+                    className="rounded-md border border-white/20 bg-white/10 px-2 py-1.5 font-semibold text-zinc-100 disabled:opacity-45"
+                  >
+                    Back to lobby
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -787,8 +848,14 @@ export default function Ov2SharedRoomScreen({
             Start
           </button>
         ) : sharedStatusUpper === "IN_GAME" && isStakeSharedRoom ? (
-          <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-400">
-            {launchingLive ? "Opening…" : "Waiting for live session…"}
+          <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border border-zinc-600/50 bg-zinc-900/40 px-2 py-2 text-center text-[10px] font-medium text-zinc-400">
+            {launchingLive ? (
+              "Opening…"
+            ) : isBingoRoom && bingoHandoffTimedOut ? (
+              <span>Session delayed — use Refresh or actions above</span>
+            ) : (
+              "Waiting for live session…"
+            )}
           </div>
         ) : (
           <button

@@ -295,6 +295,7 @@ export function useOv2BingoSession(baseContext) {
         const just = claims.filter(c => c.claimedByParticipantKey === selfKey && c.prizeKey === pk).pop();
         const amt = just && typeof just.amount === "number" ? just.amount : Number(just?.amount);
         const cid = just?.id != null ? String(just.id).trim() : "";
+        // Must match `ov2_settlement_lines.idempotency_key` from `ov2_bingo_claim_prize` (`ov2:bingo:settle:` || claim id).
         if (cid && Number.isFinite(amt) && amt > 0) {
           const idem = `ov2:bingo:settle:${cid}`;
           void creditOnlineV2VaultForSettlementLine(Math.floor(amt), OV2_BINGO_PRODUCT_GAME_ID, idem);
