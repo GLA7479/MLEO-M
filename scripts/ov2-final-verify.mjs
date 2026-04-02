@@ -74,7 +74,26 @@ async function lobby(page) {
     null,
     { timeout: 180000 }
   );
-  await page.waitForTimeout(4000);
+  // Next FOUC uses body{display:none} until hydrated — skip layout probes until Refresh is real size.
+  await page.waitForFunction(
+    () => {
+      const refreshEl = Array.from(document.querySelectorAll("button")).find(b =>
+        /^\s*Refresh\s*$/i.test((b.textContent || "").trim())
+      );
+      const nameEl = document.querySelector('input[placeholder="Display name"]');
+      return (
+        refreshEl &&
+        refreshEl.offsetParent != null &&
+        refreshEl.clientWidth > 0 &&
+        refreshEl.clientHeight > 0 &&
+        nameEl &&
+        nameEl.clientWidth > 0
+      );
+    },
+    null,
+    { timeout: 180000 }
+  );
+  await page.waitForTimeout(800);
 }
 
 async function fillDisplay(page, name) {
