@@ -161,7 +161,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
   const liveExceptionUi = Boolean(vm.isLive && !playingLive && !isFinishedLive);
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-0.5 overflow-hidden px-0.5 sm:gap-1 sm:px-1">
+    <div className="flex h-full min-h-0 min-w-0 w-full flex-col gap-0.5 overflow-hidden overscroll-y-contain px-0.5 sm:gap-1 sm:px-1">
       <Ov2GameStatusStrip title={stripTitle} subtitle={vm.phaseLine} tone={stripTone} compact={Boolean(vm.isLive)} />
 
       {vm.isLive && onLeaveToLobby ? (
@@ -329,7 +329,7 @@ export default function Ov2BingoScreen({ contextInput = null }) {
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden sm:gap-1 lg:grid lg:h-full lg:min-h-0 lg:grid-cols-5 lg:grid-rows-1 lg:auto-rows-[minmax(0,1fr)] lg:gap-1.5">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 p-1 lg:col-span-3 lg:min-h-0 lg:h-full">
           <div className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">Your card</div>
-          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-hidden py-0.5 sm:overflow-y-auto sm:py-1">
+          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto py-0.5 sm:py-1">
             <Ov2BingoCard
               card={vm.card}
               called={vm.called}
@@ -343,8 +343,8 @@ export default function Ov2BingoScreen({ contextInput = null }) {
           ) : null}
         </div>
 
-        <div className="flex min-h-0 min-w-0 shrink-0 flex-col gap-0.5 sm:gap-1 lg:col-span-2 lg:flex lg:min-h-0 lg:h-full lg:flex-col lg:overflow-hidden">
-          <div className="flex h-[7.875rem] max-h-[7.875rem] shrink-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 px-1.5 py-1 sm:h-[11.5rem] sm:max-h-[11.5rem] sm:px-2 sm:py-1.5 lg:max-h-[min(30vh,10.5rem)] lg:shrink-0">
+        <div className="flex min-h-0 min-w-0 max-h-[min(44svh,14rem)] shrink overflow-y-auto flex-col gap-0.5 sm:max-h-none sm:shrink-0 sm:overflow-y-visible sm:gap-1 lg:col-span-2 lg:flex lg:h-full lg:max-h-none lg:min-h-0 lg:shrink-0 lg:flex-col lg:overflow-hidden">
+          <div className="flex h-[min(7.875rem,32svh)] max-h-[min(7.875rem,34svh)] shrink-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-black/25 px-1.5 py-1 sm:h-[11.5rem] sm:max-h-[11.5rem] sm:px-2 sm:py-1.5 lg:max-h-[min(30vh,10.5rem)] lg:shrink-0">
             <div className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">
               Called numbers
             </div>

@@ -18,6 +18,8 @@ export default function OnlineV2GamePageShell({
   infoPanel = null,
   menuPanel = null,
   showSubtitle = true,
+  /** Bingo / iOS: use --app-100vh from _app visualViewport instead of raw 100dvh */
+  useAppViewportHeight = false,
 }) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -37,10 +39,14 @@ export default function OnlineV2GamePageShell({
   const subtitleText = typeof subtitle === "string" ? subtitle.trim() : "";
   const shouldRenderSubtitle = showSubtitle && Boolean(subtitleText);
 
+  const mainHeightClass = useAppViewportHeight
+    ? "h-[var(--app-100vh,100svh)] max-h-[var(--app-100vh,100svh)] min-h-0 overscroll-y-contain"
+    : "h-[100dvh] max-h-[100dvh] min-h-0";
+
   return (
     <Layout title={title}>
       <main
-        className="online-v2-game-main h-[100dvh] max-h-[100dvh] overflow-hidden bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white"
+        className={`online-v2-game-main ${mainHeightClass} overflow-hidden bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white`}
         style={{
           paddingTop: "max(8px, env(safe-area-inset-top))",
           paddingBottom: "max(8px, env(safe-area-inset-bottom))",
@@ -78,7 +84,9 @@ export default function OnlineV2GamePageShell({
             </div>
           </header>
 
-          <div className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-hidden pt-0">
+          <div
+            className={`relative min-h-0 flex-1 overflow-x-hidden overflow-y-hidden pt-0 ${useAppViewportHeight ? "overscroll-y-contain" : ""}`}
+          >
             {children}
 
             <OnlineV2GameOverlay

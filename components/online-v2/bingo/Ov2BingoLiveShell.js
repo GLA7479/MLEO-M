@@ -169,8 +169,10 @@ export default function Ov2BingoLiveShell() {
 
   if (!roomId) {
     return (
-      <div className={OV2_BINGO_NONSELECT_ROOT}>
-        <OnlineV2GamePageShell title="Bingo" showSubtitle={false} infoPanel={null}>
+      <div
+        className={`${OV2_BINGO_NONSELECT_ROOT} max-h-[var(--app-100vh,100svh)] overflow-hidden overscroll-y-contain`}
+      >
+        <OnlineV2GamePageShell title="Bingo" showSubtitle={false} infoPanel={null} useAppViewportHeight>
           <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-sm text-zinc-400">
             {router.isReady ? "Opening rooms…" : "Loading…"}
           </div>
@@ -180,10 +182,13 @@ export default function Ov2BingoLiveShell() {
   }
 
   return (
-    <div className={OV2_BINGO_NONSELECT_ROOT}>
+    <div
+      className={`${OV2_BINGO_NONSELECT_ROOT} max-h-[var(--app-100vh,100svh)] overflow-hidden overscroll-y-contain`}
+    >
       <OnlineV2GamePageShell
         title="Bingo"
         showSubtitle={false}
+        useAppViewportHeight
         infoPanel={
           <>
             <div className="space-y-2 text-[11px] leading-snug text-zinc-300">
@@ -274,8 +279,8 @@ export default function Ov2BingoLiveShell() {
         ) : roomId && loading && !room ? (
           <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-zinc-400">Loading room…</div>
         ) : room && contextInput ? (
-          <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden overscroll-y-contain">
+            <div className="min-h-0 min-w-0 flex-1 overflow-hidden overscroll-y-contain">
               <Ov2BingoScreen contextInput={contextInput} />
             </div>
           </div>
