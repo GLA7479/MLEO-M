@@ -523,8 +523,8 @@ export default function Ov2C21Screen({
           {loadError}
         </div>
       ) : null}
-      {/* Board scrolls on small viewports; controls stay in bottom dock */}
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden overscroll-y-contain sm:overflow-hidden">
+      {/* Board: no vertical scroll — flex fits within shell viewport */}
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden overflow-x-hidden sm:gap-1">
         {/* HOUSE — same height as MY HAND; larger on desktop */}
         <div className="relative flex h-[8.775rem] shrink-0 flex-col rounded-xl border border-amber-900/40 bg-gradient-to-b from-zinc-900/90 to-black/60 px-1.5 py-1 sm:h-[7.75rem]">
           <div
@@ -567,37 +567,21 @@ export default function Ov2C21Screen({
           )}
         </div>
 
-        {/* MY HAND — fixed height = HOUSE; primary card area */}
-        <div className="relative flex h-[8.775rem] shrink-0 flex-col rounded-xl border border-emerald-800/35 bg-gradient-to-b from-zinc-900/88 to-black/58 px-1.5 py-1 sm:h-[7.75rem]">
-          <div className="shrink-0 text-center text-[10px] font-bold uppercase tracking-wide text-emerald-200/85">Your hand</div>
-          <div className="flex min-h-0 flex-1 flex-col justify-center gap-px overflow-hidden px-0.5">
-            {mySeat ? (
-              mySeat.hands?.length ? (
-                mySeat.hands.map((h, hi) => (
-                  <SeatHandRow
-                    key={hi}
-                    hand={h}
-                    handKey={`mine-${hi}-${(h || []).join("|")}`}
-                    tiers={MY_HAND_TIERS}
-                  />
-                ))
-              ) : (
-                <div className="text-center text-[9px] text-zinc-500">—</div>
-              )
-            ) : (
-              <div className="text-center text-[9px] leading-tight text-zinc-500">Take a seat below</div>
-            )}
-          </div>
-        </div>
-
-        {/* Other seats only — 5 when seated, 6 when spectating */}
+        {/* Other seats — mobile: compact fixed height (no scroll); sm+: grows in middle */}
         <div
           className={
             otherSeatIndices.length <= 5
-              ? "grid h-[5.5rem] shrink-0 grid-cols-5 gap-0.5 min-h-0 sm:h-[6rem] sm:gap-1"
-              : "grid h-[10.5rem] shrink-0 grid-cols-3 grid-rows-2 gap-1 min-h-0 sm:h-[6rem] sm:grid-cols-6 sm:grid-rows-1 sm:gap-1"
+              ? "flex h-[3.875rem] shrink-0 flex-col overflow-hidden sm:min-h-[8.75rem] sm:flex-1"
+              : "flex h-[8rem] shrink-0 flex-col overflow-hidden sm:min-h-[8.75rem] sm:flex-1"
           }
         >
+          <div
+            className={
+              otherSeatIndices.length <= 5
+                ? "grid h-full w-full grid-cols-5 gap-0.5 sm:min-h-0 sm:gap-1"
+                : "grid h-full w-full grid-cols-3 grid-rows-2 gap-1 sm:min-h-0 sm:grid-cols-6 sm:grid-rows-1 sm:gap-1"
+            }
+          >
           {otherSeatIndices.map(idx => {
             const seat = seatsForUi[idx];
             const taken = Boolean(seat?.participantKey);
@@ -648,11 +632,32 @@ export default function Ov2C21Screen({
               </button>
             );
           })}
+          </div>
+        </div>
+
+        {/* MY HAND — fixed height = HOUSE; below other players */}
+        <div className="relative flex h-[8.775rem] shrink-0 flex-col rounded-xl border border-emerald-800/35 bg-gradient-to-b from-zinc-900/88 to-black/58 px-1.5 py-1 sm:h-[7.75rem]">
+          <div className="shrink-0 text-center text-[10px] font-bold uppercase tracking-wide text-emerald-200/85">Your hand</div>
+          <div className="flex min-h-0 flex-1 flex-col justify-center gap-px overflow-hidden px-0.5">
+            {mySeat ? (
+              mySeat.hands?.length ? (
+                mySeat.hands.map((h, hi) => (
+                  <SeatHandRow
+                    key={hi}
+                    hand={h}
+                    handKey={`mine-${hi}-${(h || []).join("|")}`}
+                    tiers={MY_HAND_TIERS}
+                  />
+                ))
+              ) : (
+                <div className="text-center text-[9px] text-zinc-500">—</div>
+              )
+            ) : (
+              <div className="text-center text-[9px] leading-tight text-zinc-500">Pick an open seat above</div>
+            )}
+          </div>
         </div>
       </div>
-
-      {/* Result strip slot (mobile): fixed height between board and bottom dock */}
-      <div className="h-11 w-full shrink-0 max-sm:block sm:hidden" aria-hidden />
 
       {/* Bottom controls — fixed height; mobile dock + safe-area */}
       <div className="flex h-[11rem] shrink-0 flex-col justify-start gap-1 overflow-hidden border-t border-white/5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:h-[7rem] sm:pb-2">
