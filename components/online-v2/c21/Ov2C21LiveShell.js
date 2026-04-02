@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
+import { OV2_HUD_CHROME_BTN } from "../OnlineV2GameHudOverlays";
 import Ov2C21Screen from "./Ov2C21Screen";
 import { useOv2C21Session } from "../../../hooks/useOv2C21Session";
 import { OV2_C21_STAKE_TIERS, OV2_C21_ROOM_ID_BY_STAKE } from "../../../lib/online-v2/c21/ov2C21TableIds";
@@ -24,6 +25,23 @@ function formatTierLabel(tier) {
   if (tier >= 1000) return `${tier / 1000}K`;
   return String(tier);
 }
+
+const C21_INFO_PANEL = (
+  <div className="space-y-2 text-[11px] leading-snug text-zinc-300">
+    <p>
+      <span className="font-semibold text-zinc-200">House</span> (top-right number): seconds left in the current step
+      (play window, side cover, someone&apos;s turn, or reveal pause).
+    </p>
+    <p>
+      Visitor: you can watch without a seat. Take an open seat to join; use <span className="text-zinc-200">Tables</span>{" "}
+      to browse other levels without giving up your seat. <span className="text-zinc-200">Leave</span> vacates your seat
+      and returns here.
+    </p>
+    <p className="text-zinc-500">
+      Two consecutive rounds without meeting this table&apos;s minimum play clears your seat (using Tables does not).
+    </p>
+  </div>
+);
 
 export default function Ov2C21LiveShell() {
   const router = useRouter();
@@ -62,19 +80,33 @@ export default function Ov2C21LiveShell() {
   const c21OpBusy = session.operateBusy;
 
   const onLeaveTable = useCallback(async () => {
-    if (leaveInFlightRef.current || leaveBusy || !roomId) return;
+    if (leaveInFlightRef.current || !roomId) return;
     leaveInFlightRef.current = true;
     setLeaveBusy(true);
     try {
-      const r = await runC21Op("leave_seat", {});
-      if (r?.ok === true) {
+      const tryLeave = async () => {
+        let r = await runC21Op("leave_seat", {});
+        if (r?.skipped) {
+          await new Promise(res => setTimeout(res, 220));
+          r = await runC21Op("leave_seat", {});
+        }
+        return r;
+      };
+      let r = await tryLeave();
+      let okLeave = r?.ok === true || r?.error?.code === "not_seated";
+      if (!okLeave && r?.error?.code === "REVISION_CONFLICT") {
+        await new Promise(res => setTimeout(res, 240));
+        r = await tryLeave();
+        okLeave = r?.ok === true || r?.error?.code === "not_seated";
+      }
+      if (okLeave) {
         await router.replace("/ov2-21-challenge");
       }
     } finally {
       leaveInFlightRef.current = false;
       setLeaveBusy(false);
     }
-  }, [leaveBusy, roomId, router, runC21Op]);
+  }, [roomId, router, runC21Op]);
 
   const persistName = () => {
     try {
@@ -86,7 +118,12 @@ export default function Ov2C21LiveShell() {
 
   if (!roomId) {
     return (
-      <OnlineV2GamePageShell title="21 Challenge" subtitle="Five permanent live tables" useAppViewportHeight>
+      <OnlineV2GamePageShell
+        title="21 Challenge"
+        subtitle="Five permanent live tables"
+        useAppViewportHeight
+        infoPanel={C21_INFO_PANEL}
+      >
         <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
           <div className="shrink-0">
             <label className="text-[11px] text-zinc-400" htmlFor="ov2-c21-name">
@@ -136,6 +173,7 @@ export default function Ov2C21LiveShell() {
         title="21 Challenge"
         subtitle={`Live · table play ${formatTierLabel(tableStake)}`}
         useAppViewportHeight
+        infoPanel={C21_INFO_PANEL}
       >
       <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -150,24 +188,20 @@ export default function Ov2C21LiveShell() {
             type="button"
             title="Pick another table without leaving your seat"
             onClick={() => router.push("/ov2-21-challenge")}
-            className="shrink-0 rounded-lg border border-white/15 px-2 py-1.5 text-[11px] text-zinc-300"
+            className={OV2_HUD_CHROME_BTN}
           >
             Tables
           </button>
           <button
             type="button"
-            disabled={leaveBusy || c21OpBusy}
+            title="Vacate seat and return to table list"
+            disabled={leaveBusy}
             onClick={() => void onLeaveTable()}
-            className="shrink-0 rounded-lg border border-rose-500/40 bg-rose-950/40 px-2 py-1.5 text-[11px] font-semibold text-rose-100 disabled:opacity-45"
+            className={`${OV2_HUD_CHROME_BTN} border-rose-500/35 bg-rose-950/30 text-rose-100 hover:border-rose-400/40 hover:bg-rose-950/45 disabled:opacity-45`}
           >
-            {leaveBusy ? "Leaving…" : "Leave table"}
+            {leaveBusy ? "…" : "Leave"}
           </button>
         </div>
-        {session.loadError ? (
-          <div className="rounded-lg border border-red-500/30 bg-red-950/30 p-2 text-center text-xs text-red-100">
-            {session.loadError}
-          </div>
-        ) : null}
         <div className="min-h-0 flex-1 overflow-hidden">
           <Ov2C21Screen
             roomId={roomId}
@@ -177,6 +211,7 @@ export default function Ov2C21LiveShell() {
             displayName={displayName}
             onOperate={session.operate}
             operateBusy={session.operateBusy}
+            loadError={session.loadError}
           />
         </div>
       </div>

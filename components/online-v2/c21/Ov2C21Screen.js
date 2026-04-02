@@ -1,13 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatCardShort, handTotal } from "../../../lib/solo-v2/challenge21HandMath";
-import {
-  OV2_C21_BETTING_MS,
-  OV2_C21_BETWEEN_MS,
-  OV2_C21_INSURANCE_MS,
-  OV2_C21_TURN_MS,
-} from "../../../lib/online-v2/c21/ov2C21ClientConstants";
+import { formatCardShort, handTotal, splitCardCode } from "../../../lib/solo-v2/challenge21HandMath";
 import { getOv2C21LegalFlags } from "../../../lib/online-v2/c21/ov2C21LegalMoves";
 
 const SEAT_RING = ["ring-emerald-400", "ring-sky-400", "ring-violet-400", "ring-fuchsia-400", "ring-amber-400", "ring-slate-400"];
@@ -32,33 +26,93 @@ function secsLeft(phaseEndsAt) {
   return Math.max(0, Math.ceil((t - Date.now()) / 1000));
 }
 
-function phaseDurationMs(phase) {
-  if (phase === "betting") return OV2_C21_BETTING_MS;
-  if (phase === "insurance") return OV2_C21_INSURANCE_MS;
-  if (phase === "acting") return OV2_C21_TURN_MS;
-  if (phase === "between_rounds") return OV2_C21_BETWEEN_MS;
-  return 0;
+const SUIT_SYM = { h: "♥", d: "♦", c: "♣", s: "♠" };
+
+function toDeckApiImageCode(code) {
+  const s = String(code || "");
+  if (!s) return null;
+  let rank;
+  let suitKey;
+  if (s.length >= 3 && s.startsWith("10")) {
+    rank = "0";
+    suitKey = s.slice(2);
+  } else {
+    rank = s.slice(0, 1).toUpperCase();
+    suitKey = s.slice(1);
+  }
+  const sm = { h: "H", d: "D", c: "C", s: "S" };
+  const sk = String(suitKey || "s").toLowerCase();
+  return `${rank}${sm[sk] || "S"}`;
 }
 
-/** Visible phase label (internal `phase` stays server-shaped). */
-function phaseDisplayLabel(phase) {
-  if (phase === "betting") return "Play window";
-  if (phase === "between_rounds") return "Reveal";
-  if (phase === "insurance") return "Side cover";
-  if (phase === "acting") return "Play";
-  return String(phase || "").replace(/_/g, " ") || "—";
-}
-
-function CardFace({ code, small }) {
-  if (!code) return <span className="text-white/40">—</span>;
-  const s = formatCardShort(code);
-  const cls = small ? "min-w-[2.1rem] px-1 py-0.5 text-[10px]" : "min-w-[2.35rem] px-1.5 py-1 text-xs";
+function FallbackCardFace({ code, compact }) {
+  const { rank, suit } = splitCardCode(code);
+  const sym = SUIT_SYM[String(suit).toLowerCase()] || suit;
+  const red = suit.toLowerCase() === "h" || suit.toLowerCase() === "d";
   return (
-    <span
-      className={`inline-flex items-center justify-center rounded-md border border-white/25 bg-black/50 font-bold text-white ${cls}`}
+    <div
+      className={`flex h-full w-full flex-col items-center justify-center rounded-md border border-zinc-500/80 bg-gradient-to-b from-white to-zinc-100 px-0.5 shadow-inner ${
+        red ? "text-red-600" : "text-zinc-900"
+      } ${compact ? "text-[9px] font-extrabold leading-none" : "text-xs font-extrabold leading-tight"}`}
     >
-      {s}
-    </span>
+      <span>{rank}</span>
+      <span className={compact ? "text-[11px]" : "text-base"}>{sym}</span>
+    </div>
+  );
+}
+
+/**
+ * Card size: large for 1–3 cards per hand; smaller only when that hand has 4+ cards.
+ * Applies to house and seat hands.
+ */
+function PlayingCardOv2({ code, hidden, handCardCount = 1 }) {
+  const [imgErr, setImgErr] = useState(false);
+  useEffect(() => {
+    setImgErr(false);
+  }, [code]);
+  const n = Math.max(0, Math.floor(Number(handCardCount) || 0));
+  const crowded = n >= 4;
+  const size = crowded
+    ? "h-[2.95rem] w-[2.05rem] sm:h-[3.2rem] sm:w-[2.35rem]"
+    : "h-[4.2rem] w-[2.95rem] sm:h-[4rem] sm:w-[2.85rem]";
+  const compactFallback = crowded;
+  if (hidden) {
+    return (
+      <div
+        className={`${size} shrink-0 overflow-hidden rounded-md border border-white/30 shadow-[0_2px_6px_rgba(0,0,0,0.45)]`}
+      >
+        <img
+          src="/card-backs/poker-back.jpg"
+          alt=""
+          className="h-full w-full object-cover"
+          draggable={false}
+        />
+      </div>
+    );
+  }
+  if (!code) return <div className={`${size} shrink-0 rounded-md border border-white/20 bg-black/40`} />;
+  const api = toDeckApiImageCode(code);
+  const url = api ? `https://deckofcardsapi.com/static/img/${api}.png` : null;
+  const showFallback = !url || imgErr;
+  return (
+    <div
+      className={`${size} relative shrink-0 overflow-hidden rounded-md border border-white/25 shadow-[0_2px_6px_rgba(0,0,0,0.4)]`}
+    >
+      {url && !imgErr ? (
+        <img
+          src={url}
+          alt=""
+          className="h-full w-full object-cover"
+          draggable={false}
+          onError={() => setImgErr(true)}
+        />
+      ) : null}
+      {showFallback ? (
+        <div className="absolute inset-0">
+          <FallbackCardFace code={code} compact={compactFallback} />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -70,6 +124,7 @@ export default function Ov2C21Screen({
   displayName,
   onOperate,
   operateBusy,
+  loadError = "",
 }) {
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [actionLock, setActionLock] = useState(false);
@@ -78,9 +133,13 @@ export default function Ov2C21Screen({
   const resultToastTimerRef = useRef(null);
   const actionLockRef = useRef(false);
   const betLockRef = useRef(false);
+  const quickAddLockRef = useRef(false);
   const sitLockRef = useRef(false);
   const engineRef = useRef(engine);
   engineRef.current = engine;
+  const [playDraftStr, setPlayDraftStr] = useState("");
+  const [dealerRevealN, setDealerRevealN] = useState(0);
+  const dealerRevealTimersRef = useRef([]);
 
   useEffect(() => {
     const id = window.setInterval(() => setNowTick(Date.now()), 500);
@@ -114,6 +173,14 @@ export default function Ov2C21Screen({
     if (!participantKey) return null;
     return seatsForUi.find(s => s.participantKey === participantKey) || null;
   }, [seatsForUi, participantKey]);
+
+  const intendedBetFloor = Math.floor(Number(mySeat?.intendedBet) || 0);
+
+  useEffect(() => {
+    if (phase !== "betting" || !mySeat) return;
+    const v = intendedBetFloor >= minBet ? intendedBetFloor : minBet;
+    setPlayDraftStr(String(v));
+  }, [phase, engine?.roundSeq, intendedBetFloor, minBet, mySeat?.seatIndex, mySeat?.participantKey]);
 
   const mySummary = engine?.lastRoundSummaries?.byParticipantKey?.[participantKey] || null;
 
@@ -189,19 +256,13 @@ export default function Ov2C21Screen({
     [operateBusy],
   );
 
-  const timerLabel = useMemo(() => {
-    const left = secsLeft(engine?.phaseEndsAt);
-    const dur = phaseDurationMs(phase) / 1000;
-    const label = phaseDisplayLabel(phase);
-    if (phase === "acting" && engine?.turnDeadline) {
-      const tl = Math.max(0, Math.ceil((phaseEndsMs(engine.turnDeadline) - nowTick) / 1000));
-      const si = engine?.currentTurn?.seatIndex;
-      const seatBit = typeof si === "number" ? ` · Seat ${si + 1}` : "";
-      return `Turn${seatBit} · ${tl}s / ${Math.round(OV2_C21_TURN_MS / 1000)}s`;
+  /** Seconds left: turn timer in acting when set, else phase window. */
+  const houseCountdownSeconds = useMemo(() => {
+    if (phase === "acting" && engine?.turnDeadline != null && phaseEndsMs(engine.turnDeadline) > 0) {
+      return Math.max(0, Math.ceil((phaseEndsMs(engine.turnDeadline) - nowTick) / 1000));
     }
-    if (dur > 0) return `${label} · ${left}s / ${dur}s`;
-    return label;
-  }, [engine, phase, nowTick]);
+    return secsLeft(engine?.phaseEndsAt);
+  }, [phase, engine?.turnDeadline, engine?.phaseEndsAt, nowTick]);
 
   const currentTurn = engine?.currentTurn;
   const isMyTurn =
@@ -217,49 +278,64 @@ export default function Ov2C21Screen({
 
   const showInsuranceModal = Boolean(legal.insuranceYes || legal.insuranceNo);
 
-  const roleLabel = useMemo(() => {
-    if (!participantKey) return "";
-    if (!mySeat) {
-      return "Spectating · open seat to play · no seat held (two missed table minimum plays unseats)";
-    }
-    if (mySeat.inRound) {
-      if (phase === "acting" && isMyTurn) return "Acting now · your hand · in this round";
-      if (phase === "acting") return "In this round · waiting for another seat";
-      if (phase === "insurance") return "In this round · side cover choice";
-      if (phase === "betting") return "Seated · in this round · choose play before lock";
-      if (phase === "between_rounds") return "Seated · in this round · reveal (cards stay until next play window)";
-      return "In this round";
-    }
-    return "Seated · not in this round · you join on next lock";
-  }, [participantKey, mySeat, phase, isMyTurn]);
-
   const dealer = engine?.dealerHand || [];
   const dealerHidden = Boolean(engine?.dealerHidden);
+  const dealerSig = dealer.join("|");
 
-  const playAmountOptions = useMemo(() => {
-    const mults = [1, 2, 5, 10];
-    const amounts = mults.map(m => Math.min(maxBet, minBet * m));
-    return [...new Set(amounts)];
-  }, [maxBet, minBet]);
+  useEffect(() => {
+    dealerRevealTimersRef.current.forEach(clearTimeout);
+    dealerRevealTimersRef.current = [];
+    if (dealer.length === 0) {
+      setDealerRevealN(0);
+      return undefined;
+    }
+    if (dealerHidden) {
+      setDealerRevealN(1);
+      return undefined;
+    }
+    setDealerRevealN(1);
+    for (let k = 2; k <= dealer.length; k++) {
+      const delay = 420 + (k - 2) * 480;
+      const t = window.setTimeout(() => setDealerRevealN(k), delay);
+      dealerRevealTimersRef.current.push(t);
+    }
+    return () => {
+      dealerRevealTimersRef.current.forEach(clearTimeout);
+      dealerRevealTimersRef.current = [];
+    };
+  }, [dealerSig, dealerHidden, dealer.length]);
 
-  const applyQuickBet = useCallback(
-    async amount => {
-      const e = engineRef.current;
-      if (e?.phase !== "betting" || betLockRef.current || operateBusy) return;
-      const n = Math.max(0, Math.floor(Number(amount) || 0));
-      if (n < minBet || n > maxBet) return;
-      if (!playAmountOptions.includes(n)) return;
-      betLockRef.current = true;
-      try {
-        await onOperate("set_bet", { amount: n });
-      } finally {
-        window.setTimeout(() => {
-          betLockRef.current = false;
-        }, 380);
-      }
-    },
-    [maxBet, minBet, onOperate, operateBusy, playAmountOptions],
-  );
+  const parsedDraftPlay = Math.floor(Number(String(playDraftStr).replace(/\D/g, "")) || 0);
+  const draftPlayValid = parsedDraftPlay >= minBet && parsedDraftPlay <= maxBet;
+
+  const bumpDraftByTableMin = useCallback(() => {
+    if (engineRef.current?.phase !== "betting" || operateBusy || quickAddLockRef.current) return;
+    quickAddLockRef.current = true;
+    setPlayDraftStr(prev => {
+      const cur = Math.floor(Number(String(prev).replace(/\D/g, "")) || 0);
+      const base = cur < minBet ? minBet : cur;
+      const next = Math.min(maxBet, base + minBet);
+      return String(next);
+    });
+    window.setTimeout(() => {
+      quickAddLockRef.current = false;
+    }, 140);
+  }, [maxBet, minBet, operateBusy]);
+
+  const commitPlayAmount = useCallback(async () => {
+    const e = engineRef.current;
+    if (e?.phase !== "betting" || betLockRef.current || operateBusy) return;
+    const raw = Math.floor(Number(String(playDraftStr).replace(/\D/g, "")) || 0);
+    if (raw < minBet || raw > maxBet) return;
+    betLockRef.current = true;
+    try {
+      await onOperate("set_bet", { amount: raw });
+    } finally {
+      window.setTimeout(() => {
+        betLockRef.current = false;
+      }, 400);
+    }
+  }, [playDraftStr, maxBet, minBet, onOperate, operateBusy]);
 
   const trySit = useCallback(
     idx => {
@@ -274,121 +350,170 @@ export default function Ov2C21Screen({
     [displayName, onOperate, operateBusy],
   );
 
-  return (
-    <div className="flex h-full min-h-0 flex-col gap-1.5 overflow-hidden text-white">
-      <div className="shrink-0 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-center text-[11px] text-zinc-300">
-        {roleLabel ? <div className="mb-0.5 text-[10px] leading-tight text-zinc-400">{roleLabel}</div> : null}
-        <div className="font-semibold text-emerald-200/90">{timerLabel}</div>
-        {mySeat ? (
-          <div className="mt-0.5 text-[9px] text-zinc-500">
-            Table min play {fmt(minBet)}
-            {mySeat.inRound ? " · committed this round" : " · not in this round yet"}
-          </div>
-        ) : (
-          <div className="mt-0.5 text-[9px] text-zinc-500">You are not seated on this table.</div>
-        )}
-      </div>
+  const showDealerTotal = !dealerHidden && dealer.length > 0 && dealerRevealN >= dealer.length;
+  const dealerHandCount = dealer.length;
+  const dealerGap = dealerHandCount >= 4 ? "gap-0.5" : "gap-1";
 
-      {/* Dealer */}
-      <div className="shrink-0 rounded-xl border border-amber-900/40 bg-gradient-to-b from-zinc-900/90 to-black/60 px-2 py-2">
-        <div className="text-center text-[10px] font-bold uppercase tracking-wide text-amber-200/80">House</div>
-        <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
-          {dealer.length === 0 ? (
-            <span className="text-xs text-white/50">—</span>
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden text-white">
+      {loadError ? (
+        <div className="shrink-0 px-0.5 text-center text-[10px] leading-tight text-red-300/95" role="alert">
+          {loadError}
+        </div>
+      ) : null}
+      {/* Board scrolls on small viewports; controls stay in bottom dock */}
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden overscroll-y-contain sm:overflow-hidden">
+        {/* Dealer — +50% height on mobile vs prior 5.85rem; fixed per breakpoint */}
+        <div className="relative flex h-[8.775rem] shrink-0 flex-col rounded-xl border border-amber-900/40 bg-gradient-to-b from-zinc-900/90 to-black/60 px-1.5 py-1 sm:h-[5.85rem]">
+          <div
+            className="pointer-events-none absolute right-1.5 top-0.5 z-10 min-w-[1.75rem] text-right tabular-nums text-[17px] font-black leading-none tracking-tight text-amber-100 drop-shadow-md sm:text-xl"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {houseCountdownSeconds}
+          </div>
+          <div className="shrink-0 text-center text-[10px] font-bold uppercase tracking-wide text-amber-200/80">House</div>
+          <div className={`flex min-h-0 flex-1 items-center justify-center overflow-x-auto py-0.5 ${dealerGap}`}>
+            {dealer.length === 0 ? (
+              <span className="text-xs text-white/50">—</span>
+            ) : dealerHidden ? (
+              dealer.map((c, i) => {
+                if (i === 0) return <PlayingCardOv2 key="dh0" code={c} handCardCount={dealerHandCount} />;
+                if (i === 1) return <PlayingCardOv2 key="dh1" hidden handCardCount={dealerHandCount} />;
+                return null;
+              })
+            ) : (
+              dealer.map((c, i) => {
+                const up = i < dealerRevealN;
+                return (
+                  <PlayingCardOv2
+                    key={`d-${dealerSig}-${i}`}
+                    code={up ? c : undefined}
+                    hidden={!up}
+                    handCardCount={dealerHandCount}
+                  />
+                );
+              })
+            )}
+          </div>
+          {showDealerTotal ? (
+            <div className="shrink-0 text-center text-[10px] text-zinc-400">Total {handTotal(dealer)}</div>
           ) : (
-            dealer.map((c, i) => (
-              <CardFace key={`d${i}`} code={dealerHidden && i === 1 ? null : c} small />
-            ))
+            <div className="h-[14px] shrink-0" aria-hidden />
           )}
         </div>
-        {!dealerHidden && dealer.length > 0 ? (
-          <div className="mt-1 text-center text-[10px] text-zinc-400">Total {handTotal(dealer)}</div>
-        ) : null}
-      </div>
 
-      {/* Seats */}
-      <div className="grid min-h-0 shrink-0 grid-cols-3 gap-1.5 sm:grid-cols-6">
-        {seatsForUi.map((seat, idx) => {
-          const taken = Boolean(seat.participantKey);
-          const mine = seat.participantKey === participantKey;
-          const ring = SEAT_RING[idx % SEAT_RING.length];
-          const isActingSeat = phase === "acting" && currentTurn?.seatIndex === idx;
-          const actingHere = isActingSeat ? `ring-2 ring-sky-400 ring-offset-1 ring-offset-black/80` : "";
-          const mineRing = mine ? `ring-2 ${ring} ring-offset-1 ring-offset-black/80` : "";
-          return (
-            <button
-              key={idx}
-              type="button"
-              disabled={operateBusy || (taken && !mine)}
-              onClick={() => {
-                if (!taken) trySit(idx);
-              }}
-              className={`flex min-h-[4.5rem] touch-manipulation flex-col rounded-lg border border-white/10 bg-black/35 px-1 py-1 text-left text-[10px] transition ${mineRing} ${actingHere} disabled:opacity-40`}
-            >
-              <div className="font-bold text-zinc-400">
-                Seat {idx + 1}
-                {mine ? <span className="ml-0.5 font-semibold text-emerald-300/90">· You</span> : null}
-                {isActingSeat ? <span className="ml-0.5 font-semibold text-sky-300/90">· Turn</span> : null}
-              </div>
-              <div className="line-clamp-2 min-h-[2rem] text-[11px] text-white">
-                {taken ? seat.displayName || "…" : "Open"}
-              </div>
-              {seat.inRound && seat.roundBet > 0 ? (
-                <div className="text-emerald-300/90">Play {fmt(seat.roundBet)}</div>
-              ) : null}
-              {phase === "betting" && mine ? (
-                <div className="text-[9px] text-zinc-500">Chosen play: {fmt(seat.intendedBet || 0)}</div>
-              ) : null}
-              {seat.hands?.length ? (
-                <div className="mt-0.5 space-y-0.5">
-                  {seat.hands.map((h, hi) => (
-                    <div key={hi} className="flex flex-wrap gap-0.5">
-                      {(h || []).map((c, ci) => (
-                        <CardFace key={ci} code={c} small />
-                      ))}
-                    </div>
-                  ))}
+        {/* Seats — +25% height on mobile vs prior 9.25rem; fixed grid */}
+        <div className="grid h-[11.5625rem] shrink-0 grid-cols-3 gap-1 sm:h-[9.25rem] sm:grid-cols-6 sm:gap-1.5">
+          {seatsForUi.map((seat, idx) => {
+            const taken = Boolean(seat.participantKey);
+            const mine = seat.participantKey === participantKey;
+            const ring = SEAT_RING[idx % SEAT_RING.length];
+            const isActingSeat = phase === "acting" && currentTurn?.seatIndex === idx;
+            const actingHere = isActingSeat ? `ring-2 ring-sky-400 ring-offset-1 ring-offset-black/80` : "";
+            const mineRing = mine ? `ring-2 ${ring} ring-offset-1 ring-offset-black/80` : "";
+            return (
+              <button
+                key={idx}
+                type="button"
+                disabled={operateBusy || (taken && !mine)}
+                onClick={() => {
+                  if (!taken) trySit(idx);
+                }}
+                className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-lg border border-white/10 bg-black/35 px-0.5 py-0.5 text-left text-[10px] transition ${mineRing} ${actingHere} disabled:opacity-40`}
+              >
+                <div className="shrink-0 font-bold leading-tight text-zinc-400">
+                  S{idx + 1}
+                  {mine ? <span className="text-emerald-300/90"> · You</span> : null}
+                  {isActingSeat ? <span className="text-sky-300/90"> · Turn</span> : null}
                 </div>
-              ) : null}
-            </button>
-          );
-        })}
+                <div className="line-clamp-1 h-[14px] shrink-0 text-[10px] leading-tight text-white">
+                  {taken ? seat.displayName || "…" : "Open"}
+                </div>
+                <div className="flex h-[12px] shrink-0 items-center text-[9px] leading-none text-emerald-300/90">
+                  {seat.inRound && seat.roundBet > 0 ? `Play ${fmt(seat.roundBet)}` : "\u00a0"}
+                </div>
+                <div className="line-clamp-1 flex h-[14px] shrink-0 items-center text-[8px] leading-tight text-zinc-500">
+                  {phase === "betting" && mine ? (
+                    <>
+                      Chosen play {fmt(seat.intendedBet || 0)}
+                      {parsedDraftPlay !== intendedBetFloor && draftPlayValid ? ` → next ${fmt(parsedDraftPlay)}` : ""}
+                    </>
+                  ) : (
+                    "\u00a0"
+                  )}
+                </div>
+                <div className="mt-0.5 flex min-h-0 flex-1 items-end overflow-x-auto overflow-y-hidden">
+                  {seat.hands?.length ? (
+                    <div className="flex flex-col gap-0.5">
+                      {seat.hands.map((h, hi) => {
+                        const hc = (h || []).length;
+                        const rowGap = hc >= 4 ? "gap-0.5" : "gap-1";
+                        return (
+                          <div key={hi} className={`flex shrink-0 flex-row ${rowGap}`}>
+                            {(h || []).map((c, ci) => (
+                              <PlayingCardOv2 key={`${hi}-${ci}-${c}`} code={c} handCardCount={hc} />
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Play window + actions */}
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
-        {phase === "betting" && mySeat ? (
-          <div className="shrink-0 rounded-lg border border-white/10 bg-black/25 p-2">
-            <div className="text-[10px] text-zinc-400">
-              Choose play amount (tap one). You can change until the play window ends.
-            </div>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {playAmountOptions.map(amt => {
-                const chosen = Math.floor(Number(mySeat.intendedBet) || 0) === amt;
-                return (
-                  <button
-                    key={amt}
-                    type="button"
-                    disabled={operateBusy || actionLock || phase !== "betting"}
-                    onClick={() => void applyQuickBet(amt)}
-                    className={`min-h-[40px] min-w-[3.25rem] touch-manipulation rounded-lg border px-2 py-1.5 text-[11px] font-bold disabled:opacity-35 ${
-                      chosen
-                        ? "border-emerald-400/80 bg-emerald-900/50 text-emerald-100"
-                        : "border-white/15 bg-black/40 text-zinc-200"
-                    }`}
-                  >
-                    {fmt(amt)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
+      {/* Result strip slot (mobile): fixed height between board and bottom dock */}
+      <div className="h-11 w-full shrink-0 max-sm:block sm:hidden" aria-hidden />
 
-        {phase === "acting" && isMyTurn ? (
-          <div className="shrink-0 rounded-lg border border-sky-500/30 bg-sky-950/30 p-2">
-            <div className="mb-1 text-center text-[11px] font-bold text-sky-200">Your move</div>
-            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+      {/* Bottom controls — fixed height; mobile dock + safe-area */}
+      <div className="flex h-[11rem] shrink-0 flex-col justify-start gap-1 overflow-hidden border-t border-white/5 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:h-[7rem] sm:pb-2">
+        {phase === "betting" && mySeat ? (
+          <div className="flex h-full min-h-0 flex-col justify-center rounded-lg border border-white/10 bg-black/25 px-2 py-1 sm:py-1.5">
+            <div className="shrink-0 text-[10px] text-zinc-400">
+              Choose play amount · type exact or use +{fmt(minBet)} · then Commit play
+            </div>
+            <div className="mt-1 flex shrink-0 flex-wrap items-center gap-1.5">
+              <input
+                value={playDraftStr}
+                onChange={e => setPlayDraftStr(e.target.value)}
+                inputMode="numeric"
+                disabled={operateBusy || actionLock || phase !== "betting"}
+                className="min-w-0 flex-1 rounded-md border border-white/15 bg-black/50 px-2 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                aria-label="Play amount"
+              />
+              <button
+                type="button"
+                disabled={operateBusy || actionLock || phase !== "betting"}
+                onClick={() => bumpDraftByTableMin()}
+                className="h-10 shrink-0 touch-manipulation rounded-lg border border-white/20 bg-white/10 px-2.5 text-[11px] font-bold text-zinc-100 disabled:opacity-35"
+              >
+                +{fmt(minBet)}
+              </button>
+              <button
+                type="button"
+                disabled={operateBusy || actionLock || phase !== "betting" || !draftPlayValid}
+                onClick={() => void commitPlayAmount()}
+                className="h-10 shrink-0 touch-manipulation rounded-lg bg-emerald-600 px-3 text-[11px] font-bold text-white disabled:opacity-35"
+              >
+                Commit play
+              </button>
+            </div>
+            {!draftPlayValid && playDraftStr.trim() !== "" ? (
+              <div className="mt-0.5 shrink-0 text-[9px] text-amber-200/90">
+                Enter between {fmt(minBet)} and {fmt(maxBet)}
+              </div>
+            ) : (
+              <div className="h-[14px] shrink-0" aria-hidden />
+            )}
+          </div>
+        ) : phase === "acting" && isMyTurn ? (
+          <div className="flex h-full min-h-0 flex-col justify-center rounded-lg border border-sky-500/30 bg-sky-950/30 px-1 py-1 sm:py-1.5">
+            <div className="mb-0.5 shrink-0 text-center text-[11px] font-bold text-sky-200">Your move</div>
+            <div className="grid shrink-0 grid-cols-3 gap-1 sm:grid-cols-6">
               {[
                 ["hit", "HIT", legal.hit],
                 ["stand", "STAND", legal.stand],
@@ -407,26 +532,16 @@ export default function Ov2C21Screen({
                     if (e?.phase !== "acting" || !ms || ct?.seatIndex !== ms.seatIndex) return;
                     await onOperate(op);
                   })}
-                  className="min-h-[44px] touch-manipulation rounded-md bg-white/10 py-2 text-[10px] font-bold tracking-wide disabled:opacity-35 active:scale-[0.98]"
+                  className="min-h-[40px] touch-manipulation rounded-md bg-white/10 py-2 text-[10px] font-bold tracking-wide disabled:opacity-35 active:scale-[0.98] sm:min-h-[40px]"
                 >
                   {label}
                 </button>
               ))}
             </div>
           </div>
-        ) : null}
-      </div>
-
-      {/* Bottom panel */}
-      <div className="max-h-[min(30vh,9rem)] shrink-0 overflow-y-auto overscroll-y-contain rounded-lg border border-white/10 bg-black/30 p-2 text-[10px] text-zinc-400">
-        <div className="font-semibold text-zinc-300">Table</div>
-        <p className="mt-1 leading-snug">
-          Persistent live table · six seats · spectate anytime. Vault moves only after server confirmation.{" "}
-          <span className="text-zinc-500">
-            Auto-unseat: two consecutive rounds without meeting table minimum play clears your seat (Tables does not vacate
-            you).
-          </span>
-        </p>
+        ) : (
+          <div className="h-full rounded-lg border border-transparent bg-transparent" aria-hidden />
+        )}
       </div>
 
       {showInsuranceModal ? (
@@ -465,7 +580,7 @@ export default function Ov2C21Screen({
       ) : null}
 
       {resultToastOpen && mySummary ? (
-        <div className="pointer-events-none fixed bottom-[max(5.5rem,env(safe-area-inset-bottom,0px))] left-2 right-2 z-30 mx-auto max-w-lg">
+        <div className="pointer-events-none fixed bottom-[calc(11rem+0.65rem+env(safe-area-inset-bottom,0px))] left-2 right-2 z-30 mx-auto max-w-lg sm:bottom-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
           <div className="rounded-xl border border-emerald-500/35 bg-zinc-950/95 px-3 py-2 shadow-lg backdrop-blur-sm">
             <div className="text-center text-[10px] font-bold uppercase tracking-wide text-emerald-300/90">Round result</div>
             <div className="mt-0.5 text-center text-sm font-black text-white">{mySummary.headline}</div>
