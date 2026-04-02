@@ -135,15 +135,11 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
         if (json?.vaultEffects?.length) {
           await applyVaultEffects(json.vaultEffects, participantKey);
         }
-        if (
-          json?.ok &&
-          (json.vaultTouchedForCaller ||
-            json.vaultEffects?.length ||
-            json.localVaultRefreshHint)
-        ) {
+        // Any successful operate may have changed server vault (commit/credit); always reconcile so UI never depends on response flag completeness.
+        if (json?.ok) {
           await pullAuthoritativeVaultAfterC21();
         }
-        return { ok: true, json };
+        return { ok: Boolean(json?.ok), json };
       } catch (e) {
         return { ok: false, error: e };
       } finally {
