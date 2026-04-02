@@ -70,6 +70,12 @@ export default function OnlineV2Hub() {
                     >
                       21 Challenge (live tables)
                     </Link>
+                    <Link
+                      href="/ov2-community-cards"
+                      className="flex min-h-[48px] w-full items-center justify-center rounded-xl border border-violet-500/40 bg-violet-900/25 px-4 py-3 text-sm font-bold text-violet-100 md:min-h-[52px] md:text-base"
+                    >
+                      Community Cards (live tables)
+                    </Link>
                   </div>
                 </article>
               </div>
