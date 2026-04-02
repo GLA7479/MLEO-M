@@ -64,6 +64,12 @@ export default function OnlineV2Hub() {
                     >
                       Open rooms
                     </Link>
+                    <Link
+                      href="/ov2-21-challenge"
+                      className="flex min-h-[48px] w-full items-center justify-center rounded-xl border border-sky-500/40 bg-sky-900/30 px-4 py-3 text-sm font-bold text-sky-100 md:min-h-[52px] md:text-base"
+                    >
+                      21 Challenge (live tables)
+                    </Link>
                   </div>
                 </article>
               </div>
