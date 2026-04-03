@@ -119,6 +119,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, code: "OP_REQUIRED" });
   }
 
+  const reqT0 = Date.now();
   try {
     const admin = getSupabaseAdmin();
 
@@ -484,6 +485,7 @@ export default async function handler(req, res) {
         persisted: true,
         attempt,
         serverLoopRetry: attempt > 0,
+        requestDurationMs: Date.now() - reqT0,
       });
 
       return res.status(200).json({
@@ -499,13 +501,38 @@ export default async function handler(req, res) {
       });
     }
 
+    let conflictBody = { ok: false, code: "REVISION_CONFLICT", retried: lastConflict };
+    try {
+      const { data: snapLive, error: snapErr } = await admin
+        .from("ov2_community_cards_live_state")
+        .select("engine, match_seq, revision")
+        .eq("room_id", roomId)
+        .maybeSingle();
+      if (!snapErr && snapLive?.engine && typeof snapLive.engine === "object") {
+        const { data: snapPriv } = await admin
+          .from("ov2_community_cards_private")
+          .select("payload")
+          .eq("room_id", roomId)
+          .maybeSingle();
+        const privSnap = normalizePrivatePayload(snapPriv?.payload);
+        conflictBody.engine = buildPublicEngineView(snapLive.engine, privSnap);
+        conflictBody.viewerHoleCards = extractViewerHoleCards(privSnap, snapLive.engine, participantKey);
+        conflictBody.revision = Math.max(0, Math.floor(Number(snapLive.revision) || 0));
+        conflictBody.matchSeq = Math.max(0, Math.floor(Number(snapLive.match_seq) || 0));
+      }
+    } catch {
+      /* keep minimal 409 body */
+    }
+
     ccOperateLog({
       tableId: roomId,
       op,
       clientOpId: clientOpId || null,
       exhaustedAttempts: true,
+      requestDurationMs: Date.now() - reqT0,
+      conflictSnapshot: Boolean(conflictBody.engine),
     });
-    return res.status(409).json({ ok: false, code: "REVISION_CONFLICT", retried: lastConflict });
+    return res.status(409).json(conflictBody);
   } catch (e) {
     const msg = e?.message || String(e);
     return res.status(500).json({ ok: false, code: "SERVER_ERROR", message: msg });

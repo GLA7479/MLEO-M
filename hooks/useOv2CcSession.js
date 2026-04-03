@@ -217,6 +217,10 @@ export function useOv2CcSession(roomId) {
         }
       };
 
+      const ccTiming =
+        typeof window !== "undefined" && window.localStorage?.getItem("ov2_cc_timing") === "1";
+      const t0 = ccTiming ? performance.now() : 0;
+
       pushOperateBusy();
       setOperateSubmitStatus("sending");
       try {
@@ -224,6 +228,15 @@ export function useOv2CcSession(roomId) {
           const json = await runPost();
           ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
           await finishOk(json);
+          if (ccTiming) {
+            console.log("[ov2-cc-timing]", {
+              op,
+              msToResponse: Math.round(performance.now() - t0),
+              clientRetried: false,
+              duplicateAbsorbed: Boolean(json?.duplicateAbsorbed),
+              tickNoop: Boolean(json?.tickNoop),
+            });
+          }
           return { ok: Boolean(json?.ok), json, clientRetried: false };
         } catch (e) {
           const code = e?.payload?.code ?? e?.code;
@@ -235,11 +248,28 @@ export function useOv2CcSession(roomId) {
 
           if (code === "REVISION_CONFLICT" || status === 409) {
             setOperateSubmitStatus("resyncing");
-            await reloadFromDb();
+            const skipReload =
+              e?.payload &&
+              typeof e.payload === "object" &&
+              e.payload.engine &&
+              typeof e.payload.engine === "object" &&
+              e.payload.revision != null;
+            if (!skipReload) {
+              await reloadFromDb();
+            }
             try {
               const json2 = await runPost();
               ingestOperateJson(json2, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
               await finishOk(json2);
+              if (ccTiming) {
+                console.log("[ov2-cc-timing]", {
+                  op,
+                  msToResponse: Math.round(performance.now() - t0),
+                  clientRetried: true,
+                  resyncSkippedDb: skipReload,
+                  duplicateAbsorbed: Boolean(json2?.duplicateAbsorbed),
+                });
+              }
               return { ok: Boolean(json2?.ok), json: json2, clientRetried: true };
             } catch (e2) {
               const code2 = e2?.payload?.code ?? e2?.code;
