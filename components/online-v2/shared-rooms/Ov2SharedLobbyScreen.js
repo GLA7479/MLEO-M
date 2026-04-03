@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createOv2Room,
   joinOv2Room,
@@ -23,6 +23,8 @@ export default function Ov2SharedLobbyScreen({
   const [rooms, setRooms] = useState([]);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [listRefreshing, setListRefreshing] = useState(false);
+  const listRequestIdRef = useRef(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
 
@@ -33,21 +35,28 @@ export default function Ov2SharedLobbyScreen({
     return out;
   }, []);
 
-  const loadRooms = useCallback(async () => {
+  const loadRooms = useCallback(async (opts = {}) => {
+    const silent = opts.silent === true;
+    const rid = ++listRequestIdRef.current;
+    if (!silent) setListRefreshing(true);
     setMsg("");
     try {
       const out = await listOv2Rooms({ product_game_id: selectedGameId, limit: 80 });
+      if (rid !== listRequestIdRef.current) return;
       const raw = Array.isArray(out.rooms) ? out.rooms : [];
       const list = raw.filter(r => r && isOv2ActiveSharedProductId(r.product_game_id));
       setRooms(list);
     } catch (e) {
+      if (rid !== listRequestIdRef.current) return;
       setMsg(e?.message || String(e));
       setRooms([]);
+    } finally {
+      if (rid === listRequestIdRef.current && !silent) setListRefreshing(false);
     }
   }, [selectedGameId]);
 
   useEffect(() => {
-    void loadRooms();
+    void loadRooms({ silent: true });
   }, [loadRooms]);
 
   async function handleCreate(payload) {
@@ -65,7 +74,7 @@ export default function Ov2SharedLobbyScreen({
       });
       setCreateOpen(false);
       onEnterRoom(out.room?.id || null);
-      await loadRooms();
+      await loadRooms({ silent: true });
     } catch (e) {
       setMsg(e?.message || String(e));
     } finally {
@@ -88,7 +97,7 @@ export default function Ov2SharedLobbyScreen({
         password_plaintext,
       });
       onEnterRoom(room_id);
-      await loadRooms();
+      await loadRooms({ silent: true });
     } catch (e) {
       setMsg(e?.message || String(e));
     } finally {
@@ -112,7 +121,7 @@ export default function Ov2SharedLobbyScreen({
       });
       setCodeOpen(false);
       onEnterRoom(out.room?.id || null);
-      await loadRooms();
+      await loadRooms({ silent: true });
     } catch (e) {
       setMsg(e?.message || String(e));
     } finally {
@@ -134,11 +143,12 @@ export default function Ov2SharedLobbyScreen({
           />
           <button
             type="button"
-            disabled={busy}
-            onClick={() => void loadRooms()}
-            className="shrink-0 whitespace-nowrap rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold sm:px-3"
+            disabled={listRefreshing}
+            aria-busy={listRefreshing}
+            onClick={() => void loadRooms({ silent: false })}
+            className="shrink-0 touch-manipulation whitespace-nowrap rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold disabled:opacity-60 sm:px-3"
           >
-            Refresh
+            {listRefreshing ? "…" : "Refresh"}
           </button>
         </div>
       </div>

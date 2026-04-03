@@ -21,6 +21,8 @@ import {
   writeOv2SharedDisplayName,
 } from "../../../lib/online-v2/ov2SharedDisplayName";
 import { supabaseMP } from "../../../lib/supabaseClients";
+import { useOv2FixedTableLobbySeatCounts, ov2C21SeatCountFromEngine } from "../../../hooks/useOv2FixedTableLobbySeatCounts";
+import Ov2TablePickCardSeatBadge from "../Ov2TablePickCardSeatBadge";
 
 function parseRoomQuery(router) {
   if (!router.isReady) return null;
@@ -179,6 +181,13 @@ export default function Ov2C21LiveShell() {
 
   const session = useOv2C21Session(roomId, tableStake);
 
+  const c21LobbyRoomIds = useMemo(() => Object.values(OV2_C21_ROOM_ID_BY_STAKE), []);
+  const c21LobbySeatCounts = useOv2FixedTableLobbySeatCounts(
+    c21LobbyRoomIds,
+    "ov2_c21_live_state",
+    (engine, _rid) => ov2C21SeatCountFromEngine(engine),
+  );
+
   useEffect(() => {
     const id = window.setInterval(() => setNowTick(Date.now()), 500);
     return () => window.clearInterval(id);
@@ -312,7 +321,7 @@ export default function Ov2C21LiveShell() {
                   <button
                     key={tier}
                     type="button"
-                    className="flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-emerald-500/35 bg-emerald-950/25 px-2 py-3 text-sm font-bold text-emerald-100 touch-manipulation active:scale-[0.99]"
+                    className="relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-emerald-500/35 bg-emerald-950/25 px-2 py-3 text-sm font-bold text-emerald-100 touch-manipulation active:scale-[0.99]"
                     onClick={() => {
                       persistName();
                       router.push(`/ov2-21-challenge?room=${id}`);
@@ -320,6 +329,7 @@ export default function Ov2C21LiveShell() {
                   >
                     <span>{formatTierLabel(tier)}</span>
                     <span className="text-[9px] font-normal text-emerald-200/70">Table level {formatTierLabel(tier)}</span>
+                    <Ov2TablePickCardSeatBadge activity={c21LobbySeatCounts[id]} />
                   </button>
                 );
               })}

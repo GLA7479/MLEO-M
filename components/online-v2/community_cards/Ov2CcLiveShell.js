@@ -6,7 +6,15 @@ import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
 import { OV2_HUD_CHROME_BTN } from "../OnlineV2GameHudOverlays";
 import Ov2CcScreen from "./Ov2CcScreen";
 import { useOv2CcSession } from "../../../hooks/useOv2CcSession";
-import { OV2_CC_ROOMS_BY_STAKE, OV2_CC_STAKE_TIERS, resolveOv2CcTableConfigFromRoomRow } from "../../../lib/online-v2/community_cards/ov2CcTableIds";
+import {
+  OV2_CC_ALL_ROOM_IDS,
+  OV2_CC_ROOM_MAX_SEATS_BY_ID,
+  OV2_CC_ROOMS_BY_STAKE,
+  OV2_CC_STAKE_TIERS,
+  resolveOv2CcTableConfigFromRoomRow,
+} from "../../../lib/online-v2/community_cards/ov2CcTableIds";
+import { useOv2FixedTableLobbySeatCounts, ov2CcSeatCountFromEngine } from "../../../hooks/useOv2FixedTableLobbySeatCounts";
+import Ov2TablePickCardSeatBadge from "../Ov2TablePickCardSeatBadge";
 import { isOv2RoomIdQueryParam } from "../../../lib/online-v2/onlineV2GameRegistry";
 import {
   OV2_SHARED_DISPLAY_NAME_KEY,
@@ -80,6 +88,12 @@ export default function Ov2CcLiveShell() {
   const leaveInFlightRef = useRef(false);
 
   const session = useOv2CcSession(roomId);
+
+  const ccLobbySeatCounts = useOv2FixedTableLobbySeatCounts(
+    OV2_CC_ALL_ROOM_IDS,
+    "ov2_community_cards_live_state",
+    (engine, rid) => ov2CcSeatCountFromEngine(engine, rid, OV2_CC_ROOM_MAX_SEATS_BY_ID),
+  );
 
   const infoPanel = useMemo(() => <CcInfoPanelBody />, []);
 
@@ -175,7 +189,7 @@ export default function Ov2CcLiveShell() {
                   <Fragment key={tier}>
                     <button
                       type="button"
-                      className="flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-emerald-500/35 bg-emerald-950/25 px-2 py-3 text-sm font-bold text-emerald-100 touch-manipulation active:scale-[0.99]"
+                      className="relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-emerald-500/35 bg-emerald-950/25 px-2 py-3 text-sm font-bold text-emerald-100 touch-manipulation active:scale-[0.99]"
                       onClick={() => {
                         persistName();
                         router.push(`/ov2-community-cards?room=${ids.max5}`);
@@ -183,10 +197,11 @@ export default function Ov2CcLiveShell() {
                     >
                       <span>{formatTierLabel(tier)}</span>
                       <span className="text-[9px] font-normal text-emerald-200/70">5-max</span>
+                      <Ov2TablePickCardSeatBadge activity={ccLobbySeatCounts[ids.max5]} />
                     </button>
                     <button
                       type="button"
-                      className="flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-violet-500/35 bg-violet-950/25 px-2 py-3 text-sm font-bold text-violet-100 touch-manipulation active:scale-[0.99]"
+                      className="relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-violet-500/35 bg-violet-950/25 px-2 py-3 text-sm font-bold text-violet-100 touch-manipulation active:scale-[0.99]"
                       onClick={() => {
                         persistName();
                         router.push(`/ov2-community-cards?room=${ids.max9}`);
@@ -194,6 +209,7 @@ export default function Ov2CcLiveShell() {
                     >
                       <span>{formatTierLabel(tier)}</span>
                       <span className="text-[9px] font-normal text-violet-200/70">9-max</span>
+                      <Ov2TablePickCardSeatBadge activity={ccLobbySeatCounts[ids.max9]} />
                     </button>
                   </Fragment>
                 );
