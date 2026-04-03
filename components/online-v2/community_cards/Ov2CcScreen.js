@@ -326,96 +326,164 @@ export default function Ov2CcScreen({
               <div className="relative z-[4] flex min-h-0 flex-1 flex-col">
                 <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-1 pb-2 max-sm:px-[6%] sm:px-[13%] sm:pt-2 sm:pb-3 md:px-[15%] md:pt-2 md:pb-4">
                   <div className="flex w-full max-w-md flex-col items-center gap-1 sm:max-w-lg sm:gap-2 md:gap-2.5">
-                  <p className="text-center text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[9px]">
-                    {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
-                    {bb}
-                  </p>
-
-                  <div className="w-full text-center">
-                    <p className="text-[10px] font-medium text-emerald-100/70 sm:text-[11px]">
-                      <span className="text-white">{phaseLabel}</span>
-                      {handSeqN > 0 ? (
-                        <span className="text-emerald-200/55">
-                          {" "}
-                          · Hand <span className="tabular-nums text-emerald-100/85">{handSeqN}</span>
-                        </span>
-                      ) : null}
-                      {currentBet > 0 ? (
-                        <span className="text-emerald-200/45">
-                          {" "}
-                          · Match <span className="tabular-nums text-emerald-100/75">{currentBet}</span>
-                        </span>
-                      ) : null}
-                    </p>
-                    {engine.buttonSeat != null && engine.sbSeat != null && engine.bbSeat != null ? (
-                      <p className="mt-0.5 text-[9px] text-emerald-200/40 sm:text-[10px]">
-                        BTN {engine.buttonSeat + 1} · SB {engine.sbSeat + 1} · BB {engine.bbSeat + 1}
-                      </p>
-                    ) : null}
-                    {phase === "between_hands" && nextHandInSec != null ? (
-                      <p className="mt-0.5 text-[9px] font-medium text-amber-200/80 sm:text-[10px]">
-                        Next hand ~{nextHandInSec}s
-                      </p>
-                    ) : null}
-                    {engine.tableNotice ? (
-                      <p className="mt-0.5 text-[9px] text-amber-200/75 sm:text-[10px]">{engine.tableNotice}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="relative z-[1] flex min-h-[2.75rem] flex-wrap items-center justify-center gap-1.5 max-sm:drop-shadow-[0_3px_8px_rgba(0,0,0,0.32)] drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.1rem] sm:gap-2 md:min-h-[3.35rem]">
-                    {(communityCards || []).length ? (
-                      (communityCards || []).map((c, idx) => (
-                        <Ov2CcPlayingCard
-                          key={`${c}-${idx}`}
-                          code={c}
-                          size="lg"
-                          className="sm:scale-[1.06] md:scale-110"
-                        />
-                      ))
-                    ) : (
-                      <div className="flex h-[2.75rem] items-center sm:h-[3.1rem]">
-                        <span className="text-[10px] font-medium tracking-wide text-emerald-200/30 sm:text-[11px]">
-                          Community cards
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="relative z-[2] flex max-sm:mt-1 flex-col items-center gap-0.5">
-                    <span className="text-[7px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[8px]">
-                      Pot
-                    </span>
-                    <div className="flex min-h-[2.4rem] items-center justify-center overflow-visible rounded-xl border border-black/35 bg-black/45 px-5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_6px_20px_rgba(0,0,0,0.42)] sm:rounded-2xl sm:px-7 sm:py-2.5">
-                      <span className="relative block translate-y-px text-[17px] font-extrabold leading-none text-amber-100 sm:translate-y-0 sm:font-mono sm:text-xl sm:font-bold sm:leading-[1.25] sm:tabular-nums md:text-2xl">
-                        {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {likelyBoardRunout ? (
-                    <p className="text-center text-[9px] font-medium text-emerald-200/50 sm:text-[10px]">
-                      All-in runout — dealing board
-                    </p>
-                  ) : null}
-
-                  <div className="flex min-h-0 w-full max-w-sm shrink-0 flex-col items-center justify-center">
-                    {engine.winnersDisplay?.seats?.length ? (
-                      <div className="max-w-sm rounded-lg border border-emerald-500/22 bg-black/35 px-2.5 py-1.5 text-center text-[10px] text-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl sm:px-3 sm:py-2 sm:text-[11px]">
-                        <p className="font-semibold text-emerald-100">
-                          Winner{engine.winnersDisplay.seats.length > 1 ? "s" : ""} · seat{" "}
-                          {engine.winnersDisplay.seats.map(x => x + 1).join(", ")}
+                    {handBettingLive ? (
+                      <>
+                        <p className="text-center text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[9px]">
+                          {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
+                          {bb}
                         </p>
-                        {engine.winnersDisplay.stacksWon && typeof engine.winnersDisplay.stacksWon === "object" ? (
-                          <p className="mt-0.5 text-[9px] text-emerald-200/72 sm:text-[10px]">
-                            {Object.entries(engine.winnersDisplay.stacksWon)
-                              .map(([si, amt]) => `S${Number(si) + 1} +${amt}`)
-                              .join(" · ")}
+
+                        <div className="w-full text-center">
+                          <p className="text-[10px] font-medium text-emerald-100/70 sm:text-[11px]">
+                            <span className="text-white">{phaseLabel}</span>
+                            {handSeqN > 0 ? (
+                              <span className="text-emerald-200/55">
+                                {" "}
+                                · Hand <span className="tabular-nums text-emerald-100/85">{handSeqN}</span>
+                              </span>
+                            ) : null}
+                            {currentBet > 0 ? (
+                              <span className="text-emerald-200/45">
+                                {" "}
+                                · Match <span className="tabular-nums text-emerald-100/75">{currentBet}</span>
+                              </span>
+                            ) : null}
+                          </p>
+                          {engine.buttonSeat != null && engine.sbSeat != null && engine.bbSeat != null ? (
+                            <p className="mt-0.5 text-[9px] text-emerald-200/40 sm:text-[10px]">
+                              BTN {engine.buttonSeat + 1} · SB {engine.sbSeat + 1} · BB {engine.bbSeat + 1}
+                            </p>
+                          ) : null}
+                          {phase === "between_hands" && nextHandInSec != null ? (
+                            <p className="mt-0.5 text-[9px] font-medium text-amber-200/80 sm:text-[10px]">
+                              Next hand ~{nextHandInSec}s
+                            </p>
+                          ) : null}
+                          {engine.tableNotice ? (
+                            <p className="mt-0.5 text-[9px] text-amber-200/75 sm:text-[10px]">{engine.tableNotice}</p>
+                          ) : null}
+                        </div>
+
+                        <div className="relative z-[1] flex min-h-[2.75rem] flex-wrap items-center justify-center gap-1.5 max-sm:drop-shadow-[0_3px_8px_rgba(0,0,0,0.32)] drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.1rem] sm:gap-2 md:min-h-[3.35rem]">
+                          {(communityCards || []).length ? (
+                            (communityCards || []).map((c, idx) => (
+                              <Ov2CcPlayingCard
+                                key={`${c}-${idx}`}
+                                code={c}
+                                size="lg"
+                                className="sm:scale-[1.06] md:scale-110"
+                              />
+                            ))
+                          ) : (
+                            <div className="flex h-[2.75rem] items-center sm:h-[3.1rem]">
+                              <span className="text-[10px] font-medium tracking-wide text-emerald-200/30 sm:text-[11px]">
+                                Community cards
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="relative z-[2] flex max-sm:mt-1 flex-col items-center gap-0.5">
+                          <span className="text-[7px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[8px]">
+                            Pot
+                          </span>
+                          <div className="flex min-h-[2.4rem] items-center justify-center overflow-visible rounded-xl border border-black/35 bg-black/45 px-5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_6px_20px_rgba(0,0,0,0.42)] sm:rounded-2xl sm:px-7 sm:py-2.5">
+                            <span className="relative block translate-y-px text-[17px] font-extrabold leading-none text-amber-100 sm:translate-y-0 sm:font-mono sm:text-xl sm:font-bold sm:leading-[1.25] sm:tabular-nums md:text-2xl">
+                              {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {likelyBoardRunout ? (
+                          <p className="text-center text-[9px] font-medium text-emerald-200/50 sm:text-[10px]">
+                            All-in runout — dealing board
                           </p>
                         ) : null}
-                      </div>
-                    ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-center text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[9px]">
+                          {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
+                          {bb}
+                        </p>
+
+                        <div className="flex w-full min-h-[2.5rem] items-center justify-center px-1 text-center sm:min-h-[2.625rem]">
+                          <p className="text-[10px] font-medium text-emerald-100/70 sm:text-[11px]">
+                            <span className="text-white">{phaseLabel}</span>
+                            {handSeqN > 0 ? (
+                              <span className="text-emerald-200/55">
+                                {" "}
+                                · Hand <span className="tabular-nums text-emerald-100/85">{handSeqN}</span>
+                              </span>
+                            ) : null}
+                            {currentBet > 0 ? (
+                              <span className="text-emerald-200/45">
+                                {" "}
+                                · Match <span className="tabular-nums text-emerald-100/75">{currentBet}</span>
+                              </span>
+                            ) : null}
+                          </p>
+                        </div>
+
+                        <div className="flex w-full min-h-[2.875rem] flex-col items-center justify-center gap-0.5 text-center sm:min-h-[3rem]">
+                          <p className="min-h-[1.125rem] text-[9px] leading-tight text-emerald-200/40 sm:min-h-[1.25rem] sm:text-[10px]">
+                            {engine.buttonSeat != null && engine.sbSeat != null && engine.bbSeat != null ? (
+                              <>
+                                BTN {engine.buttonSeat + 1} · SB {engine.sbSeat + 1} · BB {engine.bbSeat + 1}
+                              </>
+                            ) : (
+                              <span className="invisible" aria-hidden>
+                                &nbsp;
+                              </span>
+                            )}
+                          </p>
+                          <p className="min-h-[1.125rem] text-[9px] font-medium leading-tight sm:min-h-[1.25rem] sm:text-[10px]">
+                            {engine.tableNotice ? (
+                              <span className="text-amber-200/75">{engine.tableNotice}</span>
+                            ) : phase === "between_hands" && nextHandInSec != null ? (
+                              <span className="text-amber-200/80">Next hand ~{nextHandInSec}s</span>
+                            ) : (
+                              <span className="invisible" aria-hidden>
+                                &nbsp;
+                              </span>
+                            )}
+                          </p>
+                        </div>
+
+                        <div className="relative z-[1] flex min-h-[2.75rem] flex-nowrap items-center justify-center gap-1.5 max-sm:drop-shadow-[0_3px_8px_rgba(0,0,0,0.32)] drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.1rem] sm:gap-2 md:min-h-[3.35rem]">
+                          {Array.from({ length: 5 }, (_, i) => {
+                            const c = (communityCards || [])[i];
+                            return (
+                              <div key={`board-slot-${i}`} className="flex shrink-0 items-center justify-center">
+                                {c ? (
+                                  <Ov2CcPlayingCard
+                                    code={c}
+                                    size="lg"
+                                    className="sm:scale-[1.06] md:scale-110"
+                                  />
+                                ) : (
+                                  <div className="pointer-events-none opacity-0" aria-hidden>
+                                    <Ov2CcPlayingCard faceDown size="lg" className="sm:scale-[1.06] md:scale-110" />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="relative z-[2] flex max-sm:mt-1 flex-col items-center gap-0.5">
+                          <span className="text-[7px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[8px]">
+                            Pot
+                          </span>
+                          <div className="flex min-h-[2.4rem] items-center justify-center overflow-visible rounded-xl border border-black/35 bg-black/45 px-5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_6px_20px_rgba(0,0,0,0.42)] sm:rounded-2xl sm:px-7 sm:py-2.5">
+                            <span className="relative block translate-y-px text-[17px] font-extrabold leading-none text-amber-100 sm:translate-y-0 sm:font-mono sm:text-xl sm:font-bold sm:leading-[1.25] sm:tabular-nums md:text-2xl">
+                              {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
-                </div>
                 </div>
 
                 <div
@@ -437,6 +505,27 @@ export default function Ov2CcScreen({
                   )}
                 </div>
               </div>
+
+              {engine.winnersDisplay?.seats?.length ? (
+                <div
+                  className="pointer-events-none absolute left-1/2 z-[8] flex w-full max-w-sm -translate-x-1/2 justify-center px-3 max-sm:bottom-[10.5rem] sm:bottom-[9.25rem]"
+                  aria-live="polite"
+                >
+                  <div className="max-w-sm rounded-lg border border-emerald-500/22 bg-black/55 px-2.5 py-1.5 text-center text-[10px] text-emerald-200/95 shadow-[0_8px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-[1px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-[11px]">
+                    <p className="font-semibold text-emerald-100">
+                      Winner{engine.winnersDisplay.seats.length > 1 ? "s" : ""} · seat{" "}
+                      {engine.winnersDisplay.seats.map(x => x + 1).join(", ")}
+                    </p>
+                    {engine.winnersDisplay.stacksWon && typeof engine.winnersDisplay.stacksWon === "object" ? (
+                      <p className="mt-0.5 text-[9px] text-emerald-200/72 sm:text-[10px]">
+                        {Object.entries(engine.winnersDisplay.stacksWon)
+                          .map(([si, amt]) => `S${Number(si) + 1} +${amt}`)
+                          .join(" · ")}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
               <div
                 className="pointer-events-none absolute right-2 top-2 z-[12] flex max-w-[min(42vw,9.5rem)] flex-col items-end gap-0.5 sm:right-3 sm:top-3 sm:max-w-[11rem] md:max-w-[12rem]"
