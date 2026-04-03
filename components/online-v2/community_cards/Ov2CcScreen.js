@@ -325,7 +325,7 @@ export default function Ov2CcScreen({
 
               <div className="relative z-[4] flex min-h-0 flex-1 flex-col">
                 <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-1 pb-2 max-sm:px-[6%] sm:px-[13%] sm:pt-2 sm:pb-3 md:px-[15%] md:pt-2 md:pb-4">
-                  <div className="flex w-full max-w-md flex-col items-center gap-1 sm:max-w-lg sm:gap-2 md:gap-2.5">
+                  <div className="flex w-full max-w-md flex-col items-center gap-1 max-sm:translate-y-2.5 sm:max-w-lg sm:gap-2 md:gap-2.5">
                   <p className="text-center text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[9px]">
                     {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
                     {bb}
