@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isOv2CcHandBettingLive } from "../../../lib/online-v2/community_cards/ov2CcClientConstants";
+import { ov2CcSeatRingPercent } from "../../../lib/online-v2/community_cards/ov2CcSeatRingGeometry";
 import Ov2CcPlayingCard from "./Ov2CcPlayingCard";
 
 export default function Ov2CcScreen({
@@ -113,6 +114,16 @@ export default function Ov2CcScreen({
     return () => window.clearInterval(id);
   }, [engine?.phase, engine?.phaseEndsAt]);
 
+  const [wideSeatRing, setWideSeatRing] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const mq = window.matchMedia("(min-width: 640px)");
+    const apply = () => setWideSeatRing(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
   if (!engine) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center text-sm text-zinc-500">
@@ -179,203 +190,233 @@ export default function Ov2CcScreen({
     else if (allIn) state = "border-amber-600/35 bg-amber-950/20 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.12)]";
     let turn = "";
     if (isAct && handBettingLive && !folded) {
-      turn = "ring-2 ring-amber-400/45 ring-offset-2 ring-offset-[#0a1810] shadow-[0_0_0_1px_rgba(251,191,36,0.2),0_8px_24px_rgba(0,0,0,0.45)]";
+      turn =
+        "ring-2 ring-amber-400/50 ring-offset-2 ring-offset-[#061510] shadow-[0_0_0_1px_rgba(251,191,36,0.18),0_8px_22px_rgba(0,0,0,0.42)]";
     } else if (isYou) {
-      turn = "ring-1 ring-sky-400/40 ring-offset-1 ring-offset-[#0a1810]";
+      turn = "ring-1 ring-sky-400/45 ring-offset-1 ring-offset-[#061510]";
     }
     return `${base} ${state} ${turn}`;
   };
 
-  return (
-    <div className="flex h-full min-h-0 flex-col gap-2 overflow-hidden bg-[#060a0c] text-zinc-100">
-      <p className="shrink-0 text-center text-[10px] font-medium tracking-wide text-zinc-500">
-        {maxSeats}-max · min {minBuy.toLocaleString?.() ?? minBuy} · max {maxBuy.toLocaleString?.() ?? maxBuy} ·{" "}
-        {sb}/{bb} blinds
-      </p>
-
-      <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-2 lg:max-w-5xl lg:gap-3">
-        <div
-          className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-black/50 shadow-[0_16px_48px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.06)] sm:rounded-[2.25rem]"
-          style={{
-            background:
-              "radial-gradient(ellipse 92% 72% at 50% 38%, #166534 0%, #0f4d28 38%, #0a3020 72%, #051910 100%)",
+  const renderSeatNode = (s, i) => {
+    const isYou = s.participantKey === participantKey;
+    const isAct = engine.actionSeat === i;
+    const pos = ov2CcSeatRingPercent(maxSeats, i, wideSeatRing);
+    return (
+      <div
+        key={i}
+        className="pointer-events-auto absolute z-[8] w-[4.35rem] max-w-[29vw] sm:w-[5rem] sm:max-w-[5.5rem] md:w-[5.35rem] -translate-x-1/2 -translate-y-1/2"
+        style={{ left: pos.left, top: pos.top }}
+      >
+        <button
+          type="button"
+          disabled={operateBusy || Boolean(s.participantKey)}
+          onClick={() => {
+            if (!s.participantKey) {
+              setFormHint("");
+              setPickSeat(i);
+            }
           }}
+          className={`${seatButtonClass(s, i)} w-full disabled:cursor-not-allowed disabled:opacity-55`}
         >
-          <div
-            className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-90"
-            style={{
-              background:
-                "radial-gradient(ellipse 70% 45% at 50% 35%, rgba(255,255,255,0.07) 0%, transparent 55%)",
-            }}
-          />
-          <div className="pointer-events-none absolute inset-[5px] rounded-[1.55rem] border border-black/20 sm:inset-2 sm:rounded-[2.05rem]" />
-          <div className="pointer-events-none absolute inset-x-4 top-3 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent sm:inset-x-8" />
+          <span className="text-[7px] font-bold uppercase tracking-wider text-zinc-500 sm:text-[8px]">
+            Seat {i + 1}
+          </span>
+          <div className="flex flex-wrap items-center justify-center gap-x-0.5 gap-y-0">
+            {engine.buttonSeat === i ? (
+              <span className="rounded bg-amber-500/25 px-1 py-px text-[6px] font-bold text-amber-200 sm:text-[7px]">
+                D
+              </span>
+            ) : null}
+            {engine.sbSeat === i ? (
+              <span className="rounded bg-zinc-500/20 px-1 py-px text-[6px] font-bold text-zinc-300 sm:text-[7px]">
+                SB
+              </span>
+            ) : null}
+            {engine.bbSeat === i ? (
+              <span className="rounded bg-zinc-400/20 px-1 py-px text-[6px] font-bold text-zinc-200 sm:text-[7px]">
+                BB
+              </span>
+            ) : null}
+          </div>
+          {s.participantKey ? (
+            <>
+              <span className="max-w-full truncate px-0.5 text-[8px] font-semibold text-zinc-100 sm:text-[9px]">
+                {isYou ? "You" : s.displayName || "…"}
+              </span>
+              <span className="font-mono text-[9px] font-bold tabular-nums text-emerald-100/95 sm:text-[10px]">
+                {Math.floor(s.stack || 0)}
+              </span>
+              {s.allIn && !s.folded ? (
+                <span className="text-[6px] font-bold uppercase tracking-wide text-amber-300/95 sm:text-[7px]">
+                  All-in
+                </span>
+              ) : null}
+              {s.waitBb && !s.inCurrentHand ? (
+                <span className="text-[6px] font-semibold text-amber-200/90 sm:text-[7px]">Wait BB</span>
+              ) : null}
+              {s.pendingSitOutAfterHand ? (
+                <span className="text-[6px] text-amber-300/85 sm:text-[7px]">Sit out next</span>
+              ) : null}
+              {s.sitOut ? <span className="text-[6px] text-zinc-500 sm:text-[7px]">Sitting out</span> : null}
+              {s.folded ? (
+                <span className="text-[6px] font-semibold uppercase tracking-wide text-rose-300/90 sm:text-[7px]">
+                  Folded
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <span className="text-[8px] font-semibold text-emerald-300/85 sm:text-[9px]">Open</span>
+          )}
+          {isAct && handBettingLive && s.participantKey && !s.folded ? (
+            <span className="text-[6px] font-bold uppercase tracking-widest text-amber-200/90 sm:text-[7px]">
+              Acts
+            </span>
+          ) : null}
+        </button>
+      </div>
+    );
+  };
 
-          <div className="relative z-[1] shrink-0 px-2 pb-1 pt-3 sm:px-4 sm:pb-2 sm:pt-4">
-            <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-9 sm:gap-2">
-              {seats.length === 0 ? (
-                <div className="col-span-full rounded-xl border border-white/10 bg-black/25 px-3 py-4 text-center text-[11px] text-zinc-400">
-                  Seat layout not available yet. If this stays empty, run the Community Cards SQL migration and refresh.
-                </div>
-              ) : (
-                seats.map((s, i) => {
-                  const isYou = s.participantKey === participantKey;
-                  const isAct = engine.actionSeat === i;
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      disabled={operateBusy || Boolean(s.participantKey)}
-                      onClick={() => {
-                        if (!s.participantKey) {
-                          setFormHint("");
-                          setPickSeat(i);
-                        }
-                      }}
-                      className={`${seatButtonClass(s, i)} disabled:cursor-not-allowed disabled:opacity-55`}
-                    >
-                      <span className="text-[8px] font-bold uppercase tracking-wider text-zinc-500 sm:text-[9px]">
-                        Seat {i + 1}
-                      </span>
-                      <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0">
-                        {engine.buttonSeat === i ? (
-                          <span className="rounded bg-amber-500/25 px-1 py-px text-[7px] font-bold text-amber-200">
-                            D
-                          </span>
-                        ) : null}
-                        {engine.sbSeat === i ? (
-                          <span className="rounded bg-zinc-500/20 px-1 py-px text-[7px] font-bold text-zinc-300">
-                            SB
-                          </span>
-                        ) : null}
-                        {engine.bbSeat === i ? (
-                          <span className="rounded bg-zinc-400/20 px-1 py-px text-[7px] font-bold text-zinc-200">
-                            BB
-                          </span>
-                        ) : null}
-                      </div>
-                      {s.participantKey ? (
-                        <>
-                          <span className="max-w-full truncate px-0.5 text-[9px] font-semibold text-zinc-100 sm:text-[10px]">
-                            {isYou ? "You" : s.displayName || "…"}
-                          </span>
-                          <span className="font-mono text-[10px] font-bold tabular-nums text-emerald-100/95 sm:text-[11px]">
-                            {Math.floor(s.stack || 0)}
-                          </span>
-                          {s.allIn && !s.folded ? (
-                            <span className="text-[7px] font-bold uppercase tracking-wide text-amber-300/95">
-                              All-in
-                            </span>
-                          ) : null}
-                          {s.waitBb && !s.inCurrentHand ? (
-                            <span className="text-[7px] font-semibold text-amber-200/90">Wait BB</span>
-                          ) : null}
-                          {s.pendingSitOutAfterHand ? (
-                            <span className="text-[7px] text-amber-300/85">Sit out next</span>
-                          ) : null}
-                          {s.sitOut ? <span className="text-[7px] text-zinc-500">Sitting out</span> : null}
-                          {s.folded ? (
-                            <span className="text-[7px] font-semibold uppercase tracking-wide text-rose-300/90">
-                              Folded
-                            </span>
-                          ) : null}
-                        </>
-                      ) : (
-                        <span className="text-[9px] font-semibold text-emerald-300/85">Open</span>
-                      )}
-                      {isAct && handBettingLive && s.participantKey && !s.folded ? (
-                        <span className="text-[7px] font-bold uppercase tracking-widest text-amber-200/90">
-                          Acts
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden bg-[#050708] text-zinc-100 sm:gap-1.5">
+      <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-2 lg:max-w-6xl lg:gap-2.5">
+        <div className="relative flex min-h-0 min-h-[300px] flex-1 flex-col">
+          <div className="relative mx-auto h-full w-full max-w-[920px] min-h-[min(50vh,380px)] flex-1 rounded-[1.85rem] border border-black/55 bg-gradient-to-b from-[#5c4030] via-[#2e1e16] to-[#120b08] p-[5px] shadow-[0_28px_72px_rgba(0,0,0,0.58),inset_0_1px_0_rgba(255,255,255,0.06)] sm:min-h-[min(56vh,440px)] sm:rounded-[2.35rem] sm:p-1 md:min-h-[min(58vh,500px)] lg:rounded-[2.55rem] lg:p-[7px]">
+            <div
+              className="relative h-full min-h-0 w-full overflow-hidden rounded-[1.45rem] border border-black/45 shadow-[inset_0_2px_24px_rgba(0,0,0,0.35)] sm:rounded-[1.85rem] md:rounded-[2.05rem]"
+              style={{
+                background:
+                  "radial-gradient(ellipse 86% 68% at 50% 42%, #168047 0%, #0e5c32 36%, #083a1f 70%, #03150c 100%)",
+              }}
+            >
+              <div
+                className="pointer-events-none absolute inset-0 rounded-[inherit]"
+                style={{
+                  background:
+                    "radial-gradient(ellipse 58% 42% at 50% 36%, rgba(255,255,255,0.09) 0%, transparent 52%)",
+                }}
+              />
+              <div className="pointer-events-none absolute inset-[6px] rounded-[1.25rem] border border-black/25 sm:inset-2 sm:rounded-[1.55rem] md:rounded-[1.75rem]" />
+              <div className="pointer-events-none absolute inset-[10px] rounded-[1.1rem] border border-white/[0.06] sm:inset-3 sm:rounded-[1.35rem] md:rounded-[1.55rem]" />
+
+              <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center px-[11%] py-[16%] sm:px-[13%] sm:py-[18%] md:px-[15%] md:py-[20%]">
+                <div className="flex w-full max-w-md flex-col items-center gap-2 sm:max-w-lg sm:gap-2.5 md:gap-3">
+                  <p className="text-center text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[9px]">
+                    {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
+                    {bb}
+                  </p>
+
+                  <div className="w-full text-center">
+                    <p className="text-[10px] font-medium text-emerald-100/70 sm:text-[11px]">
+                      <span className="text-white">{phaseLabel}</span>
+                      {handSeqN > 0 ? (
+                        <span className="text-emerald-200/55">
+                          {" "}
+                          · Hand <span className="tabular-nums text-emerald-100/85">{handSeqN}</span>
                         </span>
                       ) : null}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
+                      {currentBet > 0 ? (
+                        <span className="text-emerald-200/45">
+                          {" "}
+                          · Bet <span className="tabular-nums text-emerald-100/75">{currentBet}</span>
+                        </span>
+                      ) : null}
+                    </p>
+                    {engine.buttonSeat != null && engine.sbSeat != null && engine.bbSeat != null ? (
+                      <p className="mt-0.5 text-[9px] text-emerald-200/40 sm:text-[10px]">
+                        BTN {engine.buttonSeat + 1} · SB {engine.sbSeat + 1} · BB {engine.bbSeat + 1}
+                      </p>
+                    ) : null}
+                    {phase === "between_hands" && nextHandInSec != null ? (
+                      <p className="mt-0.5 text-[9px] font-medium text-amber-200/80 sm:text-[10px]">
+                        Next hand ~{nextHandInSec}s
+                      </p>
+                    ) : null}
+                    {engine.tableNotice ? (
+                      <p className="mt-0.5 text-[9px] text-amber-200/75 sm:text-[10px]">{engine.tableNotice}</p>
+                    ) : null}
+                  </div>
 
-          <div className="relative z-[1] flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-y-auto overflow-x-hidden px-3 pb-4 pt-1 [-webkit-overflow-scrolling:touch] sm:gap-4 sm:px-6 sm:pb-6">
-            <div className="w-full max-w-md text-center">
-              <p className="text-[11px] font-medium text-emerald-100/75 sm:text-xs">
-                <span className="text-white">{phaseLabel}</span>
-                {handSeqN > 0 ? (
-                  <span className="text-emerald-200/60">
-                    {" "}
-                    · Hand <span className="tabular-nums text-emerald-100/90">{handSeqN}</span>
-                  </span>
-                ) : null}
-                {currentBet > 0 ? (
-                  <span className="text-emerald-200/50">
-                    {" "}
-                    · Bet <span className="tabular-nums text-emerald-100/80">{currentBet}</span>
-                  </span>
-                ) : null}
-              </p>
-              {engine.buttonSeat != null && engine.sbSeat != null && engine.bbSeat != null ? (
-                <p className="mt-1 text-[10px] text-emerald-200/45">
-                  BTN {engine.buttonSeat + 1} · SB {engine.sbSeat + 1} · BB {engine.bbSeat + 1}
-                </p>
-              ) : null}
-              {phase === "between_hands" && nextHandInSec != null ? (
-                <p className="mt-1 text-[10px] font-medium text-amber-200/85">Next hand ~{nextHandInSec}s</p>
-              ) : null}
-              {engine.tableNotice ? (
-                <p className="mt-1 text-[10px] text-amber-200/80">{engine.tableNotice}</p>
-              ) : null}
-            </div>
+                  <div className="flex min-h-[3rem] flex-wrap items-center justify-center gap-1.5 drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.35rem] sm:gap-2 md:min-h-[3.6rem]">
+                    {(communityCards || []).length ? (
+                      (communityCards || []).map((c, idx) => (
+                        <Ov2CcPlayingCard
+                          key={`${c}-${idx}`}
+                          code={c}
+                          size="lg"
+                          className="sm:scale-[1.06] md:scale-110"
+                        />
+                      ))
+                    ) : (
+                      <div className="flex h-[3rem] items-center sm:h-[3.35rem]">
+                        <span className="text-[10px] font-medium tracking-wide text-emerald-200/30 sm:text-[11px]">
+                          Community cards
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-emerald-200/50">Pot</span>
-              <div className="rounded-2xl border border-black/30 bg-black/40 px-6 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_24px_rgba(0,0,0,0.4)] sm:px-8 sm:py-2.5">
-                <span className="font-mono text-xl font-bold tabular-nums tracking-tight text-amber-100 sm:text-2xl">
-                  {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
-                </span>
-              </div>
-            </div>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-[7px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[8px]">
+                      Pot
+                    </span>
+                    <div className="rounded-xl border border-black/35 bg-black/45 px-5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_6px_20px_rgba(0,0,0,0.42)] sm:rounded-2xl sm:px-7 sm:py-2">
+                      <span className="font-mono text-lg font-bold tabular-nums tracking-tight text-amber-100 sm:text-xl md:text-2xl">
+                        {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
+                      </span>
+                    </div>
+                  </div>
 
-            {canAct && turnSecondsLeft != null ? (
-              <div className="rounded-full border border-amber-500/30 bg-black/35 px-4 py-1.5 text-xs font-semibold text-amber-100 shadow-[0_4px_16px_rgba(0,0,0,0.35)]">
-                Your turn · <span className="tabular-nums">{turnSecondsLeft}</span>s
-              </div>
-            ) : handBettingLive && engine.actionSeat != null ? (
-              <p className="text-center text-[10px] text-emerald-200/50">
-                Seat {engine.actionSeat + 1} to act
-                {engine.actionDeadline
-                  ? ` · ${Math.max(0, Math.ceil((Number(engine.actionDeadline) - Date.now()) / 1000))}s`
-                  : ""}
-              </p>
-            ) : likelyBoardRunout ? (
-              <p className="text-center text-[10px] font-medium text-emerald-200/55">All-in runout — board dealing</p>
-            ) : null}
+                  <div className="min-h-[1.5rem] w-full text-center">
+                    {canAct && turnSecondsLeft != null ? (
+                      <div className="inline-flex rounded-full border border-amber-500/28 bg-black/40 px-3 py-1 text-[10px] font-semibold text-amber-100 shadow-[0_4px_14px_rgba(0,0,0,0.32)] sm:px-4 sm:text-xs">
+                        Your turn · <span className="tabular-nums">{turnSecondsLeft}</span>s
+                      </div>
+                    ) : handBettingLive && engine.actionSeat != null ? (
+                      <p className="text-[9px] text-emerald-200/48 sm:text-[10px]">
+                        Seat {engine.actionSeat + 1} to act
+                        {engine.actionDeadline
+                          ? ` · ${Math.max(0, Math.ceil((Number(engine.actionDeadline) - Date.now()) / 1000))}s`
+                          : ""}
+                      </p>
+                    ) : likelyBoardRunout ? (
+                      <p className="text-[9px] font-medium text-emerald-200/50 sm:text-[10px]">
+                        All-in runout — dealing board
+                      </p>
+                    ) : null}
+                  </div>
 
-            <div className="flex min-h-[52px] flex-wrap items-center justify-center gap-2 sm:min-h-[56px] sm:gap-2.5">
-              {(communityCards || []).length ? (
-                (communityCards || []).map((c, idx) => (
-                  <Ov2CcPlayingCard key={`${c}-${idx}`} code={c} size="lg" className="sm:scale-105" />
-                ))
-              ) : (
-                <div className="flex h-[3.25rem] items-center sm:h-[3.5rem]">
-                  <span className="text-[11px] font-medium text-emerald-200/35">Board</span>
+                  {engine.winnersDisplay?.seats?.length ? (
+                    <div className="max-w-sm rounded-lg border border-emerald-500/22 bg-black/35 px-2.5 py-1.5 text-center text-[10px] text-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl sm:px-3 sm:py-2 sm:text-[11px]">
+                      <p className="font-semibold text-emerald-100">
+                        Winner{engine.winnersDisplay.seats.length > 1 ? "s" : ""} · seat{" "}
+                        {engine.winnersDisplay.seats.map(x => x + 1).join(", ")}
+                      </p>
+                      {engine.winnersDisplay.stacksWon && typeof engine.winnersDisplay.stacksWon === "object" ? (
+                        <p className="mt-0.5 text-[9px] text-emerald-200/72 sm:text-[10px]">
+                          {Object.entries(engine.winnersDisplay.stacksWon)
+                            .map(([si, amt]) => `S${Number(si) + 1} +${amt}`)
+                            .join(" · ")}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
-              )}
-            </div>
-
-            {engine.winnersDisplay?.seats?.length ? (
-              <div className="max-w-sm rounded-xl border border-emerald-500/25 bg-black/30 px-3 py-2 text-center text-[11px] text-emerald-200/95 shadow-inner">
-                <p className="font-semibold text-emerald-100">
-                  Winner{engine.winnersDisplay.seats.length > 1 ? "s" : ""} · seat{" "}
-                  {engine.winnersDisplay.seats.map(x => x + 1).join(", ")}
-                </p>
-                {engine.winnersDisplay.stacksWon && typeof engine.winnersDisplay.stacksWon === "object" ? (
-                  <p className="mt-1 text-[10px] text-emerald-200/75">
-                    {Object.entries(engine.winnersDisplay.stacksWon)
-                      .map(([si, amt]) => `S${Number(si) + 1} +${amt}`)
-                      .join(" · ")}
-                  </p>
-                ) : null}
               </div>
-            ) : null}
+
+              <div className="pointer-events-none absolute inset-0 z-[7]">
+                {seats.length === 0 ? null : seats.map((s, i) => renderSeatNode(s, i))}
+              </div>
+
+              {seats.length === 0 ? (
+                <div className="absolute inset-0 z-[9] flex items-center justify-center p-4">
+                  <div className="pointer-events-auto max-w-sm rounded-xl border border-white/12 bg-black/40 px-4 py-4 text-center text-[11px] text-zinc-400 shadow-lg backdrop-blur-sm">
+                    Seat layout not available yet. If this stays empty, run the Community Cards SQL migration and refresh.
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -554,44 +595,46 @@ export default function Ov2CcScreen({
       ) : null}
 
       {mySeat && canAct ? (
-        <div className="relative z-10 shrink-0 rounded-t-2xl border border-white/[0.08] border-b-0 bg-[#0a0e11] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_40px_rgba(0,0,0,0.5)] sm:rounded-2xl sm:border-b sm:px-3 sm:py-3">
-          <p className="mb-2 text-center text-[9px] font-semibold uppercase tracking-[0.2em] text-zinc-600">Actions</p>
-          <div className="mx-auto flex max-w-2xl flex-col gap-2">
-            <div className="grid grid-cols-3 gap-2">
+        <div className="relative z-10 shrink-0 border-t border-white/[0.06] bg-[#070a0d] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-16px_48px_rgba(0,0,0,0.55)] sm:px-4 sm:pb-3 sm:pt-3">
+          <div className="mx-auto max-w-lg">
+            <p className="mb-2 text-center text-[8px] font-medium uppercase tracking-[0.28em] text-zinc-600">Betting</p>
+            <div className="flex items-stretch gap-2">
               <button
                 type="button"
                 disabled={actionClusterLocked}
-                className="min-h-[48px] rounded-xl border border-rose-900/50 bg-rose-950/55 py-2.5 text-xs font-bold text-rose-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32]"
+                className="flex w-[4.5rem] shrink-0 flex-col justify-center rounded-lg border border-white/[0.08] bg-transparent py-2.5 text-[10px] font-semibold leading-tight text-zinc-500 touch-manipulation active:bg-white/[0.03] disabled:cursor-not-allowed disabled:opacity-30 sm:w-[5rem] sm:text-[11px]"
                 onClick={() => void runGameOp("fold")}
               >
                 Fold
               </button>
-              <button
-                type="button"
-                disabled={actionClusterLocked || canCallChips}
-                className="min-h-[48px] rounded-xl border border-zinc-600/40 bg-zinc-900/70 py-2.5 text-xs font-bold text-zinc-100 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32]"
-                onClick={() => void runGameOp("check")}
-              >
-                Check
-              </button>
-              <button
-                type="button"
-                disabled={actionClusterLocked || !canCallChips}
-                className="min-h-[48px] rounded-xl border border-sky-800/50 bg-sky-950/60 py-2.5 text-xs font-bold text-sky-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3]"
-                onClick={() => {
-                  if (!canCallChips) return;
-                  void runGameOp("call");
-                }}
-              >
-                Call{canCallChips ? ` ${toCall}` : ""}
-              </button>
+              <div className="flex min-w-0 flex-1 gap-2">
+                <button
+                  type="button"
+                  disabled={actionClusterLocked || canCallChips}
+                  className="min-h-[52px] min-w-0 flex-1 rounded-xl border border-zinc-500/35 bg-zinc-800/55 py-3 text-xs font-bold text-zinc-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.28] sm:min-h-[54px] sm:text-sm"
+                  onClick={() => void runGameOp("check")}
+                >
+                  Check
+                </button>
+                <button
+                  type="button"
+                  disabled={actionClusterLocked || !canCallChips}
+                  className="min-h-[52px] min-w-0 flex-[1.15] rounded-xl border border-sky-700/40 bg-sky-950/65 py-3 text-xs font-bold text-sky-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.28] sm:min-h-[54px] sm:text-sm"
+                  onClick={() => {
+                    if (!canCallChips) return;
+                    void runGameOp("call");
+                  }}
+                >
+                  Call{canCallChips ? ` ${toCall}` : ""}
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="mt-2.5 flex gap-2 border-t border-white/[0.05] pt-2.5">
               {canBetOpen ? (
                 <button
                   type="button"
                   disabled={actionClusterLocked}
-                  className="min-h-[48px] rounded-xl border border-emerald-800/45 bg-emerald-950/55 py-2.5 text-xs font-bold text-emerald-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32]"
+                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-emerald-800/35 bg-emerald-950/40 py-2.5 text-[11px] font-semibold text-emerald-100/95 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3] sm:text-xs"
                   onClick={() => void runGameOp("bet", { amount: bb })}
                 >
                   Bet {bb}
@@ -600,7 +643,7 @@ export default function Ov2CcScreen({
                 <button
                   type="button"
                   disabled={actionClusterLocked || !canMinRaiseBtn}
-                  className="min-h-[48px] rounded-xl border border-violet-900/45 bg-violet-950/50 py-2.5 text-xs font-bold text-violet-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32]"
+                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-zinc-600/30 bg-zinc-900/50 py-2.5 text-[11px] font-semibold text-zinc-200 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3] sm:text-xs"
                   onClick={() => void runGameOp("raise", { amount: minRaiseChips })}
                 >
                   Raise +{minRaiseChips}
@@ -609,7 +652,7 @@ export default function Ov2CcScreen({
               <button
                 type="button"
                 disabled={actionClusterLocked || !canQuickBumpBtn}
-                className="min-h-[48px] rounded-xl border border-indigo-900/45 bg-indigo-950/50 py-2.5 text-xs font-bold text-indigo-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32]"
+                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-zinc-600/30 bg-zinc-900/45 py-2.5 text-[11px] font-semibold text-zinc-300 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3] sm:text-xs"
                 onClick={() => {
                   const op = curBet === 0 && toCall === 0 ? "bet" : "raise";
                   void runGameOp(op, { amount: quickAmount });
@@ -620,7 +663,7 @@ export default function Ov2CcScreen({
               <button
                 type="button"
                 disabled={actionClusterLocked}
-                className="min-h-[48px] rounded-xl border border-amber-700/45 bg-amber-950/45 py-2.5 text-xs font-bold text-amber-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32]"
+                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-amber-800/35 bg-amber-950/35 py-2.5 text-[11px] font-semibold text-amber-100/95 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3] sm:text-xs"
                 onClick={() => void runGameOp("all_in")}
               >
                 All-in

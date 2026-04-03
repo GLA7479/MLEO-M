@@ -235,21 +235,22 @@ export default function Ov2CcLiveShell() {
       subtitle={`Live · ${formatTierLabel(tableConfig.tablePrice)} · ${tableConfig.maxSeats}-max`}
       useAppViewportHeight
       infoPanel={infoPanel}
+      chromePreset="cc_live_table"
     >
       <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-white/[0.05] pb-1.5 pt-0.5">
           <input
             value={nameDraft}
             onChange={e => setNameDraft(e.target.value)}
             onBlur={persistName}
-            className="min-w-0 flex-1 rounded-lg border border-white/12 bg-black/35 px-2 py-1.5 text-[11px] text-white"
+            className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-black/55 px-2 py-1.5 text-[10px] text-white placeholder:text-zinc-600 sm:text-[11px]"
             placeholder="Display name"
           />
           <button
             type="button"
             title="Pick another table without leaving your seat"
             onClick={() => router.push("/ov2-community-cards")}
-            className={OV2_HUD_CHROME_BTN}
+            className={`${OV2_HUD_CHROME_BTN} text-[10px] sm:text-xs`}
           >
             Tables
           </button>
@@ -258,7 +259,7 @@ export default function Ov2CcLiveShell() {
             title="Leave table and return chips to vault when allowed"
             disabled={leaveBusy}
             onClick={() => void onLeaveTable()}
-            className={`${OV2_HUD_CHROME_BTN} border-rose-500/35 bg-rose-950/30 text-rose-100 hover:border-rose-400/40 hover:bg-rose-950/45 disabled:opacity-45`}
+            className={`${OV2_HUD_CHROME_BTN} border-rose-500/30 bg-rose-950/25 text-rose-100/95 hover:border-rose-400/35 hover:bg-rose-950/40 disabled:opacity-45 text-[10px] sm:text-xs`}
           >
             {leaveBusy ? "…" : "Leave"}
           </button>
