@@ -76,7 +76,7 @@ function C21InfoPanelBody() {
           </li>
           <li>
             <span className="font-semibold text-zinc-200">Betting</span> (~{betS}s): choose an amount between the table minimum
-            and the server cap, then <span className="text-zinc-200">Commit play</span>. The server debits your vault when commit
+            and the server cap, then <span className="text-zinc-200">Play</span>. The server debits your vault when the commit
             succeeds; until then you are not in the upcoming deal.
           </li>
           <li>

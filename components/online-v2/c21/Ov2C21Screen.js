@@ -1062,7 +1062,7 @@ export default function Ov2C21Screen({
                   onChange={e => setPlayDraftStr(e.target.value)}
                   inputMode="numeric"
                   disabled={operateBusy || actionLock || phase !== "betting"}
-                  className="h-10 w-full min-w-0 rounded border border-white/15 bg-black/50 py-0 pl-1.5 pr-9 text-[11px] font-semibold leading-none text-white disabled:opacity-40"
+                  className="h-10 w-full min-w-0 rounded border border-white/15 bg-black/50 py-0 pl-1.5 pr-9 text-[13px] font-semibold leading-none text-white disabled:opacity-40 sm:text-sm"
                   aria-label="Play amount"
                 />
                 <button
@@ -1073,7 +1073,7 @@ export default function Ov2C21Screen({
                   aria-label="Reset amount to table minimum"
                   title="Reset to table minimum"
                 >
-                  <span className="text-[19px] leading-none" aria-hidden>
+                  <span className="text-[22px] leading-none" aria-hidden>
                     ↺
                   </span>
                 </button>
@@ -1082,7 +1082,7 @@ export default function Ov2C21Screen({
                 type="button"
                 disabled={operateBusy || actionLock || phase !== "betting"}
                 onClick={() => bumpDraftByTableMin()}
-                className="h-10 shrink-0 touch-manipulation rounded border border-white/20 bg-white/10 px-1.5 text-[9px] font-bold leading-none text-zinc-100 disabled:opacity-35 sm:px-2 sm:text-[10px]"
+                className="h-10 shrink-0 touch-manipulation rounded border border-white/20 bg-white/10 px-1.5 text-[11px] font-bold leading-none text-zinc-100 disabled:opacity-35 sm:px-2 sm:text-xs"
               >
                 +{fmt(minBet)}
               </button>
@@ -1098,7 +1098,7 @@ export default function Ov2C21Screen({
                     operateBusy || actionLock || phase !== "betting" || bettingPreRoundFreezeActive
                   }
                   onClick={() => void uncommitPlayAmount()}
-                  className="h-10 min-w-[4.25rem] shrink-0 touch-manipulation rounded border border-rose-500 bg-rose-600 px-2.5 text-[11px] font-extrabold leading-none text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_0_0_1px_rgba(127,29,29,0.45)] disabled:opacity-35 sm:min-w-[4.5rem] sm:px-3 sm:text-xs"
+                  className="h-10 min-w-[5.25rem] shrink-0 touch-manipulation rounded border border-rose-500 bg-rose-600 px-2.5 text-[13px] font-extrabold leading-none text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_0_0_1px_rgba(127,29,29,0.45)] disabled:opacity-35 sm:min-w-[5.75rem] sm:px-3 sm:text-sm"
                 >
                   Reverse
                 </button>
@@ -1109,23 +1109,23 @@ export default function Ov2C21Screen({
                   operateBusy || actionLock || phase !== "betting" || !draftPlayValid || !vaultOkForCommit
                 }
                 onClick={() => void commitPlayAmount()}
-                className="h-10 min-w-[5.25rem] shrink-0 touch-manipulation rounded bg-emerald-600 px-2.5 text-[11px] font-bold leading-none text-white disabled:opacity-35 sm:min-w-[5.75rem] sm:px-3 sm:text-xs"
+                className="h-10 min-w-[5.25rem] shrink-0 touch-manipulation rounded bg-emerald-600 px-2.5 text-[13px] font-bold leading-none text-white disabled:opacity-35 sm:min-w-[5.75rem] sm:px-3 sm:text-sm"
               >
-                Commit play
+                Play
               </button>
             </div>
             {!draftPlayValid && playDraftStr.trim() !== "" ? (
-              <div className="mt-px shrink-0 text-[7px] leading-tight text-amber-200/90">
+              <div className="mt-px shrink-0 text-[9px] leading-tight text-amber-200/90 sm:text-[10px]">
                 {fmt(minBet)}–{fmt(maxBet)}
               </div>
             ) : null}
             {economyHint ? (
-              <div className="mt-px shrink-0 text-[7px] leading-tight text-rose-200/95" role="status">
+              <div className="mt-px shrink-0 text-[9px] leading-tight text-rose-200/95 sm:text-[10px]" role="status">
                 {economyHint}
               </div>
             ) : null}
             {draftPlayValid && !vaultOkForCommit ? (
-              <div className="mt-px shrink-0 text-[7px] leading-tight text-amber-200/90">Vault too low for this amount.</div>
+              <div className="mt-px shrink-0 text-[9px] leading-tight text-amber-200/90 sm:text-[10px]">Vault too low for this amount.</div>
             ) : null}
           </div>
         ) : phase === "acting" && isMyTurn ? (
@@ -1186,7 +1186,7 @@ export default function Ov2C21Screen({
                     if (e?.phase !== "acting" || !ms || ct?.seatIndex !== ms.seatIndex) return;
                     await onOperate(op);
                   })}
-                  className={`flex min-h-[4.5rem] min-w-0 items-center justify-center touch-manipulation appearance-none rounded border-2 px-0.5 text-[14px] font-bold leading-none tracking-wide text-white disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-[0.65] active:scale-[0.98] sm:min-h-[30px] sm:px-0 sm:py-0.5 sm:text-[9px] ${shell}`}
+                  className={`flex min-h-[4.5rem] min-w-0 items-center justify-center touch-manipulation appearance-none rounded border-2 px-0.5 text-base font-bold leading-none tracking-wide text-white disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-[0.65] active:scale-[0.98] sm:min-h-[30px] sm:px-0 sm:py-0.5 sm:text-[11px] ${shell}`}
                 >
                   {label}
                 </button>
