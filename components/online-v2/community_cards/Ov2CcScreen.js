@@ -418,10 +418,10 @@ export default function Ov2CcScreen({
                 </div>
                 </div>
 
-                {mySeat ? (
-                  <div
-                    className={`relative z-[10] flex w-full shrink-0 justify-center px-1 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] pt-0 pointer-events-none sm:h-[8.5rem] sm:max-h-none sm:items-center ${OV2_CC_MOBILE_HERO_ZONE_CLASSES}`}
-                  >
+                <div
+                  className={`relative z-[10] flex w-full shrink-0 justify-center px-1 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] pt-0 pointer-events-none sm:h-[8.5rem] sm:max-h-none sm:items-center ${OV2_CC_MOBILE_HERO_ZONE_CLASSES}`}
+                >
+                  {mySeat ? (
                     <div className="flex max-h-full w-full max-w-[98%] flex-wrap items-center justify-center gap-3 drop-shadow-[0_10px_28px_rgba(0,0,0,0.55)] max-sm:max-h-none sm:items-end sm:gap-4">
                       {holeCardsToShow.length > 0
                         ? holeCardsToShow.map((c, idx) => (
@@ -429,8 +429,13 @@ export default function Ov2CcScreen({
                           ))
                         : null}
                     </div>
-                  </div>
-                ) : null}
+                  ) : (
+                    <div
+                      className="flex max-h-full w-full max-w-[98%] flex-wrap items-center justify-center gap-3 max-sm:max-h-none sm:items-end sm:gap-4"
+                      aria-hidden
+                    />
+                  )}
+                </div>
               </div>
 
               <div
