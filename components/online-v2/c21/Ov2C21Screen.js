@@ -1144,28 +1144,34 @@ export default function Ov2C21Screen({
               >
                 Play
               </button>
-              <label
-                className="flex h-10 shrink-0 cursor-pointer flex-col justify-center px-0.5 touch-manipulation select-none sm:px-1"
+              <button
+                type="button"
+                role="switch"
+                aria-checked={Boolean(mySeat?.autoNextEnabled)}
                 title="Auto-enter the next round with the stake shown (server-side). Stops after 3 rounds with no manual hit/stand/play, or if funds fail."
+                disabled={
+                  operateBusy ||
+                  actionLock ||
+                  bettingPreRoundFreezeActive ||
+                  (!draftPlayValid && !mySeat?.autoNextEnabled)
+                }
+                onClick={() => void onAutoNextToggle(!Boolean(mySeat?.autoNextEnabled))}
+                className={`h-10 min-w-[4.5rem] shrink-0 touch-manipulation rounded border px-2 py-0 text-center font-extrabold uppercase leading-tight shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-35 sm:min-w-[5.5rem] sm:px-2.5 ${
+                  mySeat?.autoNextEnabled
+                    ? "border-emerald-500/55 bg-emerald-950/55 text-emerald-100"
+                    : "border-white/18 bg-zinc-950/90 text-zinc-400"
+                }`}
               >
-                <span className="flex items-center gap-0.5">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(mySeat?.autoNextEnabled)}
-                    disabled={
-                      operateBusy ||
-                      actionLock ||
-                      bettingPreRoundFreezeActive ||
-                      (!draftPlayValid && !mySeat?.autoNextEnabled)
-                    }
-                    onChange={e => void onAutoNextToggle(e.target.checked)}
-                    className="h-3.5 w-3.5 shrink-0 rounded border border-white/30 bg-black/60 accent-emerald-500"
-                  />
-                  <span className="max-w-[2.5rem] text-[7px] font-bold uppercase leading-tight text-zinc-400 sm:max-w-none sm:text-[8px]">
-                    Auto next
-                  </span>
+                <span className="flex h-full min-h-0 flex-col items-center justify-center gap-0 leading-none">
+                  {mySeat?.autoNextEnabled ? (
+                    <span className="mb-px text-[11px] text-emerald-200 sm:text-[12px]" aria-hidden>
+                      ✓
+                    </span>
+                  ) : null}
+                  <span className="text-[8px] font-extrabold tracking-wide sm:text-[9px]">AUTO</span>
+                  <span className="text-[8px] font-extrabold tracking-wide sm:text-[9px]">NEXT</span>
                 </span>
-              </label>
+              </button>
             </div>
             {!draftPlayValid && playDraftStr.trim() !== "" ? (
               <div className="mt-px shrink-0 text-[9px] leading-tight text-amber-200/90 sm:text-[10px]">
