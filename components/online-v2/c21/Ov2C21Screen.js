@@ -1045,8 +1045,14 @@ export default function Ov2C21Screen({
         </div>
       </div>
 
-      {/* Bottom controls — fixed height; mobile dock + safe-area */}
-      <div className="flex h-[5.35rem] shrink-0 flex-col justify-center gap-0 overflow-hidden border-t border-white/5 pb-[max(0.2rem,env(safe-area-inset-bottom,0px))] pt-0 sm:h-[3.95rem] sm:pb-1 sm:pt-px">
+      {/* Bottom controls — fixed height; mobile dock + safe-area (acting row can grow on small screens for tall tap targets) */}
+      <div
+        className={`flex shrink-0 flex-col justify-center gap-0 border-t border-white/5 ${
+          phase === "acting" && isMyTurn
+            ? "max-sm:h-auto max-sm:min-h-0 max-sm:overflow-visible max-sm:py-1 max-sm:pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] sm:h-[3.95rem] sm:overflow-hidden sm:py-0 sm:pb-1 sm:pt-px"
+            : "h-[5.35rem] overflow-hidden pb-[max(0.2rem,env(safe-area-inset-bottom,0px))] pt-0 sm:h-[3.95rem] sm:pb-1 sm:pt-px"
+        }`}
+      >
         {phase === "betting" && mySeat ? (
           <div className="flex h-full min-h-0 flex-col justify-center gap-0 rounded border border-white/10 bg-black/30 px-1 py-0 sm:px-1.5 sm:py-0">
             <div className="flex min-h-0 w-full min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -1123,29 +1129,69 @@ export default function Ov2C21Screen({
             ) : null}
           </div>
         ) : phase === "acting" && isMyTurn ? (
-          <div className="grid w-full shrink-0 grid-cols-2 gap-px px-0.5 sm:grid-cols-4 sm:gap-0.5 sm:px-0.5">
+          <div className="grid w-full shrink-0 grid-cols-4 gap-1 px-0.5 sm:gap-0.5 sm:px-0.5">
             {[
               ["hit", "HIT", legal.hit],
               ["stand", "STAND", legal.stand],
               ["double", "DOUBLE", legal.double],
               ["split", "SPLIT", legal.split],
-            ].map(([op, label, ok]) => (
-              <button
-                key={op}
-                type="button"
-                disabled={operateBusy || actionLock || !ok || phase !== "acting" || !isMyTurn}
-                onClick={guardAction(async () => {
-                  const e = engineRef.current;
-                  const ct = e?.currentTurn;
-                  const ms = e?.seats?.find(s => s.participantKey === participantKey);
-                  if (e?.phase !== "acting" || !ms || ct?.seatIndex !== ms.seatIndex) return;
-                  await onOperate(op);
-                })}
-                className="min-h-[28px] touch-manipulation rounded border border-white/10 bg-white/10 py-0.5 text-[8px] font-bold tracking-wide disabled:opacity-35 active:scale-[0.98] sm:min-h-[30px] sm:text-[9px]"
-              >
-                {label}
-              </button>
-            ))}
+            ].map(([op, label, ok]) => {
+              // Inline gradient + appearance reset: iOS/Safari often drops Tailwind bg on native <button>.
+              const shell =
+                op === "hit"
+                  ? "border-emerald-400/55 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                  : op === "stand"
+                    ? "border-blue-400/55 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                    : op === "double"
+                      ? "border-orange-400/55 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                      : "border-purple-400/55 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]";
+              const fill =
+                op === "hit"
+                  ? {
+                      WebkitAppearance: "none",
+                      appearance: "none",
+                      backgroundColor: "#047857",
+                      backgroundImage: "linear-gradient(180deg,#10b981 0%,#059669 40%,#047857 100%)",
+                    }
+                  : op === "stand"
+                    ? {
+                        WebkitAppearance: "none",
+                        appearance: "none",
+                        backgroundColor: "#1d4ed8",
+                        backgroundImage: "linear-gradient(180deg,#3b82f6 0%,#2563eb 45%,#1e40af 100%)",
+                      }
+                    : op === "double"
+                      ? {
+                          WebkitAppearance: "none",
+                          appearance: "none",
+                          backgroundColor: "#c2410c",
+                          backgroundImage: "linear-gradient(180deg,#fb923c 0%,#ea580c 45%,#9a3412 100%)",
+                        }
+                      : {
+                          WebkitAppearance: "none",
+                          appearance: "none",
+                          backgroundColor: "#6d28d9",
+                          backgroundImage: "linear-gradient(180deg,#c084fc 0%,#9333ea 45%,#5b21b6 100%)",
+                        };
+              return (
+                <button
+                  key={op}
+                  type="button"
+                  disabled={operateBusy || actionLock || !ok || phase !== "acting" || !isMyTurn}
+                  style={fill}
+                  onClick={guardAction(async () => {
+                    const e = engineRef.current;
+                    const ct = e?.currentTurn;
+                    const ms = e?.seats?.find(s => s.participantKey === participantKey);
+                    if (e?.phase !== "acting" || !ms || ct?.seatIndex !== ms.seatIndex) return;
+                    await onOperate(op);
+                  })}
+                  className={`flex min-h-[4.5rem] min-w-0 items-center justify-center touch-manipulation appearance-none rounded border-2 px-0.5 text-[14px] font-bold leading-none tracking-wide text-white disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-[0.65] active:scale-[0.98] sm:min-h-[30px] sm:px-0 sm:py-0.5 sm:text-[9px] ${shell}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         ) : (
           <div className="h-full rounded-lg border border-transparent bg-transparent" aria-hidden />
