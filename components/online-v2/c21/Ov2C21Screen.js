@@ -764,6 +764,15 @@ export default function Ov2C21Screen({
     }
   }, [onOperate, operateBusy, participantKey]);
 
+  const onAutoNextToggle = useCallback(
+    async enabled => {
+      if (operateBusy || actionLock) return;
+      if (enabled && !draftPlayValid) return;
+      await onOperate("set_auto_next", { enabled, stake: parsedDraftPlay });
+    },
+    [actionLock, draftPlayValid, onOperate, operateBusy, parsedDraftPlay],
+  );
+
   const trySit = useCallback(
     idx => {
       if (sitLockRef.current || operateBusy) return;
@@ -1135,6 +1144,28 @@ export default function Ov2C21Screen({
               >
                 Play
               </button>
+              <label
+                className="flex h-10 shrink-0 cursor-pointer flex-col justify-center px-0.5 touch-manipulation select-none sm:px-1"
+                title="Auto-enter the next round with the stake shown (server-side). Stops after 3 rounds with no manual hit/stand/play, or if funds fail."
+              >
+                <span className="flex items-center gap-0.5">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(mySeat?.autoNextEnabled)}
+                    disabled={
+                      operateBusy ||
+                      actionLock ||
+                      bettingPreRoundFreezeActive ||
+                      (!draftPlayValid && !mySeat?.autoNextEnabled)
+                    }
+                    onChange={e => void onAutoNextToggle(e.target.checked)}
+                    className="h-3.5 w-3.5 shrink-0 rounded border border-white/30 bg-black/60 accent-emerald-500"
+                  />
+                  <span className="max-w-[2.5rem] text-[7px] font-bold uppercase leading-tight text-zinc-400 sm:max-w-none sm:text-[8px]">
+                    Auto next
+                  </span>
+                </span>
+              </label>
             </div>
             {!draftPlayValid && playDraftStr.trim() !== "" ? (
               <div className="mt-px shrink-0 text-[9px] leading-tight text-amber-200/90 sm:text-[10px]">

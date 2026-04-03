@@ -7,8 +7,10 @@ import { buildIdemCommit, buildIdemSettle } from "../../../lib/online-v2/c21/ov2
 import {
   applyC21EconomyOpsToVault,
   getArcadeVaultBalanceForRequest,
+  getVaultBalanceForDevice,
   reverseC21EconomyOps,
 } from "../../../lib/server/ov2C21VaultAuthority";
+import { getOv2C21DeviceForParticipant } from "../../../lib/server/ov2C21ParticipantDevice";
 
 /**
  * Persist ledger rows. Client vault mirror only receives credits for *other* participants
@@ -67,6 +69,42 @@ async function persistEconomyOps(admin, roomId, matchSeq, economyOps, callerPart
     }
   }
   return vaultEffects;
+}
+
+/**
+ * Auto-next main commits are planned in-engine at round boundary; remove any a vault cannot cover
+ * (missing device binding or insufficient balance) and clear that seat's pending bet + auto-next prefs.
+ */
+async function reconcileC21AutoNextCommits(admin, roomId, engine, economyOps) {
+  const ops = economyOps.slice();
+  for (let i = ops.length - 1; i >= 0; i--) {
+    const o = ops[i];
+    if (!o || o.type !== "commit" || o.c21AutoNextSeat == null) continue;
+    const idx = Math.floor(Number(o.c21AutoNextSeat));
+    const pk = String(o.participantKey || "").trim();
+    if (idx < 0 || idx > 5 || !pk) {
+      ops.splice(i, 1);
+      continue;
+    }
+    const deviceId = await getOv2C21DeviceForParticipant(admin, roomId, pk);
+    const amt = Math.max(0, Math.floor(Number(o.amount) || 0));
+    let can = Boolean(deviceId && amt > 0);
+    if (can) {
+      const bal = await getVaultBalanceForDevice(admin, deviceId);
+      can = bal.ok && bal.balance >= amt;
+    }
+    if (!can) {
+      const s = engine.seats[idx];
+      if (s && s.participantKey === pk) {
+        s.autoNextEnabled = false;
+        s.autoNextStake = 0;
+        s.intendedBet = 0;
+        s.betCommitRecorded = false;
+      }
+      ops.splice(i, 1);
+    }
+  }
+  return { engine, economyOps: ops };
 }
 
 export default async function handler(req, res) {
@@ -172,8 +210,16 @@ export default async function handler(req, res) {
         return res.status(400).json({ ok: false, code: result.error });
       }
 
-      const nextEngine = result.engine;
-      const economyOps = result.economyOps || [];
+      let nextEngine = result.engine;
+      let economyOps = result.economyOps || [];
+      if (
+        op === "tick" &&
+        economyOps.some(o => o && o.type === "commit" && o.c21AutoNextSeat != null)
+      ) {
+        const r = await reconcileC21AutoNextCommits(admin, roomId, nextEngine, economyOps);
+        nextEngine = r.engine;
+        economyOps = r.economyOps;
+      }
       const roundForEconomy = Math.max(matchSeqBefore, Math.floor(Number(nextEngine.roundSeq) || 0));
 
       const { data: updated, error: upErr } = await admin
