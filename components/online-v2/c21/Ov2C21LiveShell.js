@@ -348,12 +348,12 @@ export default function Ov2C21LiveShell() {
         infoPanel={infoPanel}
       >
       <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
-        <div className="flex shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden sm:gap-2">
+        <div className="flex shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden border-b border-white/[0.06] pb-1 sm:gap-2">
           <input
             value={nameDraft}
             onChange={e => setNameDraft(e.target.value)}
             onBlur={persistName}
-            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/12 bg-black/35 px-2 py-1.5 text-[11px] text-white"
+            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/[0.1] bg-[#050708]/85 px-2 py-1.5 text-[11px] text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
             placeholder="Display name"
           />
           <button
@@ -365,8 +365,8 @@ export default function Ov2C21LiveShell() {
             style={{ WebkitTapHighlightColor: "rgba(52, 211, 153, 0.35)" }}
             className={`relative z-10 inline-flex h-9 min-w-[6.2rem] shrink-0 touch-manipulation select-none items-center justify-center gap-0.5 rounded-full border px-2 text-[11px] font-semibold whitespace-nowrap transition-all duration-150 ease-out sm:h-9 sm:min-w-[6.85rem] sm:px-2.5 sm:text-[11px] lg:h-8 lg:min-h-[32px] lg:px-2.5 lg:text-[11px] ${
               autoWatchEnabled
-                ? "border-emerald-400/60 bg-emerald-800/55 text-emerald-50 shadow-[inset_0_0_22px_rgba(52,211,153,0.35),inset_0_0_0_1px_rgba(167,243,208,0.45)] hover:border-emerald-300/70 hover:bg-emerald-700/50 hover:shadow-[inset_0_0_28px_rgba(52,211,153,0.42)] active:scale-[0.97] active:border-emerald-100/50 active:bg-emerald-500/50 active:text-white active:shadow-[inset_0_0_40px_rgba(190,242,100,0.45),inset_0_0_0_2px_rgba(236,253,245,0.65)]"
-                : "border-white/22 bg-white/[0.1] text-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_0_14px_rgba(255,255,255,0.05)] hover:border-white/32 hover:bg-white/[0.15] active:scale-[0.97] active:border-white/45 active:bg-white/[0.32] active:text-white active:shadow-[inset_0_0_28px_rgba(255,255,255,0.2),inset_0_0_0_1px_rgba(255,255,255,0.35)]"
+                ? "border-emerald-700/50 bg-emerald-950/70 text-emerald-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-emerald-600/45 hover:bg-emerald-900/55 active:scale-[0.97]"
+                : "border-white/18 bg-white/[0.06] text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-white/28 hover:bg-white/[0.1] active:scale-[0.97]"
             }`}
           >
             {autoWatchEnabled ? (

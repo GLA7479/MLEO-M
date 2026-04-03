@@ -60,6 +60,22 @@ function parseFollowKeySeatIndex(key) {
 
 const AUTO_WATCH_DWELL_MS = 1050;
 
+/** Presentation-only: nudge seats toward a shallow half-arc (higher at ends). Index = physical seat 0–5. */
+function c21SeatArcOffsetPx(seatIndex) {
+  const i = Math.floor(Number(seatIndex) || 0);
+  const map = [6, 4, 2, 2, 4, 6];
+  return map[i] ?? 0;
+}
+
+function c21PhaseStripLabel(phase) {
+  const p = String(phase || "");
+  if (p === "betting") return "Betting";
+  if (p === "insurance") return "Side cover";
+  if (p === "acting") return "In play";
+  if (p === "between_rounds") return "Round complete";
+  return p ? p.replace(/_/g, " ") : "—";
+}
+
 function otherSeatHandStatusLabel(phase, seatIndex, handIndex, seat, currentTurn) {
   const m = seat?.handMeta?.[handIndex];
   if (!m) return "—";
@@ -115,8 +131,8 @@ function FallbackCardFace({ code, compact }) {
   const red = suit.toLowerCase() === "h" || suit.toLowerCase() === "d";
   return (
     <div
-      className={`flex h-full w-full flex-col items-center justify-center rounded-md border border-zinc-500/80 bg-gradient-to-b from-white to-zinc-100 px-0.5 shadow-inner ${
-        red ? "text-red-600" : "text-zinc-900"
+      className={`flex h-full w-full flex-col items-center justify-center rounded-[4px] border border-black/15 bg-[#faf9f7] px-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_1px_2px_rgba(0,0,0,0.12)] ${
+        red ? "text-[#b91c1c]" : "text-[#0f172a]"
       } ${compact ? "text-[9px] font-extrabold leading-none" : "text-xs font-extrabold leading-tight"}`}
     >
       <span>{rank}</span>
@@ -152,20 +168,24 @@ function PlayingCardOv2({ code, hidden, handCardCount = 1, seatFit = null }) {
   }
 
   const baseBox =
-    "shrink-0 overflow-hidden rounded-md border shadow-[0_2px_6px_rgba(0,0,0,0.4)]";
+    "shrink-0 overflow-hidden rounded-[5px] border border-black/25 shadow-[0_3px_10px_rgba(0,0,0,0.45),0_1px_2px_rgba(0,0,0,0.35)] sm:rounded-[6px]";
   const boxClass = `${classSize} ${baseBox}`.trim();
 
   if (hidden) {
     return (
       <div
-        className={`${boxClass} border-white/30`}
+        className={`${boxClass} border-[#1e293b] bg-[#152238]`}
         style={styleSize || undefined}
       >
         <img
           src="/card-backs/poker-back.jpg"
           alt=""
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover opacity-[0.97]"
           draggable={false}
+        />
+        <div
+          className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]"
+          aria-hidden
         />
       </div>
     );
@@ -173,7 +193,7 @@ function PlayingCardOv2({ code, hidden, handCardCount = 1, seatFit = null }) {
   if (!code) {
     return (
       <div
-        className={`${boxClass} border-white/20 bg-black/40`}
+        className={`${boxClass} border-white/10 bg-black/50`}
         style={styleSize || undefined}
       />
     );
@@ -183,7 +203,7 @@ function PlayingCardOv2({ code, hidden, handCardCount = 1, seatFit = null }) {
   const showFallback = !url || imgErr;
   return (
     <div
-      className={`${boxClass} relative border-white/25`}
+      className={`${boxClass} relative border-black/20 [box-shadow:inset_0_0_0_1px_rgba(255,255,255,0.06),0_3px_12px_rgba(0,0,0,0.4)]`}
       style={styleSize || undefined}
     >
       {url && !imgErr ? (
@@ -1021,269 +1041,302 @@ export default function Ov2C21Screen({
   const dealerGap = dealerRevealVisibleCount >= 4 ? "gap-0.5" : "gap-1";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden text-white">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#040608] text-zinc-100">
       {loadError ? (
         <div className="shrink-0 px-0.5 text-center text-[10px] leading-tight text-red-300/95" role="alert">
           {loadError}
         </div>
       ) : null}
-      {/* Board: no vertical scroll — flex fits within shell viewport */}
-      <div className="flex min-h-0 flex-1 flex-col gap-px overflow-hidden overflow-x-hidden sm:gap-0.5">
-        {/* HOUSE — single line: left label | centered total | right countdown (equal thirds) */}
-        <div className="relative h-[11.375rem] shrink-0 overflow-hidden rounded-xl border border-amber-900/40 bg-gradient-to-b from-zinc-900/90 to-black/60 px-1 sm:h-[10.375rem]">
-          <div className="pointer-events-none absolute inset-x-1 top-0.5 z-10 grid h-[1.05rem] grid-cols-3 items-center leading-none">
-            <span className="min-w-0 truncate text-left text-[10px] font-bold uppercase tracking-wide text-amber-200/85">
-              House
-            </span>
-            <span className="min-w-0 truncate text-center text-[10px] font-semibold tabular-nums text-zinc-200/95">
-              {dealerTotalCenter != null ? `Total ${dealerTotalCenter}` : "\u00a0"}
-            </span>
-            <span
-              className="min-w-0 truncate text-right tabular-nums text-[15px] font-black tracking-tight text-amber-100 drop-shadow-md sm:text-lg"
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              {houseCountdownSeconds}
-            </span>
-          </div>
-          <div
-            className={`absolute inset-x-1 top-[1.15rem] bottom-px flex items-center justify-center overflow-x-auto ${dealerGap}`}
-          >
-            {dealerRender.length === 0 ? (
-              <span className="text-xs text-white/50">—</span>
-            ) : dealerHiddenRender ? (
-              dealerRender.map((c, i) => {
-                if (i === 0) return <PlayingCardOv2 key="dh0" code={c} handCardCount={dealerHandCount} />;
-                if (i === 1) return <PlayingCardOv2 key="dh1" hidden handCardCount={dealerHandCount} />;
-                return null;
-              })
-            ) : (
-              dealerRender.slice(0, dealerRevealNRender).map((c, i) => (
-                <PlayingCardOv2
-                  key={`d-${dealerSigRender}-${i}`}
-                  code={c}
-                  handCardCount={Math.max(1, dealerRevealNRender)}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Other seats — mobile: compact fixed height (no scroll); sm+: grows in middle */}
+      {/* Table felt: dealer-first stack; bottom rail stays outside for toast offset compatibility */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden overflow-x-hidden px-1 pb-1 pt-0.5 sm:px-2 sm:pb-1.5 sm:pt-1">
         <div
-          className={
-            otherSeatIndices.length <= 5
-              ? "flex h-[3.875rem] shrink-0 flex-col overflow-hidden sm:h-[6.125rem] sm:min-h-[6.125rem] sm:max-h-[6.125rem] sm:shrink-0 sm:flex-none"
-              : "flex h-[8rem] shrink-0 flex-col overflow-hidden sm:h-[6.125rem] sm:min-h-[6.125rem] sm:max-h-[6.125rem] sm:shrink-0 sm:flex-none"
-          }
+          className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-black/50 shadow-[0_14px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.05)] sm:rounded-[1.35rem]"
+          style={{
+            background:
+              "radial-gradient(ellipse 95% 80% at 50% 0%, #14532d 0%, #0d3d24 42%, #071912 78%, #030806 100%)",
+          }}
         >
           <div
-            className={
-              otherSeatIndices.length <= 5
-                ? "grid h-full w-full grid-cols-5 gap-0.5 sm:min-h-0 sm:gap-1"
-                : "grid h-full w-full grid-cols-3 grid-rows-2 gap-1 sm:min-h-0 sm:grid-cols-6 sm:grid-rows-1 sm:gap-1"
-            }
-          >
-          {otherSeatIndices.map(idx => {
-            const seat = seatsForDisplay[idx];
-            const taken = Boolean(seat?.participantKey);
-            const otherPlayLbl = otherSeatCommittedPlayLabel(seat, phase, minBet);
-            const isActingSeat = phase === "acting" && currentTurn?.seatIndex === idx;
-            const actingHere = isActingSeat ? `ring-2 ring-sky-400 ring-offset-1 ring-offset-black/80` : "";
-            const ariaSeat = taken
-              ? `${String(seat.displayName || "Player").trim() || "Player"}${isActingSeat ? " — turn to act" : ""}`
-              : `Open seat ${idx + 1}`;
-            return (
-              <button
-                key={idx}
-                type="button"
-                aria-label={ariaSeat}
-                disabled={!taken && (operateBusy || !canSitToPlay)}
-                onClick={() => {
-                  if (operateBusy && !taken) return;
-                  if (taken) {
-                    setInspectorSeatIdx(prev => {
-                      const next = prev === idx ? null : idx;
-                      if (next != null) {
-                        manualInspectorOverrideRef.current = true;
-                      } else {
-                        manualInspectorOverrideRef.current = false;
-                        clearAutoWatchDwell();
-                        if (autoWatchEnabled) {
-                          dismissedAutoWatchFollowKeyRef.current = autoWatchFollowKey(phase, currentTurn);
-                        }
-                      }
-                      return next;
-                    });
-                    return;
-                  }
-                  trySit(idx);
-                }}
-                className={`flex h-full min-h-0 touch-manipulation flex-col overflow-hidden rounded-md border border-white/10 bg-black/40 px-px py-0 text-left transition ${actingHere} ${inspectorSeatIdx === idx ? "ring-1 ring-emerald-500/45 ring-offset-1 ring-offset-black/60" : ""} ${!taken && (operateBusy || !canSitToPlay) ? "opacity-40" : ""}`}
-              >
-                <div className="grid h-[11px] max-h-[11px] shrink-0 grid-cols-3 items-center gap-px overflow-hidden leading-none">
-                  {taken ? (
-                    <>
-                      <span className="min-w-0 truncate text-left text-[8px] font-semibold leading-none text-white/90">
-                        {String(seat.displayName || "").trim() || "…"}
-                      </span>
-                      <span className="min-w-0 truncate text-center text-[7px] font-bold tabular-nums leading-none text-zinc-400/95">
-                        {(() => {
-                          const parts = (seat.hands || []).filter(h => h && h.length).map(h => handTotal(h));
-                          return parts.length ? parts.join("·") : "\u00a0";
-                        })()}
-                      </span>
-                      <span className="flex min-w-0 justify-end gap-px overflow-hidden">
-                        {otherPlayLbl ? (
-                          <span className="shrink-0 text-[7px] font-semibold tabular-nums leading-none text-emerald-300/85">
-                            Play {otherPlayLbl}
-                          </span>
-                        ) : null}
-                        {isActingSeat ? (
-                          <span className="shrink-0 rounded px-px text-[7px] font-extrabold uppercase leading-none text-sky-200">
-                            Turn
-                          </span>
-                        ) : null}
-                      </span>
-                    </>
+            className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-80"
+            style={{
+              background:
+                "radial-gradient(ellipse 55% 35% at 50% 12%, rgba(255,255,255,0.06) 0%, transparent 55%)",
+            }}
+          />
+          <div className="pointer-events-none absolute inset-[4px] rounded-[1.4rem] border border-white/[0.05] sm:inset-[5px] sm:rounded-[1.2rem]" />
+
+          <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
+            {/* DEALER — fixed interior geometry preserved */}
+            <div className="relative h-[11.375rem] shrink-0 overflow-hidden px-1 pt-1 sm:h-[10.375rem] sm:px-1.5">
+              <div className="relative h-full overflow-hidden rounded-xl border border-black/35 bg-gradient-to-b from-[#1a120d]/95 via-[#0f0c0a]/90 to-black/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_8px_28px_rgba(0,0,0,0.45)]">
+                <div className="pointer-events-none absolute inset-x-1 top-0.5 z-10 grid h-[1.05rem] grid-cols-3 items-center leading-none">
+                  <span className="min-w-0 truncate text-left text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/90">
+                    Dealer
+                  </span>
+                  <span className="min-w-0 truncate text-center text-[10px] font-semibold tabular-nums text-zinc-100/95">
+                    {dealerTotalCenter != null ? `Total ${dealerTotalCenter}` : "\u00a0"}
+                  </span>
+                  <span
+                    className="min-w-0 truncate text-right tabular-nums text-[15px] font-black tracking-tight text-amber-100 drop-shadow-md sm:text-lg"
+                    aria-live="polite"
+                    aria-atomic="true"
+                  >
+                    {houseCountdownSeconds}
+                  </span>
+                </div>
+                <div
+                  className={`absolute inset-x-1 top-[1.15rem] bottom-px flex items-center justify-center overflow-x-auto ${dealerGap}`}
+                >
+                  {dealerRender.length === 0 ? (
+                    <span className="text-xs text-emerald-200/35">—</span>
+                  ) : dealerHiddenRender ? (
+                    dealerRender.map((c, i) => {
+                      if (i === 0) return <PlayingCardOv2 key="dh0" code={c} handCardCount={dealerHandCount} />;
+                      if (i === 1) return <PlayingCardOv2 key="dh1" hidden handCardCount={dealerHandCount} />;
+                      return null;
+                    })
                   ) : (
-                    <span className="col-span-3 w-full text-center text-[8px] font-medium leading-none text-white/50">
-                      Open
-                    </span>
+                    dealerRender.slice(0, dealerRevealNRender).map((c, i) => (
+                      <PlayingCardOv2
+                        key={`d-${dealerSigRender}-${i}`}
+                        code={c}
+                        handCardCount={Math.max(1, dealerRevealNRender)}
+                      />
+                    ))
                   )}
                 </div>
-                <div className="relative flex h-[calc(100%-11px)] min-h-0 w-full shrink-0 flex-col justify-center gap-px overflow-hidden">
-                  <div className="flex min-h-0 flex-1 flex-col justify-center gap-px overflow-hidden">
-                    {seat.hands?.length ? (
-                      seat.hands.map((h, hi) => (
-                        <SeatHandRow
-                          key={hi}
-                          hand={h}
-                          handKey={`o-${idx}-${hi}-${(h || []).join("|")}`}
-                          tiers={OTHER_HAND_TIERS}
-                        />
-                      ))
+              </div>
+            </div>
+
+            {/* Table status — phase only (timer remains on dealer header) */}
+            <div className="relative z-[1] shrink-0 border-y border-black/25 bg-black/20 px-2 py-1 text-center">
+              <span className="text-[9px] font-semibold uppercase tracking-[0.22em] text-emerald-200/50 sm:text-[10px]">
+                {c21PhaseStripLabel(phase)}
+              </span>
+            </div>
+
+            {/* Player seats — shallow half-arc via translateY on physical seat index */}
+            <div
+              className={
+                otherSeatIndices.length <= 5
+                  ? "relative z-[1] flex h-[3.875rem] shrink-0 items-end justify-center gap-0.5 overflow-hidden px-0.5 sm:h-[6.125rem] sm:gap-1.5 sm:px-1"
+                  : "relative z-[1] flex h-[8rem] shrink-0 items-end justify-center gap-0.5 overflow-hidden px-0.5 sm:h-[6.125rem] sm:gap-1.5 sm:px-1"
+              }
+            >
+              {otherSeatIndices.map(idx => {
+                const seat = seatsForDisplay[idx];
+                const taken = Boolean(seat?.participantKey);
+                const otherPlayLbl = otherSeatCommittedPlayLabel(seat, phase, minBet);
+                const isActingSeat = phase === "acting" && currentTurn?.seatIndex === idx;
+                const actingHere = isActingSeat
+                  ? "ring-2 ring-amber-400/55 ring-offset-2 ring-offset-[#071510]"
+                  : "";
+                const ariaSeat = taken
+                  ? `${String(seat.displayName || "Player").trim() || "Player"}${isActingSeat ? " — turn to act" : ""}`
+                  : `Open seat ${idx + 1}`;
+                return (
+                  <div
+                    key={idx}
+                    className="flex h-full min-h-0 min-w-0 max-w-[19vw] flex-1 flex-col justify-end sm:max-w-[6.25rem]"
+                    style={{ transform: `translateY(-${c21SeatArcOffsetPx(idx)}px)` }}
+                  >
+                    <button
+                      type="button"
+                      aria-label={ariaSeat}
+                      disabled={!taken && (operateBusy || !canSitToPlay)}
+                      onClick={() => {
+                        if (operateBusy && !taken) return;
+                        if (taken) {
+                          setInspectorSeatIdx(prev => {
+                            const next = prev === idx ? null : idx;
+                            if (next != null) {
+                              manualInspectorOverrideRef.current = true;
+                            } else {
+                              manualInspectorOverrideRef.current = false;
+                              clearAutoWatchDwell();
+                              if (autoWatchEnabled) {
+                                dismissedAutoWatchFollowKeyRef.current = autoWatchFollowKey(phase, currentTurn);
+                              }
+                            }
+                            return next;
+                          });
+                          return;
+                        }
+                        trySit(idx);
+                      }}
+                      className={`flex h-full min-h-0 w-full touch-manipulation flex-col overflow-hidden rounded-lg border border-white/[0.1] bg-black/45 px-px py-0 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition ${actingHere} ${inspectorSeatIdx === idx ? "ring-1 ring-emerald-400/50 ring-offset-2 ring-offset-[#071510]" : ""} ${!taken && (operateBusy || !canSitToPlay) ? "opacity-40" : ""}`}
+                    >
+                      <div className="grid h-[11px] max-h-[11px] shrink-0 grid-cols-3 items-center gap-px overflow-hidden leading-none">
+                        {taken ? (
+                          <>
+                            <span className="min-w-0 truncate text-left text-[8px] font-semibold leading-none text-zinc-100">
+                              {String(seat.displayName || "").trim() || "…"}
+                            </span>
+                            <span className="min-w-0 truncate text-center text-[7px] font-bold tabular-nums leading-none text-emerald-200/75">
+                              {(() => {
+                                const parts = (seat.hands || []).filter(h => h && h.length).map(h => handTotal(h));
+                                return parts.length ? parts.join("·") : "\u00a0";
+                              })()}
+                            </span>
+                            <span className="flex min-w-0 justify-end gap-px overflow-hidden">
+                              {otherPlayLbl ? (
+                                <span className="shrink-0 text-[7px] font-semibold tabular-nums leading-none text-emerald-300/90">
+                                  Play {otherPlayLbl}
+                                </span>
+                              ) : null}
+                              {isActingSeat ? (
+                                <span className="shrink-0 rounded bg-amber-500/20 px-px text-[7px] font-extrabold uppercase leading-none text-amber-100">
+                                  Turn
+                                </span>
+                              ) : null}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="col-span-3 w-full text-center text-[8px] font-medium leading-none text-emerald-200/45">
+                            Open
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative flex h-[calc(100%-11px)] min-h-0 w-full shrink-0 flex-col justify-center gap-px overflow-hidden">
+                        <div className="flex min-h-0 flex-1 flex-col justify-center gap-px overflow-hidden">
+                          {seat.hands?.length ? (
+                            seat.hands.map((h, hi) => (
+                              <SeatHandRow
+                                key={hi}
+                                hand={h}
+                                handKey={`o-${idx}-${hi}-${(h || []).join("|")}`}
+                                tiers={OTHER_HAND_TIERS}
+                              />
+                            ))
+                          ) : null}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* YOUR HAND — same internal measurements */}
+            <div className="relative z-[1] mt-auto h-[11.375rem] shrink-0 overflow-hidden px-1 pb-1 sm:h-[10.375rem] sm:px-1.5 sm:pb-1.5">
+              <div className="relative h-full overflow-hidden rounded-xl border border-emerald-900/35 bg-gradient-to-b from-[#0c1612]/95 via-[#050a08]/92 to-black/80 shadow-[inset_0_1px_0_rgba(167,243,208,0.06),0_6px_22px_rgba(0,0,0,0.4)]">
+                <div className="absolute inset-x-1 top-0.5 z-20 grid h-[1.05rem] grid-cols-3 items-center leading-none">
+                  <span className="pointer-events-none min-w-0 truncate text-left text-[10px] font-bold uppercase leading-none tracking-[0.1em] text-emerald-200/88">
+                    Your hand
+                  </span>
+                  <span className="pointer-events-none min-w-0 truncate text-center text-[10px] font-semibold tabular-nums text-emerald-100/92">
+                    {myHandTotalLabel != null ? `Total ${myHandTotalLabel}` : "\u00a0"}
+                  </span>
+                  <div className="flex min-w-0 flex-row flex-nowrap items-center justify-end gap-0.5 overflow-hidden">
+                    {myPlayAmountLabel ? (
+                      <span className="shrink-0 text-[8px] font-semibold tabular-nums leading-none text-emerald-300/92">
+                        Play {myPlayAmountLabel}
+                      </span>
+                    ) : null}
+                    {phase === "acting" && isMyTurn && legal.surrender ? (
+                      <button
+                        type="button"
+                        disabled={operateBusy || actionLock}
+                        onClick={guardAction(async () => {
+                          const e = engineRef.current;
+                          const ct = e?.currentTurn;
+                          const ms = e?.seats?.find(s => s.participantKey === participantKey);
+                          if (e?.phase !== "acting" || !ms || ct?.seatIndex !== ms.seatIndex) return;
+                          await onOperate("surrender");
+                        })}
+                        className="shrink-0 touch-manipulation rounded border border-rose-600/40 bg-rose-950/50 px-1 py-px text-[8px] font-extrabold uppercase leading-none text-rose-50 disabled:opacity-25"
+                      >
+                        Surrender
+                      </button>
+                    ) : null}
+                    {phase === "acting" && isMyTurn ? (
+                      <span className="shrink-0 text-[8px] font-extrabold uppercase leading-none text-amber-200/95">
+                        Turn
+                      </span>
                     ) : null}
                   </div>
                 </div>
-              </button>
-            );
-          })}
-          </div>
-        </div>
-
-        {/* YOUR HAND — single line: left label | centered total | right Play / Surrender / Turn (equal thirds) */}
-        <div className="relative h-[11.375rem] shrink-0 overflow-hidden rounded-xl border border-emerald-800/35 bg-gradient-to-b from-zinc-900/88 to-black/58 px-1 sm:h-[10.375rem]">
-          <div className="absolute inset-x-1 top-0.5 z-20 grid h-[1.05rem] grid-cols-3 items-center leading-none">
-            <span className="pointer-events-none min-w-0 truncate text-left text-[10px] font-bold uppercase leading-none tracking-wide text-emerald-200/85">
-              Your hand
-            </span>
-            <span className="pointer-events-none min-w-0 truncate text-center text-[10px] font-semibold tabular-nums text-emerald-200/90">
-              {myHandTotalLabel != null ? `Total ${myHandTotalLabel}` : "\u00a0"}
-            </span>
-            <div className="flex min-w-0 flex-row flex-nowrap items-center justify-end gap-0.5 overflow-hidden">
-              {myPlayAmountLabel ? (
-                <span className="shrink-0 text-[8px] font-semibold tabular-nums leading-none text-emerald-300/90">
-                  Play {myPlayAmountLabel}
-                </span>
-              ) : null}
-              {phase === "acting" && isMyTurn && legal.surrender ? (
-                <button
-                  type="button"
-                  disabled={operateBusy || actionLock}
-                  onClick={guardAction(async () => {
-                    const e = engineRef.current;
-                    const ct = e?.currentTurn;
-                    const ms = e?.seats?.find(s => s.participantKey === participantKey);
-                    if (e?.phase !== "acting" || !ms || ct?.seatIndex !== ms.seatIndex) return;
-                    await onOperate("surrender");
-                  })}
-                  className="shrink-0 touch-manipulation rounded border border-rose-500/35 bg-rose-950/40 px-1 py-px text-[8px] font-extrabold uppercase leading-none text-rose-100 disabled:opacity-25"
-                >
-                  Surrender
-                </button>
-              ) : null}
-              {phase === "acting" && isMyTurn ? (
-                <span className="shrink-0 text-[8px] font-extrabold uppercase leading-none text-sky-300/95">Turn</span>
-              ) : null}
-            </div>
-          </div>
-          <div className="absolute inset-x-1 top-[1.15rem] bottom-[1.65rem] flex flex-col items-center justify-center gap-px overflow-hidden">
-            {mySeat ? (
-              displayMySeat?.hands?.length ? (
-                mySplitHandCount > 1 ? (
-                  <SeatHandRow
-                    hand={displayMySeat.hands[Math.min(splitViewIdx, mySplitHandCount - 1)] || []}
-                    handKey={`mine-sv-${splitViewIdx}-${(displayMySeat.hands[Math.min(splitViewIdx, mySplitHandCount - 1)] || []).join("|")}`}
-                    tiers={MY_HAND_TIERS}
-                  />
-                ) : (
-                  displayMySeat.hands.map((h, hi) => (
-                    <SeatHandRow
-                      key={hi}
-                      hand={h}
-                      handKey={`mine-${hi}-${(h || []).join("|")}`}
-                      tiers={MY_HAND_TIERS}
-                    />
-                  ))
-                )
-              ) : (
-                <span className="text-[9px] text-zinc-500">—</span>
-              )
-            ) : (
-              <span className="px-1 text-center text-[8px] leading-tight text-zinc-500">Pick an open seat above</span>
-            )}
-          </div>
-          {mySeat && mySplitHandCount > 1 ? (
-            <div className="absolute bottom-1 left-1 right-1 z-20 min-w-0 overflow-x-auto overflow-y-visible overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div
-                className="mx-auto flex w-max min-w-full flex-nowrap items-center justify-center gap-0.5"
-                role="tablist"
-                aria-label="Split hands"
-              >
-                {displayMySeat.hands.map((_, hi) => {
-                  const isActionHere =
-                    phase === "acting" &&
-                    isMyTurn &&
-                    currentTurn?.seatIndex === mySeat?.seatIndex &&
-                    currentTurn?.handIndex === hi;
-                  return (
-                    <button
-                      key={`hand-tab-${hi}`}
-                      type="button"
-                      role="tab"
-                      aria-selected={splitViewIdx === hi}
-                      aria-current={isActionHere ? "step" : undefined}
-                      title={isActionHere ? "Play this hand now" : `View hand ${hi + 1}`}
-                      onClick={() => setSplitViewIdx(hi)}
-                      className={`min-h-[22px] shrink-0 touch-manipulation rounded border px-1 py-px text-[7px] font-extrabold uppercase leading-none whitespace-nowrap min-w-[3.1rem] ${
-                        isActionHere
-                          ? "z-[1] border-2 border-sky-300 bg-sky-900/70 text-sky-50 shadow-[0_0_0_2px_rgba(14,165,233,0.45),0_2px_8px_rgba(0,0,0,0.5)]"
-                          : splitViewIdx === hi
-                            ? "border-emerald-500/45 bg-emerald-950/35 text-emerald-100"
-                            : "border-white/12 bg-black/45 text-zinc-400"
-                      }`}
+                <div className="absolute inset-x-1 top-[1.15rem] bottom-[1.65rem] flex flex-col items-center justify-center gap-px overflow-hidden">
+                  {mySeat ? (
+                    displayMySeat?.hands?.length ? (
+                      mySplitHandCount > 1 ? (
+                        <SeatHandRow
+                          hand={displayMySeat.hands[Math.min(splitViewIdx, mySplitHandCount - 1)] || []}
+                          handKey={`mine-sv-${splitViewIdx}-${(displayMySeat.hands[Math.min(splitViewIdx, mySplitHandCount - 1)] || []).join("|")}`}
+                          tiers={MY_HAND_TIERS}
+                        />
+                      ) : (
+                        displayMySeat.hands.map((h, hi) => (
+                          <SeatHandRow
+                            key={hi}
+                            hand={h}
+                            handKey={`mine-${hi}-${(h || []).join("|")}`}
+                            tiers={MY_HAND_TIERS}
+                          />
+                        ))
+                      )
+                    ) : (
+                      <span className="text-[9px] text-emerald-200/35">—</span>
+                    )
+                  ) : (
+                    <span className="px-1 text-center text-[8px] leading-tight text-emerald-200/40">
+                      Pick an open seat above
+                    </span>
+                  )}
+                </div>
+                {mySeat && mySplitHandCount > 1 ? (
+                  <div className="absolute bottom-1 left-1 right-1 z-20 min-w-0 overflow-x-auto overflow-y-visible overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div
+                      className="mx-auto flex w-max min-w-full flex-nowrap items-center justify-center gap-0.5"
+                      role="tablist"
+                      aria-label="Split hands"
                     >
-                      Hand {hi + 1}
-                    </button>
-                  );
-                })}
+                      {displayMySeat.hands.map((_, hi) => {
+                        const isActionHere =
+                          phase === "acting" &&
+                          isMyTurn &&
+                          currentTurn?.seatIndex === mySeat?.seatIndex &&
+                          currentTurn?.handIndex === hi;
+                        return (
+                          <button
+                            key={`hand-tab-${hi}`}
+                            type="button"
+                            role="tab"
+                            aria-selected={splitViewIdx === hi}
+                            aria-current={isActionHere ? "step" : undefined}
+                            title={isActionHere ? "Play this hand now" : `View hand ${hi + 1}`}
+                            onClick={() => setSplitViewIdx(hi)}
+                            className={`min-h-[22px] shrink-0 touch-manipulation rounded-md border px-1 py-px text-[7px] font-extrabold uppercase leading-none whitespace-nowrap min-w-[3.1rem] ${
+                              isActionHere
+                                ? "z-[1] border-2 border-amber-400/80 bg-[#1a1510] text-amber-50 shadow-[0_0_0_1px_rgba(251,191,36,0.35)]"
+                                : splitViewIdx === hi
+                                  ? "border-emerald-600/45 bg-emerald-950/40 text-emerald-100"
+                                  : "border-white/10 bg-black/50 text-zinc-500"
+                            }`}
+                          >
+                            Hand {hi + 1}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
-          ) : null}
+          </div>
         </div>
       </div>
 
-      {/* Bottom controls — fixed height; mobile dock + safe-area (acting row can grow on small screens for tall tap targets) */}
+      {/* Bottom controls — heights unchanged for toast math */}
       <div
-        className={`flex shrink-0 flex-col justify-center gap-0 border-t border-white/5 ${
+        className={`flex shrink-0 flex-col justify-center gap-0 border-t border-white/[0.07] bg-[#05070a] ${
           phase === "acting" && isMyTurn
             ? "max-sm:h-auto max-sm:min-h-0 max-sm:overflow-visible max-sm:py-1 max-sm:pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] sm:h-[3.95rem] sm:overflow-hidden sm:py-0 sm:pb-1 sm:pt-px"
             : "h-[6.25rem] overflow-hidden pb-[max(0.2rem,env(safe-area-inset-bottom,0px))] pt-0 sm:h-[4.5rem] sm:pb-1 sm:pt-px"
         }`}
       >
         {phase === "betting" && mySeat ? (
-          <div className="flex h-full min-h-0 flex-col justify-center gap-0 rounded border border-white/10 bg-black/30 px-1 py-0 sm:px-1.5 sm:py-0">
+          <div className="flex h-full min-h-0 flex-col justify-center gap-0 rounded-t-lg border border-white/[0.08] border-b-0 bg-[#0a0d12] px-1 py-0 sm:px-1.5 sm:py-0">
             <div className="flex min-h-0 w-full min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <div className="relative min-w-0 flex-1">
                 <input
@@ -1291,7 +1344,7 @@ export default function Ov2C21Screen({
                   onChange={e => setPlayDraftStr(e.target.value)}
                   inputMode="numeric"
                   disabled={operateBusy || actionLock || phase !== "betting"}
-                  className="h-10 w-full min-w-0 rounded border border-white/15 bg-black/50 py-0 pl-1.5 pr-9 text-[13px] font-semibold leading-none text-white disabled:opacity-40 sm:text-sm"
+                  className="h-10 w-full min-w-0 rounded-md border border-white/[0.12] bg-[#050708] py-0 pl-1.5 pr-9 text-[13px] font-semibold leading-none text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] disabled:opacity-40 sm:text-sm"
                   aria-label="Play amount"
                 />
                 <button
@@ -1311,7 +1364,7 @@ export default function Ov2C21Screen({
                 type="button"
                 disabled={operateBusy || actionLock || phase !== "betting"}
                 onClick={() => bumpDraftByTableMin()}
-                className="h-10 shrink-0 touch-manipulation rounded border border-white/20 bg-white/10 px-1.5 text-[11px] font-bold leading-none text-zinc-100 disabled:opacity-35 sm:px-2 sm:text-xs"
+                className="h-10 shrink-0 touch-manipulation rounded-md border border-white/[0.14] bg-white/[0.06] px-1.5 text-[11px] font-bold leading-none text-zinc-200 disabled:opacity-35 sm:px-2 sm:text-xs"
               >
                 +{fmt(minBet)}
               </button>
@@ -1327,7 +1380,7 @@ export default function Ov2C21Screen({
                     operateBusy || actionLock || phase !== "betting" || bettingPreRoundFreezeActive
                   }
                   onClick={() => void uncommitPlayAmount()}
-                  className="h-10 min-w-[5.25rem] shrink-0 touch-manipulation rounded border border-rose-500 bg-rose-600 px-2.5 text-[13px] font-extrabold leading-none text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_0_0_1px_rgba(127,29,29,0.45)] disabled:opacity-35 sm:min-w-[5.75rem] sm:px-3 sm:text-sm"
+                  className="h-10 min-w-[5.25rem] shrink-0 touch-manipulation rounded-md border border-rose-900/50 bg-gradient-to-b from-rose-700 to-rose-950 px-2.5 text-[13px] font-extrabold leading-none text-rose-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] disabled:opacity-35 sm:min-w-[5.75rem] sm:px-3 sm:text-sm"
                 >
                   Reverse
                 </button>
@@ -1348,7 +1401,7 @@ export default function Ov2C21Screen({
                     : undefined
                 }
                 onClick={() => void commitPlayAmount()}
-                className="h-10 min-w-[5.25rem] shrink-0 touch-manipulation rounded bg-emerald-600 px-2.5 text-[13px] font-bold leading-none text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500 disabled:shadow-none disabled:saturate-0 sm:min-w-[5.75rem] sm:px-3 sm:text-sm"
+                className="h-10 min-w-[5.25rem] shrink-0 touch-manipulation rounded-md border border-emerald-800/40 bg-gradient-to-b from-emerald-700 to-emerald-950 px-2.5 text-[13px] font-bold leading-none text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:border-zinc-700 disabled:bg-zinc-900 disabled:text-zinc-500 disabled:shadow-none disabled:saturate-0 sm:min-w-[5.75rem] sm:px-3 sm:text-sm"
               >
                 Play
               </button>
@@ -1396,7 +1449,7 @@ export default function Ov2C21Screen({
             ) : null}
           </div>
         ) : phase === "acting" && isMyTurn ? (
-          <div className="grid w-full shrink-0 grid-cols-4 gap-1 px-0.5 sm:gap-0.5 sm:px-0.5">
+          <div className="grid w-full shrink-0 grid-cols-4 gap-1.5 px-1 sm:gap-1 sm:px-1.5">
             {[
               ["hit", "HIT", legal.hit],
               ["stand", "STAND", legal.stand],
@@ -1406,39 +1459,39 @@ export default function Ov2C21Screen({
               // Inline gradient + appearance reset: iOS/Safari often drops Tailwind bg on native <button>.
               const shell =
                 op === "hit"
-                  ? "border-emerald-400/55 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                  ? "border-emerald-700/50 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
                   : op === "stand"
-                    ? "border-blue-400/55 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+                    ? "border-slate-500/45 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
                     : op === "double"
-                      ? "border-orange-400/55 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
-                      : "border-purple-400/55 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]";
+                      ? "border-amber-800/45 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+                      : "border-violet-900/45 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]";
               const fill =
                 op === "hit"
                   ? {
                       WebkitAppearance: "none",
                       appearance: "none",
-                      backgroundColor: "#047857",
-                      backgroundImage: "linear-gradient(180deg,#10b981 0%,#059669 40%,#047857 100%)",
+                      backgroundColor: "#064e3b",
+                      backgroundImage: "linear-gradient(180deg,#0d7a5c 0%,#0a5c45 45%,#052e24 100%)",
                     }
                   : op === "stand"
                     ? {
                         WebkitAppearance: "none",
                         appearance: "none",
-                        backgroundColor: "#1d4ed8",
-                        backgroundImage: "linear-gradient(180deg,#3b82f6 0%,#2563eb 45%,#1e40af 100%)",
+                        backgroundColor: "#1e3a5f",
+                        backgroundImage: "linear-gradient(180deg,#334e68 0%,#243b53 50%,#152535 100%)",
                       }
                     : op === "double"
                       ? {
                           WebkitAppearance: "none",
                           appearance: "none",
-                          backgroundColor: "#c2410c",
-                          backgroundImage: "linear-gradient(180deg,#fb923c 0%,#ea580c 45%,#9a3412 100%)",
+                          backgroundColor: "#7c2d12",
+                          backgroundImage: "linear-gradient(180deg,#9a3412 0%,#7c2d12 50%,#431407 100%)",
                         }
                       : {
                           WebkitAppearance: "none",
                           appearance: "none",
-                          backgroundColor: "#6d28d9",
-                          backgroundImage: "linear-gradient(180deg,#c084fc 0%,#9333ea 45%,#5b21b6 100%)",
+                          backgroundColor: "#4c1d6b",
+                          backgroundImage: "linear-gradient(180deg,#5b21a6 0%,#4c1d6b 50%,#2e1065 100%)",
                         };
               return (
                 <button
@@ -1453,7 +1506,7 @@ export default function Ov2C21Screen({
                     if (e?.phase !== "acting" || !ms || ct?.seatIndex !== ms.seatIndex) return;
                     await onOperate(op);
                   })}
-                  className={`flex min-h-[4.5rem] min-w-0 items-center justify-center touch-manipulation appearance-none rounded border-2 px-0.5 text-base font-bold leading-none tracking-wide text-white disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-[0.65] active:scale-[0.98] sm:min-h-[30px] sm:px-0 sm:py-0.5 sm:text-[11px] ${shell}`}
+                  className={`flex min-h-[4.5rem] min-w-0 items-center justify-center touch-manipulation appearance-none rounded-lg border-2 px-0.5 text-base font-bold leading-none tracking-wide text-white disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-[0.65] active:scale-[0.98] sm:min-h-[30px] sm:px-0 sm:py-0.5 sm:text-[11px] ${shell}`}
                 >
                   {label}
                 </button>
@@ -1466,10 +1519,10 @@ export default function Ov2C21Screen({
       </div>
 
       {showInsuranceModal ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center pointer-events-auto">
-          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-zinc-900 p-4 shadow-xl">
-            <div className="text-center text-sm font-bold text-white">Side cover</div>
-            <p className="mt-2 text-center text-[11px] text-zinc-400">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-[2px] sm:items-center pointer-events-auto">
+          <div className="w-full max-w-sm rounded-2xl border border-amber-900/35 bg-[#0c0f14] p-4 shadow-[0_24px_64px_rgba(0,0,0,0.65)]">
+            <div className="text-center text-xs font-bold uppercase tracking-[0.18em] text-amber-200/85">Side cover</div>
+            <p className="mt-2 text-center text-[11px] leading-snug text-zinc-400">
               The house start card is an ace. Optional cover is up to half of your main play.
             </p>
             <div className="mt-3 flex gap-2">
@@ -1480,7 +1533,7 @@ export default function Ov2C21Screen({
                   if (engineRef.current?.phase !== "insurance") return;
                   await onOperate("insurance_yes");
                 })}
-                className="min-h-[44px] flex-1 touch-manipulation rounded-xl bg-amber-600 py-2 text-xs font-bold tracking-wide disabled:opacity-35"
+                className="min-h-[44px] flex-1 touch-manipulation rounded-xl border border-amber-700/40 bg-gradient-to-b from-amber-800/90 to-amber-950/90 py-2 text-xs font-bold tracking-wide text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] disabled:opacity-35"
               >
                 INSURANCE
               </button>
@@ -1491,7 +1544,7 @@ export default function Ov2C21Screen({
                   if (engineRef.current?.phase !== "insurance") return;
                   await onOperate("insurance_no");
                 })}
-                className="min-h-[44px] flex-1 touch-manipulation rounded-xl border border-white/20 py-2 text-xs font-bold disabled:opacity-35"
+                className="min-h-[44px] flex-1 touch-manipulation rounded-xl border border-white/15 bg-black/40 py-2 text-xs font-bold text-zinc-200 disabled:opacity-35"
               >
                 DECLINE
               </button>
@@ -1519,15 +1572,15 @@ export default function Ov2C21Screen({
               >
                 <button
                   type="button"
-                  className="absolute inset-0 bg-black/50"
+                  className="absolute inset-0 bg-black/55 backdrop-blur-[1px]"
                   aria-label="Close"
                   onClick={() => dismissInspectorSheet({ recordAutoWatchDismiss: true })}
                 />
                 <div
-                  className="relative z-10 flex max-h-[min(72vh,24rem)] w-[min(92vw,17.75rem)] flex-col overflow-hidden rounded-xl border border-zinc-500/50 bg-black shadow-[0_20px_50px_rgba(0,0,0,0.75),0_0_0_1px_rgba(255,255,255,0.06)_inset]"
+                  className="relative z-10 flex max-h-[min(72vh,24rem)] w-[min(92vw,17.75rem)] flex-col overflow-hidden rounded-xl border border-emerald-900/30 bg-[#070a0c] shadow-[0_24px_56px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.05)]"
                   onClick={e => e.stopPropagation()}
                 >
-                  <div className="flex shrink-0 items-start justify-between gap-1 border-b border-zinc-600/70 bg-black px-2 py-1">
+                  <div className="flex shrink-0 items-start justify-between gap-1 border-b border-white/[0.08] bg-[#0a0f12] px-2 py-1.5">
                     <div className="grid min-w-0 flex-1 grid-cols-3 items-center gap-0.5 leading-none">
                       <span className="min-w-0 truncate text-left text-[10px] font-bold text-white">{name}</span>
                       <span className="min-w-0 truncate text-center text-[10px] font-semibold tabular-nums text-zinc-100">
@@ -1549,7 +1602,7 @@ export default function Ov2C21Screen({
                       ×
                     </button>
                   </div>
-                  <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-neutral-950 px-2 py-3">
+                  <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-[#050808] px-2 py-3">
                     {h.length ? (
                       <SeatHandRow
                         hand={h}
@@ -1561,7 +1614,7 @@ export default function Ov2C21Screen({
                     )}
                   </div>
                   {nh > 1 ? (
-                    <div className="min-w-0 shrink-0 overflow-x-auto overflow-y-visible border-t border-zinc-700/80 bg-black px-1 py-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="min-w-0 shrink-0 overflow-x-auto overflow-y-visible border-t border-white/[0.06] bg-[#080c0f] px-1 py-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       <div className="flex w-max min-w-full flex-nowrap justify-center gap-1">
                         {(s.hands || []).map((_, b) => {
                           const isAct =
@@ -1597,12 +1650,12 @@ export default function Ov2C21Screen({
       {resultToastOpen && mySummary ? (
         <div className="pointer-events-none fixed bottom-[calc(5.35rem+0.25rem+env(safe-area-inset-bottom,0px))] left-2 right-2 z-30 mx-auto max-w-lg sm:bottom-[calc(3.95rem+0.25rem+env(safe-area-inset-bottom,0px))]">
           <div
-            className={`rounded-xl border bg-zinc-950/95 px-3 py-2 shadow-lg backdrop-blur-sm ${
+            className={`rounded-xl border px-3 py-2.5 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-md ${
               Number(mySummary.vaultDelta) < 0
-                ? "border-rose-500/45"
+                ? "border-rose-500/40 bg-[#14080a]/95"
                 : Number(mySummary.vaultDelta) > 0
-                  ? "border-emerald-500/35"
-                  : "border-zinc-500/35"
+                  ? "border-emerald-600/35 bg-[#06120e]/95"
+                  : "border-zinc-600/30 bg-[#0a0c10]/95"
             }`}
           >
             <div
