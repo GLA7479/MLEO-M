@@ -324,8 +324,8 @@ export default function Ov2CcScreen({
               <div className="pointer-events-none absolute inset-[7px] rounded-[1.05rem] border border-white/[0.06] max-sm:inset-[5px] sm:inset-3 sm:rounded-[1.35rem] md:rounded-[1.55rem]" />
 
               <div className="relative z-[4] flex min-h-0 flex-1 flex-col">
-                <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto overflow-x-hidden px-[7%] py-2 max-sm:px-[6%] sm:px-[13%] sm:py-4 md:px-[15%] md:py-[8%]">
-                  <div className="flex w-full max-w-md flex-col items-center gap-1.5 sm:max-w-lg sm:gap-2.5 md:gap-3">
+                <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-1 pb-2 max-sm:px-[6%] sm:px-[13%] sm:pt-2 sm:pb-3 md:px-[15%] md:pt-2 md:pb-4">
+                  <div className="flex w-full max-w-md flex-col items-center gap-1 sm:max-w-lg sm:gap-2 md:gap-2.5">
                   <p className="text-center text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[9px]">
                     {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
                     {bb}
@@ -362,7 +362,7 @@ export default function Ov2CcScreen({
                     ) : null}
                   </div>
 
-                  <div className="flex min-h-[3rem] flex-wrap items-center justify-center gap-1.5 drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.35rem] sm:gap-2 md:min-h-[3.6rem]">
+                  <div className="flex min-h-[2.75rem] flex-wrap items-center justify-center gap-1.5 drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.1rem] sm:gap-2 md:min-h-[3.35rem]">
                     {(communityCards || []).length ? (
                       (communityCards || []).map((c, idx) => (
                         <Ov2CcPlayingCard
@@ -373,7 +373,7 @@ export default function Ov2CcScreen({
                         />
                       ))
                     ) : (
-                      <div className="flex h-[3rem] items-center sm:h-[3.35rem]">
+                      <div className="flex h-[2.75rem] items-center sm:h-[3.1rem]">
                         <span className="text-[10px] font-medium tracking-wide text-emerald-200/30 sm:text-[11px]">
                           Community cards
                         </span>
@@ -398,7 +398,7 @@ export default function Ov2CcScreen({
                     </p>
                   ) : null}
 
-                  <div className="flex min-h-[3.5rem] w-full max-w-sm shrink-0 flex-col items-center justify-center sm:min-h-[3.25rem]">
+                  <div className="flex min-h-0 w-full max-w-sm shrink-0 flex-col items-center justify-center">
                     {engine.winnersDisplay?.seats?.length ? (
                       <div className="max-w-sm rounded-lg border border-emerald-500/22 bg-black/35 px-2.5 py-1.5 text-center text-[10px] text-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl sm:px-3 sm:py-2 sm:text-[11px]">
                         <p className="font-semibold text-emerald-100">
