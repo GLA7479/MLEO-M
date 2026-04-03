@@ -41,17 +41,12 @@ export default async function handler(req, res) {
     const wholeAmount = Math.max(0, Math.floor(Number(amount) || 0));
 
     const envPw = process.env.MLEO_DEV_VAULT_CREDIT_PASSWORD;
-    let expectedPassword;
-    if (isProd && allowOnProd) {
-      expectedPassword = typeof envPw === "string" && envPw.length > 0 ? envPw : null;
-      if (!expectedPassword) {
-        return res.status(503).json({
-          success: false,
-          message: "Dev credit enabled but MLEO_DEV_VAULT_CREDIT_PASSWORD is not set",
-        });
-      }
-    } else {
-      expectedPassword = typeof envPw === "string" && envPw.length > 0 ? envPw : "7479";
+    const expectedPassword =
+      typeof envPw === "string" && envPw.length > 0 ? envPw : "7479";
+    if (isProd && allowOnProd && !(typeof envPw === "string" && envPw.length > 0)) {
+      console.warn(
+        "[mleo] dev-credit: MLEO_DEV_VAULT_CREDIT_PASSWORD is not set; using default password. Set MLEO_DEV_VAULT_CREDIT_PASSWORD on the host for a private staging secret."
+      );
     }
 
     if (password !== expectedPassword) {
