@@ -1050,7 +1050,7 @@ export default function Ov2C21Screen({
         className={`flex shrink-0 flex-col justify-center gap-0 border-t border-white/5 ${
           phase === "acting" && isMyTurn
             ? "max-sm:h-auto max-sm:min-h-0 max-sm:overflow-visible max-sm:py-1 max-sm:pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] sm:h-[3.95rem] sm:overflow-hidden sm:py-0 sm:pb-1 sm:pt-px"
-            : "h-[5.35rem] overflow-hidden pb-[max(0.2rem,env(safe-area-inset-bottom,0px))] pt-0 sm:h-[3.95rem] sm:pb-1 sm:pt-px"
+            : "h-[6.25rem] overflow-hidden pb-[max(0.2rem,env(safe-area-inset-bottom,0px))] pt-0 sm:h-[4.5rem] sm:pb-1 sm:pt-px"
         }`}
       >
         {phase === "betting" && mySeat ? (
@@ -1062,18 +1062,18 @@ export default function Ov2C21Screen({
                   onChange={e => setPlayDraftStr(e.target.value)}
                   inputMode="numeric"
                   disabled={operateBusy || actionLock || phase !== "betting"}
-                  className="h-7 w-full min-w-0 rounded border border-white/15 bg-black/50 py-0 pl-1 pr-6 text-[10px] font-semibold leading-none text-white disabled:opacity-40"
+                  className="h-10 w-full min-w-0 rounded border border-white/15 bg-black/50 py-0 pl-1.5 pr-9 text-[11px] font-semibold leading-none text-white disabled:opacity-40"
                   aria-label="Play amount"
                 />
                 <button
                   type="button"
                   disabled={operateBusy || actionLock || phase !== "betting"}
                   onClick={() => setPlayDraftStr(String(minBet))}
-                  className="absolute right-0.5 top-1/2 flex h-5 w-5 -translate-y-1/2 touch-manipulation items-center justify-center rounded text-zinc-400 hover:bg-white/10 hover:text-zinc-100 disabled:pointer-events-none disabled:opacity-35"
+                  className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 touch-manipulation items-center justify-center rounded text-zinc-300 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-35"
                   aria-label="Reset amount to table minimum"
                   title="Reset to table minimum"
                 >
-                  <span className="text-[13px] leading-none" aria-hidden>
+                  <span className="text-[19px] leading-none" aria-hidden>
                     ↺
                   </span>
                 </button>
@@ -1082,7 +1082,7 @@ export default function Ov2C21Screen({
                 type="button"
                 disabled={operateBusy || actionLock || phase !== "betting"}
                 onClick={() => bumpDraftByTableMin()}
-                className="h-7 shrink-0 touch-manipulation rounded border border-white/20 bg-white/10 px-1 text-[8px] font-bold leading-none text-zinc-100 disabled:opacity-35"
+                className="h-10 shrink-0 touch-manipulation rounded border border-white/20 bg-white/10 px-1.5 text-[9px] font-bold leading-none text-zinc-100 disabled:opacity-35 sm:px-2 sm:text-[10px]"
               >
                 +{fmt(minBet)}
               </button>
@@ -1098,7 +1098,7 @@ export default function Ov2C21Screen({
                     operateBusy || actionLock || phase !== "betting" || bettingPreRoundFreezeActive
                   }
                   onClick={() => void uncommitPlayAmount()}
-                  className="h-7 shrink-0 touch-manipulation rounded border border-rose-500 bg-rose-600 px-1.5 text-[8px] font-extrabold leading-none text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_0_0_1px_rgba(127,29,29,0.45)] disabled:opacity-35"
+                  className="h-10 min-w-[4.25rem] shrink-0 touch-manipulation rounded border border-rose-500 bg-rose-600 px-2.5 text-[11px] font-extrabold leading-none text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_0_0_1px_rgba(127,29,29,0.45)] disabled:opacity-35 sm:min-w-[4.5rem] sm:px-3 sm:text-xs"
                 >
                   Reverse
                 </button>
@@ -1109,7 +1109,7 @@ export default function Ov2C21Screen({
                   operateBusy || actionLock || phase !== "betting" || !draftPlayValid || !vaultOkForCommit
                 }
                 onClick={() => void commitPlayAmount()}
-                className="h-7 shrink-0 touch-manipulation rounded bg-emerald-600 px-1.5 text-[8px] font-bold leading-none text-white disabled:opacity-35"
+                className="h-10 min-w-[5.25rem] shrink-0 touch-manipulation rounded bg-emerald-600 px-2.5 text-[11px] font-bold leading-none text-white disabled:opacity-35 sm:min-w-[5.75rem] sm:px-3 sm:text-xs"
               >
                 Commit play
               </button>
