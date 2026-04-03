@@ -351,21 +351,18 @@ export default function Ov2C21LiveShell() {
             aria-checked={autoWatchEnabled}
             title="Open the small hand panel for whoever is acting (not you); hides on your turn."
             onClick={() => setAutoWatchEnabled(v => !v)}
-            className={`h-9 shrink-0 touch-manipulation rounded border px-1 py-0 text-center font-extrabold uppercase leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition enabled:active:scale-[0.98] sm:px-1.5 ${
+            className={`${OV2_HUD_CHROME_BTN} min-w-[6.2rem] gap-0.5 px-2 whitespace-nowrap sm:min-w-[6.85rem] sm:px-2.5 ${
               autoWatchEnabled
-                ? "border-emerald-500/55 bg-emerald-950/55 text-emerald-100"
-                : "border-white/18 bg-zinc-950/90 text-zinc-400"
+                ? "border-emerald-500/40 bg-emerald-950/35 text-emerald-50 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.18)] hover:border-emerald-400/45 hover:bg-emerald-950/48 active:border-emerald-200/55 active:bg-emerald-400/40 active:text-white active:shadow-[inset_0_0_0_1px_rgba(167,243,208,0.5),0_0_16px_rgba(52,211,153,0.45)]"
+                : "active:border-white/35 active:bg-white/[0.26] active:text-white active:shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]"
             }`}
           >
-            <span className="flex flex-col items-center justify-center gap-0 leading-none">
-              {autoWatchEnabled ? (
-                <span className="text-[10px] leading-none text-emerald-200 sm:text-[11px]" aria-hidden>
-                  ✓
-                </span>
-              ) : null}
-              <span className="text-[7px] tracking-wide sm:text-[8px]">AUTO</span>
-              <span className="text-[7px] tracking-wide sm:text-[8px]">WATCH</span>
-            </span>
+            {autoWatchEnabled ? (
+              <span className="text-emerald-300" aria-hidden>
+                ✓
+              </span>
+            ) : null}
+            <span>Auto watch</span>
           </button>
           <button
             type="button"
