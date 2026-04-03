@@ -10,13 +10,16 @@ import {
   OV2_SHARED_LAST_ROOM_SESSION_KEY,
 } from "../../lib/online-v2/onlineV2GameRegistry";
 import { getOv2ParticipantId } from "../../lib/online-v2/ov2ParticipantId";
+import {
+  OV2_SHARED_DISPLAY_NAME_KEY,
+  readOv2SharedDisplayName,
+  writeOv2SharedDisplayName,
+} from "../../lib/online-v2/ov2SharedDisplayName";
 import { getOv2RoomSnapshot } from "../../lib/online-v2/room-api/ov2SharedRoomsApi";
 import OnlineV2ReservedAdSlot from "./OnlineV2ReservedAdSlot";
 import OnlineV2VaultStrip from "./OnlineV2VaultStrip";
 import Ov2SharedLobbyScreen from "./shared-rooms/Ov2SharedLobbyScreen";
 import Ov2SharedRoomScreen from "./shared-rooms/Ov2SharedRoomScreen";
-
-const OV2_DISPLAY_NAME_KEY = "ov2_display_name_v1";
 
 function isOv2HubEnabled() {
   if (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_ONLINE_V2_ENABLED === "false") {
@@ -31,14 +34,9 @@ export default function OnlineV2RoomsScreen() {
   const [participantId, setParticipantId] = useState(() =>
     typeof window !== "undefined" ? getOv2ParticipantId() : ""
   );
-  const [displayName, setDisplayName] = useState(() => {
-    if (typeof window === "undefined") return "";
-    try {
-      return window.localStorage.getItem(OV2_DISPLAY_NAME_KEY) || "";
-    } catch {
-      return "";
-    }
-  });
+  const [displayName, setDisplayName] = useState(() =>
+    typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
+  );
   const [selectedRoomId, setSelectedRoomId] = useState(null);
   const sessionResumeTriedRef = useRef(false);
   /** After `exitRoom`, Next may still expose old `?room=` briefly; avoid snapping back into the room. */
@@ -49,9 +47,17 @@ export default function OnlineV2RoomsScreen() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(OV2_DISPLAY_NAME_KEY, displayName || "");
+    writeOv2SharedDisplayName(displayName || "");
   }, [displayName]);
+
+  useEffect(() => {
+    const onStorage = e => {
+      if (e.key !== OV2_SHARED_DISPLAY_NAME_KEY || e.storageArea !== window.localStorage) return;
+      setDisplayName(e.newValue ?? "");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const enterRoom = useCallback(
     roomId => {

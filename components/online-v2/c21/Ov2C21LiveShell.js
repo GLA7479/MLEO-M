@@ -15,9 +15,12 @@ import {
   OV2_C21_TURN_MS,
 } from "../../../lib/online-v2/c21/ov2C21ClientConstants";
 import { isOv2RoomIdQueryParam } from "../../../lib/online-v2/onlineV2GameRegistry";
+import {
+  OV2_SHARED_DISPLAY_NAME_KEY,
+  readOv2SharedDisplayName,
+  writeOv2SharedDisplayName,
+} from "../../../lib/online-v2/ov2SharedDisplayName";
 import { supabaseMP } from "../../../lib/supabaseClients";
-
-const NAME_LS = "ov2_c21_display_name_v1";
 
 function parseRoomQuery(router) {
   if (!router.isReady) return null;
@@ -166,7 +169,9 @@ export default function Ov2C21LiveShell() {
   const router = useRouter();
   const roomId = useMemo(() => parseRoomQuery(router), [router.isReady, router.query.room]);
   const [tableStake, setTableStake] = useState(10_000);
-  const [nameDraft, setNameDraft] = useState("");
+  const [nameDraft, setNameDraft] = useState(() =>
+    typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
+  );
   const [autoWatchEnabled, setAutoWatchEnabled] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const leaveInFlightRef = useRef(false);
@@ -214,12 +219,16 @@ export default function Ov2C21LiveShell() {
   );
 
   useEffect(() => {
-    try {
-      const n = window.localStorage.getItem(NAME_LS);
-      if (n) setNameDraft(n);
-    } catch {
-      /* ignore */
-    }
+    writeOv2SharedDisplayName(nameDraft);
+  }, [nameDraft]);
+
+  useEffect(() => {
+    const onStorage = e => {
+      if (e.key !== OV2_SHARED_DISPLAY_NAME_KEY || e.storageArea !== window.localStorage) return;
+      setNameDraft(e.newValue ?? "");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   useEffect(() => {
@@ -270,11 +279,7 @@ export default function Ov2C21LiveShell() {
   }, [roomId, router, runC21Op]);
 
   const persistName = () => {
-    try {
-      window.localStorage.setItem(NAME_LS, displayName);
-    } catch {
-      /* ignore */
-    }
+    writeOv2SharedDisplayName(nameDraft);
   };
 
   if (!roomId) {
