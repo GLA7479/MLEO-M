@@ -325,7 +325,7 @@ export default function Ov2CcScreen({
 
               <div className="relative z-[4] flex min-h-0 flex-1 flex-col">
                 <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-1 pb-2 max-sm:px-[6%] sm:px-[13%] sm:pt-2 sm:pb-3 md:px-[15%] md:pt-2 md:pb-4">
-                  <div className="flex w-full max-w-md flex-col items-center gap-1 max-sm:translate-y-2.5 sm:max-w-lg sm:gap-2 md:gap-2.5">
+                  <div className="flex w-full max-w-md flex-col items-center gap-1 sm:max-w-lg sm:gap-2 md:gap-2.5">
                   <p className="text-center text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[9px]">
                     {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
                     {bb}
@@ -362,7 +362,7 @@ export default function Ov2CcScreen({
                     ) : null}
                   </div>
 
-                  <div className="flex min-h-[2.75rem] flex-wrap items-center justify-center gap-1.5 drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.1rem] sm:gap-2 md:min-h-[3.35rem]">
+                  <div className="relative z-[1] flex min-h-[2.75rem] flex-wrap items-center justify-center gap-1.5 max-sm:drop-shadow-[0_3px_8px_rgba(0,0,0,0.32)] drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.1rem] sm:gap-2 md:min-h-[3.35rem]">
                     {(communityCards || []).length ? (
                       (communityCards || []).map((c, idx) => (
                         <Ov2CcPlayingCard
@@ -381,12 +381,12 @@ export default function Ov2CcScreen({
                     )}
                   </div>
 
-                  <div className="flex flex-col items-center gap-0.5">
+                  <div className="relative z-[2] flex max-sm:mt-1 flex-col items-center gap-0.5">
                     <span className="text-[7px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[8px]">
                       Pot
                     </span>
-                    <div className="rounded-xl border border-black/35 bg-black/45 px-5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_6px_20px_rgba(0,0,0,0.42)] sm:rounded-2xl sm:px-7 sm:py-2">
-                      <span className="font-mono text-lg font-bold tabular-nums tracking-tight text-amber-100 sm:text-xl md:text-2xl">
+                    <div className="flex min-h-[2.4rem] items-center justify-center overflow-visible rounded-xl border border-black/35 bg-black/45 px-5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_6px_20px_rgba(0,0,0,0.42)] sm:rounded-2xl sm:px-7 sm:py-2.5">
+                      <span className="relative block translate-y-px text-[17px] font-extrabold leading-none text-amber-100 sm:translate-y-0 sm:font-mono sm:text-xl sm:font-bold sm:leading-[1.25] sm:tabular-nums md:text-2xl">
                         {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
                       </span>
                     </div>
