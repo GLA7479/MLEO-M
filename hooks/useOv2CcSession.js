@@ -334,13 +334,25 @@ export function useOv2CcSession(roomId) {
 
   useEffect(() => {
     if (!roomId) return undefined;
-    const id = window.setInterval(() => {
+    let cancelled = false;
+    let timeoutId = 0;
+
+    const runTickOnce = async () => {
+      if (cancelled || tickBusyRef.current) return;
       const now = Date.now();
-      if (now - lastTickAtRef.current < 900) return;
-      if (tickBusyRef.current) return;
+      if (now - lastTickAtRef.current < 850) return;
       tickBusyRef.current = true;
       lastTickAtRef.current = now;
-      void (async () => {
+      const applyTickJson = async json => {
+        ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
+        if (json?.vaultEffects?.length) {
+          await applyVaultEffects(json.vaultEffects, participantKey);
+        }
+        if (shouldPullAuthoritativeVaultAfterCc(json)) {
+          await pullAuthoritativeVaultAfterCc();
+        }
+      };
+      try {
         try {
           const json = await postOv2CcOperate({
             roomId,
@@ -348,23 +360,49 @@ export function useOv2CcSession(roomId) {
             op: "tick",
             payload: {},
           });
-          ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
-          if (json?.vaultEffects?.length) {
-            await applyVaultEffects(json.vaultEffects, participantKey);
-          }
-          if (shouldPullAuthoritativeVaultAfterCc(json)) {
-            await pullAuthoritativeVaultAfterCc();
-          }
+          await applyTickJson(json);
         } catch (e) {
-          if (typeof console !== "undefined" && console.warn) {
+          const code = e?.payload?.code ?? e?.code;
+          const status = e?.status ?? e?.payload?.status;
+          const snap =
+            e?.payload &&
+            typeof e.payload === "object" &&
+            e.payload.engine &&
+            typeof e.payload.engine === "object" &&
+            e.payload.revision != null;
+          if ((code === "REVISION_CONFLICT" || status === 409) && snap) {
+            ingestOperateJson(e.payload, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
+            await new Promise(r => window.setTimeout(r, 40));
+            const json2 = await postOv2CcOperate({
+              roomId,
+              participantKey,
+              op: "tick",
+              payload: {},
+            });
+            await applyTickJson(json2);
+          } else if (typeof console !== "undefined" && console.warn) {
             console.warn("[ov2-cc] tick failed", e?.message || e);
           }
-        } finally {
-          tickBusyRef.current = false;
         }
-      })();
-    }, 1000);
-    return () => window.clearInterval(id);
+      } finally {
+        tickBusyRef.current = false;
+      }
+    };
+
+    const schedule = () => {
+      if (cancelled) return;
+      const delay = 950 + Math.floor(Math.random() * 550);
+      timeoutId = window.setTimeout(async () => {
+        await runTickOnce();
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+    return () => {
+      cancelled = true;
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
   }, [roomId, participantKey]);
 
   return {

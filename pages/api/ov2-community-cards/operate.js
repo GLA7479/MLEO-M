@@ -193,7 +193,8 @@ export default async function handler(req, res) {
       }
     }
 
-    const maxAttempts = 6;
+    // Many browsers send `tick` concurrently; CAS conflicts are expected — ticks need more retries than seat actions.
+    const maxAttempts = op === "tick" ? 24 : 6;
     let lastConflict = false;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
