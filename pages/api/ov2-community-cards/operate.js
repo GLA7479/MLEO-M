@@ -261,6 +261,28 @@ export default async function handler(req, res) {
         config,
       });
 
+      if (result.leaveNotSeatedNoop) {
+        const publicEngine = buildPublicEngineView(result.engine, result.privatePayload);
+        const viewerHoleCards = extractViewerHoleCards(result.privatePayload, result.engine, participantKey);
+        ccOperateLog({
+          tableId: roomId,
+          op,
+          leaveNotSeatedNoop: true,
+          serverRevision: prevRevision,
+        });
+        return res.status(200).json({
+          ok: true,
+          leaveNotSeatedNoop: true,
+          engine: publicEngine,
+          viewerHoleCards,
+          revision: prevRevision,
+          matchSeq: matchSeqBefore,
+          vaultEffects: [],
+          localVaultRefreshHint: false,
+          vaultTouchedForCaller: false,
+        });
+      }
+
       if (result.error) {
         const errEng = result.engine;
         const errPriv = result.privatePayload;
