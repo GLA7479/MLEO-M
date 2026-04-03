@@ -351,10 +351,11 @@ export default function Ov2C21LiveShell() {
             aria-checked={autoWatchEnabled}
             title="Open the small hand panel for whoever is acting (not you); hides on your turn."
             onClick={() => setAutoWatchEnabled(v => !v)}
-            className={`${OV2_HUD_CHROME_BTN} min-w-[6.2rem] gap-0.5 px-2 whitespace-nowrap sm:min-w-[6.85rem] sm:px-2.5 ${
+            style={{ WebkitTapHighlightColor: "rgba(52, 211, 153, 0.35)" }}
+            className={`relative z-10 inline-flex h-9 min-w-[6.2rem] shrink-0 touch-manipulation select-none items-center justify-center gap-0.5 rounded-full border px-2 text-[11px] font-semibold whitespace-nowrap transition-all duration-150 ease-out sm:h-9 sm:min-w-[6.85rem] sm:px-2.5 sm:text-[11px] lg:h-8 lg:min-h-[32px] lg:px-2.5 lg:text-[11px] ${
               autoWatchEnabled
-                ? "border-emerald-500/40 bg-emerald-950/35 text-emerald-50 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.18)] hover:border-emerald-400/45 hover:bg-emerald-950/48 active:border-emerald-200/55 active:bg-emerald-400/40 active:text-white active:shadow-[inset_0_0_0_1px_rgba(167,243,208,0.5),0_0_16px_rgba(52,211,153,0.45)]"
-                : "active:border-white/35 active:bg-white/[0.26] active:text-white active:shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]"
+                ? "border-emerald-400/60 bg-emerald-800/55 text-emerald-50 shadow-[inset_0_0_22px_rgba(52,211,153,0.35),inset_0_0_0_1px_rgba(167,243,208,0.45)] hover:border-emerald-300/70 hover:bg-emerald-700/50 hover:shadow-[inset_0_0_28px_rgba(52,211,153,0.42)] active:scale-[0.97] active:border-emerald-100/50 active:bg-emerald-500/50 active:text-white active:shadow-[inset_0_0_40px_rgba(190,242,100,0.45),inset_0_0_0_2px_rgba(236,253,245,0.65)]"
+                : "border-white/22 bg-white/[0.1] text-white/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_0_14px_rgba(255,255,255,0.05)] hover:border-white/32 hover:bg-white/[0.15] active:scale-[0.97] active:border-white/45 active:bg-white/[0.32] active:text-white active:shadow-[inset_0_0_28px_rgba(255,255,255,0.2),inset_0_0_0_1px_rgba(255,255,255,0.35)]"
             }`}
           >
             {autoWatchEnabled ? (
