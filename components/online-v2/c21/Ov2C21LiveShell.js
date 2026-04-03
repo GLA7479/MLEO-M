@@ -305,10 +305,6 @@ export default function Ov2C21LiveShell() {
             />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-            <p className="mb-2 text-center text-[11px] text-zinc-400">
-              Five always-on tables. Open one to spectate or sit; leaving via Tables keeps your seat until you Leave table
-              or miss two rounds without a play.
-            </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {OV2_C21_STAKE_TIERS.map(tier => {
                 const id = OV2_C21_ROOM_ID_BY_STAKE[tier];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
 import { OV2_HUD_CHROME_BTN } from "../OnlineV2GameHudOverlays";
@@ -168,39 +168,34 @@ export default function Ov2CcLiveShell() {
             />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-            <p className="mb-2 text-center text-[11px] text-zinc-400">
-              Pick a table level and size (5-max or 9-max). Tables keeps your seat on refresh until you leave or sit-out rules
-              remove you.
-            </p>
-            <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-2">
               {OV2_CC_STAKE_TIERS.map(tier => {
                 const ids = OV2_CC_ROOMS_BY_STAKE[tier];
                 return (
-                  <div key={tier} className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                    <p className="mb-2 text-center text-xs font-bold text-zinc-200">{formatTierLabel(tier)} level</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        className="rounded-xl border border-violet-500/35 bg-violet-950/25 py-3 text-sm font-bold text-violet-100 touch-manipulation"
-                        onClick={() => {
-                          persistName();
-                          router.push(`/ov2-community-cards?room=${ids.max5}`);
-                        }}
-                      >
-                        5-max
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-xl border border-violet-500/35 bg-violet-950/25 py-3 text-sm font-bold text-violet-100 touch-manipulation"
-                        onClick={() => {
-                          persistName();
-                          router.push(`/ov2-community-cards?room=${ids.max9}`);
-                        }}
-                      >
-                        9-max
-                      </button>
-                    </div>
-                  </div>
+                  <Fragment key={tier}>
+                    <button
+                      type="button"
+                      className="flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-emerald-500/35 bg-emerald-950/25 px-2 py-3 text-sm font-bold text-emerald-100 touch-manipulation active:scale-[0.99]"
+                      onClick={() => {
+                        persistName();
+                        router.push(`/ov2-community-cards?room=${ids.max5}`);
+                      }}
+                    >
+                      <span>{formatTierLabel(tier)}</span>
+                      <span className="text-[9px] font-normal text-emerald-200/70">5-max</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-violet-500/35 bg-violet-950/25 px-2 py-3 text-sm font-bold text-violet-100 touch-manipulation active:scale-[0.99]"
+                      onClick={() => {
+                        persistName();
+                        router.push(`/ov2-community-cards?room=${ids.max9}`);
+                      }}
+                    >
+                      <span>{formatTierLabel(tier)}</span>
+                      <span className="text-[9px] font-normal text-violet-200/70">9-max</span>
+                    </button>
+                  </Fragment>
                 );
               })}
             </div>
