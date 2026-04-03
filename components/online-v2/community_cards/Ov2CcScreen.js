@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isOv2CcHandBettingLive } from "../../../lib/online-v2/community_cards/ov2CcClientConstants";
-import { ov2CcSeatRingPercent } from "../../../lib/online-v2/community_cards/ov2CcSeatRingGeometry";
+import {
+  ov2CcSeatRingBreakpointFromWidth,
+  ov2CcSeatRingPercent,
+} from "../../../lib/online-v2/community_cards/ov2CcSeatRingGeometry";
 import Ov2CcPlayingCard from "./Ov2CcPlayingCard";
 
 export default function Ov2CcScreen({
@@ -114,14 +117,13 @@ export default function Ov2CcScreen({
     return () => window.clearInterval(id);
   }, [engine?.phase, engine?.phaseEndsAt]);
 
-  const [wideSeatRing, setWideSeatRing] = useState(false);
+  const [seatRingBp, setSeatRingBp] = useState("mo");
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    const mq = window.matchMedia("(min-width: 640px)");
-    const apply = () => setWideSeatRing(mq.matches);
+    const apply = () => setSeatRingBp(ov2CcSeatRingBreakpointFromWidth(window.innerWidth));
     apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
   }, []);
 
   if (!engine) {
@@ -201,7 +203,7 @@ export default function Ov2CcScreen({
   const renderSeatNode = (s, i) => {
     const isYou = s.participantKey === participantKey;
     const isAct = engine.actionSeat === i;
-    const pos = ov2CcSeatRingPercent(maxSeats, i, wideSeatRing);
+    const pos = ov2CcSeatRingPercent(maxSeats, i, seatRingBp);
     return (
       <div
         key={i}
