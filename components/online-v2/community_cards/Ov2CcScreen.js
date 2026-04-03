@@ -76,10 +76,10 @@ export default function Ov2CcScreen({
   }, [canAct, engine?.actionDeadline, clock]);
 
   const otherTurnSeconds = useMemo(() => {
-    if (!handBettingLive || engine.actionSeat == null || canAct || !engine?.actionDeadline) return null;
+    if (!handBettingLive || engine?.actionSeat == null || canAct || !engine?.actionDeadline) return null;
     void clock;
     return Math.max(0, Math.ceil((Number(engine.actionDeadline) - Date.now()) / 1000));
-  }, [handBettingLive, engine.actionSeat, engine?.actionDeadline, canAct, clock]);
+  }, [handBettingLive, engine?.actionSeat, engine?.actionDeadline, canAct, clock]);
 
   const doOp = useCallback(async (op, payload = {}) => onOperate(op, payload), [onOperate]);
 
@@ -294,10 +294,10 @@ export default function Ov2CcScreen({
       : [];
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-0.5 overflow-hidden bg-[#050708] text-zinc-100 sm:gap-1.5">
-      <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-1 sm:gap-2 lg:max-w-6xl lg:gap-2.5">
-        <div className="relative flex min-h-0 min-h-[280px] flex-1 flex-col max-sm:min-h-[260px]">
-          <div className="relative mx-auto h-full w-full max-w-[920px] min-h-[min(64vh,480px)] flex-1 rounded-[1.65rem] border border-black/55 bg-gradient-to-b from-[#5c4030] via-[#2e1e16] to-[#120b08] p-[3px] shadow-[0_28px_72px_rgba(0,0,0,0.58),inset_0_1px_0_rgba(255,255,255,0.06)] max-sm:min-h-[min(66vh,520px)] sm:min-h-[min(56vh,440px)] sm:rounded-[2.35rem] sm:p-1 md:min-h-[min(58vh,500px)] lg:rounded-[2.55rem] lg:p-[7px]">
+    <div className="flex h-full min-h-0 flex-col gap-0 overflow-hidden bg-[#050708] text-zinc-100 max-sm:gap-0 sm:gap-1.5">
+      <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-0 max-sm:gap-0 sm:gap-2 lg:max-w-6xl lg:gap-2.5">
+        <div className="relative flex min-h-0 min-h-[260px] flex-1 flex-col max-sm:min-h-[240px]">
+          <div className="relative mx-auto h-full w-full max-w-[920px] min-h-[min(64vh,480px)] flex-1 rounded-[1.55rem] border border-black/55 bg-gradient-to-b from-[#5c4030] via-[#2e1e16] to-[#120b08] p-[2px] shadow-[0_28px_72px_rgba(0,0,0,0.58),inset_0_1px_0_rgba(255,255,255,0.06)] max-sm:min-h-[min(74vh,600px)] sm:min-h-[min(56vh,440px)] sm:rounded-[2.35rem] sm:p-1 md:min-h-[min(58vh,500px)] lg:rounded-[2.55rem] lg:p-[7px]">
             <div
               className="relative h-full min-h-0 w-full overflow-hidden rounded-[1.45rem] border border-black/45 shadow-[inset_0_2px_24px_rgba(0,0,0,0.35)] sm:rounded-[1.85rem] md:rounded-[2.05rem]"
               style={{
@@ -312,10 +312,10 @@ export default function Ov2CcScreen({
                     "radial-gradient(ellipse 58% 42% at 50% 36%, rgba(255,255,255,0.09) 0%, transparent 52%)",
                 }}
               />
-              <div className="pointer-events-none absolute inset-[6px] rounded-[1.25rem] border border-black/25 sm:inset-2 sm:rounded-[1.55rem] md:rounded-[1.75rem]" />
-              <div className="pointer-events-none absolute inset-[10px] rounded-[1.1rem] border border-white/[0.06] sm:inset-3 sm:rounded-[1.35rem] md:rounded-[1.55rem]" />
+              <div className="pointer-events-none absolute inset-[4px] rounded-[1.2rem] border border-black/25 max-sm:inset-[3px] sm:inset-2 sm:rounded-[1.55rem] md:rounded-[1.75rem]" />
+              <div className="pointer-events-none absolute inset-[7px] rounded-[1.05rem] border border-white/[0.06] max-sm:inset-[5px] sm:inset-3 sm:rounded-[1.35rem] md:rounded-[1.55rem]" />
 
-              <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center px-[8%] py-[11%] max-sm:px-[7%] max-sm:py-[10%] sm:px-[13%] sm:py-[17%] md:px-[15%] md:py-[20%]">
+              <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center px-[7%] py-[9%] max-sm:px-[6%] max-sm:pb-[30%] max-sm:pt-[7%] sm:px-[13%] sm:py-[17%] md:px-[15%] md:py-[20%]">
                 <div className="flex w-full max-w-md flex-col items-center gap-1.5 sm:max-w-lg sm:gap-2.5 md:gap-3">
                   <p className="text-center text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[9px]">
                     {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
@@ -407,27 +407,38 @@ export default function Ov2CcScreen({
                 </div>
               </div>
 
-              <div className="pointer-events-none absolute right-[1%] top-[18%] z-[6] flex max-w-[46%] flex-col items-end gap-1 pr-0.5 sm:right-[1.5%] sm:top-[20%] md:max-w-[38%]">
+              <div
+                className="pointer-events-none absolute right-2 top-2 z-[12] flex max-w-[min(42vw,9.5rem)] flex-col items-end gap-0.5 sm:right-3 sm:top-3 sm:max-w-[11rem] md:max-w-[12rem]"
+                aria-live="polite"
+              >
                 {canAct && turnSecondsLeft != null ? (
-                  <div className="rounded-full border border-amber-500/28 bg-black/50 px-2.5 py-1 text-[9px] font-semibold text-amber-100 shadow-[0_4px_14px_rgba(0,0,0,0.32)] sm:px-3 sm:text-[10px]">
-                    Your turn · <span className="tabular-nums">{turnSecondsLeft}</span>s
+                  <div
+                    className="rounded-lg border border-amber-500/30 bg-black/55 px-2 py-1 text-right shadow-[0_4px_14px_rgba(0,0,0,0.35)] sm:rounded-full sm:px-2.5 sm:py-1"
+                    aria-label="Your turn"
+                  >
+                    <span className="font-mono text-sm font-bold tabular-nums text-amber-100 sm:text-base">
+                      {turnSecondsLeft}s
+                    </span>
                   </div>
                 ) : handBettingLive && engine.actionSeat != null ? (
-                  <p className="text-right text-[8px] leading-snug text-emerald-200/55 sm:text-[9px]">
-                    <span className="font-semibold text-emerald-100/80">Seat {engine.actionSeat + 1}</span>
-                    <span className="block text-emerald-200/45">To act</span>
+                  <div className="rounded-lg border border-white/[0.1] bg-black/45 px-2 py-1 text-right shadow-[0_4px_12px_rgba(0,0,0,0.3)] sm:rounded-full sm:px-2.5">
+                    <span className="block text-[8px] font-medium text-emerald-200/55 sm:text-[9px]">
+                      Seat {engine.actionSeat + 1}
+                    </span>
                     {otherTurnSeconds != null ? (
-                      <span className="mt-0.5 inline-block font-mono tabular-nums text-amber-200/90">{otherTurnSeconds}s</span>
+                      <span className="font-mono text-xs font-bold tabular-nums text-amber-200/90 sm:text-sm">
+                        {otherTurnSeconds}s
+                      </span>
                     ) : null}
-                  </p>
+                  </div>
                 ) : null}
               </div>
 
               {holeCardsToShow.length > 0 ? (
-                <div className="pointer-events-none absolute inset-x-2 bottom-[20%] z-[6] flex justify-center max-sm:bottom-[22%] sm:bottom-[18%] sm:inset-x-4 md:bottom-[16%]">
-                  <div className="flex flex-wrap items-center justify-center gap-2 drop-shadow-[0_8px_24px_rgba(0,0,0,0.55)] sm:gap-2.5">
+                <div className="pointer-events-none absolute inset-x-1 bottom-2 z-[6] flex justify-center pb-[env(safe-area-inset-bottom,0px)] max-sm:inset-x-1 max-sm:bottom-3 sm:bottom-4 sm:inset-x-3 md:bottom-5">
+                  <div className="flex max-w-[96%] flex-wrap items-end justify-center gap-3 drop-shadow-[0_10px_28px_rgba(0,0,0,0.55)] max-sm:gap-3.5 sm:gap-4">
                     {holeCardsToShow.map((c, idx) => (
-                      <Ov2CcPlayingCard key={`felt-h-${idx}`} code={c} size="lg" className="max-sm:scale-[1.06]" />
+                      <Ov2CcPlayingCard key={`felt-h-${idx}`} code={c} size="hero" />
                     ))}
                   </div>
                 </div>

@@ -60,15 +60,6 @@ function parseFollowKeySeatIndex(key) {
 
 const AUTO_WATCH_DWELL_MS = 1050;
 
-function c21PhaseStripLabel(phase) {
-  const p = String(phase || "");
-  if (p === "betting") return "Round setup";
-  if (p === "insurance") return "Side cover";
-  if (p === "acting") return "In play";
-  if (p === "between_rounds") return "Round complete";
-  return p ? p.replace(/_/g, " ") : "—";
-}
-
 function otherSeatHandStatusLabel(phase, seatIndex, handIndex, seat, currentTurn) {
   const m = seat?.handMeta?.[handIndex];
   if (!m) return "—";
@@ -1060,7 +1051,7 @@ export default function Ov2C21Screen({
 
           <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
             {/* DEALER — fixed interior geometry preserved */}
-            <div className="relative h-[11.375rem] shrink-0 overflow-hidden px-1 pt-1 sm:h-[10.375rem] sm:px-1.5">
+            <div className="relative h-[11.375rem] shrink-0 overflow-hidden px-1 pt-0.5 sm:h-[10.375rem] sm:px-1.5 sm:pt-0.5">
               <div className="relative h-full overflow-hidden rounded-xl border border-black/35 bg-gradient-to-b from-[#1a120d]/95 via-[#0f0c0a]/90 to-black/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_8px_28px_rgba(0,0,0,0.45)]">
                 <div className="pointer-events-none absolute inset-x-1 top-0.5 z-10 grid h-[1.05rem] grid-cols-3 items-center leading-none">
                   <span className="min-w-0 truncate text-left text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/90">
@@ -1101,12 +1092,8 @@ export default function Ov2C21Screen({
               </div>
             </div>
 
-            {/* Table status — phase only (timer remains on dealer header) */}
-            <div className="relative z-[1] shrink-0 border-y border-black/25 bg-black/20 px-2 py-1 text-center">
-              <span className="text-[9px] font-semibold uppercase tracking-[0.22em] text-emerald-200/50 sm:text-[10px]">
-                {c21PhaseStripLabel(phase)}
-              </span>
-            </div>
+            {/* Same vertical gap as seat row → your hand */}
+            <div className="h-2 max-sm:h-1.5 shrink-0" aria-hidden />
 
             {/* Player seats — compact row only in lobby (6 seats); full height when seated (5 others) */}
             <div
@@ -1209,7 +1196,7 @@ export default function Ov2C21Screen({
               })}
             </div>
 
-            {/* Fixed seat→hand gap (replaces mt-auto so the middle does not balloon on mobile) */}
+            {/* Same vertical gap as dealer → seat row */}
             <div className="h-2 max-sm:h-1.5 shrink-0" aria-hidden />
 
             {/* YOUR HAND — same internal measurements */}

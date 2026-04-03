@@ -18,11 +18,13 @@ const SIZE_WIDTH = {
   sm: "w-[2.125rem] min-w-[2.125rem] sm:w-9 sm:min-w-[2.25rem]",
   md: "w-10 min-w-[2.5rem] sm:w-11 sm:min-w-[2.75rem]",
   lg: "w-[2.7rem] min-w-[2.7rem] sm:w-[3.2rem] sm:min-w-[3.2rem] md:w-[3.35rem] md:min-w-[3.35rem]",
+  /** Hero hand on felt — larger on small viewports */
+  hero: "w-[3.65rem] min-w-[3.65rem] max-sm:w-[4.15rem] max-sm:min-w-[4.15rem] sm:w-[3.85rem] sm:min-w-[3.85rem] md:w-[4rem] md:min-w-[4rem]",
 };
 
 /**
  * Poker-style playing card (5:7). Presentation only.
- * @param {{ code?: string, faceDown?: boolean, size?: "sm"|"md"|"lg", className?: string }} props
+ * @param {{ code?: string, faceDown?: boolean, size?: "sm"|"md"|"lg"|"hero", className?: string }} props
  */
 export default function Ov2CcPlayingCard({ code, faceDown = false, size = "md", className = "" }) {
   const aspect = "aspect-[5/7]";
