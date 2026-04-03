@@ -328,13 +328,13 @@ export default function Ov2CcScreen({
                   <div className="flex w-full max-w-md flex-col items-center gap-1 sm:max-w-lg sm:gap-2 md:gap-2.5">
                     {handBettingLive ? (
                       <>
-                        <p className="text-center text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[9px]">
+                        <p className="text-center text-[10px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[11px]">
                           {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
                           {bb}
                         </p>
 
                         <div className="w-full text-center">
-                          <p className="text-[10px] font-medium text-emerald-100/70 sm:text-[11px]">
+                          <p className="text-[12px] font-medium text-emerald-100/70 sm:text-[13px]">
                             <span className="text-white">{phaseLabel}</span>
                             {handSeqN > 0 ? (
                               <span className="text-emerald-200/55">
@@ -350,17 +350,17 @@ export default function Ov2CcScreen({
                             ) : null}
                           </p>
                           {engine.buttonSeat != null && engine.sbSeat != null && engine.bbSeat != null ? (
-                            <p className="mt-0.5 text-[9px] text-emerald-200/40 sm:text-[10px]">
+                            <p className="mt-0.5 text-[11px] text-emerald-200/40 sm:text-[12px]">
                               BTN {engine.buttonSeat + 1} · SB {engine.sbSeat + 1} · BB {engine.bbSeat + 1}
                             </p>
                           ) : null}
                           {phase === "between_hands" && nextHandInSec != null ? (
-                            <p className="mt-0.5 text-[9px] font-medium text-amber-200/80 sm:text-[10px]">
+                            <p className="mt-0.5 text-[11px] font-medium text-amber-200/80 sm:text-[12px]">
                               Next hand ~{nextHandInSec}s
                             </p>
                           ) : null}
                           {engine.tableNotice ? (
-                            <p className="mt-0.5 text-[9px] text-amber-200/75 sm:text-[10px]">{engine.tableNotice}</p>
+                            <p className="mt-0.5 text-[11px] text-amber-200/75 sm:text-[12px]">{engine.tableNotice}</p>
                           ) : null}
                         </div>
 
@@ -376,7 +376,7 @@ export default function Ov2CcScreen({
                             ))
                           ) : (
                             <div className="flex h-[2.75rem] items-center sm:h-[3.1rem]">
-                              <span className="text-[10px] font-medium tracking-wide text-emerald-200/30 sm:text-[11px]">
+                              <span className="text-[12px] font-medium tracking-wide text-emerald-200/30 sm:text-[13px]">
                                 Community cards
                               </span>
                             </div>
@@ -384,31 +384,31 @@ export default function Ov2CcScreen({
                         </div>
 
                         <div className="relative z-[2] flex max-sm:mt-1 flex-col items-center gap-0.5">
-                          <span className="text-[7px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[8px]">
+                          <span className="text-[9px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[10px]">
                             Pot
                           </span>
                           <div className="flex min-h-[2.4rem] items-center justify-center overflow-visible rounded-xl border border-black/35 bg-black/45 px-5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_6px_20px_rgba(0,0,0,0.42)] sm:rounded-2xl sm:px-7 sm:py-2.5">
-                            <span className="relative block translate-y-px text-[17px] font-extrabold leading-none text-amber-100 sm:translate-y-0 sm:font-mono sm:text-xl sm:font-bold sm:leading-[1.25] sm:tabular-nums md:text-2xl">
+                            <span className="relative block translate-y-px text-[18px] font-extrabold leading-none text-amber-100 sm:translate-y-0 sm:font-mono sm:text-2xl sm:font-bold sm:leading-[1.25] sm:tabular-nums md:text-3xl">
                               {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
                             </span>
                           </div>
                         </div>
 
                         {likelyBoardRunout ? (
-                          <p className="text-center text-[9px] font-medium text-emerald-200/50 sm:text-[10px]">
+                          <p className="text-center text-[11px] font-medium text-emerald-200/50 sm:text-[12px]">
                             All-in runout — dealing board
                           </p>
                         ) : null}
                       </>
                     ) : (
                       <>
-                        <p className="text-center text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[9px]">
+                        <p className="text-center text-[10px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[11px]">
                           {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
                           {bb}
                         </p>
 
                         <div className="flex w-full min-h-[2.5rem] items-center justify-center px-1 text-center sm:min-h-[2.625rem]">
-                          <p className="text-[10px] font-medium text-emerald-100/70 sm:text-[11px]">
+                          <p className="text-[12px] font-medium text-emerald-100/70 sm:text-[13px]">
                             <span className="text-white">{phaseLabel}</span>
                             {handSeqN > 0 ? (
                               <span className="text-emerald-200/55">
@@ -426,7 +426,7 @@ export default function Ov2CcScreen({
                         </div>
 
                         <div className="flex w-full min-h-[2.875rem] flex-col items-center justify-center gap-0.5 text-center sm:min-h-[3rem]">
-                          <p className="min-h-[1.125rem] text-[9px] leading-tight text-emerald-200/40 sm:min-h-[1.25rem] sm:text-[10px]">
+                          <p className="min-h-[1.125rem] text-[11px] leading-tight text-emerald-200/40 sm:min-h-[1.25rem] sm:text-[12px]">
                             {engine.buttonSeat != null && engine.sbSeat != null && engine.bbSeat != null ? (
                               <>
                                 BTN {engine.buttonSeat + 1} · SB {engine.sbSeat + 1} · BB {engine.bbSeat + 1}
@@ -437,7 +437,7 @@ export default function Ov2CcScreen({
                               </span>
                             )}
                           </p>
-                          <p className="min-h-[1.125rem] text-[9px] font-medium leading-tight sm:min-h-[1.25rem] sm:text-[10px]">
+                          <p className="min-h-[1.125rem] text-[11px] font-medium leading-tight sm:min-h-[1.25rem] sm:text-[12px]">
                             {engine.tableNotice ? (
                               <span className="text-amber-200/75">{engine.tableNotice}</span>
                             ) : phase === "between_hands" && nextHandInSec != null ? (
@@ -472,11 +472,11 @@ export default function Ov2CcScreen({
                         </div>
 
                         <div className="relative z-[2] flex max-sm:mt-1 flex-col items-center gap-0.5">
-                          <span className="text-[7px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[8px]">
+                          <span className="text-[9px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[10px]">
                             Pot
                           </span>
                           <div className="flex min-h-[2.4rem] items-center justify-center overflow-visible rounded-xl border border-black/35 bg-black/45 px-5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_6px_20px_rgba(0,0,0,0.42)] sm:rounded-2xl sm:px-7 sm:py-2.5">
-                            <span className="relative block translate-y-px text-[17px] font-extrabold leading-none text-amber-100 sm:translate-y-0 sm:font-mono sm:text-xl sm:font-bold sm:leading-[1.25] sm:tabular-nums md:text-2xl">
+                            <span className="relative block translate-y-px text-[18px] font-extrabold leading-none text-amber-100 sm:translate-y-0 sm:font-mono sm:text-2xl sm:font-bold sm:leading-[1.25] sm:tabular-nums md:text-3xl">
                               {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
                             </span>
                           </div>
@@ -511,13 +511,13 @@ export default function Ov2CcScreen({
                   className="pointer-events-none absolute left-1/2 z-[8] flex w-full max-w-sm -translate-x-1/2 justify-center px-3 max-sm:bottom-[10.5rem] sm:bottom-[9.25rem]"
                   aria-live="polite"
                 >
-                  <div className="max-w-sm rounded-lg border border-emerald-500/22 bg-black/55 px-2.5 py-1.5 text-center text-[10px] text-emerald-200/95 shadow-[0_8px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-[1px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-[11px]">
+                  <div className="max-w-sm rounded-lg border border-emerald-500/22 bg-black/55 px-2.5 py-1.5 text-center text-[12px] text-emerald-200/95 shadow-[0_8px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-[1px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-[13px]">
                     <p className="font-semibold text-emerald-100">
                       Winner{engine.winnersDisplay.seats.length > 1 ? "s" : ""} · seat{" "}
                       {engine.winnersDisplay.seats.map(x => x + 1).join(", ")}
                     </p>
                     {engine.winnersDisplay.stacksWon && typeof engine.winnersDisplay.stacksWon === "object" ? (
-                      <p className="mt-0.5 text-[9px] text-emerald-200/72 sm:text-[10px]">
+                      <p className="mt-0.5 text-[11px] text-emerald-200/72 sm:text-[12px]">
                         {Object.entries(engine.winnersDisplay.stacksWon)
                           .map(([si, amt]) => `S${Number(si) + 1} +${amt}`)
                           .join(" · ")}
@@ -542,7 +542,7 @@ export default function Ov2CcScreen({
                   </div>
                 ) : handBettingLive && engine?.actionSeat != null ? (
                   <div className="rounded-lg border border-white/[0.1] bg-black/45 px-2 py-1 text-right shadow-[0_4px_12px_rgba(0,0,0,0.3)] sm:rounded-full sm:px-2.5">
-                    <span className="block text-[8px] font-medium text-emerald-200/55 sm:text-[9px]">
+                    <span className="block text-[10px] font-medium text-emerald-200/55 sm:text-[11px]">
                       Seat {engine.actionSeat + 1}
                     </span>
                     {otherTurnSeconds != null ? (
@@ -572,13 +572,13 @@ export default function Ov2CcScreen({
         <div className="shrink-0 rounded-2xl border border-white/[0.08] bg-[#0c1216] px-3 py-2.5 shadow-[0_8px_28px_rgba(0,0,0,0.45)] sm:px-4 sm:py-3">
           {mySeat ? (
             <div className="flex items-start justify-between gap-2">
-              <p className="pt-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Your stack</p>
+              <p className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 sm:text-[12px]">Your stack</p>
               <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
                 {!mySeat.sitOut && !mySeat.pendingSitOutAfterHand ? (
                   <button
                     type="button"
                     disabled={operateBusy}
-                    className="min-h-[36px] rounded-lg border border-zinc-600/35 bg-zinc-900/60 px-3 py-1.5 text-[9px] font-semibold text-zinc-200 touch-manipulation sm:min-h-[40px] sm:rounded-xl sm:px-4 sm:text-[10px]"
+                    className="min-h-[36px] rounded-lg border border-zinc-600/35 bg-zinc-900/60 px-3 py-1.5 text-[11px] font-semibold text-zinc-200 touch-manipulation sm:min-h-[40px] sm:rounded-xl sm:px-4 sm:text-[12px]"
                     onClick={() => void runGameOp("sit_out")}
                   >
                     {betweenHands ? "Sit out" : "Next hand out"}
@@ -588,7 +588,7 @@ export default function Ov2CcScreen({
                   <button
                     type="button"
                     disabled={operateBusy || mySeat.pendingSitOutAfterHand}
-                    className="min-h-[36px] rounded-lg border border-sky-600/35 bg-sky-950/40 px-3 py-1.5 text-[9px] font-semibold text-sky-100 touch-manipulation disabled:opacity-40 sm:min-h-[40px] sm:rounded-xl sm:px-4 sm:text-[10px]"
+                    className="min-h-[36px] rounded-lg border border-sky-600/35 bg-sky-950/40 px-3 py-1.5 text-[11px] font-semibold text-sky-100 touch-manipulation disabled:opacity-40 sm:min-h-[40px] sm:rounded-xl sm:px-4 sm:text-[12px]"
                     onClick={() => void runGameOp("sit_in")}
                     title={mySeat.pendingSitOutAfterHand ? "Wait until this hand ends" : undefined}
                   >
@@ -598,18 +598,18 @@ export default function Ov2CcScreen({
               </div>
             </div>
           ) : (
-            <p className="text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Your stack</p>
+            <p className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 sm:text-[12px]">Your stack</p>
           )}
           {mySeat ? (
             <div className="mt-2 space-y-2.5">
-              <p className="text-center font-mono text-xl font-bold tabular-nums text-white sm:text-2xl">
+              <p className="text-center font-mono text-2xl font-bold tabular-nums text-white sm:text-3xl">
                 {Math.floor(mySeat.stack || 0).toLocaleString?.() ?? Math.floor(mySeat.stack || 0)}
               </p>
               <div className="min-h-[48px] shrink-0">
                 {betweenHands ? (
                   <div className="flex gap-2">
                     <input
-                      className="min-w-0 flex-1 rounded-xl border border-white/12 bg-black/45 px-3 py-2 text-xs text-white placeholder:text-zinc-600"
+                      className="min-w-0 flex-1 rounded-xl border border-white/12 bg-black/45 px-3 py-2 text-sm text-white placeholder:text-zinc-600"
                       value={topUpDraft}
                       onChange={e => setTopUpDraft(e.target.value.replace(/[^\d]/g, ""))}
                       placeholder={`Top-up (max +${maxBuy - Math.floor(mySeat.stack || 0)})`}
@@ -618,7 +618,7 @@ export default function Ov2CcScreen({
                     <button
                       type="button"
                       disabled={operateBusy}
-                      className="min-h-[44px] shrink-0 rounded-xl border border-emerald-600/40 bg-emerald-950/50 px-4 text-xs font-bold text-emerald-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                      className="min-h-[44px] shrink-0 rounded-xl border border-emerald-600/40 bg-emerald-950/50 px-4 text-sm font-bold text-emerald-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                       onClick={async () => {
                         setFormHint("");
                         const cap = maxBuy - Math.floor(mySeat.stack || 0);
@@ -652,13 +652,13 @@ export default function Ov2CcScreen({
               </div>
               <div className="min-h-[22px] shrink-0">
                 {mySeat.pendingSitOutAfterHand && !betweenHands ? (
-                  <p className="text-center text-[9px] text-amber-400/90 sm:text-[10px]">Leaving after this hand</p>
+                  <p className="text-center text-[11px] text-amber-400/90 sm:text-[12px]">Leaving after this hand</p>
                 ) : null}
               </div>
-              {formHint ? <p className="text-center text-[10px] text-rose-400/90">{formHint}</p> : null}
+              {formHint ? <p className="text-center text-[12px] text-rose-400/90 sm:text-[13px]">{formHint}</p> : null}
             </div>
           ) : (
-            <p className="mt-2 text-center text-xs text-zinc-500">Take a seat to join</p>
+            <p className="mt-2 text-center text-sm text-zinc-500 sm:text-base">Take a seat to join</p>
           )}
         </div>
       </div>
@@ -740,7 +740,7 @@ export default function Ov2CcScreen({
       ) : null}
 
       {actionHint ? (
-        <p className="shrink-0 text-center text-[10px] text-rose-400/90">{actionHint}</p>
+        <p className="shrink-0 text-center text-[12px] text-rose-400/90 sm:text-[13px]">{actionHint}</p>
       ) : null}
 
       {mySeat ? (
@@ -752,7 +752,7 @@ export default function Ov2CcScreen({
               <button
                 type="button"
                 disabled={actionClusterLocked}
-                className="flex w-[4.5rem] shrink-0 flex-col justify-center rounded-lg border border-white/[0.08] bg-transparent py-2.5 text-[10px] font-semibold leading-tight text-zinc-500 touch-manipulation active:bg-white/[0.03] disabled:cursor-not-allowed disabled:opacity-30 sm:w-[5rem] sm:text-[11px]"
+                className="flex w-[4.5rem] shrink-0 flex-col justify-center rounded-lg border border-rose-500/55 bg-rose-950/60 py-2.5 text-[15px] font-bold leading-tight text-rose-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-rose-900/50 disabled:cursor-not-allowed disabled:opacity-45 sm:w-[5rem] sm:text-[17px]"
                 onClick={() => void runGameOp("fold")}
               >
                 Fold
@@ -761,7 +761,7 @@ export default function Ov2CcScreen({
                 <button
                   type="button"
                   disabled={actionClusterLocked || canCallChips}
-                  className="min-h-[52px] min-w-0 flex-1 rounded-xl border border-zinc-500/35 bg-zinc-800/55 py-3 text-xs font-bold text-zinc-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.28] sm:min-h-[54px] sm:text-sm"
+                  className="min-h-[52px] min-w-0 flex-1 rounded-xl border border-green-500/50 bg-green-900/55 py-2.5 text-[16px] font-bold leading-snug text-green-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-green-800/50 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg"
                   onClick={() => void runGameOp("check")}
                 >
                   Check
@@ -769,7 +769,7 @@ export default function Ov2CcScreen({
                 <button
                   type="button"
                   disabled={actionClusterLocked || !canCallChips}
-                  className="min-h-[52px] min-w-0 flex-[1.15] rounded-xl border border-sky-700/40 bg-sky-950/65 py-3 text-xs font-bold text-sky-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.28] sm:min-h-[54px] sm:text-sm"
+                  className="min-h-[52px] min-w-0 flex-[1.15] rounded-xl border border-sky-500/55 bg-sky-800/55 py-2.5 text-[16px] font-bold leading-snug text-sky-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-sky-700/45 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg"
                   onClick={() => {
                     if (!canCallChips) return;
                     void runGameOp("call");
@@ -779,12 +779,12 @@ export default function Ov2CcScreen({
                 </button>
               </div>
             </div>
-            <div className="mt-2.5 flex gap-2 border-t border-white/[0.05] pt-2.5">
+            <div className="mt-2.5 flex gap-2 border-t border-white/[0.08] pt-2.5">
               {canBetOpen ? (
                 <button
                   type="button"
                   disabled={actionClusterLocked}
-                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-emerald-800/35 bg-emerald-950/40 py-2.5 text-[11px] font-semibold text-emerald-100/95 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3] sm:text-xs"
+                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-violet-500/50 bg-violet-900/50 py-2 text-[15px] font-bold leading-snug text-violet-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-violet-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
                   onClick={() => void runGameOp("bet", { amount: bb })}
                 >
                   Bet {bb}
@@ -793,7 +793,7 @@ export default function Ov2CcScreen({
                 <button
                   type="button"
                   disabled={actionClusterLocked || !canMinRaiseBtn}
-                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-zinc-600/30 bg-zinc-900/50 py-2.5 text-[11px] font-semibold text-zinc-200 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3] sm:text-xs"
+                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-indigo-500/50 bg-indigo-900/50 py-2 text-[15px] font-bold leading-snug text-indigo-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-indigo-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
                   onClick={() => void runGameOp("raise", { amount: minRaiseChips })}
                 >
                   Raise +{minRaiseChips}
@@ -802,7 +802,7 @@ export default function Ov2CcScreen({
               <button
                 type="button"
                 disabled={actionClusterLocked || !canQuickBumpBtn}
-                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-zinc-600/30 bg-zinc-900/45 py-2.5 text-[11px] font-semibold text-zinc-300 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3] sm:text-xs"
+                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-fuchsia-500/50 bg-fuchsia-900/50 py-2 text-[15px] font-bold leading-snug text-fuchsia-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-fuchsia-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
                 onClick={() => {
                   const op = curBet === 0 && toCall === 0 ? "bet" : "raise";
                   void runGameOp(op, { amount: quickAmount });
@@ -813,7 +813,7 @@ export default function Ov2CcScreen({
               <button
                 type="button"
                 disabled={actionClusterLocked}
-                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-amber-800/35 bg-amber-950/35 py-2.5 text-[11px] font-semibold text-amber-100/95 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3] sm:text-xs"
+                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-amber-500/55 bg-amber-900/45 py-2 text-[15px] font-bold leading-snug text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] touch-manipulation active:bg-amber-800/40 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
                 onClick={() => void runGameOp("all_in")}
               >
                 All-in
