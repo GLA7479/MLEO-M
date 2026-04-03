@@ -19,6 +19,20 @@ import {
   reverseCcEconomyOps,
 } from "../../../lib/server/ov2CcVaultAuthority";
 
+function ccOperateLog(entry) {
+  try {
+    console.log(
+      "[ov2-cc-operate]",
+      JSON.stringify({
+        receivedAt: Date.now(),
+        ...entry,
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 async function persistEconomyOps(admin, roomId, matchSeq, economyOps, callerParticipantKey) {
   const callerPk = String(callerParticipantKey || "").trim();
   const vaultEffects = [];
@@ -93,6 +107,10 @@ export default async function handler(req, res) {
   const op = String(body?.op || "").trim();
   const participantKey = String(body?.participantKey || "").trim();
   const payload = body?.payload && typeof body.payload === "object" ? body.payload : {};
+  const clientOpId = String(body?.clientOpId || "").trim();
+  const clientRevisionRaw = body?.clientRevision;
+  const clientRevision =
+    clientRevisionRaw == null ? null : Math.max(0, Math.floor(Number(clientRevisionRaw) || 0));
 
   if (!roomId) {
     return res.status(400).json({ ok: false, code: "ROOM_REQUIRED" });
@@ -174,7 +192,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const maxAttempts = 4;
+    const maxAttempts = 6;
     let lastConflict = false;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -198,9 +216,41 @@ export default async function handler(req, res) {
       const prevPrivateStr = JSON.stringify(privatePayload);
 
       const engine = liveRow.engine;
-      const beforeEngine = JSON.parse(JSON.stringify(engine));
       const prevRevision = Math.max(0, Math.floor(Number(liveRow.revision) || 0));
       const matchSeqBefore = Math.max(0, Math.floor(Number(liveRow.match_seq) || 0));
+
+      if (clientOpId && op !== "tick" && engine?.lastClientOpId === clientOpId) {
+        const publicEngine = buildPublicEngineView(engine, privatePayload);
+        const viewerHoleCards = extractViewerHoleCards(privatePayload, engine, participantKey);
+        const actorSeat =
+          participantKey && Array.isArray(engine?.seats)
+            ? engine.seats.findIndex(s => s && s.participantKey === participantKey)
+            : null;
+        ccOperateLog({
+          tableId: roomId,
+          op,
+          clientOpId,
+          clientRevision,
+          serverRevision: prevRevision,
+          actorSeat: actorSeat >= 0 ? actorSeat : null,
+          actionDeadline: engine?.actionDeadline ?? null,
+          duplicateAbsorbed: true,
+          autoRetry: false,
+        });
+        return res.status(200).json({
+          ok: true,
+          duplicateAbsorbed: true,
+          engine: publicEngine,
+          viewerHoleCards,
+          revision: prevRevision,
+          matchSeq: matchSeqBefore,
+          vaultEffects: [],
+          localVaultRefreshHint: false,
+          vaultTouchedForCaller: false,
+        });
+      }
+
+      const beforeEngine = JSON.parse(JSON.stringify(engine));
 
       const result = mutateEngine(engine, privatePayload, {
         op,
@@ -213,6 +263,20 @@ export default async function handler(req, res) {
       if (result.error) {
         const publicEngine = buildPublicEngineView(engine, privatePayload);
         const viewerHoleCardsErr = extractViewerHoleCards(privatePayload, engine, participantKey);
+        const actorSeat =
+          participantKey && Array.isArray(engine?.seats)
+            ? engine.seats.findIndex(s => s && s.participantKey === participantKey)
+            : null;
+        ccOperateLog({
+          tableId: roomId,
+          op,
+          clientOpId: clientOpId || null,
+          clientRevision,
+          serverRevision: prevRevision,
+          actorSeat: actorSeat >= 0 ? actorSeat : null,
+          actionDeadline: engine?.actionDeadline ?? null,
+          mutateError: result.error,
+        });
         return res.status(400).json({
           ok: false,
           code: result.error,
@@ -230,6 +294,37 @@ export default async function handler(req, res) {
       const invErr = validateCcEngineInvariants(nextEngine);
       if (invErr) {
         return res.status(500).json({ ok: false, code: invErr });
+      }
+
+      if (
+        op === "tick" &&
+        economyOps.length === 0 &&
+        JSON.stringify(beforeEngine) === JSON.stringify(nextEngine) &&
+        prevPrivateStr === JSON.stringify(nextPrivate)
+      ) {
+        const publicEngine = buildPublicEngineView(engine, privatePayload);
+        const viewerHoleCards = extractViewerHoleCards(privatePayload, engine, participantKey);
+        ccOperateLog({
+          tableId: roomId,
+          op: "tick",
+          tickNoop: true,
+          serverRevision: prevRevision,
+        });
+        return res.status(200).json({
+          ok: true,
+          tickNoop: true,
+          engine: publicEngine,
+          viewerHoleCards,
+          revision: prevRevision,
+          matchSeq: matchSeqBefore,
+          vaultEffects: [],
+          localVaultRefreshHint: false,
+          vaultTouchedForCaller: false,
+        });
+      }
+
+      if (clientOpId && op !== "tick") {
+        nextEngine.lastClientOpId = clientOpId;
       }
 
       const { data: updated, error: upErr } = await admin
@@ -251,6 +346,21 @@ export default async function handler(req, res) {
 
       if (!updated) {
         lastConflict = true;
+        const actorSeat =
+          participantKey && Array.isArray(engine?.seats)
+            ? engine.seats.findIndex(s => s && s.participantKey === participantKey)
+            : null;
+        ccOperateLog({
+          tableId: roomId,
+          op,
+          attempt,
+          clientOpId: clientOpId || null,
+          clientRevision,
+          serverRevision: prevRevision,
+          actorSeat: actorSeat >= 0 ? actorSeat : null,
+          actionDeadline: engine?.actionDeadline ?? null,
+          revisionConflict: true,
+        });
         continue;
       }
 
@@ -359,6 +469,23 @@ export default async function handler(req, res) {
       const publicEngine = buildPublicEngineView(nextEngine, nextPrivate);
       const viewerHoleCards = extractViewerHoleCards(nextPrivate, nextEngine, participantKey);
 
+      const actorSeatOk =
+        participantKey && Array.isArray(nextEngine?.seats)
+          ? nextEngine.seats.findIndex(s => s && s.participantKey === participantKey)
+          : null;
+      ccOperateLog({
+        tableId: roomId,
+        op,
+        clientOpId: clientOpId || null,
+        clientRevision,
+        serverRevision: updated.revision,
+        actorSeat: actorSeatOk >= 0 ? actorSeatOk : null,
+        actionDeadline: nextEngine?.actionDeadline ?? null,
+        persisted: true,
+        attempt,
+        serverLoopRetry: attempt > 0,
+      });
+
       return res.status(200).json({
         ok: true,
         engine: publicEngine,
@@ -368,9 +495,16 @@ export default async function handler(req, res) {
         vaultEffects,
         localVaultRefreshHint,
         vaultTouchedForCaller,
+        serverLoopRetry: attempt > 0,
       });
     }
 
+    ccOperateLog({
+      tableId: roomId,
+      op,
+      clientOpId: clientOpId || null,
+      exhaustedAttempts: true,
+    });
     return res.status(409).json({ ok: false, code: "REVISION_CONFLICT", retried: lastConflict });
   } catch (e) {
     const msg = e?.message || String(e);

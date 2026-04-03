@@ -21,6 +21,7 @@ export default function Ov2CcScreen({
   displayName,
   onOperate,
   operateBusy,
+  operateSubmitStatus = "idle",
   loadError,
 }) {
   const minBuy = tableConfig?.tablePrice ?? 100;
@@ -88,6 +89,8 @@ export default function Ov2CcScreen({
   }, [canAct, engine?.actionDeadline, clock]);
 
   const doOp = useCallback(async (op, payload = {}) => onOperate(op, payload), [onOperate]);
+
+  const actionClusterLocked = operateBusy || operateSubmitStatus !== "idle";
 
   const runGameOp = useCallback(
     async (op, payload = {}) => {
@@ -476,6 +479,11 @@ export default function Ov2CcScreen({
         </div>
       ) : null}
 
+      {operateSubmitStatus === "sending" ? (
+        <p className="shrink-0 text-center text-[10px] text-amber-200/95">Sending…</p>
+      ) : operateSubmitStatus === "resyncing" ? (
+        <p className="shrink-0 text-center text-[10px] text-amber-200/95">Re-syncing…</p>
+      ) : null}
       {actionHint ? (
         <p className="shrink-0 text-center text-[10px] text-rose-400/90">{actionHint}</p>
       ) : null}
@@ -483,7 +491,7 @@ export default function Ov2CcScreen({
         <div className="relative z-10 grid shrink-0 grid-cols-3 gap-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] sm:grid-cols-6">
           <button
             type="button"
-            disabled={operateBusy}
+            disabled={actionClusterLocked}
             className="min-h-[48px] rounded-lg border border-rose-600/45 bg-rose-950/50 py-2.5 text-xs font-bold text-rose-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
             onClick={() => void runGameOp("fold")}
           >
@@ -491,7 +499,7 @@ export default function Ov2CcScreen({
           </button>
           <button
             type="button"
-            disabled={operateBusy || canCallChips}
+            disabled={actionClusterLocked || canCallChips}
             className="min-h-[48px] rounded-lg border border-emerald-600/45 bg-emerald-950/50 py-2.5 text-xs font-bold text-emerald-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
             onClick={() => void runGameOp("check")}
           >
@@ -499,7 +507,7 @@ export default function Ov2CcScreen({
           </button>
           <button
             type="button"
-            disabled={operateBusy || !canCallChips}
+            disabled={actionClusterLocked || !canCallChips}
             className="min-h-[48px] rounded-lg border border-blue-600/45 bg-blue-950/50 py-2.5 text-xs font-bold text-blue-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.3] disabled:saturate-[0.55] disabled:brightness-95"
             onClick={() => {
               if (!canCallChips) return;
@@ -511,7 +519,7 @@ export default function Ov2CcScreen({
           {canBetOpen ? (
             <button
               type="button"
-              disabled={operateBusy}
+              disabled={actionClusterLocked}
               className="min-h-[48px] rounded-lg border border-purple-600/45 bg-purple-950/50 py-2.5 text-xs font-bold text-purple-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
               onClick={() => void runGameOp("bet", { amount: bb })}
             >
@@ -520,7 +528,7 @@ export default function Ov2CcScreen({
           ) : (
             <button
               type="button"
-              disabled={operateBusy || !canMinRaiseBtn}
+              disabled={actionClusterLocked || !canMinRaiseBtn}
               className="min-h-[48px] rounded-lg border border-violet-600/45 bg-violet-950/50 py-2.5 text-xs font-bold text-violet-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
               onClick={() => void runGameOp("raise", { amount: minRaiseChips })}
             >
@@ -529,7 +537,7 @@ export default function Ov2CcScreen({
           )}
           <button
             type="button"
-            disabled={operateBusy || !canQuickBumpBtn}
+            disabled={actionClusterLocked || !canQuickBumpBtn}
             className="min-h-[48px] rounded-lg border border-indigo-600/45 bg-indigo-950/50 py-2.5 text-xs font-bold text-indigo-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
             onClick={() => {
               const op = curBet === 0 && toCall === 0 ? "bet" : "raise";
@@ -540,7 +548,7 @@ export default function Ov2CcScreen({
           </button>
           <button
             type="button"
-            disabled={operateBusy}
+            disabled={actionClusterLocked}
             className="min-h-[48px] rounded-lg border border-amber-500/45 bg-amber-950/50 py-2.5 text-xs font-bold text-amber-100 touch-manipulation active:opacity-90 disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:saturate-50 disabled:brightness-95"
             onClick={() => void runGameOp("all_in")}
           >

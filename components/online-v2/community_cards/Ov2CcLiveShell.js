@@ -50,7 +50,10 @@ function CcInfoPanelBody() {
       </section>
       <section>
         <p className="font-semibold text-zinc-100">Timers</p>
-        <p className="mt-0.5">About 15 seconds per action. Check if free; otherwise the server folds for you.</p>
+        <p className="mt-0.5">
+          About 15 seconds per action on the clock; the server allows a few extra seconds for in-flight taps. Check if free;
+          otherwise the server folds for you.
+        </p>
       </section>
       <section>
         <p className="font-semibold text-zinc-100">Authority</p>
@@ -254,6 +257,7 @@ export default function Ov2CcLiveShell() {
             displayName={displayName}
             onOperate={session.operate}
             operateBusy={session.operateBusy}
+            operateSubmitStatus={session.operateSubmitStatus}
             loadError={session.loadError}
           />
         </div>

@@ -63,6 +63,7 @@ export function useOv2CcSession(roomId) {
   const [viewerHoleCards, setViewerHoleCards] = useState([]);
   const [loadError, setLoadError] = useState("");
   const [operateBusy, setOperateBusy] = useState(false);
+  const [operateSubmitStatus, setOperateSubmitStatus] = useState("idle");
   const participantKey = useMemo(() => getOv2ParticipantId(), []);
   const tickBusyRef = useRef(false);
   const lastTickAtRef = useRef(0);
@@ -190,12 +191,21 @@ export function useOv2CcSession(roomId) {
     async (op, payload = {}) => {
       if (!roomId) return { ok: false };
 
+      const clientOpId =
+        op === "tick"
+          ? ""
+          : typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+            ? crypto.randomUUID()
+            : `cc_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+
       const runPost = () =>
         postOv2CcOperate({
           roomId,
           participantKey,
           op,
           payload,
+          clientOpId: clientOpId || undefined,
+          clientRevision: lastRevisionRef.current >= 0 ? lastRevisionRef.current : undefined,
         });
 
       const finishOk = async json => {
@@ -208,12 +218,13 @@ export function useOv2CcSession(roomId) {
       };
 
       pushOperateBusy();
+      setOperateSubmitStatus("sending");
       try {
         try {
           const json = await runPost();
           ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
           await finishOk(json);
-          return { ok: Boolean(json?.ok), json };
+          return { ok: Boolean(json?.ok), json, clientRetried: false };
         } catch (e) {
           const code = e?.payload?.code ?? e?.code;
           const status = e?.status ?? e?.payload?.status;
@@ -223,12 +234,13 @@ export function useOv2CcSession(roomId) {
           }
 
           if (code === "REVISION_CONFLICT" || status === 409) {
+            setOperateSubmitStatus("resyncing");
             await reloadFromDb();
             try {
               const json2 = await runPost();
               ingestOperateJson(json2, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
               await finishOk(json2);
-              return { ok: Boolean(json2?.ok), json: json2, retried: true };
+              return { ok: Boolean(json2?.ok), json: json2, clientRetried: true };
             } catch (e2) {
               const code2 = e2?.payload?.code ?? e2?.code;
               if (e2?.payload?.engine && typeof e2.payload.engine === "object") {
@@ -241,6 +253,7 @@ export function useOv2CcSession(roomId) {
           return { ok: false, error: e, code };
         }
       } finally {
+        setOperateSubmitStatus("idle");
         popOperateBusy();
       }
     },
@@ -289,6 +302,7 @@ export function useOv2CcSession(roomId) {
     participantKey,
     loadError,
     operateBusy,
+    operateSubmitStatus,
     operate,
     reloadFromDb,
   };
