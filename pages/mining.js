@@ -4992,7 +4992,7 @@ export default function GamesHub() {
                 <button
                   type="button"
                   onClick={() => setLeaderboardOpen(true)}
-                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-bold text-zinc-200 hover:bg-white/10"
+                  className="rounded-lg border border-amber-500/45 bg-amber-600/25 px-3 py-1 text-[10px] font-bold text-amber-100 shadow-sm hover:bg-amber-600/35"
                 >
                   {lt.leaderboardButton}
                 </button>
@@ -5007,6 +5007,13 @@ export default function GamesHub() {
                     💰
                   </span>
                   <span className="min-w-0 truncate tabular-nums">{fmt(vault)} MLEO</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPoolModalOpen(true)}
+                  className="rounded-lg border border-sky-500/45 bg-sky-600/25 px-3 py-1 text-[10px] font-bold text-sky-100 shadow-sm hover:bg-sky-600/35"
+                >
+                  {text.poolStatus}
                 </button>
                 {!showDevButton ? (
                   <button
@@ -5053,9 +5060,6 @@ export default function GamesHub() {
 
               <footer className="mt-auto flex shrink-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-white/10 pt-2 pb-[max(0.35rem,env(safe-area-inset-bottom))] text-[10px] leading-tight text-white/55">
                 <span>© {new Date().getFullYear()} MLEO</span>
-                <button type="button" onClick={() => setPoolModalOpen(true)} className="underline hover:text-white/90">
-                  {text.poolStatus}
-                </button>
                 <Link href="/" className="underline hover:text-white/90">{text.footerHome}</Link>
                 <button type="button" onClick={() => setPolicyModal("terms")} className="underline hover:text-white/90">
                   {text.legalShort}
@@ -5277,7 +5281,7 @@ export default function GamesHub() {
                 <button
                   type="button"
                   onClick={() => setLeaderboardOpen(true)}
-                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-bold text-zinc-200 hover:bg-white/10"
+                  className="rounded-lg border border-amber-500/45 bg-amber-600/25 px-3 py-1 text-[11px] font-bold text-amber-100 shadow-sm hover:bg-amber-600/35"
                 >
                   {lt.leaderboardButton}
                 </button>
@@ -5292,6 +5296,13 @@ export default function GamesHub() {
                     💰
                   </span>
                   <span className="min-w-0 truncate tabular-nums">{fmt(vault)} MLEO</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPoolModalOpen(true)}
+                  className="rounded-lg border border-sky-500/45 bg-sky-600/25 px-3 py-1 text-[11px] font-bold text-sky-100 shadow-sm hover:bg-sky-600/35"
+                >
+                  {text.poolStatus}
                 </button>
                 {!showDevButton ? (
                   <button
@@ -5338,9 +5349,6 @@ export default function GamesHub() {
 
               <footer className="mt-2 flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-white/10 pt-2 text-[11px] leading-tight text-white/55">
                 <span>© {new Date().getFullYear()} MLEO</span>
-                <button type="button" onClick={() => setPoolModalOpen(true)} className="underline hover:text-white/90">
-                  {text.poolStatus}
-                </button>
                 <Link href="/" className="underline hover:text-white/90">
                   {text.footerHome}
                 </Link>
