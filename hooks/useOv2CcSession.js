@@ -40,6 +40,55 @@ function shouldPullAuthoritativeVaultAfterCc(json) {
   );
 }
 
+/** Do not await in the operate/tick hot path — `readOnlineV2Vault(forceServer)` can take hundreds of ms and blocks action buttons via operateBusy. */
+async function flushCcOperateSideEffects(json, participantKey) {
+  if (json?.vaultEffects?.length) {
+    await applyVaultEffects(json.vaultEffects, participantKey);
+  }
+  if (shouldPullAuthoritativeVaultAfterCc(json)) {
+    await pullAuthoritativeVaultAfterCc();
+  }
+}
+
+function ccClientTrace(tag, extra) {
+  try {
+    if (typeof window === "undefined" || window.localStorage?.getItem("ov2_cc_timing") !== "1") return;
+    const eng = extra?.engine && typeof extra.engine === "object" ? extra.engine : null;
+    const base = eng?.seats
+      ? eng.seats
+          .map((s, i) => (s?.participantKey ? i : -1))
+          .filter(i => i >= 0)
+      : [];
+    const eligible = eng?.seats
+      ? eng.seats
+          .map((s, i) => {
+            if (!s?.participantKey) return -1;
+            const st = Math.floor(Number(s.stack) || 0);
+            if (st <= 0 || s.sitOut) return -1;
+            return i;
+          })
+          .filter(i => i >= 0)
+      : [];
+    const dealt = eng?.seats
+      ? eng.seats.map((s, i) => (s?.participantKey && s.inCurrentHand ? i : -1)).filter(i => i >= 0)
+      : [];
+    const { engine: _engDrop, ...rest } = extra || {};
+    console.log(
+      "[ov2-cc-client-trace]",
+      JSON.stringify({
+        tag,
+        wallMs: Date.now(),
+        occupiedSeats: base,
+        baseEligibleSeats: eligible,
+        dealtSeatIndexes: dealt,
+        ...rest,
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 function ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards) {
   const revRaw = json?.revision;
   const rev = revRaw == null ? null : Math.max(0, Math.floor(Number(revRaw) || 0));
@@ -76,6 +125,8 @@ export function useOv2CcSession(roomId) {
   const [operateSubmitStatus, setOperateSubmitStatus] = useState("idle");
   const participantKey = useMemo(() => getOv2ParticipantId(), []);
   const tickBusyRef = useRef(false);
+  const tickPendingRef = useRef(false);
+  const runBackgroundTickRef = useRef(() => Promise.resolve());
   const lastTickAtRef = useRef(0);
   const lastRevisionRef = useRef(-1);
   const lastHandSeqRef = useRef(-1);
@@ -127,34 +178,6 @@ export function useOv2CcSession(roomId) {
 
   useEffect(() => {
     if (!roomId) return undefined;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const json = await postOv2CcOperate({
-          roomId,
-          participantKey,
-          op: "tick",
-          payload: {},
-        });
-        if (cancelled) return;
-        ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
-        if (json?.vaultEffects?.length) {
-          await applyVaultEffects(json.vaultEffects, participantKey);
-        }
-        if (shouldPullAuthoritativeVaultAfterCc(json)) {
-          await pullAuthoritativeVaultAfterCc();
-        }
-      } catch {
-        /* table may not exist until migration */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [roomId, participantKey]);
-
-  useEffect(() => {
-    if (!roomId) return undefined;
     const channel = supabase
       .channel(`ov2_cc_${roomId}`)
       .on(
@@ -198,27 +221,7 @@ export function useOv2CcSession(roomId) {
               : -1;
             const mine = myIdx >= 0 ? eng.seats[myIdx] : null;
             if (mine?.inCurrentHand) {
-              void (async () => {
-                try {
-                  const json = await postOv2CcOperate({
-                    roomId,
-                    participantKey,
-                    op: "tick",
-                    payload: {},
-                  });
-                  ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
-                  if (json?.vaultEffects?.length) {
-                    await applyVaultEffects(json.vaultEffects, participantKey);
-                  }
-                  if (shouldPullAuthoritativeVaultAfterCc(json)) {
-                    await pullAuthoritativeVaultAfterCc();
-                  }
-                } catch (e) {
-                  if (typeof console !== "undefined" && console.warn) {
-                    console.warn("[ov2-cc] realtime hole refresh failed", e?.message || e);
-                  }
-                }
-              })();
+              void runBackgroundTickRef.current({ urgent: true });
             }
           }
         },
@@ -250,15 +253,6 @@ export function useOv2CcSession(roomId) {
           clientRevision: lastRevisionRef.current >= 0 ? lastRevisionRef.current : undefined,
         });
 
-      const finishOk = async json => {
-        if (json?.vaultEffects?.length) {
-          await applyVaultEffects(json.vaultEffects, participantKey);
-        }
-        if (shouldPullAuthoritativeVaultAfterCc(json)) {
-          await pullAuthoritativeVaultAfterCc();
-        }
-      };
-
       const ccTiming =
         typeof window !== "undefined" && window.localStorage?.getItem("ov2_cc_timing") === "1";
       const t0 = ccTiming ? performance.now() : 0;
@@ -268,15 +262,28 @@ export function useOv2CcSession(roomId) {
       try {
         try {
           const json = await runPost();
+          const tAfterNet = ccTiming ? performance.now() : 0;
           ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
-          await finishOk(json);
+          const tAfterApply = ccTiming ? performance.now() : 0;
+          void flushCcOperateSideEffects(json, participantKey).catch(() => {});
           if (ccTiming) {
+            ccClientTrace("operate_state_applied", {
+              op,
+              clientOpId: clientOpId || null,
+              revision: json?.revision,
+              handSeq: json?.engine?.handSeq,
+              phase: json?.engine?.phase,
+              actingSeat: json?.engine?.actionSeat,
+              engine: json?.engine,
+            });
             console.log("[ov2-cc-timing]", {
               op,
-              msToResponse: Math.round(performance.now() - t0),
+              msToResponse: Math.round(tAfterNet - t0),
+              msNetToApply: Math.round(tAfterApply - tAfterNet),
               clientRetried: false,
               duplicateAbsorbed: Boolean(json?.duplicateAbsorbed),
               tickNoop: Boolean(json?.tickNoop),
+              sideEffectsDeferred: true,
             });
           }
           return { ok: Boolean(json?.ok), json, clientRetried: false };
@@ -289,6 +296,16 @@ export function useOv2CcSession(roomId) {
           }
 
           if (code === "REVISION_CONFLICT" || status === 409) {
+            if (ccTiming) {
+              ccClientTrace("operate_409_before_retry", {
+                op,
+                clientOpId: clientOpId || null,
+                revision: e?.payload?.revision,
+                handSeq: e?.payload?.engine?.handSeq,
+                phase: e?.payload?.engine?.phase,
+                engine: e?.payload?.engine,
+              });
+            }
             setOperateSubmitStatus("resyncing");
             const skipReload =
               e?.payload &&
@@ -301,15 +318,26 @@ export function useOv2CcSession(roomId) {
             }
             try {
               const json2 = await runPost();
+              const tAfterNet2 = ccTiming ? performance.now() : 0;
               ingestOperateJson(json2, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
-              await finishOk(json2);
+              void flushCcOperateSideEffects(json2, participantKey).catch(() => {});
               if (ccTiming) {
+                ccClientTrace("operate_state_applied_retry", {
+                  op,
+                  clientOpId: clientOpId || null,
+                  revision: json2?.revision,
+                  handSeq: json2?.engine?.handSeq,
+                  phase: json2?.engine?.phase,
+                  actingSeat: json2?.engine?.actionSeat,
+                  engine: json2?.engine,
+                });
                 console.log("[ov2-cc-timing]", {
                   op,
-                  msToResponse: Math.round(performance.now() - t0),
+                  msToResponse: Math.round(tAfterNet2 - t0),
                   clientRetried: true,
                   resyncSkippedDb: skipReload,
                   duplicateAbsorbed: Boolean(json2?.duplicateAbsorbed),
+                  sideEffectsDeferred: true,
                 });
               }
               return { ok: Boolean(json2?.ok), json: json2, clientRetried: true };
@@ -337,21 +365,21 @@ export function useOv2CcSession(roomId) {
     let cancelled = false;
     let timeoutId = 0;
 
-    const runTickOnce = async () => {
-      if (cancelled || tickBusyRef.current) return;
+    const applyTickIngest = json => {
+      ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
+      void flushCcOperateSideEffects(json, participantKey).catch(() => {});
+    };
+
+    runBackgroundTickRef.current = async ({ urgent = false } = {}) => {
+      if (cancelled) return;
+      if (tickBusyRef.current) {
+        tickPendingRef.current = true;
+        return;
+      }
       const now = Date.now();
-      if (now - lastTickAtRef.current < 850) return;
+      if (!urgent && now - lastTickAtRef.current < 850) return;
       tickBusyRef.current = true;
       lastTickAtRef.current = now;
-      const applyTickJson = async json => {
-        ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
-        if (json?.vaultEffects?.length) {
-          await applyVaultEffects(json.vaultEffects, participantKey);
-        }
-        if (shouldPullAuthoritativeVaultAfterCc(json)) {
-          await pullAuthoritativeVaultAfterCc();
-        }
-      };
       try {
         try {
           const json = await postOv2CcOperate({
@@ -360,7 +388,7 @@ export function useOv2CcSession(roomId) {
             op: "tick",
             payload: {},
           });
-          await applyTickJson(json);
+          applyTickIngest(json);
         } catch (e) {
           const code = e?.payload?.code ?? e?.code;
           const status = e?.status ?? e?.payload?.status;
@@ -370,8 +398,17 @@ export function useOv2CcSession(roomId) {
             e.payload.engine &&
             typeof e.payload.engine === "object" &&
             e.payload.revision != null;
+          if (typeof window !== "undefined" && window.localStorage?.getItem("ov2_cc_timing") === "1") {
+            ccClientTrace("tick_error", {
+              op: "tick",
+              code: code || null,
+              status: status ?? null,
+              had409Snapshot: Boolean(snap),
+              engine: e?.payload?.engine,
+            });
+          }
           if ((code === "REVISION_CONFLICT" || status === 409) && snap) {
-            ingestOperateJson(e.payload, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
+            applyTickIngest(e.payload);
             await new Promise(r => window.setTimeout(r, 40));
             const json2 = await postOv2CcOperate({
               roomId,
@@ -379,21 +416,29 @@ export function useOv2CcSession(roomId) {
               op: "tick",
               payload: {},
             });
-            await applyTickJson(json2);
+            applyTickIngest(json2);
           } else if (typeof console !== "undefined" && console.warn) {
             console.warn("[ov2-cc] tick failed", e?.message || e);
           }
         }
       } finally {
         tickBusyRef.current = false;
+        if (tickPendingRef.current && !cancelled) {
+          tickPendingRef.current = false;
+          queueMicrotask(() => {
+            void runBackgroundTickRef.current({ urgent: true });
+          });
+        }
       }
     };
+
+    void runBackgroundTickRef.current({ urgent: true });
 
     const schedule = () => {
       if (cancelled) return;
       const delay = 950 + Math.floor(Math.random() * 550);
-      timeoutId = window.setTimeout(async () => {
-        await runTickOnce();
+      timeoutId = window.setTimeout(() => {
+        void runBackgroundTickRef.current({ urgent: false });
         schedule();
       }, delay);
     };
@@ -402,6 +447,7 @@ export function useOv2CcSession(roomId) {
     return () => {
       cancelled = true;
       if (timeoutId) window.clearTimeout(timeoutId);
+      runBackgroundTickRef.current = () => Promise.resolve();
     };
   }, [roomId, participantKey]);
 

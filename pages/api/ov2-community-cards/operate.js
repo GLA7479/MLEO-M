@@ -532,6 +532,40 @@ export default async function handler(req, res) {
         requestDurationMs: Date.now() - reqT0,
       });
 
+      if (process.env.OV2_CC_OPERATE_TRACE === "1") {
+        const seats = nextEngine?.seats || [];
+        const occupied = seats.map((s, i) => (s?.participantKey ? i : -1)).filter(i => i >= 0);
+        const eligible = seats
+          .map((s, i) => {
+            if (!s?.participantKey) return -1;
+            if (Math.floor(Number(s.stack) || 0) <= 0 || s.sitOut) return -1;
+            return i;
+          })
+          .filter(i => i >= 0);
+        const dealt = seats.map((s, i) => (s?.participantKey && s.inCurrentHand ? i : -1)).filter(i => i >= 0);
+        try {
+          console.log(
+            "[ov2-cc-operate-trace]",
+            JSON.stringify({
+              tableId: roomId,
+              op,
+              clientOpId: clientOpId || null,
+              handSeq: nextEngine?.handSeq,
+              phase: nextEngine?.phase,
+              street: nextEngine?.street,
+              actingSeat: nextEngine?.actionSeat,
+              occupiedSeats: occupied,
+              baseEligibleSeats: eligible,
+              dealtSeatIndexes: dealt,
+              attempt,
+              requestDurationMs: Date.now() - reqT0,
+            }),
+          );
+        } catch {
+          /* ignore */
+        }
+      }
+
       return res.status(200).json({
         ok: true,
         engine: publicEngine,

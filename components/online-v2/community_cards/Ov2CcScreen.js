@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isOv2CcHandBettingLive } from "../../../lib/online-v2/community_cards/ov2CcClientConstants";
 
 const SUIT_SYM = { c: "♣", d: "♦", h: "♥", s: "♠" };
 
@@ -54,16 +55,7 @@ export default function Ov2CcScreen({
 
   const canCallChips = toCall > 0;
 
-  const handBettingLive = useMemo(
-    () =>
-      Boolean(
-        engine &&
-          engine.phase === "preflop" &&
-          Math.floor(Number(engine.handSeq) || 0) > 0 &&
-          engine.street,
-      ),
-    [engine],
-  );
+  const handBettingLive = useMemo(() => isOv2CcHandBettingLive(engine), [engine]);
 
   const canAct = Boolean(
     handBettingLive &&
@@ -226,7 +218,9 @@ export default function Ov2CcScreen({
                       {isYou ? "You" : s.displayName || "…"}
                     </span>
                     <span className="text-[9px] text-emerald-200">{Math.floor(s.stack || 0)}</span>
-                    {s.waitBb ? <span className="text-[7px] text-amber-300">Waiting for BB</span> : null}
+                    {s.waitBb && !s.inCurrentHand ? (
+                      <span className="text-[7px] text-amber-300">Waiting for BB</span>
+                    ) : null}
                     {s.pendingSitOutAfterHand ? <span className="text-[7px] text-amber-400/90">Sit out next</span> : null}
                     {s.sitOut ? <span className="text-[7px] text-zinc-500">Sit out</span> : null}
                     {s.folded ? <span className="text-[7px] text-rose-400">Out</span> : null}
