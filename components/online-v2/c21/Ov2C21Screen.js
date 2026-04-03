@@ -1108,12 +1108,12 @@ export default function Ov2C21Screen({
               </span>
             </div>
 
-            {/* Player seats — straight row (other players only) */}
+            {/* Player seats — compact row only in lobby (6 seats); full height when seated (5 others) */}
             <div
               className={
                 otherSeatIndices.length <= 5
                   ? "relative z-[1] flex h-[3.875rem] shrink-0 items-end justify-center gap-0.5 overflow-hidden px-0.5 sm:h-[6.125rem] sm:gap-1.5 sm:px-1"
-                  : "relative z-[1] flex h-[8rem] shrink-0 items-end justify-center gap-0.5 overflow-hidden px-0.5 sm:h-[6.125rem] sm:gap-1.5 sm:px-1"
+                  : "relative z-[1] flex h-[4rem] shrink-0 items-end justify-center gap-0.5 overflow-hidden px-0.5 sm:h-[6.125rem] sm:gap-1.5 sm:px-1"
               }
             >
               {otherSeatIndices.map(idx => {
@@ -1209,8 +1209,11 @@ export default function Ov2C21Screen({
               })}
             </div>
 
+            {/* Fixed seat→hand gap (replaces mt-auto so the middle does not balloon on mobile) */}
+            <div className="h-2 max-sm:h-1.5 shrink-0" aria-hidden />
+
             {/* YOUR HAND — same internal measurements */}
-            <div className="relative z-[1] mt-auto h-[11.375rem] shrink-0 overflow-hidden px-1 pb-1 sm:h-[10.375rem] sm:px-1.5 sm:pb-1.5">
+            <div className="relative z-[1] h-[11.375rem] shrink-0 overflow-hidden px-1 pb-1 sm:h-[10.375rem] sm:px-1.5 sm:pb-1.5">
               <div className="relative h-full overflow-hidden rounded-xl border border-emerald-900/35 bg-gradient-to-b from-[#0c1612]/95 via-[#050a08]/92 to-black/80 shadow-[inset_0_1px_0_rgba(167,243,208,0.06),0_6px_22px_rgba(0,0,0,0.4)]">
                 <div className="absolute inset-x-1 top-0.5 z-20 grid h-[1.05rem] grid-cols-3 items-center leading-none">
                   <span className="pointer-events-none min-w-0 truncate text-left text-[10px] font-bold uppercase leading-none tracking-[0.1em] text-emerald-200/88">
@@ -1315,6 +1318,13 @@ export default function Ov2C21Screen({
                 ) : null}
               </div>
             </div>
+
+            {/* Reserve lower band for fixed result toast footprint — layout only, toast stays position:fixed */}
+            <div
+              className="shrink-0 min-h-[4.5rem] w-full max-sm:min-h-[5.25rem]"
+              aria-hidden
+            />
+            <div className="min-h-0 flex-1" aria-hidden />
           </div>
         </div>
       </div>
