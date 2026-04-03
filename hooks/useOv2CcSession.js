@@ -134,6 +134,8 @@ export function useOv2CcSession(roomId) {
   const lastRevisionRef = useRef(-1);
   const lastHandSeqRef = useRef(-1);
   const operateDepthRef = useRef(0);
+  /** Synchronous guard: React state can lag one frame so double-taps must not enqueue two operates. */
+  const operateInFlightRef = useRef(false);
   /** Up to 3 urgent ticks per hand when seated in-hand but holes not yet hydrated (realtime is engine-only). */
   const holeTickNudgeRef = useRef({ hand: -1, n: 0 });
 
@@ -273,6 +275,8 @@ export function useOv2CcSession(roomId) {
   const operate = useCallback(
     async (op, payload = {}) => {
       if (!roomId) return { ok: false };
+      if (operateInFlightRef.current) return { ok: false, skipped: true };
+      operateInFlightRef.current = true;
 
       const clientOpId =
         op === "tick"
@@ -396,6 +400,7 @@ export function useOv2CcSession(roomId) {
         }
       } finally {
         const tBusyOff = ccTiming ? performance.now() : 0;
+        operateInFlightRef.current = false;
         setOperateSubmitStatus("idle");
         popOperateBusy();
         if (ccTiming && tAfterApply > 0) {
