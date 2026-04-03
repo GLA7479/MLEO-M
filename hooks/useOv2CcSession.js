@@ -105,7 +105,10 @@ function ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, set
     const handBumped = lastHandSeqRef.current >= 0 && hs !== lastHandSeqRef.current;
     lastHandSeqRef.current = hs;
     const ph = eng.phase;
-    if (ph === "between_hands" || ph === "idle" || handBumped) {
+    if (ph === "between_hands" || ph === "idle") {
+      setViewerHoleCards([]);
+    } else if (handBumped && !Array.isArray(json?.viewerHoleCards)) {
+      /** Realtime delivers engine-only rows; omitting the key is not proof holes are empty — hole nudge tick refills. */
       setViewerHoleCards([]);
     }
     if (ph !== "between_hands" && ph !== "idle" && Array.isArray(json?.viewerHoleCards)) {
@@ -131,6 +134,8 @@ export function useOv2CcSession(roomId) {
   const lastRevisionRef = useRef(-1);
   const lastHandSeqRef = useRef(-1);
   const operateDepthRef = useRef(0);
+  /** Up to 3 urgent ticks per hand when seated in-hand but holes not yet hydrated (realtime is engine-only). */
+  const holeTickNudgeRef = useRef({ hand: -1, n: 0 });
 
   const pushOperateBusy = useCallback(() => {
     operateDepthRef.current += 1;
@@ -232,6 +237,39 @@ export function useOv2CcSession(roomId) {
     };
   }, [roomId, participantKey]);
 
+  const mySeatInCurrentHand = useMemo(() => {
+    if (!engine?.seats || !participantKey) return false;
+    const s = engine.seats.find(x => x && x.participantKey === participantKey);
+    return Boolean(s?.inCurrentHand);
+  }, [engine, participantKey]);
+
+  useEffect(() => {
+    const hs = Math.floor(Number(engine?.handSeq) || 0);
+    if (holeTickNudgeRef.current.hand !== hs) {
+      holeTickNudgeRef.current = { hand: hs, n: 0 };
+    }
+  }, [engine?.handSeq]);
+
+  useEffect(() => {
+    if (!roomId || !participantKey || !mySeatInCurrentHand) return;
+    const hs = Math.floor(Number(engine?.handSeq) || 0);
+    if (hs <= 0) return;
+    const ph = engine?.phase;
+    if (ph === "between_hands" || ph === "idle") return;
+    if (viewerHoleCards.length > 0) return;
+    if (holeTickNudgeRef.current.hand !== hs) return;
+    if (holeTickNudgeRef.current.n >= 3) return;
+    holeTickNudgeRef.current.n += 1;
+    if (typeof window !== "undefined" && window.localStorage?.getItem("ov2_cc_timing") === "1") {
+      ccClientTrace("hole_refetch_tick_scheduled", {
+        handSeq: hs,
+        phase: ph,
+        nudgeAttempt: holeTickNudgeRef.current.n,
+      });
+    }
+    void runBackgroundTickRef.current({ urgent: true });
+  }, [roomId, participantKey, mySeatInCurrentHand, engine?.handSeq, engine?.phase, viewerHoleCards.length]);
+
   const operate = useCallback(
     async (op, payload = {}) => {
       if (!roomId) return { ok: false };
@@ -256,6 +294,7 @@ export function useOv2CcSession(roomId) {
       const ccTiming =
         typeof window !== "undefined" && window.localStorage?.getItem("ov2_cc_timing") === "1";
       const t0 = ccTiming ? performance.now() : 0;
+      let tAfterApply = 0;
 
       pushOperateBusy();
       setOperateSubmitStatus("sending");
@@ -264,7 +303,7 @@ export function useOv2CcSession(roomId) {
           const json = await runPost();
           const tAfterNet = ccTiming ? performance.now() : 0;
           ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
-          const tAfterApply = ccTiming ? performance.now() : 0;
+          tAfterApply = ccTiming ? performance.now() : 0;
           void flushCcOperateSideEffects(json, participantKey).catch(() => {});
           if (ccTiming) {
             ccClientTrace("operate_state_applied", {
@@ -293,6 +332,7 @@ export function useOv2CcSession(roomId) {
 
           if (e?.payload && typeof e.payload === "object" && e.payload.engine && typeof e.payload.engine === "object") {
             ingestOperateJson(e.payload, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
+            tAfterApply = ccTiming ? performance.now() : 0;
           }
 
           if (code === "REVISION_CONFLICT" || status === 409) {
@@ -320,6 +360,7 @@ export function useOv2CcSession(roomId) {
               const json2 = await runPost();
               const tAfterNet2 = ccTiming ? performance.now() : 0;
               ingestOperateJson(json2, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
+              tAfterApply = ccTiming ? performance.now() : 0;
               void flushCcOperateSideEffects(json2, participantKey).catch(() => {});
               if (ccTiming) {
                 ccClientTrace("operate_state_applied_retry", {
@@ -345,6 +386,7 @@ export function useOv2CcSession(roomId) {
               const code2 = e2?.payload?.code ?? e2?.code;
               if (e2?.payload?.engine && typeof e2.payload.engine === "object") {
                 ingestOperateJson(e2.payload, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
+                tAfterApply = ccTiming ? performance.now() : 0;
               }
               return { ok: false, error: e2, code: code2 };
             }
@@ -353,8 +395,16 @@ export function useOv2CcSession(roomId) {
           return { ok: false, error: e, code };
         }
       } finally {
+        const tBusyOff = ccTiming ? performance.now() : 0;
         setOperateSubmitStatus("idle");
         popOperateBusy();
+        if (ccTiming && tAfterApply > 0) {
+          console.log("[ov2-cc-timing]", {
+            phase: "busy_released",
+            msApplyToBusyOff: Math.round(tBusyOff - tAfterApply),
+            msTapToBusyOff: Math.round(tBusyOff - t0),
+          });
+        }
       }
     },
     [roomId, participantKey, pushOperateBusy, popOperateBusy, reloadFromDb],
