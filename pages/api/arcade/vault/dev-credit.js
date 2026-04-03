@@ -15,7 +15,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, message: "Method not allowed" });
   }
 
-  if (process.env.NODE_ENV === "production") {
+  const isProd = process.env.NODE_ENV === "production";
+  const allowOnProd = process.env.MLEO_ALLOW_DEV_VAULT_CREDIT === "true";
+  if (isProd && !allowOnProd) {
     return res.status(403).json({ success: false, message: "Dev credit disabled in production" });
   }
 
@@ -38,7 +40,21 @@ export default async function handler(req, res) {
     const { password, amount = 10000 } = req.body || {};
     const wholeAmount = Math.max(0, Math.floor(Number(amount) || 0));
 
-    if (password !== "7479") {
+    const envPw = process.env.MLEO_DEV_VAULT_CREDIT_PASSWORD;
+    let expectedPassword;
+    if (isProd && allowOnProd) {
+      expectedPassword = typeof envPw === "string" && envPw.length > 0 ? envPw : null;
+      if (!expectedPassword) {
+        return res.status(503).json({
+          success: false,
+          message: "Dev credit enabled but MLEO_DEV_VAULT_CREDIT_PASSWORD is not set",
+        });
+      }
+    } else {
+      expectedPassword = typeof envPw === "string" && envPw.length > 0 ? envPw : "7479";
+    }
+
+    if (password !== expectedPassword) {
       return res.status(403).json({ success: false, message: "Invalid password" });
     }
 

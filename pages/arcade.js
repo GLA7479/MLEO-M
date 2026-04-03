@@ -6,7 +6,6 @@ import { ConnectButton, useConnectModal, useAccountModal } from "@rainbow-me/rai
 import { useAccount, useDisconnect, useSwitchChain, useWriteContract, usePublicClient, useChainId } from "wagmi";
 import { parseUnits } from "viem";
 import { getFreePlayStatus, formatTimeRemaining } from "../lib/free-play-system";
-import { ensureCsrfToken } from "../lib/arcadeDeviceClient";
 import {
   debitSharedVault,
   initSharedVault,
@@ -674,9 +673,6 @@ export default function ArcadeHub() {
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [collectAmount, setCollectAmount] = useState(100);
   const [claiming, setClaiming] = useState(false);
-  const [devPassword, setDevPassword] = useState("");
-  const [showDevButton, setShowDevButton] = useState(false);
-  const [addingCoins, setAddingCoins] = useState(false);
   const [mobileGroupIndex, setMobileGroupIndex] = useState(0);
   const [desktopGroupIndex, setDesktopGroupIndex] = useState(0);
   const [showArcadeInfoModal, setShowArcadeInfoModal] = useState(false);
@@ -729,42 +725,6 @@ export default function ArcadeHub() {
       return () => clearTimeout(timer);
     }
   }, [freePlayCountdown, freePlayStatus.tokens, freePlayStatus.isFull]);
-
-  // Add dev coins (testing only)
-  async function addDevCoins() {
-    if (devPassword !== "7479") {
-      alert("Invalid password");
-      return;
-    }
-
-    setAddingCoins(true);
-    try {
-      const csrfToken = await ensureCsrfToken();
-      const response = await fetch("/api/arcade/vault/dev-credit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
-        },
-        credentials: "include",
-        body: JSON.stringify({ password: devPassword, amount: 10000 }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (response.ok && result?.success) {
-        setVault(result.balance || 0);
-        alert(`✅ Added 10,000 MLEO! New balance: ${fmt(result.balance || 0)}`);
-        setDevPassword("");
-        setShowDevButton(false);
-      } else {
-        alert(`Failed to add coins: ${result.message || "Unknown error"}`);
-      }
-    } catch (error) {
-      console.error("Failed to add dev coins:", error);
-      alert("Failed to add coins. Please try again.");
-    } finally {
-      setAddingCoins(false);
-    }
-  }
 
   // Collect MLEO to wallet
   async function collectToWallet() {
@@ -1057,7 +1017,7 @@ export default function ArcadeHub() {
             />
           </div>
 
-          {/* Bottom zone: replaceable footer actions (Back to Home + dev — temporary) */}
+          {/* Bottom zone: footer actions */}
           <footer className="mobile-arcade-footer flex-shrink-0 flex flex-col gap-1 pt-1 border-t border-white/20">
             <div className="flex flex-wrap items-center justify-center gap-1.5">
               <Link
@@ -1067,49 +1027,6 @@ export default function ArcadeHub() {
                 <span>⬅️</span>
                 <span>Back to Home</span>
               </Link>
-              {!showDevButton ? (
-                <button
-                  type="button"
-                  onClick={() => setShowDevButton(true)}
-                  className="inline-flex items-center px-2 py-1 rounded-lg bg-red-600/25 border border-red-500/35 text-red-300 text-[10px] font-bold hover:bg-red-600/35"
-                  title="Dev Tools"
-                >
-                  🔧 +10K
-                </button>
-              ) : (
-                <div className="flex flex-wrap items-center justify-center gap-1 w-full">
-                  <input
-                    type="password"
-                    value={devPassword}
-                    onChange={(e) => setDevPassword(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        addDevCoins();
-                      }
-                    }}
-                    placeholder="Password"
-                    className="px-2 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[10px] placeholder-zinc-500 focus:outline-none focus:border-red-500 w-[100px]"
-                  />
-                  <button
-                    type="button"
-                    onClick={addDevCoins}
-                    disabled={addingCoins}
-                    className="px-2 py-1 rounded-lg bg-red-600 hover:bg-red-500 font-bold text-white text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {addingCoins ? "…" : "+10K"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowDevButton(false);
-                      setDevPassword("");
-                    }}
-                    className="px-2 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[10px] hover:bg-white/20"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
             </div>
           </footer>
         </div>
@@ -1239,49 +1156,6 @@ export default function ArcadeHub() {
               <span>⬅️</span>
               <span>Back to Main Games</span>
             </Link>
-            {!showDevButton ? (
-              <button
-                type="button"
-                onClick={() => setShowDevButton(true)}
-                className="inline-flex items-center rounded-lg border border-red-500/35 bg-red-600/20 px-2.5 py-1 text-xs font-bold text-red-300 hover:bg-red-600/30"
-                title="Dev Tools"
-              >
-                🔧 +10K
-              </button>
-            ) : (
-              <div className="flex flex-wrap items-center justify-center gap-1.5">
-                <input
-                  type="password"
-                  value={devPassword}
-                  onChange={(e) => setDevPassword(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      addDevCoins();
-                    }
-                  }}
-                  placeholder="Password"
-                  className="w-[100px] rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white placeholder-zinc-400 focus:border-red-500 focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={addDevCoins}
-                  disabled={addingCoins}
-                  className="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {addingCoins ? "…" : "+10K"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDevButton(false);
-                    setDevPassword("");
-                  }}
-                  className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
           </footer>
         </div>
       </main>
