@@ -30,6 +30,16 @@ async function pullAuthoritativeVaultAfterCc() {
   }
 }
 
+/** Vault refresh only when this CC operate actually affected arcade wallet or hints cross-player credits. */
+function shouldPullAuthoritativeVaultAfterCc(json) {
+  if (!json?.ok) return false;
+  return Boolean(
+    json.vaultTouchedForCaller ||
+      (Array.isArray(json.vaultEffects) && json.vaultEffects.length > 0) ||
+      json.localVaultRefreshHint,
+  );
+}
+
 function ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards) {
   const revRaw = json?.revision;
   const rev = revRaw == null ? null : Math.max(0, Math.floor(Number(revRaw) || 0));
@@ -131,10 +141,7 @@ export function useOv2CcSession(roomId) {
         if (json?.vaultEffects?.length) {
           await applyVaultEffects(json.vaultEffects, participantKey);
         }
-        if (
-          json?.ok &&
-          (json.vaultTouchedForCaller || json.vaultEffects?.length || json.localVaultRefreshHint)
-        ) {
+        if (shouldPullAuthoritativeVaultAfterCc(json)) {
           await pullAuthoritativeVaultAfterCc();
         }
       } catch {
@@ -170,14 +177,49 @@ export function useOv2CcSession(roomId) {
             lastRevisionRef.current = rev;
           }
           const eng = row.engine;
-          setEngine(eng);
+          const prevHand = lastHandSeqRef.current;
           const hs = Math.floor(Number(eng.handSeq) || 0);
+          setEngine(eng);
           if (lastHandSeqRef.current >= 0 && hs !== lastHandSeqRef.current) {
             setViewerHoleCards([]);
           }
           lastHandSeqRef.current = hs;
           if (eng.phase === "between_hands" || eng.phase === "idle") {
             setViewerHoleCards([]);
+          } else if (
+            prevHand >= 0 &&
+            hs > prevHand &&
+            roomId &&
+            participantKey &&
+            (eng.phase === "preflop" || eng.phase === "post_blinds")
+          ) {
+            const myIdx = Array.isArray(eng.seats)
+              ? eng.seats.findIndex(s => s && s.participantKey === participantKey)
+              : -1;
+            const mine = myIdx >= 0 ? eng.seats[myIdx] : null;
+            if (mine?.inCurrentHand) {
+              void (async () => {
+                try {
+                  const json = await postOv2CcOperate({
+                    roomId,
+                    participantKey,
+                    op: "tick",
+                    payload: {},
+                  });
+                  ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, setViewerHoleCards);
+                  if (json?.vaultEffects?.length) {
+                    await applyVaultEffects(json.vaultEffects, participantKey);
+                  }
+                  if (shouldPullAuthoritativeVaultAfterCc(json)) {
+                    await pullAuthoritativeVaultAfterCc();
+                  }
+                } catch (e) {
+                  if (typeof console !== "undefined" && console.warn) {
+                    console.warn("[ov2-cc] realtime hole refresh failed", e?.message || e);
+                  }
+                }
+              })();
+            }
           }
         },
       )
@@ -185,7 +227,7 @@ export function useOv2CcSession(roomId) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [roomId]);
+  }, [roomId, participantKey]);
 
   const operate = useCallback(
     async (op, payload = {}) => {
@@ -212,7 +254,7 @@ export function useOv2CcSession(roomId) {
         if (json?.vaultEffects?.length) {
           await applyVaultEffects(json.vaultEffects, participantKey);
         }
-        if (json?.ok) {
+        if (shouldPullAuthoritativeVaultAfterCc(json)) {
           await pullAuthoritativeVaultAfterCc();
         }
       };
@@ -310,14 +352,13 @@ export function useOv2CcSession(roomId) {
           if (json?.vaultEffects?.length) {
             await applyVaultEffects(json.vaultEffects, participantKey);
           }
-          if (
-            json?.ok &&
-            (json.vaultTouchedForCaller || json.vaultEffects?.length || json.localVaultRefreshHint)
-          ) {
+          if (shouldPullAuthoritativeVaultAfterCc(json)) {
             await pullAuthoritativeVaultAfterCc();
           }
-        } catch {
-          /* ignore */
+        } catch (e) {
+          if (typeof console !== "undefined" && console.warn) {
+            console.warn("[ov2-cc] tick failed", e?.message || e);
+          }
         } finally {
           tickBusyRef.current = false;
         }

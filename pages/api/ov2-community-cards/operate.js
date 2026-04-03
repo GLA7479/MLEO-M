@@ -262,22 +262,43 @@ export default async function handler(req, res) {
       });
 
       if (result.error) {
-        const publicEngine = buildPublicEngineView(engine, privatePayload);
-        const viewerHoleCardsErr = extractViewerHoleCards(privatePayload, engine, participantKey);
+        const errEng = result.engine;
+        const errPriv = result.privatePayload;
+        const publicEngine = buildPublicEngineView(errEng, errPriv);
+        const viewerHoleCardsErr = extractViewerHoleCards(errPriv, errEng, participantKey);
         const actorSeat =
-          participantKey && Array.isArray(engine?.seats)
-            ? engine.seats.findIndex(s => s && s.participantKey === participantKey)
+          participantKey && Array.isArray(errEng?.seats)
+            ? errEng.seats.findIndex(s => s && s.participantKey === participantKey)
             : null;
-        ccOperateLog({
+        const logEntry = {
           tableId: roomId,
           op,
           clientOpId: clientOpId || null,
           clientRevision,
           serverRevision: prevRevision,
           actorSeat: actorSeat >= 0 ? actorSeat : null,
-          actionDeadline: engine?.actionDeadline ?? null,
+          actionDeadline: errEng?.actionDeadline ?? null,
           mutateError: result.error,
-        });
+        };
+        if (op === "tick") {
+          const live = (errEng?.seats || []).filter(s => s && s.inCurrentHand && !s.folded);
+          Object.assign(logEntry, {
+            tickMutateFailed: true,
+            handSeq: errEng?.handSeq,
+            phase: errEng?.phase,
+            street: errEng?.street,
+            boardLen: (errEng?.communityCards || []).length,
+            board: errEng?.communityCards,
+            pot: errEng?.pot,
+            deckRemaining: Array.isArray(errPriv?.deck) ? errPriv.deck.length : null,
+            liveSeatCount: live.length,
+            liveSeats: live.map(s => ({
+              seatIndex: s.seatIndex,
+              allIn: !!s.allIn,
+            })),
+          });
+        }
+        ccOperateLog(logEntry);
         return res.status(400).json({
           ok: false,
           code: result.error,
