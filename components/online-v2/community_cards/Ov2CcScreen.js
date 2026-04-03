@@ -218,7 +218,7 @@ export default function Ov2CcScreen({
     return (
       <div
         key={i}
-        className="pointer-events-auto absolute z-[8] w-[4.35rem] max-w-[29vw] sm:w-[5rem] sm:max-w-[5.5rem] md:w-[5.35rem] -translate-x-1/2 -translate-y-1/2"
+        className="pointer-events-auto absolute z-[8] w-[3.53rem] max-w-[23.4vw] sm:w-[4.05rem] sm:max-w-[4.46rem] md:w-[4.34rem] -translate-x-1/2 -translate-y-1/2"
         style={{ left: pos.left, top: pos.top }}
       >
         <button
