@@ -25,12 +25,61 @@ async function applyVaultEffects(effects, selfParticipantKey) {
   }
 }
 
-/** Align HUD + gating with server wallet after C21 API applied vault RPCs (bypasses pending-delta skip in balance read). */
+function c21TimingOn() {
+  return typeof window !== "undefined" && window.localStorage?.getItem("ov2_c21_timing") === "1";
+}
+
+/** Same contract as CC: only force a server vault read when this response actually moved money or hints cross-player credits. */
+function shouldPullAuthoritativeVaultAfterC21(json) {
+  if (!json?.ok) return false;
+  return Boolean(
+    json.vaultTouchedForCaller ||
+      (Array.isArray(json.vaultEffects) && json.vaultEffects.length > 0) ||
+      json.localVaultRefreshHint,
+  );
+}
+
+/** `forceServer` bypasses pending-delta skip so HUD matches server after commits/credits. */
 async function pullAuthoritativeVaultAfterC21() {
   try {
     await readOnlineV2Vault({ fresh: true, forceServer: true });
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * Off the operate/tick unlock path — applies client-side credits then optional authoritative balance pull.
+ */
+async function flushC21OperateSideEffects(json, participantKey, traceCtx) {
+  const { op = "?", tTap = 0, tAfterApply = 0 } = traceCtx || {};
+  const timing = c21TimingOn();
+  const tVaultStart = timing ? performance.now() : 0;
+  if (timing && tTap > 0) {
+    console.log("[ov2-c21-timing]", {
+      phase: "vault_deferred_start",
+      op,
+      msSinceTap: Math.round(tVaultStart - tTap),
+      msSinceStateApply: Math.round(tVaultStart - tAfterApply),
+    });
+  }
+  try {
+    if (json?.vaultEffects?.length) {
+      await applyVaultEffects(json.vaultEffects, participantKey);
+    }
+    if (shouldPullAuthoritativeVaultAfterC21(json)) {
+      await pullAuthoritativeVaultAfterC21();
+    }
+  } finally {
+    if (timing && tTap > 0) {
+      const tEnd = performance.now();
+      console.log("[ov2-c21-timing]", {
+        phase: "vault_deferred_end",
+        op,
+        msSinceTap: Math.round(tEnd - tTap),
+        deferredVaultMs: Math.round(tEnd - tVaultStart),
+      });
+    }
   }
 }
 
@@ -78,17 +127,7 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
         });
         if (cancelled) return;
         if (json?.engine) setEngine(json.engine);
-        if (json?.vaultEffects?.length) {
-          await applyVaultEffects(json.vaultEffects, participantKey);
-        }
-        if (
-          json?.ok &&
-          (json.vaultTouchedForCaller ||
-            json.vaultEffects?.length ||
-            json.localVaultRefreshHint)
-        ) {
-          await pullAuthoritativeVaultAfterC21();
-        }
+        void flushC21OperateSideEffects(json, participantKey, { op: "tick_mount" }).catch(() => {});
       } catch {
         /* table may not exist until migration */
       }
@@ -124,6 +163,10 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
       if (operateInFlightRef.current) return { ok: false, skipped: true };
       operateInFlightRef.current = true;
       setOperateBusy(true);
+      const timing = c21TimingOn();
+      const tTap = timing ? performance.now() : 0;
+      let tAfterResponse = 0;
+      let tAfterApply = 0;
       try {
         const json = await postOv2C21Operate({
           roomId,
@@ -131,20 +174,40 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
           op,
           payload,
         });
+        tAfterResponse = timing ? performance.now() : 0;
         if (json?.engine) setEngine(json.engine);
-        if (json?.vaultEffects?.length) {
-          await applyVaultEffects(json.vaultEffects, participantKey);
-        }
-        // Any successful operate may have changed server vault (commit/credit); always reconcile so UI never depends on response flag completeness.
-        if (json?.ok) {
-          await pullAuthoritativeVaultAfterC21();
+        tAfterApply = timing ? performance.now() : 0;
+        void flushC21OperateSideEffects(json, participantKey, { op, tTap, tAfterApply }).catch(() => {});
+        if (timing) {
+          console.log("[ov2-c21-timing]", {
+            phase: "operate_state_applied",
+            op,
+            msTapToResponse: Math.round(tAfterResponse - tTap),
+            msResponseToApply: Math.round(tAfterApply - tAfterResponse),
+          });
         }
         return { ok: Boolean(json?.ok), json };
       } catch (e) {
         return { ok: false, error: e };
       } finally {
+        const tBusyOff = timing ? performance.now() : 0;
         operateInFlightRef.current = false;
         setOperateBusy(false);
+        if (timing && tTap > 0 && tAfterApply > 0) {
+          console.log("[ov2-c21-timing]", {
+            phase: "busy_released",
+            op,
+            msApplyToBusyOff: Math.round(tBusyOff - tAfterApply),
+            msTapToBusyOff: Math.round(tBusyOff - tTap),
+          });
+        } else if (timing && tTap > 0) {
+          console.log("[ov2-c21-timing]", {
+            phase: "busy_released",
+            op,
+            msTapToBusyOff: Math.round(tBusyOff - tTap),
+            note: "no_state_apply_mark",
+          });
+        }
       }
     },
     [roomId, participantKey],
@@ -167,17 +230,7 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
             payload: {},
           });
           if (json?.engine) setEngine(json.engine);
-          if (json?.vaultEffects?.length) {
-            await applyVaultEffects(json.vaultEffects, participantKey);
-          }
-          if (
-            json?.ok &&
-            (json.vaultTouchedForCaller ||
-              json.vaultEffects?.length ||
-              json.localVaultRefreshHint)
-          ) {
-            await pullAuthoritativeVaultAfterC21();
-          }
+          void flushC21OperateSideEffects(json, participantKey, { op: "tick_interval" }).catch(() => {});
         } catch {
           /* ignore tick errors — next poll retries */
         } finally {
