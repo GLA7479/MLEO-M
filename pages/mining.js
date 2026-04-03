@@ -4996,6 +4996,18 @@ export default function GamesHub() {
                 >
                   {lt.leaderboardButton}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowVaultModal(true)}
+                  className="inline-flex max-w-[min(100%,9rem)] items-center gap-1 rounded-lg border border-emerald-500/45 bg-emerald-600/25 px-2.5 py-1 text-[10px] font-bold text-emerald-100 hover:bg-emerald-600/35"
+                  title={text.menuPlayerVaultTitle}
+                  aria-label={text.menuPlayerVaultTitle}
+                >
+                  <span className="shrink-0" aria-hidden>
+                    💰
+                  </span>
+                  <span className="min-w-0 truncate tabular-nums">{fmt(vault)} MLEO</span>
+                </button>
                 {!showDevButton ? (
                   <button
                     type="button"
@@ -5268,6 +5280,18 @@ export default function GamesHub() {
                   className="rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-bold text-zinc-200 hover:bg-white/10"
                 >
                   {lt.leaderboardButton}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowVaultModal(true)}
+                  className="inline-flex max-w-[min(100%,11rem)] items-center gap-1.5 rounded-lg border border-emerald-500/45 bg-emerald-600/25 px-3 py-1 text-[11px] font-bold text-emerald-100 hover:bg-emerald-600/35"
+                  title={text.menuPlayerVaultTitle}
+                  aria-label={text.menuPlayerVaultTitle}
+                >
+                  <span className="shrink-0" aria-hidden>
+                    💰
+                  </span>
+                  <span className="min-w-0 truncate tabular-nums">{fmt(vault)} MLEO</span>
                 </button>
                 {!showDevButton ? (
                   <button
