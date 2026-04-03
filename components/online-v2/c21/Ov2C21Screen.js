@@ -667,7 +667,15 @@ export default function Ov2C21Screen({
 
   const parsedDraftPlay = Math.floor(Number(String(playDraftStr).replace(/\D/g, "")) || 0);
   const draftPlayValid = parsedDraftPlay >= minBet && parsedDraftPlay <= maxBet;
-  const vaultOkForCommit = vaultBalance >= parsedDraftPlay;
+  /** After commit, HUD vault is post-debit; add back pledged intended bet so Play stays valid for same/higher draft until Reverse. */
+  const committedPledge =
+    mySeat?.betCommitRecorded ? Math.max(0, Math.floor(Number(mySeat.intendedBet) || 0)) : 0;
+  const vaultOkForCommit = vaultBalance + committedPledge >= parsedDraftPlay;
+  /** Same amount already committed — Play must look & behave off until draft changes or Reverse. */
+  const playLockedInUi =
+    Boolean(mySeat?.betCommitRecorded) &&
+    committedPledge >= minBet &&
+    parsedDraftPlay === committedPledge;
   const canSitToPlay = vaultBalance >= minBet;
 
   const bumpDraftByTableMin = useCallback(() => {
@@ -689,10 +697,14 @@ export default function Ov2C21Screen({
     if (e?.phase !== "betting" || betLockRef.current || operateBusy) return;
     const raw = Math.floor(Number(String(playDraftStr).replace(/\D/g, "")) || 0);
     if (raw < minBet || raw > maxBet) return;
-    if (vaultBalance < raw) {
+    const ms = e?.seats?.find(s => s.participantKey === participantKey);
+    const pledge =
+      ms?.betCommitRecorded ? Math.max(0, Math.floor(Number(ms.intendedBet) || 0)) : 0;
+    if (vaultBalance + pledge < raw) {
       setEconomyHint("Not enough vault for this play.");
       return;
     }
+    if (ms?.betCommitRecorded && pledge >= minBet && raw === pledge) return;
     betLockRef.current = true;
     try {
       const r = await onOperate("set_bet", { amount: raw });
@@ -718,7 +730,7 @@ export default function Ov2C21Screen({
         betLockRef.current = false;
       }, 400);
     }
-  }, [playDraftStr, maxBet, minBet, onOperate, operateBusy, vaultBalance]);
+  }, [playDraftStr, maxBet, minBet, onOperate, operateBusy, participantKey, vaultBalance]);
 
   const uncommitPlayAmount = useCallback(async () => {
     const e = engineRef.current;
@@ -1106,10 +1118,20 @@ export default function Ov2C21Screen({
               <button
                 type="button"
                 disabled={
-                  operateBusy || actionLock || phase !== "betting" || !draftPlayValid || !vaultOkForCommit
+                  operateBusy ||
+                  actionLock ||
+                  phase !== "betting" ||
+                  !draftPlayValid ||
+                  !vaultOkForCommit ||
+                  playLockedInUi
+                }
+                title={
+                  playLockedInUi
+                    ? "Play is locked in — change the amount or tap Reverse"
+                    : undefined
                 }
                 onClick={() => void commitPlayAmount()}
-                className="h-10 min-w-[5.25rem] shrink-0 touch-manipulation rounded bg-emerald-600 px-2.5 text-[13px] font-bold leading-none text-white disabled:opacity-35 sm:min-w-[5.75rem] sm:px-3 sm:text-sm"
+                className="h-10 min-w-[5.25rem] shrink-0 touch-manipulation rounded bg-emerald-600 px-2.5 text-[13px] font-bold leading-none text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500 disabled:shadow-none disabled:saturate-0 sm:min-w-[5.75rem] sm:px-3 sm:text-sm"
               >
                 Play
               </button>
