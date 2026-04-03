@@ -29,6 +29,17 @@ function otherSeatCommittedPlayLabel(seat, phase, minBet) {
   return null;
 }
 
+/** Acting-phase seat to follow for Auto Watch (non-self, occupied). */
+function autoWatchTargetSeatIndex(phase, currentTurn, mySeatIndex, seatsForUi) {
+  if (phase !== "acting" || currentTurn == null) return null;
+  const idx = Math.floor(Number(currentTurn.seatIndex));
+  if (!Number.isFinite(idx) || idx < 0 || idx > 5) return null;
+  if (mySeatIndex != null && idx === mySeatIndex) return null;
+  const s = seatsForUi[idx];
+  if (!s?.participantKey) return null;
+  return idx;
+}
+
 function otherSeatHandStatusLabel(phase, seatIndex, handIndex, seat, currentTurn) {
   const m = seat?.handMeta?.[handIndex];
   if (!m) return "—";
@@ -310,6 +321,7 @@ export default function Ov2C21Screen({
   onOperate,
   operateBusy,
   loadError = "",
+  autoWatchEnabled = false,
 }) {
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [actionLock, setActionLock] = useState(false);
@@ -574,6 +586,49 @@ export default function Ov2C21Screen({
 
   const [inspectorSeatIdx, setInspectorSeatIdx] = useState(null);
   const [inspectorSplitIdx, setInspectorSplitIdx] = useState(0);
+  const manualInspectorOverrideRef = useRef(false);
+  const phaseTurnClearRef = useRef({ phase: "", sig: "" });
+
+  const dismissInspectorSheet = useCallback(() => {
+    manualInspectorOverrideRef.current = false;
+    setInspectorSeatIdx(null);
+  }, []);
+
+  useEffect(() => {
+    const sig =
+      phase === "acting" && currentTurn != null
+        ? `${currentTurn.seatIndex}-${currentTurn.handIndex}`
+        : "";
+    const prev = phaseTurnClearRef.current;
+    if (prev.phase !== phase || (sig && prev.sig && sig !== prev.sig)) {
+      manualInspectorOverrideRef.current = false;
+    }
+    phaseTurnClearRef.current = { phase, sig };
+  }, [phase, currentTurn?.seatIndex, currentTurn?.handIndex]);
+
+  useEffect(() => {
+    if (!autoWatchEnabled) return;
+    if (isMyTurn) {
+      dismissInspectorSheet();
+      return;
+    }
+    const myIdx = mySeat != null ? mySeat.seatIndex : undefined;
+    const target = autoWatchTargetSeatIndex(phase, currentTurn, myIdx, seatsForUi);
+    if (target == null) {
+      if (!manualInspectorOverrideRef.current) dismissInspectorSheet();
+      return;
+    }
+    if (manualInspectorOverrideRef.current) return;
+    setInspectorSeatIdx(target);
+  }, [
+    autoWatchEnabled,
+    isMyTurn,
+    phase,
+    currentTurn,
+    mySeat,
+    seatsForUi,
+    dismissInspectorSheet,
+  ]);
 
   useEffect(() => {
     if (mySplitHandCount <= 1) {
@@ -597,9 +652,9 @@ export default function Ov2C21Screen({
     if (inspectorSeatIdx == null) return;
     const s = seatsForUi[inspectorSeatIdx];
     if (!s?.participantKey || s.participantKey === participantKey) {
-      setInspectorSeatIdx(null);
+      dismissInspectorSheet();
     }
-  }, [inspectorSeatIdx, seatsForUi, participantKey]);
+  }, [inspectorSeatIdx, seatsForUi, participantKey, dismissInspectorSheet]);
 
   useEffect(() => {
     if (inspectorSeatIdx != null) setInspectorSplitIdx(0);
@@ -621,11 +676,11 @@ export default function Ov2C21Screen({
   useEffect(() => {
     if (inspectorSeatIdx == null) return;
     const onKey = e => {
-      if (e.key === "Escape") setInspectorSeatIdx(null);
+      if (e.key === "Escape") dismissInspectorSheet();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [inspectorSeatIdx]);
+  }, [inspectorSeatIdx, dismissInspectorSheet]);
 
   const myHandTotalLabel = useMemo(() => {
     if (!displayMySeat?.hands?.length) return null;
@@ -906,7 +961,12 @@ export default function Ov2C21Screen({
                 onClick={() => {
                   if (operateBusy && !taken) return;
                   if (taken) {
-                    setInspectorSeatIdx(prev => (prev === idx ? null : idx));
+                    setInspectorSeatIdx(prev => {
+                      const next = prev === idx ? null : idx;
+                      if (next != null) manualInspectorOverrideRef.current = true;
+                      else manualInspectorOverrideRef.current = false;
+                      return next;
+                    });
                     return;
                   }
                   trySit(idx);
@@ -1313,7 +1373,7 @@ export default function Ov2C21Screen({
                   type="button"
                   className="absolute inset-0 bg-black/50"
                   aria-label="Close"
-                  onClick={() => setInspectorSeatIdx(null)}
+                  onClick={() => dismissInspectorSheet()}
                 />
                 <div
                   className="relative z-10 flex max-h-[min(72vh,24rem)] w-[min(92vw,17.75rem)] flex-col overflow-hidden rounded-xl border border-zinc-500/50 bg-black shadow-[0_20px_50px_rgba(0,0,0,0.75),0_0_0_1px_rgba(255,255,255,0.06)_inset]"
@@ -1334,7 +1394,7 @@ export default function Ov2C21Screen({
                     </div>
                     <button
                       type="button"
-                      onClick={() => setInspectorSeatIdx(null)}
+                      onClick={() => dismissInspectorSheet()}
                       className="shrink-0 rounded border border-zinc-500/70 bg-zinc-950 px-1.5 py-0.5 text-[11px] font-bold leading-none text-white hover:bg-zinc-900"
                       aria-label="Close"
                     >

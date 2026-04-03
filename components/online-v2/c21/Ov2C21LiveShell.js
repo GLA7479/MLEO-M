@@ -61,6 +61,19 @@ function C21InfoPanelBody() {
         </p>
       </section>
       <section>
+        <p className="font-semibold text-zinc-100">Optional controls</p>
+        <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
+          <li>
+            <span className="text-zinc-200">Auto Next</span> — automatically joins the next round with the same selected bet
+            until you turn it off, funds fail, or inactivity stops it.
+          </li>
+          <li>
+            <span className="text-zinc-200">Auto Watch</span> — automatically opens the small player hand panel for the
+            currently active other player; it hides on your own turn and you can turn it off anytime.
+          </li>
+        </ul>
+      </section>
+      <section>
         <p className="font-semibold text-zinc-100">How to play</p>
         <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
           <li>
@@ -154,6 +167,7 @@ export default function Ov2C21LiveShell() {
   const roomId = useMemo(() => parseRoomQuery(router), [router.isReady, router.query.room]);
   const [tableStake, setTableStake] = useState(10_000);
   const [nameDraft, setNameDraft] = useState("");
+  const [autoWatchEnabled, setAutoWatchEnabled] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const leaveInFlightRef = useRef(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -323,14 +337,36 @@ export default function Ov2C21LiveShell() {
         infoPanel={infoPanel}
       >
       <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden sm:gap-2">
           <input
             value={nameDraft}
             onChange={e => setNameDraft(e.target.value)}
             onBlur={persistName}
-            className="min-w-0 flex-1 rounded-lg border border-white/12 bg-black/35 px-2 py-1.5 text-[11px] text-white"
+            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/12 bg-black/35 px-2 py-1.5 text-[11px] text-white"
             placeholder="Display name"
           />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autoWatchEnabled}
+            title="Open the small hand panel for whoever is acting (not you); hides on your turn."
+            onClick={() => setAutoWatchEnabled(v => !v)}
+            className={`h-9 shrink-0 touch-manipulation rounded border px-1 py-0 text-center font-extrabold uppercase leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition enabled:active:scale-[0.98] sm:px-1.5 ${
+              autoWatchEnabled
+                ? "border-emerald-500/55 bg-emerald-950/55 text-emerald-100"
+                : "border-white/18 bg-zinc-950/90 text-zinc-400"
+            }`}
+          >
+            <span className="flex flex-col items-center justify-center gap-0 leading-none">
+              {autoWatchEnabled ? (
+                <span className="text-[10px] leading-none text-emerald-200 sm:text-[11px]" aria-hidden>
+                  ✓
+                </span>
+              ) : null}
+              <span className="text-[7px] tracking-wide sm:text-[8px]">AUTO</span>
+              <span className="text-[7px] tracking-wide sm:text-[8px]">WATCH</span>
+            </span>
+          </button>
           <button
             type="button"
             title="Pick another table without leaving your seat"
@@ -363,6 +399,7 @@ export default function Ov2C21LiveShell() {
             onOperate={session.operate}
             operateBusy={session.operateBusy}
             loadError={session.loadError}
+            autoWatchEnabled={autoWatchEnabled}
           />
         </div>
       </div>
