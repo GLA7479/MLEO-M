@@ -75,6 +75,12 @@ export default function Ov2CcScreen({
     return Math.max(0, Math.ceil((Number(engine.actionDeadline) - Date.now()) / 1000));
   }, [canAct, engine?.actionDeadline, clock]);
 
+  const otherTurnSeconds = useMemo(() => {
+    if (!handBettingLive || engine.actionSeat == null || canAct || !engine?.actionDeadline) return null;
+    void clock;
+    return Math.max(0, Math.ceil((Number(engine.actionDeadline) - Date.now()) / 1000));
+  }, [handBettingLive, engine.actionSeat, engine?.actionDeadline, canAct, clock]);
+
   const doOp = useCallback(async (op, payload = {}) => onOperate(op, payload), [onOperate]);
 
   const actionClusterLocked = operateBusy;
@@ -280,11 +286,18 @@ export default function Ov2CcScreen({
     );
   };
 
+  const holeCardsToShow =
+    mySeat && (viewerHoleCards?.length || mySeat.holeCards?.length)
+      ? viewerHoleCards?.length
+        ? viewerHoleCards
+        : mySeat.holeCards || []
+      : [];
+
   return (
-    <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden bg-[#050708] text-zinc-100 sm:gap-1.5">
-      <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-2 lg:max-w-6xl lg:gap-2.5">
-        <div className="relative flex min-h-0 min-h-[300px] flex-1 flex-col">
-          <div className="relative mx-auto h-full w-full max-w-[920px] min-h-[min(50vh,380px)] flex-1 rounded-[1.85rem] border border-black/55 bg-gradient-to-b from-[#5c4030] via-[#2e1e16] to-[#120b08] p-[5px] shadow-[0_28px_72px_rgba(0,0,0,0.58),inset_0_1px_0_rgba(255,255,255,0.06)] sm:min-h-[min(56vh,440px)] sm:rounded-[2.35rem] sm:p-1 md:min-h-[min(58vh,500px)] lg:rounded-[2.55rem] lg:p-[7px]">
+    <div className="flex h-full min-h-0 flex-col gap-0.5 overflow-hidden bg-[#050708] text-zinc-100 sm:gap-1.5">
+      <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-1 sm:gap-2 lg:max-w-6xl lg:gap-2.5">
+        <div className="relative flex min-h-0 min-h-[280px] flex-1 flex-col max-sm:min-h-[260px]">
+          <div className="relative mx-auto h-full w-full max-w-[920px] min-h-[min(64vh,480px)] flex-1 rounded-[1.65rem] border border-black/55 bg-gradient-to-b from-[#5c4030] via-[#2e1e16] to-[#120b08] p-[3px] shadow-[0_28px_72px_rgba(0,0,0,0.58),inset_0_1px_0_rgba(255,255,255,0.06)] max-sm:min-h-[min(66vh,520px)] sm:min-h-[min(56vh,440px)] sm:rounded-[2.35rem] sm:p-1 md:min-h-[min(58vh,500px)] lg:rounded-[2.55rem] lg:p-[7px]">
             <div
               className="relative h-full min-h-0 w-full overflow-hidden rounded-[1.45rem] border border-black/45 shadow-[inset_0_2px_24px_rgba(0,0,0,0.35)] sm:rounded-[1.85rem] md:rounded-[2.05rem]"
               style={{
@@ -302,8 +315,8 @@ export default function Ov2CcScreen({
               <div className="pointer-events-none absolute inset-[6px] rounded-[1.25rem] border border-black/25 sm:inset-2 sm:rounded-[1.55rem] md:rounded-[1.75rem]" />
               <div className="pointer-events-none absolute inset-[10px] rounded-[1.1rem] border border-white/[0.06] sm:inset-3 sm:rounded-[1.35rem] md:rounded-[1.55rem]" />
 
-              <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center px-[11%] py-[16%] sm:px-[13%] sm:py-[18%] md:px-[15%] md:py-[20%]">
-                <div className="flex w-full max-w-md flex-col items-center gap-2 sm:max-w-lg sm:gap-2.5 md:gap-3">
+              <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center px-[8%] py-[11%] max-sm:px-[7%] max-sm:py-[10%] sm:px-[13%] sm:py-[17%] md:px-[15%] md:py-[20%]">
+                <div className="flex w-full max-w-md flex-col items-center gap-1.5 sm:max-w-lg sm:gap-2.5 md:gap-3">
                   <p className="text-center text-[8px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[9px]">
                     {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
                     {bb}
@@ -321,7 +334,7 @@ export default function Ov2CcScreen({
                       {currentBet > 0 ? (
                         <span className="text-emerald-200/45">
                           {" "}
-                          · Bet <span className="tabular-nums text-emerald-100/75">{currentBet}</span>
+                          · Match <span className="tabular-nums text-emerald-100/75">{currentBet}</span>
                         </span>
                       ) : null}
                     </p>
@@ -370,24 +383,11 @@ export default function Ov2CcScreen({
                     </div>
                   </div>
 
-                  <div className="min-h-[1.5rem] w-full text-center">
-                    {canAct && turnSecondsLeft != null ? (
-                      <div className="inline-flex rounded-full border border-amber-500/28 bg-black/40 px-3 py-1 text-[10px] font-semibold text-amber-100 shadow-[0_4px_14px_rgba(0,0,0,0.32)] sm:px-4 sm:text-xs">
-                        Your turn · <span className="tabular-nums">{turnSecondsLeft}</span>s
-                      </div>
-                    ) : handBettingLive && engine.actionSeat != null ? (
-                      <p className="text-[9px] text-emerald-200/48 sm:text-[10px]">
-                        Seat {engine.actionSeat + 1} to act
-                        {engine.actionDeadline
-                          ? ` · ${Math.max(0, Math.ceil((Number(engine.actionDeadline) - Date.now()) / 1000))}s`
-                          : ""}
-                      </p>
-                    ) : likelyBoardRunout ? (
-                      <p className="text-[9px] font-medium text-emerald-200/50 sm:text-[10px]">
-                        All-in runout — dealing board
-                      </p>
-                    ) : null}
-                  </div>
+                  {likelyBoardRunout ? (
+                    <p className="text-center text-[9px] font-medium text-emerald-200/50 sm:text-[10px]">
+                      All-in runout — dealing board
+                    </p>
+                  ) : null}
 
                   {engine.winnersDisplay?.seats?.length ? (
                     <div className="max-w-sm rounded-lg border border-emerald-500/22 bg-black/35 px-2.5 py-1.5 text-center text-[10px] text-emerald-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:rounded-xl sm:px-3 sm:py-2 sm:text-[11px]">
@@ -407,6 +407,32 @@ export default function Ov2CcScreen({
                 </div>
               </div>
 
+              <div className="pointer-events-none absolute right-[1%] top-[18%] z-[6] flex max-w-[46%] flex-col items-end gap-1 pr-0.5 sm:right-[1.5%] sm:top-[20%] md:max-w-[38%]">
+                {canAct && turnSecondsLeft != null ? (
+                  <div className="rounded-full border border-amber-500/28 bg-black/50 px-2.5 py-1 text-[9px] font-semibold text-amber-100 shadow-[0_4px_14px_rgba(0,0,0,0.32)] sm:px-3 sm:text-[10px]">
+                    Your turn · <span className="tabular-nums">{turnSecondsLeft}</span>s
+                  </div>
+                ) : handBettingLive && engine.actionSeat != null ? (
+                  <p className="text-right text-[8px] leading-snug text-emerald-200/55 sm:text-[9px]">
+                    <span className="font-semibold text-emerald-100/80">Seat {engine.actionSeat + 1}</span>
+                    <span className="block text-emerald-200/45">To act</span>
+                    {otherTurnSeconds != null ? (
+                      <span className="mt-0.5 inline-block font-mono tabular-nums text-amber-200/90">{otherTurnSeconds}s</span>
+                    ) : null}
+                  </p>
+                ) : null}
+              </div>
+
+              {holeCardsToShow.length > 0 ? (
+                <div className="pointer-events-none absolute inset-x-2 bottom-[20%] z-[6] flex justify-center max-sm:bottom-[22%] sm:bottom-[18%] sm:inset-x-4 md:bottom-[16%]">
+                  <div className="flex flex-wrap items-center justify-center gap-2 drop-shadow-[0_8px_24px_rgba(0,0,0,0.55)] sm:gap-2.5">
+                    {holeCardsToShow.map((c, idx) => (
+                      <Ov2CcPlayingCard key={`felt-h-${idx}`} code={c} size="lg" className="max-sm:scale-[1.06]" />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="pointer-events-none absolute inset-0 z-[7]">
                 {seats.length === 0 ? null : seats.map((s, i) => renderSeatNode(s, i))}
               </div>
@@ -422,91 +448,90 @@ export default function Ov2CcScreen({
           </div>
         </div>
 
-        <div className="shrink-0 rounded-2xl border border-white/[0.08] bg-[#0c1216] px-3 py-3 shadow-[0_8px_28px_rgba(0,0,0,0.45)] sm:px-4">
-          <p className="text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Your stack</p>
+        <div className="shrink-0 rounded-2xl border border-white/[0.08] bg-[#0c1216] px-3 py-2.5 shadow-[0_8px_28px_rgba(0,0,0,0.45)] sm:px-4 sm:py-3">
           {mySeat ? (
-            <div className="mt-2 space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <p className="pt-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Your stack</p>
+              <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                {!mySeat.sitOut && !mySeat.pendingSitOutAfterHand ? (
+                  <button
+                    type="button"
+                    disabled={operateBusy}
+                    className="min-h-[36px] rounded-lg border border-zinc-600/35 bg-zinc-900/60 px-3 py-1.5 text-[9px] font-semibold text-zinc-200 touch-manipulation sm:min-h-[40px] sm:rounded-xl sm:px-4 sm:text-[10px]"
+                    onClick={() => void runGameOp("sit_out")}
+                  >
+                    {betweenHands ? "Sit out" : "Next hand out"}
+                  </button>
+                ) : null}
+                {betweenHands && (mySeat.sitOut || mySeat.pendingSitOutAfterHand) ? (
+                  <button
+                    type="button"
+                    disabled={operateBusy || mySeat.pendingSitOutAfterHand}
+                    className="min-h-[36px] rounded-lg border border-sky-600/35 bg-sky-950/40 px-3 py-1.5 text-[9px] font-semibold text-sky-100 touch-manipulation disabled:opacity-40 sm:min-h-[40px] sm:rounded-xl sm:px-4 sm:text-[10px]"
+                    onClick={() => void runGameOp("sit_in")}
+                    title={mySeat.pendingSitOutAfterHand ? "Wait until this hand ends" : undefined}
+                  >
+                    I&apos;m back
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <p className="text-center text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Your stack</p>
+          )}
+          {mySeat ? (
+            <div className="mt-2 space-y-2.5">
               <p className="text-center font-mono text-xl font-bold tabular-nums text-white sm:text-2xl">
                 {Math.floor(mySeat.stack || 0).toLocaleString?.() ?? Math.floor(mySeat.stack || 0)}
               </p>
-              <div className="flex min-h-[44px] flex-wrap items-center justify-center gap-2">
-                {(viewerHoleCards?.length ? viewerHoleCards : mySeat.holeCards || []).map((c, idx) => (
-                  <Ov2CcPlayingCard key={`h-${idx}`} code={c} size="md" />
-                ))}
-              </div>
-              <div className="flex flex-col gap-2">
-                {betweenHands ? (
-                  <div className="flex gap-2">
-                    <input
-                      className="min-w-0 flex-1 rounded-xl border border-white/12 bg-black/45 px-3 py-2 text-xs text-white placeholder:text-zinc-600"
-                      value={topUpDraft}
-                      onChange={e => setTopUpDraft(e.target.value.replace(/[^\d]/g, ""))}
-                      placeholder={`Top-up (max +${maxBuy - Math.floor(mySeat.stack || 0)})`}
-                      inputMode="numeric"
-                    />
-                    <button
-                      type="button"
-                      disabled={operateBusy}
-                      className="min-h-[44px] shrink-0 rounded-xl border border-emerald-600/40 bg-emerald-950/50 px-4 text-xs font-bold text-emerald-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                      onClick={async () => {
+              {betweenHands ? (
+                <div className="flex gap-2">
+                  <input
+                    className="min-w-0 flex-1 rounded-xl border border-white/12 bg-black/45 px-3 py-2 text-xs text-white placeholder:text-zinc-600"
+                    value={topUpDraft}
+                    onChange={e => setTopUpDraft(e.target.value.replace(/[^\d]/g, ""))}
+                    placeholder={`Top-up (max +${maxBuy - Math.floor(mySeat.stack || 0)})`}
+                    inputMode="numeric"
+                  />
+                  <button
+                    type="button"
+                    disabled={operateBusy}
+                    className="min-h-[44px] shrink-0 rounded-xl border border-emerald-600/40 bg-emerald-950/50 px-4 text-xs font-bold text-emerald-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                    onClick={async () => {
+                      setFormHint("");
+                      const cap = maxBuy - Math.floor(mySeat.stack || 0);
+                      const n = Math.max(0, Math.floor(Number(topUpDraft) || 0));
+                      if (n <= 0) {
+                        setFormHint("Enter a top-up amount.");
+                        return;
+                      }
+                      if (n > cap) {
+                        setFormHint(`Top-up cannot exceed ${cap}.`);
+                        return;
+                      }
+                      const r = await doOp("top_up", { amount: n });
+                      if (r?.ok) {
+                        setTopUpDraft("");
                         setFormHint("");
-                        const cap = maxBuy - Math.floor(mySeat.stack || 0);
-                        const n = Math.max(0, Math.floor(Number(topUpDraft) || 0));
-                        if (n <= 0) {
-                          setFormHint("Enter a top-up amount.");
-                          return;
-                        }
-                        if (n > cap) {
-                          setFormHint(`Top-up cannot exceed ${cap}.`);
-                          return;
-                        }
-                        const r = await doOp("top_up", { amount: n });
-                        if (r?.ok) {
-                          setTopUpDraft("");
-                          setFormHint("");
-                        } else {
-                          setTopUpDraft(String(n));
-                          setFormHint(
-                            String(r?.code || r?.json?.code || r?.error?.payload?.code || "Top-up failed."),
-                          );
-                        }
-                      }}
-                    >
-                      Top-up
-                    </button>
-                  </div>
-                ) : null}
-                <div className="flex flex-wrap justify-center gap-2">
-                  {!mySeat.sitOut && !mySeat.pendingSitOutAfterHand ? (
-                    <button
-                      type="button"
-                      disabled={operateBusy}
-                      className="min-h-[40px] rounded-xl border border-zinc-600/35 bg-zinc-900/60 px-4 py-2 text-[10px] font-semibold text-zinc-200 touch-manipulation"
-                      onClick={() => void runGameOp("sit_out")}
-                    >
-                      {betweenHands ? "Sit out" : "Sit out next hand"}
-                    </button>
-                  ) : null}
-                  {betweenHands && (mySeat.sitOut || mySeat.pendingSitOutAfterHand) ? (
-                    <button
-                      type="button"
-                      disabled={operateBusy || mySeat.pendingSitOutAfterHand}
-                      className="min-h-[40px] rounded-xl border border-sky-600/35 bg-sky-950/40 px-4 py-2 text-[10px] font-semibold text-sky-100 touch-manipulation disabled:opacity-40"
-                      onClick={() => void runGameOp("sit_in")}
-                      title={mySeat.pendingSitOutAfterHand ? "Wait until this hand ends" : undefined}
-                    >
-                      I&apos;m back
-                    </button>
-                  ) : null}
+                      } else {
+                        setTopUpDraft(String(n));
+                        setFormHint(
+                          String(r?.code || r?.json?.code || r?.error?.payload?.code || "Top-up failed."),
+                        );
+                      }
+                    }}
+                  >
+                    Top-up
+                  </button>
                 </div>
-              </div>
+              ) : null}
               {mySeat.pendingSitOutAfterHand && !betweenHands ? (
-                <p className="text-center text-[10px] text-amber-400/90">Sit out after this hand</p>
+                <p className="text-center text-[9px] text-amber-400/90 sm:text-[10px]">Leaving after this hand</p>
               ) : null}
               {formHint ? <p className="text-center text-[10px] text-rose-400/90">{formHint}</p> : null}
             </div>
           ) : (
-            <p className="mt-2 text-center text-xs text-zinc-500">Take a seat to receive hole cards</p>
+            <p className="mt-2 text-center text-xs text-zinc-500">Take a seat to join</p>
           )}
         </div>
       </div>
@@ -587,19 +612,15 @@ export default function Ov2CcScreen({
         </div>
       ) : null}
 
-      {operateSubmitStatus === "sending" ? (
-        <p className="shrink-0 text-center text-[10px] text-amber-200/95">Sending…</p>
-      ) : operateSubmitStatus === "resyncing" ? (
-        <p className="shrink-0 text-center text-[10px] text-amber-200/95">Re-syncing…</p>
-      ) : null}
       {actionHint ? (
         <p className="shrink-0 text-center text-[10px] text-rose-400/90">{actionHint}</p>
       ) : null}
 
-      {mySeat && canAct ? (
-        <div className="relative z-10 shrink-0 border-t border-white/[0.06] bg-[#070a0d] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-16px_48px_rgba(0,0,0,0.55)] sm:px-4 sm:pb-3 sm:pt-3">
-          <div className="mx-auto max-w-lg">
-            <p className="mb-2 text-center text-[8px] font-medium uppercase tracking-[0.28em] text-zinc-600">Betting</p>
+      {mySeat ? (
+        <div className="relative z-10 flex min-h-[152px] shrink-0 flex-col border-t border-white/[0.06] bg-[#070a0d] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-16px_48px_rgba(0,0,0,0.55)] sm:min-h-[158px] sm:px-4 sm:pb-3 sm:pt-3">
+          {canAct ? (
+            <div className="mx-auto w-full max-w-lg">
+            <p className="mb-2 text-center text-[8px] font-medium uppercase tracking-[0.28em] text-zinc-600">Actions</p>
             <div className="flex items-stretch gap-2">
               <button
                 type="button"
@@ -672,6 +693,14 @@ export default function Ov2CcScreen({
               </button>
             </div>
           </div>
+          ) : (
+            <div
+              className="mx-auto w-full max-w-lg flex-1 shrink-0 rounded-lg bg-transparent sm:rounded-none"
+              aria-hidden
+            >
+              <div className="min-h-[128px] w-full sm:min-h-[132px]" />
+            </div>
+          )}
         </div>
       ) : null}
     </div>
