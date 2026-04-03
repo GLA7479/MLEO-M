@@ -752,7 +752,7 @@ export default function Ov2CcScreen({
               <button
                 type="button"
                 disabled={actionClusterLocked}
-                className="flex w-[4.5rem] shrink-0 flex-col justify-center rounded-lg border border-rose-500/55 bg-rose-950/60 py-2.5 text-[15px] font-bold leading-tight text-rose-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-rose-900/50 disabled:cursor-not-allowed disabled:opacity-45 sm:w-[5rem] sm:text-[17px]"
+                className="flex w-[4.5rem] shrink-0 flex-col justify-center rounded-lg border border-rose-500/55 bg-rose-950/60 py-2.5 text-[15px] font-bold uppercase leading-tight tracking-wide text-rose-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-rose-900/50 disabled:cursor-not-allowed disabled:opacity-45 sm:w-[5rem] sm:text-[17px]"
                 onClick={() => void runGameOp("fold")}
               >
                 Fold
@@ -761,7 +761,7 @@ export default function Ov2CcScreen({
                 <button
                   type="button"
                   disabled={actionClusterLocked || canCallChips}
-                  className="min-h-[52px] min-w-0 flex-1 rounded-xl border border-green-500/50 bg-green-900/55 py-2.5 text-[16px] font-bold leading-snug text-green-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-green-800/50 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg"
+                  className="min-h-[52px] min-w-0 flex-1 rounded-xl border border-green-500/50 bg-green-900/55 py-2.5 text-[16px] font-bold uppercase leading-snug tracking-wide text-green-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-green-800/50 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg"
                   onClick={() => void runGameOp("check")}
                 >
                   Check
@@ -769,7 +769,7 @@ export default function Ov2CcScreen({
                 <button
                   type="button"
                   disabled={actionClusterLocked || !canCallChips}
-                  className="min-h-[52px] min-w-0 flex-[1.15] rounded-xl border border-sky-500/55 bg-sky-800/55 py-2.5 text-[16px] font-bold leading-snug text-sky-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-sky-700/45 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg"
+                  className="min-h-[52px] min-w-0 flex-[1.15] rounded-xl border border-sky-500/55 bg-sky-800/55 py-2.5 text-[16px] font-bold uppercase leading-snug tracking-wide text-sky-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-sky-700/45 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg"
                   onClick={() => {
                     if (!canCallChips) return;
                     void runGameOp("call");
@@ -784,7 +784,7 @@ export default function Ov2CcScreen({
                 <button
                   type="button"
                   disabled={actionClusterLocked}
-                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-violet-500/50 bg-violet-900/50 py-2 text-[15px] font-bold leading-snug text-violet-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-violet-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
+                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-violet-500/50 bg-violet-900/50 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-violet-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-violet-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
                   onClick={() => void runGameOp("bet", { amount: bb })}
                 >
                   Bet {bb}
@@ -793,7 +793,7 @@ export default function Ov2CcScreen({
                 <button
                   type="button"
                   disabled={actionClusterLocked || !canMinRaiseBtn}
-                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-indigo-500/50 bg-indigo-900/50 py-2 text-[15px] font-bold leading-snug text-indigo-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-indigo-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
+                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-indigo-500/50 bg-indigo-900/50 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-indigo-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-indigo-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
                   onClick={() => void runGameOp("raise", { amount: minRaiseChips })}
                 >
                   Raise +{minRaiseChips}
@@ -802,7 +802,7 @@ export default function Ov2CcScreen({
               <button
                 type="button"
                 disabled={actionClusterLocked || !canQuickBumpBtn}
-                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-fuchsia-500/50 bg-fuchsia-900/50 py-2 text-[15px] font-bold leading-snug text-fuchsia-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-fuchsia-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
+                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-fuchsia-500/50 bg-fuchsia-900/50 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-fuchsia-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-fuchsia-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
                 onClick={() => {
                   const op = curBet === 0 && toCall === 0 ? "bet" : "raise";
                   void runGameOp(op, { amount: quickAmount });
@@ -813,7 +813,7 @@ export default function Ov2CcScreen({
               <button
                 type="button"
                 disabled={actionClusterLocked}
-                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-amber-500/55 bg-amber-900/45 py-2 text-[15px] font-bold leading-snug text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] touch-manipulation active:bg-amber-800/40 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
+                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-amber-500/55 bg-amber-900/45 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] touch-manipulation active:bg-amber-800/40 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
                 onClick={() => void runGameOp("all_in")}
               >
                 All-in
