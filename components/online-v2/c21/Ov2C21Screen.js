@@ -60,16 +60,9 @@ function parseFollowKeySeatIndex(key) {
 
 const AUTO_WATCH_DWELL_MS = 1050;
 
-/** Presentation-only: nudge seats toward a shallow half-arc (higher at ends). Index = physical seat 0–5. */
-function c21SeatArcOffsetPx(seatIndex) {
-  const i = Math.floor(Number(seatIndex) || 0);
-  const map = [6, 4, 2, 2, 4, 6];
-  return map[i] ?? 0;
-}
-
 function c21PhaseStripLabel(phase) {
   const p = String(phase || "");
-  if (p === "betting") return "Betting";
+  if (p === "betting") return "Round setup";
   if (p === "insurance") return "Side cover";
   if (p === "acting") return "In play";
   if (p === "between_rounds") return "Round complete";
@@ -85,8 +78,8 @@ function otherSeatHandStatusLabel(phase, seatIndex, handIndex, seat, currentTurn
   if (phase === "acting" && currentTurn?.seatIndex === seatIndex && currentTurn?.handIndex === handIndex) {
     return "Turn";
   }
-  if (phase === "betting") return "Betting";
-  if (phase === "insurance" && seat?.inRound && seat?.insuranceChoice == null) return "Cover?";
+  if (phase === "betting") return "Ready";
+  if (phase === "insurance" && seat?.inRound && seat?.insuranceChoice == null) return "Option?";
   if (phase === "insurance") return "—";
   if (seat?.inRound && phase === "acting") return "Wait";
   if (phase === "between_rounds") return "Settled";
@@ -993,7 +986,7 @@ export default function Ov2C21Screen({
     idx => {
       if (sitLockRef.current || operateBusy) return;
       if (vaultBalance < minBet) {
-        setEconomyHint("Not enough vault for this table minimum.");
+        setEconomyHint("Not enough vault for this minimum play.");
         return;
       }
       sitLockRef.current = true;
@@ -1003,7 +996,7 @@ export default function Ov2C21Screen({
             const code = r?.error?.code || r?.error?.payload?.code || "";
             setEconomyHint(
               code === "insufficient_vault_for_table"
-                ? "Not enough vault for this table."
+                ? "Not enough vault for this level."
                 : code === "DEVICE_REQUIRED"
                   ? "Session required to take a seat."
                   : "",
@@ -1071,7 +1064,7 @@ export default function Ov2C21Screen({
               <div className="relative h-full overflow-hidden rounded-xl border border-black/35 bg-gradient-to-b from-[#1a120d]/95 via-[#0f0c0a]/90 to-black/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_8px_28px_rgba(0,0,0,0.45)]">
                 <div className="pointer-events-none absolute inset-x-1 top-0.5 z-10 grid h-[1.05rem] grid-cols-3 items-center leading-none">
                   <span className="min-w-0 truncate text-left text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/90">
-                    Dealer
+                    Opponent
                   </span>
                   <span className="min-w-0 truncate text-center text-[10px] font-semibold tabular-nums text-zinc-100/95">
                     {dealerTotalCenter != null ? `Total ${dealerTotalCenter}` : "\u00a0"}
@@ -1115,7 +1108,7 @@ export default function Ov2C21Screen({
               </span>
             </div>
 
-            {/* Player seats — shallow half-arc via translateY on physical seat index */}
+            {/* Player seats — straight row (other players only) */}
             <div
               className={
                 otherSeatIndices.length <= 5
@@ -1138,7 +1131,6 @@ export default function Ov2C21Screen({
                   <div
                     key={idx}
                     className="flex h-full min-h-0 min-w-0 max-w-[19vw] flex-1 flex-col justify-end sm:max-w-[6.25rem]"
-                    style={{ transform: `translateY(-${c21SeatArcOffsetPx(idx)}px)` }}
                   >
                     <button
                       type="button"
@@ -1352,8 +1344,8 @@ export default function Ov2C21Screen({
                   disabled={operateBusy || actionLock || phase !== "betting"}
                   onClick={() => setPlayDraftStr(String(minBet))}
                   className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 touch-manipulation items-center justify-center rounded text-zinc-300 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-35"
-                  aria-label="Reset amount to table minimum"
-                  title="Reset to table minimum"
+                  aria-label="Reset amount to minimum play"
+                  title="Reset to minimum play"
                 >
                   <span className="text-[22px] leading-none" aria-hidden>
                     ↺
@@ -1523,7 +1515,7 @@ export default function Ov2C21Screen({
           <div className="w-full max-w-sm rounded-2xl border border-amber-900/35 bg-[#0c0f14] p-4 shadow-[0_24px_64px_rgba(0,0,0,0.65)]">
             <div className="text-center text-xs font-bold uppercase tracking-[0.18em] text-amber-200/85">Side cover</div>
             <p className="mt-2 text-center text-[11px] leading-snug text-zinc-400">
-              The house start card is an ace. Optional cover is up to half of your main play.
+              The opener is an ace. Optional add-on is up to half of your main play.
             </p>
             <div className="mt-3 flex gap-2">
               <button
@@ -1535,7 +1527,7 @@ export default function Ov2C21Screen({
                 })}
                 className="min-h-[44px] flex-1 touch-manipulation rounded-xl border border-amber-700/40 bg-gradient-to-b from-amber-800/90 to-amber-950/90 py-2 text-xs font-bold tracking-wide text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] disabled:opacity-35"
               >
-                INSURANCE
+                Add cover
               </button>
               <button
                 type="button"
@@ -1546,7 +1538,7 @@ export default function Ov2C21Screen({
                 })}
                 className="min-h-[44px] flex-1 touch-manipulation rounded-xl border border-white/15 bg-black/40 py-2 text-xs font-bold text-zinc-200 disabled:opacity-35"
               >
-                DECLINE
+                Skip
               </button>
             </div>
           </div>
