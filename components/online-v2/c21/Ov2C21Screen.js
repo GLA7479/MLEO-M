@@ -49,6 +49,17 @@ function autoWatchFollowKey(phase, currentTurn) {
   return `a:${si}:${hi}`;
 }
 
+/** Seat index from an `autoWatchFollowKey` value (`a:seat:hand`). */
+function parseFollowKeySeatIndex(key) {
+  if (!key || typeof key !== "string" || !key.startsWith("a:")) return null;
+  const parts = key.split(":");
+  if (parts.length < 2) return null;
+  const si = Math.floor(Number(parts[1]));
+  return Number.isFinite(si) ? si : null;
+}
+
+const AUTO_WATCH_DWELL_MS = 1050;
+
 function otherSeatHandStatusLabel(phase, seatIndex, handIndex, seat, currentTurn) {
   const m = seat?.handMeta?.[handIndex];
   if (!m) return "—";
@@ -599,9 +610,31 @@ export default function Ov2C21Screen({
   const phaseTurnClearRef = useRef({ phase: "", sig: "" });
   const dismissedAutoWatchFollowKeyRef = useRef("");
   const prevAutoWatchFollowKeyRef = useRef("");
+  const prevFollowKeyForDwellRef = useRef("");
+  const dwellHoldUntilRef = useRef(0);
+  const dwellHoldSeatIdxRef = useRef(null);
+  const dwellTimerRef = useRef(null);
+  const [autoWatchDwellNonce, setAutoWatchDwellNonce] = useState(0);
+
+  const clearAutoWatchDwell = useCallback(() => {
+    if (dwellTimerRef.current != null) {
+      window.clearTimeout(dwellTimerRef.current);
+      dwellTimerRef.current = null;
+    }
+    dwellHoldUntilRef.current = 0;
+    dwellHoldSeatIdxRef.current = null;
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (dwellTimerRef.current != null) window.clearTimeout(dwellTimerRef.current);
+    },
+    [],
+  );
 
   const dismissInspectorSheet = useCallback(
     (opts = {}) => {
+      clearAutoWatchDwell();
       const recordAutoWatchDismiss = opts.recordAutoWatchDismiss === true;
       const clearManual = opts.clearManual !== false;
       if (clearManual) {
@@ -612,16 +645,18 @@ export default function Ov2C21Screen({
         dismissedAutoWatchFollowKeyRef.current = autoWatchFollowKey(phase, currentTurn);
       }
     },
-    [autoWatchEnabled, phase, currentTurn],
+    [autoWatchEnabled, phase, currentTurn, clearAutoWatchDwell],
   );
 
   useEffect(() => {
     if (autoWatchEnabled) return;
+    clearAutoWatchDwell();
+    prevFollowKeyForDwellRef.current = autoWatchFollowKey(phase, currentTurn);
     dismissedAutoWatchFollowKeyRef.current = "";
     if (!manualInspectorOverrideRef.current) {
       setInspectorSeatIdx(null);
     }
-  }, [autoWatchEnabled]);
+  }, [autoWatchEnabled, phase, currentTurn, clearAutoWatchDwell]);
 
   useEffect(() => {
     const sig =
@@ -644,18 +679,82 @@ export default function Ov2C21Screen({
   }, [phase, currentTurn?.seatIndex, currentTurn?.handIndex]);
 
   useEffect(() => {
+    const k = autoWatchFollowKey(phase, currentTurn);
+    const prev = prevFollowKeyForDwellRef.current;
+    if (
+      autoWatchEnabled &&
+      prev &&
+      prev !== k &&
+      prev.startsWith("a:") &&
+      Date.now() >= dwellHoldUntilRef.current
+    ) {
+      const oldSeat = parseFollowKeySeatIndex(prev);
+      const wasOthersTurn =
+        mySeat == null || (oldSeat != null && oldSeat !== mySeat.seatIndex);
+      if (oldSeat != null && wasOthersTurn) {
+        const occ = seatsForUi[oldSeat];
+        if (occ?.participantKey) {
+          const actingEnded = !k || !k.startsWith("a:");
+          const newSeat = actingEnded ? null : parseFollowKeySeatIndex(k);
+          const shouldDwell =
+            actingEnded || (newSeat != null && newSeat !== oldSeat);
+          if (shouldDwell) {
+            const until = Date.now() + AUTO_WATCH_DWELL_MS;
+            dwellHoldSeatIdxRef.current = oldSeat;
+            dwellHoldUntilRef.current = until;
+            if (dwellTimerRef.current != null) window.clearTimeout(dwellTimerRef.current);
+            dwellTimerRef.current = window.setTimeout(() => {
+              dwellTimerRef.current = null;
+              dwellHoldUntilRef.current = 0;
+              dwellHoldSeatIdxRef.current = null;
+              setAutoWatchDwellNonce(n => n + 1);
+            }, AUTO_WATCH_DWELL_MS);
+          }
+        }
+      }
+    }
+    prevFollowKeyForDwellRef.current = k;
+  }, [
+    phase,
+    currentTurn?.seatIndex,
+    currentTurn?.handIndex,
+    autoWatchEnabled,
+    mySeat,
+    seatsForUi,
+  ]);
+
+  useEffect(() => {
     if (!autoWatchEnabled) return;
     if (isMyTurn) {
       dismissInspectorSheet({ recordAutoWatchDismiss: false });
       return;
     }
+    if (manualInspectorOverrideRef.current) return;
+
     const myIdx = mySeat != null ? mySeat.seatIndex : undefined;
+    const now = Date.now();
+    const dwellUntil = dwellHoldUntilRef.current;
+    const dwellSeat = dwellHoldSeatIdxRef.current;
+
+    if (dwellUntil > now && dwellSeat != null) {
+      const ds = seatsForUi[dwellSeat];
+      const dwellIsOther = myIdx == null || dwellSeat !== myIdx;
+      if (ds?.participantKey && dwellIsOther) {
+        setInspectorSeatIdx(dwellSeat);
+        return;
+      }
+      clearAutoWatchDwell();
+    }
+
+    if (dwellUntil > 0 && dwellUntil <= now) {
+      clearAutoWatchDwell();
+    }
+
     const target = autoWatchTargetSeatIndex(phase, currentTurn, myIdx, seatsForUi);
     if (target == null) {
       if (!manualInspectorOverrideRef.current) dismissInspectorSheet({ recordAutoWatchDismiss: false });
       return;
     }
-    if (manualInspectorOverrideRef.current) return;
     const fk = autoWatchFollowKey(phase, currentTurn);
     if (fk && dismissedAutoWatchFollowKeyRef.current === fk) return;
     setInspectorSeatIdx(target);
@@ -667,6 +766,9 @@ export default function Ov2C21Screen({
     mySeat,
     seatsForUi,
     dismissInspectorSheet,
+    clearAutoWatchDwell,
+    nowTick,
+    autoWatchDwellNonce,
   ]);
 
   useEffect(() => {
@@ -1006,6 +1108,7 @@ export default function Ov2C21Screen({
                         manualInspectorOverrideRef.current = true;
                       } else {
                         manualInspectorOverrideRef.current = false;
+                        clearAutoWatchDwell();
                         if (autoWatchEnabled) {
                           dismissedAutoWatchFollowKeyRef.current = autoWatchFollowKey(phase, currentTurn);
                         }
