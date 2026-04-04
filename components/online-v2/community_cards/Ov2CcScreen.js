@@ -679,7 +679,7 @@ export default function Ov2CcScreen({
                 </button>
               </div>
             </div>
-            <div className="mt-2.5 flex gap-2 border-t border-white/[0.08] pt-2.5">
+            <div className="mt-2.5 flex gap-2">
               {canBetOpen ? (
                 <button
                   type="button"
