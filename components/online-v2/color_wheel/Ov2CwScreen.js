@@ -695,14 +695,14 @@ export default function Ov2CwScreen({
                       {!Array.isArray(engine.history) || engine.history.length === 0 ? (
                         <p className="text-center text-[10px] text-zinc-500">No results yet.</p>
                       ) : (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex max-w-full flex-nowrap gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]">
                           {engine.history.slice(0, 12).map((h, idx) => {
                             const n = Math.floor(Number(h.resultNumber) || 0);
                             const c = String(h.resultColor || ov2CwColorForNumber(n));
                             return (
                               <div
                                 key={`${h.roundSeq}-${idx}-pop`}
-                                className={`flex h-7 min-w-[1.75rem] items-center justify-center rounded-md border text-[10px] font-black tabular-nums ${
+                                className={`flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-md border text-[10px] font-black tabular-nums ${
                                   c === "red"
                                     ? "border-red-500/35 bg-red-950/50 text-red-100"
                                     : c === "black"
@@ -868,7 +868,7 @@ export default function Ov2CwScreen({
                 <span className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/25 to-transparent" aria-hidden />
               </div>
               <div className="flex flex-wrap content-start gap-1 pb-0.5 sm:gap-1.5">
-                {engine.history.map((h, idx) => {
+                {engine.history.slice(0, 8).map((h, idx) => {
                   const n = Math.floor(Number(h.resultNumber) || 0);
                   const c = String(h.resultColor || ov2CwColorForNumber(n));
                   return (
@@ -902,7 +902,7 @@ export default function Ov2CwScreen({
                   <p className="text-[10px] font-medium text-zinc-500">No plays this round.</p>
                 </div>
               ) : (
-                <div className="mt-1.5 flex max-h-[min(5.5rem,22vh)] flex-wrap content-start gap-1 overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] sm:max-h-[6rem] [&::-webkit-scrollbar]:hidden">
+                <div className="mt-1.5 flex max-h-[min(5.5rem,30svh)] flex-wrap content-start gap-1 overflow-y-auto overscroll-y-contain [-ms-overflow-style:none] [scrollbar-width:none] sm:max-h-[6rem] lg:max-h-[7rem] [&::-webkit-scrollbar]:hidden">
                   {myPlays.map(p => {
                     const won =
                       resultPhase && engine.resultNumber != null
