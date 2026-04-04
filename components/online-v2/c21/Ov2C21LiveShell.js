@@ -6,7 +6,8 @@ import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
 import { OV2_HUD_CHROME_BTN } from "../OnlineV2GameHudOverlays";
 import Ov2C21Screen from "./Ov2C21Screen";
 import { useOv2C21Session } from "../../../hooks/useOv2C21Session";
-import { OV2_C21_STAKE_TIERS, OV2_C21_ROOM_ID_BY_STAKE } from "../../../lib/online-v2/c21/ov2C21TableIds";
+import { OV2_C21_STAKE_TIERS, OV2_C21_ROOM_IDS_BY_STAKE } from "../../../lib/online-v2/c21/ov2C21TableIds";
+import Ov2WavePrivateRoomModal from "../Ov2WavePrivateRoomModal";
 import {
   OV2_C21_BETTING_MS,
   OV2_C21_BETWEEN_MS,
@@ -60,7 +61,7 @@ function C21InfoPanelBody() {
       <section>
         <p className="font-semibold text-zinc-100">Tables &amp; stakes</p>
         <p className="mt-0.5">
-          Five <span className="text-zinc-200">always-on</span> tables at fixed stake levels (100 · 1K · 10K · 100K · 1M). Each table
+          Six <span className="text-zinc-200">always-on</span> stake levels (10 · 100 · 1K · 10K · 100K · 1M), ten tables each. Each table
           has its own <span className="text-zinc-200">minimum play</span> equal to that stake. Your product vault must cover the
           table minimum to <span className="text-zinc-200">take a seat</span>.
         </p>
@@ -170,6 +171,9 @@ function C21InfoPanelBody() {
 export default function Ov2C21LiveShell() {
   const router = useRouter();
   const roomId = useMemo(() => parseRoomQuery(router), [router.isReady, router.query.room]);
+  const [lobbyStep, setLobbyStep] = useState("category");
+  const [tierPick, setTierPick] = useState(null);
+  const [privateOpen, setPrivateOpen] = useState(false);
   const [tableStake, setTableStake] = useState(10_000);
   const [nameDraft, setNameDraft] = useState(() =>
     typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
@@ -181,7 +185,10 @@ export default function Ov2C21LiveShell() {
 
   const session = useOv2C21Session(roomId, tableStake);
 
-  const c21LobbyRoomIds = useMemo(() => Object.values(OV2_C21_ROOM_ID_BY_STAKE), []);
+  const c21LobbyRoomIds = useMemo(
+    () => OV2_C21_STAKE_TIERS.flatMap(t => [...OV2_C21_ROOM_IDS_BY_STAKE[t]]),
+    [],
+  );
   const c21LobbySeatCounts = useOv2FixedTableLobbySeatCounts(
     c21LobbyRoomIds,
     "ov2_c21_live_state",
@@ -249,7 +256,7 @@ export default function Ov2C21LiveShell() {
         .eq("id", roomId)
         .maybeSingle();
       if (data?.stake_per_seat != null) {
-        setTableStake(Math.max(100, Math.floor(Number(data.stake_per_seat) || 100)));
+        setTableStake(Math.max(10, Math.floor(Number(data.stake_per_seat) || 10)));
       }
     })();
   }, [roomId]);
@@ -295,12 +302,18 @@ export default function Ov2C21LiveShell() {
     return (
       <OnlineV2GamePageShell
         title="21 Challenge"
-        subtitle="Five permanent live tables"
+        subtitle="Public tables · private rooms"
         useAppViewportHeight
         chromePreset="c21_flat"
         infoPanel={infoPanel}
       >
         <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
+          <Ov2WavePrivateRoomModal
+            open={privateOpen}
+            onClose={() => setPrivateOpen(false)}
+            game="c21"
+            routeBase="/ov2-21-challenge"
+          />
           <div className="shrink-0">
             <label className="text-[11px] text-zinc-400" htmlFor="ov2-c21-name">
               Display name
@@ -315,27 +328,63 @@ export default function Ov2C21LiveShell() {
             />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {OV2_C21_STAKE_TIERS.map(tier => {
-                const id = OV2_C21_ROOM_ID_BY_STAKE[tier];
-                return (
+            {lobbyStep === "tables" && tierPick != null ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  className="text-[11px] font-semibold text-sky-300 touch-manipulation"
+                  onClick={() => {
+                    setLobbyStep("category");
+                    setTierPick(null);
+                  }}
+                >
+                  ← Back to levels
+                </button>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {OV2_C21_ROOM_IDS_BY_STAKE[tierPick].map((id, idx) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className="relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-emerald-500/35 bg-emerald-950/25 px-2 py-3 text-sm font-bold text-emerald-100 touch-manipulation active:scale-[0.99]"
+                      onClick={() => {
+                        persistName();
+                        router.push(`/ov2-21-challenge?room=${id}`);
+                      }}
+                    >
+                      <span>Table {idx + 1}</span>
+                      <span className="text-[9px] font-normal text-emerald-200/70">{formatTierLabel(tierPick)}</span>
+                      <Ov2TablePickCardSeatBadge activity={c21LobbySeatCounts[id]} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {OV2_C21_STAKE_TIERS.map(tier => (
                   <button
                     key={tier}
                     type="button"
                     className="relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-emerald-500/35 bg-emerald-950/25 px-2 py-3 text-sm font-bold text-emerald-100 touch-manipulation active:scale-[0.99]"
                     onClick={() => {
                       persistName();
-                      router.push(`/ov2-21-challenge?room=${id}`);
+                      setTierPick(tier);
+                      setLobbyStep("tables");
                     }}
                   >
                     <span>{formatTierLabel(tier)}</span>
-                    <span className="text-[9px] font-normal text-emerald-200/70">Table level {formatTierLabel(tier)}</span>
-                    <Ov2TablePickCardSeatBadge activity={c21LobbySeatCounts[id]} />
+                    <span className="text-[9px] font-normal text-emerald-200/70">10 tables</span>
                   </button>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
+          <button
+            type="button"
+            className="shrink-0 rounded-xl border border-white/15 bg-white/[0.06] py-2.5 text-sm font-semibold text-zinc-100 touch-manipulation active:scale-[0.99]"
+            onClick={() => setPrivateOpen(true)}
+          >
+            Private room
+          </button>
         </div>
       </OnlineV2GamePageShell>
     );

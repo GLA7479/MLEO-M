@@ -9,6 +9,10 @@ import {
   getArcadeVaultBalanceForRequest,
   reverseCwEconomyOps,
 } from "../../../lib/server/ov2CwVaultAuthority";
+import {
+  assertWaveFixedSeatFree,
+  applyWaveSeatRegistryAfterSuccess,
+} from "../../../lib/server/ov2WaveFixedSeatRegistry";
 
 async function persistEconomyOps(admin, roomId, matchSeq, economyOps, callerParticipantKey) {
   const callerPk = String(callerParticipantKey || "").trim();
@@ -97,7 +101,7 @@ export default async function handler(req, res) {
 
     const { data: roomRow, error: roomErr } = await admin
       .from("ov2_rooms")
-      .select("id, product_game_id, stake_per_seat")
+      .select("id, product_game_id, stake_per_seat, is_private, meta")
       .eq("id", roomId)
       .maybeSingle();
 
@@ -113,6 +117,10 @@ export default async function handler(req, res) {
     if (op === "sit") {
       if (!participantKey) {
         return res.status(400).json({ ok: false, code: "participant_required" });
+      }
+      const seatFree = await assertWaveFixedSeatFree(admin, participantKey, roomId);
+      if (!seatFree.ok) {
+        return res.status(409).json({ ok: false, code: seatFree.code, message: seatFree.message });
       }
       const bal = await getArcadeVaultBalanceForRequest(req);
       if (bal.code === "device_required") {
@@ -266,6 +274,15 @@ export default async function handler(req, res) {
             (o.type === "commit" || o.type === "credit") &&
             String(o.participantKey || "").trim() === pkTrim,
         );
+
+      await applyWaveSeatRegistryAfterSuccess(
+        admin,
+        OV2_CW_PRODUCT_GAME_ID,
+        roomId,
+        roomRow,
+        beforeEngine,
+        nextEngine,
+      );
 
       return res.status(200).json({
         ok: true,

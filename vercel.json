@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/ov2-wave/private-sweep-cron",
+      "schedule": "*/15 * * * *"
+    }
+  ],
   "framework": "nextjs",
   "buildCommand": "next build",
   "outputDirectory": ".next",

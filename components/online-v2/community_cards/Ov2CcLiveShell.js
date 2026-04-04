@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
 import { OV2_HUD_CHROME_BTN } from "../OnlineV2GameHudOverlays";
@@ -8,11 +8,11 @@ import Ov2CcScreen from "./Ov2CcScreen";
 import { useOv2CcSession } from "../../../hooks/useOv2CcSession";
 import {
   OV2_CC_ALL_ROOM_IDS,
+  OV2_CC_PUBLIC_CATEGORIES,
   OV2_CC_ROOM_MAX_SEATS_BY_ID,
-  OV2_CC_ROOMS_BY_STAKE,
-  OV2_CC_STAKE_TIERS,
   resolveOv2CcTableConfigFromRoomRow,
 } from "../../../lib/online-v2/community_cards/ov2CcTableIds";
+import Ov2WavePrivateRoomModal, { formatOv2CcCategoryLabel } from "../Ov2WavePrivateRoomModal";
 import { useOv2FixedTableLobbySeatCounts, ov2CcSeatCountFromEngine } from "../../../hooks/useOv2FixedTableLobbySeatCounts";
 import Ov2TablePickCardSeatBadge from "../Ov2TablePickCardSeatBadge";
 import { isOv2RoomIdQueryParam } from "../../../lib/online-v2/onlineV2GameRegistry";
@@ -80,6 +80,9 @@ function CcInfoPanelBody() {
 export default function Ov2CcLiveShell() {
   const router = useRouter();
   const roomId = useMemo(() => parseRoomQuery(router), [router.isReady, router.query.room]);
+  const [lobbyStep, setLobbyStep] = useState("category");
+  const [catIndex, setCatIndex] = useState(null);
+  const [privateOpen, setPrivateOpen] = useState(false);
   const [tableConfig, setTableConfig] = useState(null);
   const [nameDraft, setNameDraft] = useState(() =>
     typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
@@ -159,16 +162,24 @@ export default function Ov2CcLiveShell() {
     writeOv2SharedDisplayName(nameDraft);
   };
 
+  const selectedCat = catIndex != null ? OV2_CC_PUBLIC_CATEGORIES[catIndex] : null;
+
   if (!roomId) {
     return (
       <OnlineV2GamePageShell
         title="Community Cards"
-        subtitle="Ten permanent live tables"
+        subtitle="Public tables · private rooms"
         useAppViewportHeight
         chromePreset="cc_flat"
         infoPanel={infoPanel}
       >
         <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
+          <Ov2WavePrivateRoomModal
+            open={privateOpen}
+            onClose={() => setPrivateOpen(false)}
+            game="cc"
+            routeBase="/ov2-community-cards"
+          />
           <div className="shrink-0">
             <label className="text-[11px] text-zinc-400" htmlFor="ov2-cc-name">
               Display name
@@ -183,40 +194,85 @@ export default function Ov2CcLiveShell() {
             />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-            <div className="grid grid-cols-2 gap-2">
-              {OV2_CC_STAKE_TIERS.map(tier => {
-                const ids = OV2_CC_ROOMS_BY_STAKE[tier];
-                return (
-                  <Fragment key={tier}>
+            {lobbyStep === "tables" && selectedCat ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  className="text-[11px] font-semibold text-sky-300 touch-manipulation"
+                  onClick={() => {
+                    setLobbyStep("category");
+                    setCatIndex(null);
+                  }}
+                >
+                  ← Back to categories
+                </button>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {selectedCat.roomIds.map((id, idx) => {
+                    const is5 = selectedCat.maxSeats === 5;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-3 text-sm font-bold touch-manipulation active:scale-[0.99] ${
+                          is5
+                            ? "border-emerald-500/35 bg-emerald-950/25 text-emerald-100"
+                            : "border-violet-500/35 bg-violet-950/25 text-violet-100"
+                        }`}
+                        onClick={() => {
+                          persistName();
+                          router.push(`/ov2-community-cards?room=${id}`);
+                        }}
+                      >
+                        <span>Table {idx + 1}</span>
+                        <span
+                          className={`text-[9px] font-normal ${is5 ? "text-emerald-200/70" : "text-violet-200/70"}`}
+                        >
+                          {formatOv2CcCategoryLabel(selectedCat)}
+                        </span>
+                        <Ov2TablePickCardSeatBadge activity={ccLobbySeatCounts[id]} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {OV2_CC_PUBLIC_CATEGORIES.map((cat, idx) => {
+                  const is5 = cat.maxSeats === 5;
+                  return (
                     <button
+                      key={`${cat.stake}-${cat.maxSeats}`}
                       type="button"
-                      className="relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-emerald-500/35 bg-emerald-950/25 px-2 py-3 text-sm font-bold text-emerald-100 touch-manipulation active:scale-[0.99]"
+                      className={`relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-3 text-sm font-bold touch-manipulation active:scale-[0.99] ${
+                        is5
+                          ? "border-emerald-500/35 bg-emerald-950/25 text-emerald-100"
+                          : "border-violet-500/35 bg-violet-950/25 text-violet-100"
+                      }`}
                       onClick={() => {
                         persistName();
-                        router.push(`/ov2-community-cards?room=${ids.max5}`);
+                        setCatIndex(idx);
+                        setLobbyStep("tables");
                       }}
                     >
-                      <span>{formatTierLabel(tier)}</span>
-                      <span className="text-[9px] font-normal text-emerald-200/70">5-max</span>
-                      <Ov2TablePickCardSeatBadge activity={ccLobbySeatCounts[ids.max5]} />
+                      <span>{formatOv2CcCategoryLabel(cat)}</span>
+                      <span
+                        className={`text-[9px] font-normal ${is5 ? "text-emerald-200/70" : "text-violet-200/70"}`}
+                      >
+                        10 tables
+                      </span>
                     </button>
-                    <button
-                      type="button"
-                      className="relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-violet-500/35 bg-violet-950/25 px-2 py-3 text-sm font-bold text-violet-100 touch-manipulation active:scale-[0.99]"
-                      onClick={() => {
-                        persistName();
-                        router.push(`/ov2-community-cards?room=${ids.max9}`);
-                      }}
-                    >
-                      <span>{formatTierLabel(tier)}</span>
-                      <span className="text-[9px] font-normal text-violet-200/70">9-max</span>
-                      <Ov2TablePickCardSeatBadge activity={ccLobbySeatCounts[ids.max9]} />
-                    </button>
-                  </Fragment>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
+          <button
+            type="button"
+            className="shrink-0 rounded-xl border border-white/15 bg-white/[0.06] py-2.5 text-sm font-semibold text-zinc-100 touch-manipulation active:scale-[0.99]"
+            onClick={() => setPrivateOpen(true)}
+          >
+            Private room
+          </button>
         </div>
       </OnlineV2GamePageShell>
     );

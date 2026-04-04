@@ -389,7 +389,7 @@ export default function Ov2C21Screen({
     setActionLock(false);
     setEconomyHint("");
   }, [phase]);
-  const minBet = Math.max(100, Math.floor(Number(tableStakeUnits) || 100));
+  const minBet = Math.max(10, Math.floor(Number(tableStakeUnits) || 10));
   const maxBet = Math.min(minBet * 200, 10_000_000);
 
   const seatsForUi = useMemo(() => {
@@ -990,7 +990,9 @@ export default function Ov2C21Screen({
                 ? "Not enough vault for this level."
                 : code === "DEVICE_REQUIRED"
                   ? "Session required to take a seat."
-                  : "",
+                  : code === "ALREADY_SEATED_ELSEWHERE"
+                    ? r?.error?.message || "You already have a seat at another table."
+                    : "",
             );
           }
         })

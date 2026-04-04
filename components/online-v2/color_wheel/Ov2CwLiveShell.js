@@ -6,7 +6,8 @@ import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
 import { OV2_HUD_CHROME_BTN } from "../OnlineV2GameHudOverlays";
 import Ov2CwScreen from "./Ov2CwScreen";
 import { useOv2CwSession } from "../../../hooks/useOv2CwSession";
-import { OV2_CW_STAKE_TIERS, OV2_CW_ROOM_ID_BY_STAKE } from "../../../lib/online-v2/color_wheel/ov2CwTableIds";
+import { OV2_CW_STAKE_TIERS, OV2_CW_ROOM_IDS_BY_STAKE } from "../../../lib/online-v2/color_wheel/ov2CwTableIds";
+import Ov2WavePrivateRoomModal from "../Ov2WavePrivateRoomModal";
 import { isOv2RoomIdQueryParam } from "../../../lib/online-v2/onlineV2GameRegistry";
 import {
   OV2_SHARED_DISPLAY_NAME_KEY,
@@ -47,14 +48,14 @@ function CwInfoPanelBody({ roomId, tableStakeUnits }) {
       <section>
         <p className="font-semibold text-zinc-100">Color Wheel</p>
         <p className="mt-0.5">
-          Up to six seats share one live table. One round controller starts the first round; later rounds continue automatically after each result.
+          Up to six seats share one live table. The first player to sit starts the place window; later rounds continue automatically after each result.
         </p>
       </section>
       <section>
         <p className="font-semibold text-zinc-100">Phases</p>
         <ul className="mt-0.5 list-disc space-y-0.5 pl-4">
           <li>
-            <span className="text-zinc-200">Waiting</span> — sit down; round controller taps Start Round.
+            <span className="text-zinc-200">Waiting</span> — empty table; sit down to open the place window.
           </li>
           <li>
             <span className="text-zinc-200">Place plays</span> — timed window; amounts are debited from your vault when a play is accepted.
@@ -97,6 +98,9 @@ function CwInfoPanelBody({ roomId, tableStakeUnits }) {
 export default function Ov2CwLiveShell() {
   const router = useRouter();
   const roomId = useMemo(() => parseRoomQuery(router), [router.isReady, router.query.room]);
+  const [lobbyStep, setLobbyStep] = useState("category");
+  const [tierPick, setTierPick] = useState(null);
+  const [privateOpen, setPrivateOpen] = useState(false);
   const [tableStake, setTableStake] = useState(10_000);
   const [nameDraft, setNameDraft] = useState(() =>
     typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
@@ -106,7 +110,10 @@ export default function Ov2CwLiveShell() {
 
   const session = useOv2CwSession(roomId, tableStake);
 
-  const cwLobbyRoomIds = useMemo(() => Object.values(OV2_CW_ROOM_ID_BY_STAKE), []);
+  const cwLobbyRoomIds = useMemo(
+    () => OV2_CW_STAKE_TIERS.flatMap(t => [...OV2_CW_ROOM_IDS_BY_STAKE[t]]),
+    [],
+  );
   const cwLobbySeatCounts = useOv2FixedTableLobbySeatCounts(
     cwLobbyRoomIds,
     "ov2_color_wheel_live_state",
@@ -200,12 +207,18 @@ export default function Ov2CwLiveShell() {
     return (
       <OnlineV2GamePageShell
         title="Color Wheel"
-        subtitle="Five permanent live tables"
+        subtitle="Public tables · private rooms"
         useAppViewportHeight
         chromePreset="c21_flat"
         infoPanel={infoPanel}
       >
         <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
+          <Ov2WavePrivateRoomModal
+            open={privateOpen}
+            onClose={() => setPrivateOpen(false)}
+            game="cw"
+            routeBase="/ov2-color-wheel"
+          />
           <div className="shrink-0">
             <label className="text-[11px] text-zinc-400" htmlFor="ov2-cw-name">
               Display name
@@ -220,27 +233,63 @@ export default function Ov2CwLiveShell() {
             />
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {OV2_CW_STAKE_TIERS.map(tier => {
-                const id = OV2_CW_ROOM_ID_BY_STAKE[tier];
-                return (
+            {lobbyStep === "tables" && tierPick != null ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  className="text-[11px] font-semibold text-sky-300 touch-manipulation"
+                  onClick={() => {
+                    setLobbyStep("category");
+                    setTierPick(null);
+                  }}
+                >
+                  ← Back to levels
+                </button>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {OV2_CW_ROOM_IDS_BY_STAKE[tierPick].map((id, idx) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className="relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-amber-500/35 bg-amber-950/25 px-2 py-3 text-sm font-bold text-amber-100 touch-manipulation active:scale-[0.99]"
+                      onClick={() => {
+                        persistName();
+                        router.push(`/ov2-color-wheel?room=${id}`);
+                      }}
+                    >
+                      <span>Table {idx + 1}</span>
+                      <span className="text-[9px] font-normal text-amber-200/70">{formatTierLabel(tierPick)}</span>
+                      <Ov2TablePickCardSeatBadge activity={cwLobbySeatCounts[id]} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {OV2_CW_STAKE_TIERS.map(tier => (
                   <button
                     key={tier}
                     type="button"
                     className="relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-xl border border-amber-500/35 bg-amber-950/25 px-2 py-3 text-sm font-bold text-amber-100 touch-manipulation active:scale-[0.99]"
                     onClick={() => {
                       persistName();
-                      router.push(`/ov2-color-wheel?room=${id}`);
+                      setTierPick(tier);
+                      setLobbyStep("tables");
                     }}
                   >
                     <span>{formatTierLabel(tier)}</span>
-                    <span className="text-[9px] font-normal text-amber-200/70">Table level {formatTierLabel(tier)}</span>
-                    <Ov2TablePickCardSeatBadge activity={cwLobbySeatCounts[id]} />
+                    <span className="text-[9px] font-normal text-amber-200/70">10 tables</span>
                   </button>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
+          <button
+            type="button"
+            className="shrink-0 rounded-xl border border-white/15 bg-white/[0.06] py-2.5 text-sm font-semibold text-zinc-100 touch-manipulation active:scale-[0.99]"
+            onClick={() => setPrivateOpen(true)}
+          >
+            Private room
+          </button>
         </div>
       </OnlineV2GamePageShell>
     );

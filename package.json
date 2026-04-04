@@ -6,6 +6,7 @@
     "dev:clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\" && next dev -p 3000",
     "prebuild": "npm run encoding:check",
     "build": "next build",
+    "build:clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\" && next build",
     "start": "next start -p 3000",
     "encoding:check": "node scripts/check-encoding.js",
     "debug:mystery-chamber-rng": "node scripts/mystery-chamber-rng-sanity.js",

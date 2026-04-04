@@ -18,6 +18,10 @@ import {
   getArcadeVaultBalanceForRequest,
   reverseCcEconomyOps,
 } from "../../../lib/server/ov2CcVaultAuthority";
+import {
+  assertWaveFixedSeatFree,
+  applyWaveSeatRegistryAfterSuccess,
+} from "../../../lib/server/ov2WaveFixedSeatRegistry";
 
 function ccOperateLog(entry) {
   try {
@@ -125,7 +129,7 @@ export default async function handler(req, res) {
 
     const { data: roomRow, error: roomErr } = await admin
       .from("ov2_rooms")
-      .select("id, product_game_id, stake_per_seat, meta")
+      .select("id, product_game_id, stake_per_seat, meta, is_private")
       .eq("id", roomId)
       .maybeSingle();
 
@@ -144,6 +148,10 @@ export default async function handler(req, res) {
     if (op === "sit") {
       if (!participantKey) {
         return res.status(400).json({ ok: false, code: "participant_required" });
+      }
+      const seatFree = await assertWaveFixedSeatFree(admin, participantKey, roomId);
+      if (!seatFree.ok) {
+        return res.status(409).json({ ok: false, code: seatFree.code, message: seatFree.message });
       }
       const buyIn = Math.max(0, Math.floor(Number(payload.buyIn) || 0));
       if (buyIn < config.tablePrice || buyIn > config.maxBuyin) {
@@ -239,6 +247,14 @@ export default async function handler(req, res) {
           duplicateAbsorbed: true,
           autoRetry: false,
         });
+        await applyWaveSeatRegistryAfterSuccess(
+          admin,
+          OV2_CC_PRODUCT_GAME_ID,
+          roomId,
+          roomRow,
+          engine,
+          engine,
+        );
         return res.status(200).json({
           ok: true,
           duplicateAbsorbed: true,
@@ -271,6 +287,14 @@ export default async function handler(req, res) {
           leaveNotSeatedNoop: true,
           serverRevision: prevRevision,
         });
+        await applyWaveSeatRegistryAfterSuccess(
+          admin,
+          OV2_CC_PRODUCT_GAME_ID,
+          roomId,
+          roomRow,
+          beforeEngine,
+          result.engine,
+        );
         return res.status(200).json({
           ok: true,
           leaveNotSeatedNoop: true,
@@ -355,6 +379,14 @@ export default async function handler(req, res) {
           tickNoop: true,
           serverRevision: prevRevision,
         });
+        await applyWaveSeatRegistryAfterSuccess(
+          admin,
+          OV2_CC_PRODUCT_GAME_ID,
+          roomId,
+          roomRow,
+          engine,
+          engine,
+        );
         return res.status(200).json({
           ok: true,
           tickNoop: true,
@@ -565,6 +597,15 @@ export default async function handler(req, res) {
           /* ignore */
         }
       }
+
+      await applyWaveSeatRegistryAfterSuccess(
+        admin,
+        OV2_CC_PRODUCT_GAME_ID,
+        roomId,
+        roomRow,
+        beforeEngine,
+        nextEngine,
+      );
 
       return res.status(200).json({
         ok: true,

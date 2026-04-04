@@ -693,8 +693,12 @@ export default function Ov2CcScreen({
                     setFormHint("");
                     setPickSeat(null);
                   } else {
+                    const pl = r?.error?.payload;
+                    const c = pl?.code || r?.code || r?.json?.code || "Could not take seat.";
                     setFormHint(
-                      String(r?.code || r?.json?.code || r?.error?.payload?.code || "Could not take seat."),
+                      c === "ALREADY_SEATED_ELSEWHERE" && pl?.message
+                        ? String(pl.message)
+                        : String(c),
                     );
                   }
                 }}
