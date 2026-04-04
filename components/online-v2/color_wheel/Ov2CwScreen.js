@@ -524,14 +524,7 @@ export default function Ov2CwScreen({
 
   const statusSub = lobby ? "Sit in a seat to begin the round." : "";
 
-  const wheelStageMax = [
-    "w-full",
-    // below md: tighter cap + height tie so wheel shrinks earlier than ~640–768px layouts
-    "max-md:mx-auto max-md:w-[min(86vw,34dvh,34vh,13rem)] max-md:max-w-[min(86vw,34dvh,34vh,13rem)]",
-    // md–lg: tablet / large phone landscape
-    "md:max-lg:mx-auto md:max-lg:w-[min(88vw,38dvh,38vh,15rem)] md:max-lg:max-w-[min(88vw,38dvh,38vh,15rem)]",
-    "lg:max-w-[min(100%,19rem)] xl:max-w-[20rem]",
-  ].join(" ");
+  const wheelStageMax = "max-w-[min(92vw,17.5rem)] lg:max-w-[min(100%,19rem)] xl:max-w-[20rem]";
 
   const inspectorSeat =
     seatInspectorIndex != null && seatsForUi[seatInspectorIndex]?.participantKey
@@ -565,7 +558,7 @@ export default function Ov2CwScreen({
           <div
             className="grid min-h-0 w-full flex-1 gap-2 sm:gap-2 lg:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_minmax(0,11.5rem)] lg:grid-rows-[auto_minmax(0,1fr)] lg:items-stretch lg:gap-3 max-lg:grid-cols-1 max-lg:[grid-template-areas:'wheel'_'results'_'seats'_'myplays'] lg:[grid-template-areas:'seats_wheel_results'_'seats_wheel_myplays']"
           >
-          <div className="relative min-h-0 w-full min-w-0 [grid-area:wheel] lg:self-center">
+          <div className="relative min-h-0 w-full min-w-0 shrink-0 [grid-area:wheel] lg:min-h-0 lg:self-center">
             {countdown != null ? (
               <div
                 className="pointer-events-none absolute right-0 top-0 z-[61] px-0.5 py-0 sm:px-1 sm:py-0.5"
@@ -760,16 +753,16 @@ export default function Ov2CwScreen({
               </div>
             </div>
 
-            <div className={`relative z-[59] mx-auto w-full px-1 py-2 sm:px-1.5 sm:py-2.5 ${wheelStageMax}`}>
+            <div className={`relative z-[59] mx-auto w-full shrink-0 px-1 py-2 sm:px-1.5 sm:py-2.5 ${wheelStageMax}`}>
             <div className="relative flex w-full flex-col items-center overflow-visible">
               <div
-                className="pointer-events-none absolute -inset-2 rounded-full bg-amber-500/[0.06] blur-2xl md:-inset-3 lg:-inset-4"
+                className="pointer-events-none absolute -inset-3 rounded-full bg-amber-500/[0.06] blur-2xl sm:-inset-4"
                 aria-hidden
               />
               <div className="pointer-events-none relative z-[1] -mt-1 mb-0.5 flex justify-center">
                 <div className="flex flex-col items-center drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]">
-                  <div className="h-0 w-0 border-x-[6px] border-x-transparent border-t-[9px] border-t-amber-300 md:max-lg:border-x-[7px] md:max-lg:border-t-[11px] lg:border-x-[8px] lg:border-t-[11px] xl:border-x-[9px] xl:border-t-[13px]" />
-                  <div className="-mt-px h-0.5 w-1.5 rounded-sm bg-gradient-to-b from-amber-200 to-amber-600 max-md:w-1 md:max-lg:w-1.5" />
+                  <div className="h-0 w-0 border-x-[8px] border-x-transparent border-t-[11px] border-t-amber-300 sm:border-x-[9px] sm:border-t-[13px]" />
+                  <div className="-mt-px h-0.5 w-1.5 rounded-sm bg-gradient-to-b from-amber-200 to-amber-600" />
                 </div>
               </div>
               <div
@@ -826,7 +819,7 @@ export default function Ov2CwScreen({
                         }}
                       >
                         <span
-                          className={`block min-w-[1em] text-center text-[8px] font-black tabular-nums leading-none sm:max-md:text-[9px] md:max-lg:text-[10px] lg:text-xs xl:text-[0.95rem] ${tc} [text-shadow:0_0_3px_rgba(0,0,0,1),0_0_2px_rgba(0,0,0,1),0_1px_2px_rgba(0,0,0,0.95)] max-md:[text-shadow:0_0_2px_rgba(0,0,0,1),0_1px_2px_rgba(0,0,0,0.9)]`}
+                          className={`block min-w-[1.15em] text-center text-[11px] font-black tabular-nums leading-none sm:text-xs lg:text-sm xl:text-[0.95rem] ${tc} [text-shadow:0_0_4px_rgba(0,0,0,1),0_0_2px_rgba(0,0,0,1),0_1px_3px_rgba(0,0,0,0.95)]`}
                         >
                           {entry.num}
                         </span>
@@ -845,7 +838,7 @@ export default function Ov2CwScreen({
               {resultPhase && centerResult != null && centerResult >= 0 ? (
                 <>
                   <span
-                    className={`text-2xl font-black tabular-nums drop-shadow-sm sm:max-md:text-3xl md:max-lg:text-4xl lg:text-5xl ${
+                    className={`text-3xl font-black tabular-nums drop-shadow-sm sm:text-4xl md:text-5xl ${
                       centerColor === "red"
                         ? "text-red-400"
                         : centerColor === "black"
@@ -855,14 +848,12 @@ export default function Ov2CwScreen({
                   >
                     {centerResult}
                   </span>
-                  <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-widest text-zinc-500 md:text-[9px]">
-                    Result
-                  </span>
+                  <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-widest text-zinc-500">Result</span>
                 </>
               ) : spinning ? (
-                <span className="text-xs font-semibold text-zinc-500 md:max-lg:text-sm lg:text-base">…</span>
+                <span className="text-sm font-semibold text-zinc-500 sm:text-base">…</span>
               ) : (
-                <span className="px-2 text-center text-[8px] font-medium leading-snug text-zinc-500 md:max-lg:text-[9px] lg:text-[10px]">
+                <span className="px-2 text-center text-[9px] font-medium leading-snug text-zinc-500 sm:text-[10px]">
                   Color Wheel
                 </span>
               )}
