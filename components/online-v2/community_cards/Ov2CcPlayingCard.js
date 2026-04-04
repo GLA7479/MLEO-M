@@ -1,7 +1,30 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 const SUIT_SYM = { c: "♣", d: "♦", h: "♥", s: "♠" };
 const RED_SUITS = new Set(["h", "d"]);
+
+/** Deck of Cards API static PNG names (same as C21 `PlayingCardOv2`). */
+function toDeckApiImageCode(code) {
+  const s = String(code || "").trim();
+  if (s.length < 2) return null;
+  let rank;
+  let suitKey;
+  if (s.length >= 3 && s.toLowerCase().startsWith("10")) {
+    rank = "0";
+    suitKey = s.slice(2);
+  } else {
+    rank = s.slice(0, 1).toUpperCase();
+    suitKey = s.slice(1);
+  }
+  if (rank === "T") rank = "0";
+  const sm = { h: "H", d: "D", c: "C", s: "S" };
+  const sk = String(suitKey || "").toLowerCase();
+  const suitChar = sk[0];
+  if (!sm[suitChar]) return null;
+  return `${rank}${sm[suitChar]}`;
+}
 
 function parseCard(code) {
   const s = String(code || "").trim();
@@ -22,11 +45,35 @@ const SIZE_WIDTH = {
   hero: "w-[3.65rem] min-w-[3.65rem] max-sm:w-[4.15rem] max-sm:min-w-[4.15rem] sm:w-[3.85rem] sm:min-w-[3.85rem] md:w-[4rem] md:min-w-[4rem]",
 };
 
+function CardFaceFallback({ rank, suit, red, base }) {
+  const suitColor = red ? "text-[#c41e1e]" : "text-[#0f172a]";
+  return (
+    <div
+      className={`${base} bg-[#fafaf8] [box-shadow:inset_0_0_0_1px_rgba(0,0,0,0.05),0_3px_12px_rgba(0,0,0,0.32)]`}
+    >
+      <div className="absolute left-[3px] top-[3px] flex flex-col items-center leading-none sm:left-1 sm:top-1">
+        <span className={`text-[9px] font-extrabold tracking-tighter sm:text-[10px] ${suitColor}`}>{rank}</span>
+        <span className={`-mt-px text-[10px] font-semibold leading-none sm:text-[11px] ${suitColor}`}>{suit}</span>
+      </div>
+      <div className="absolute bottom-[3px] right-[3px] flex rotate-180 flex-col items-center leading-none sm:bottom-1 sm:right-1">
+        <span className={`text-[9px] font-extrabold tracking-tighter sm:text-[10px] ${suitColor}`}>{rank}</span>
+        <span className={`-mt-px text-[10px] font-semibold leading-none sm:text-[11px] ${suitColor}`}>{suit}</span>
+      </div>
+    </div>
+  );
+}
+
 /**
- * Poker-style playing card (5:7). Presentation only.
+ * Poker-style playing card (5:7). Face uses Deck of Cards API images; back uses local asset; falls back to vector corners.
  * @param {{ code?: string, faceDown?: boolean, size?: "sm"|"md"|"lg"|"hero", className?: string }} props
  */
 export default function Ov2CcPlayingCard({ code, faceDown = false, size = "md", className = "" }) {
+  const [imgErr, setImgErr] = useState(false);
+
+  useEffect(() => {
+    setImgErr(false);
+  }, [code, faceDown]);
+
   const aspect = "aspect-[5/7]";
   const base = [
     "relative",
@@ -41,15 +88,17 @@ export default function Ov2CcPlayingCard({ code, faceDown = false, size = "md", 
 
   if (faceDown) {
     return (
-      <div className={`${base} overflow-hidden bg-[#1a2d4a]`} aria-hidden>
-        <div
-          className="absolute inset-[2px] rounded-[2px] border border-white/[0.1] sm:inset-[3px] sm:rounded-[4px]"
-          style={{
-            background:
-              "repeating-linear-gradient(-32deg, rgba(255,255,255,0.045) 0 3px, transparent 3px 7px), linear-gradient(155deg, #243d5c 0%, #121f33 55%, #0f1828 100%)",
-          }}
+      <div className={`${base} overflow-hidden border-[#1e293b] bg-[#152238]`} aria-hidden>
+        <img
+          src="/card-backs/poker-back.jpg"
+          alt=""
+          className="h-full w-full object-cover opacity-[0.97]"
+          draggable={false}
         />
-        <div className="pointer-events-none absolute inset-[5px] rounded-[1px] border border-black/25 sm:inset-2" />
+        <div
+          className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]"
+          aria-hidden
+        />
       </div>
     );
   }
@@ -67,21 +116,26 @@ export default function Ov2CcPlayingCard({ code, faceDown = false, size = "md", 
     );
   }
 
+  const api = toDeckApiImageCode(code);
+  const url = api ? `https://deckofcardsapi.com/static/img/${api}.png` : null;
+  const showImg = Boolean(url && !imgErr);
   const { rank, suit, red } = parsed;
-  const suitColor = red ? "text-[#c41e1e]" : "text-[#0f172a]";
 
-  return (
-    <div
-      className={`${base} bg-[#fafaf8] [box-shadow:inset_0_0_0_1px_rgba(0,0,0,0.05),0_3px_12px_rgba(0,0,0,0.32)]`}
-    >
-      <div className="absolute left-[3px] top-[3px] flex flex-col items-center leading-none sm:left-1 sm:top-1">
-        <span className={`text-[9px] font-extrabold tracking-tighter sm:text-[10px] ${suitColor}`}>{rank}</span>
-        <span className={`-mt-px text-[10px] font-semibold leading-none sm:text-[11px] ${suitColor}`}>{suit}</span>
+  if (showImg) {
+    return (
+      <div
+        className={`${base} overflow-hidden border-black/20 [box-shadow:inset_0_0_0_1px_rgba(255,255,255,0.06),0_3px_12px_rgba(0,0,0,0.4)]`}
+      >
+        <img
+          src={url}
+          alt=""
+          className="h-full w-full object-cover"
+          draggable={false}
+          onError={() => setImgErr(true)}
+        />
       </div>
-      <div className="absolute bottom-[3px] right-[3px] flex rotate-180 flex-col items-center leading-none sm:bottom-1 sm:right-1">
-        <span className={`text-[9px] font-extrabold tracking-tighter sm:text-[10px] ${suitColor}`}>{rank}</span>
-        <span className={`-mt-px text-[10px] font-semibold leading-none sm:text-[11px] ${suitColor}`}>{suit}</span>
-      </div>
-    </div>
-  );
+    );
+  }
+
+  return <CardFaceFallback rank={rank} suit={suit} red={red} base={base} />;
 }

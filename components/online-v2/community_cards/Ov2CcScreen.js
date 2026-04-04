@@ -328,11 +328,6 @@ export default function Ov2CcScreen({
                   <div className="flex w-full max-w-md flex-col items-center gap-1 sm:max-w-lg sm:gap-2 md:gap-2.5">
                     {handBettingLive ? (
                       <>
-                        <p className="text-center text-[10px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[11px]">
-                          {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
-                          {bb}
-                        </p>
-
                         <div className="w-full text-center">
                           <p className="text-[12px] font-medium text-emerald-100/70 sm:text-[13px]">
                             <span className="text-white">{phaseLabel}</span>
@@ -392,6 +387,9 @@ export default function Ov2CcScreen({
                               {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
                             </span>
                           </div>
+                          <p className="mt-1 text-center text-[10px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[11px]">
+                            {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/{bb}
+                          </p>
                         </div>
 
                         {likelyBoardRunout ? (
@@ -402,11 +400,6 @@ export default function Ov2CcScreen({
                       </>
                     ) : (
                       <>
-                        <p className="text-center text-[10px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[11px]">
-                          {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/
-                          {bb}
-                        </p>
-
                         <div className="flex w-full min-h-[2.5rem] items-center justify-center px-1 text-center sm:min-h-[2.625rem]">
                           <p className="text-[12px] font-medium text-emerald-100/70 sm:text-[13px]">
                             <span className="text-white">{phaseLabel}</span>
@@ -480,6 +473,9 @@ export default function Ov2CcScreen({
                               {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
                             </span>
                           </div>
+                          <p className="mt-1 text-center text-[10px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[11px]">
+                            {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/{bb}
+                          </p>
                         </div>
                       </>
                     )}
@@ -769,7 +765,7 @@ export default function Ov2CcScreen({
                 <button
                   type="button"
                   disabled={actionClusterLocked || !canCallChips}
-                  className="min-h-[52px] min-w-0 flex-[1.15] rounded-xl border border-sky-500/55 bg-sky-800/55 py-2.5 text-[16px] font-bold uppercase leading-snug tracking-wide text-sky-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-sky-700/45 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg"
+                  className="min-h-[52px] min-w-0 flex-1 rounded-xl border border-sky-500/55 bg-sky-800/55 py-2.5 text-[16px] font-bold uppercase leading-snug tracking-wide text-sky-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-sky-700/45 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg"
                   onClick={() => {
                     if (!canCallChips) return;
                     void runGameOp("call");
