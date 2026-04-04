@@ -6,6 +6,7 @@ import {
   OV2_CW_WHEEL_NUMBERS,
   OV2_CW_SEGMENT_DEG,
   ov2CwColorForNumber,
+  ov2CwIndexToCenterAngle,
   ov2CwPlayWins,
   ov2CwPayoutMultiplier,
 } from "../../../lib/online-v2/color_wheel/ov2CwConstants";
@@ -148,16 +149,27 @@ export default function Ov2CwScreen({
   }, [engine?.phaseEndsAt, tick]);
 
   useEffect(() => {
-    if (!spinning || engine?.spinTargetAngle == null) {
+    if (!spinning || engine?.pendingResultNumber == null) {
       if (spinRafRef.current) {
         cancelAnimationFrame(spinRafRef.current);
         spinRafRef.current = null;
       }
       return undefined;
     }
-    const targetAngle = Number(engine.spinTargetAngle);
+    const pending = Math.floor(Number(engine.pendingResultNumber));
+    const winIdx = OV2_CW_WHEEL_NUMBERS.findIndex(e => e.num === pending);
+    if (winIdx < 0) {
+      if (spinRafRef.current) {
+        cancelAnimationFrame(spinRafRef.current);
+        spinRafRef.current = null;
+      }
+      return undefined;
+    }
+    /** Segment center on disk (top-CW); must match conic + rim. Stop with that pocket under the top pointer. */
+    const thetaSeg = ov2CwIndexToCenterAngle(winIdx);
     const from = wheelRotRef.current;
     const turns = 6;
+    const targetAngle = from + thetaSeg;
     const to = from + turns * 360 - targetAngle;
     const t0 = performance.now();
     const dur = OV2_CW_SPINNING_MS;
@@ -180,7 +192,7 @@ export default function Ov2CwScreen({
       if (spinRafRef.current) cancelAnimationFrame(spinRafRef.current);
       spinRafRef.current = null;
     };
-  }, [spinning, engine?.spinTargetAngle, engine?.roundSeq]);
+  }, [spinning, engine?.pendingResultNumber, engine?.roundSeq]);
 
   const dismissMobileSheet = useCallback(() => {
     if (placingLive) {
