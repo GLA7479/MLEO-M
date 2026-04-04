@@ -108,10 +108,21 @@ export default function Ov2CwScreen({
   const minPlay = Math.max(100, Math.floor(Number(tableStakeUnits) || 100));
   const maxPlay = Math.min(minPlay * 200, 10_000_000);
 
+  const seatsForUi = useMemo(() => {
+    const raw = Array.isArray(engine?.seats) ? engine.seats : [];
+    return Array.from({ length: OV2_CW_MAX_SEATS }, (_, i) => {
+      const s = raw[i];
+      if (s && typeof s === "object") {
+        return { ...s, seatIndex: i };
+      }
+      return { seatIndex: i, participantKey: null, displayName: null };
+    });
+  }, [engine?.seats]);
+
   const mySeat = useMemo(() => {
-    if (!Array.isArray(engine?.seats) || !participantKey) return null;
-    return engine.seats.find(s => s.participantKey === participantKey) || null;
-  }, [engine, participantKey]);
+    if (!participantKey) return null;
+    return seatsForUi.find(s => s.participantKey === participantKey) || null;
+  }, [seatsForUi, participantKey]);
 
   const leaderPk = useMemo(() => roundLeaderPk(engine), [engine]);
   const imLeader = Boolean(participantKey && leaderPk === participantKey);
@@ -330,7 +341,7 @@ export default function Ov2CwScreen({
       ) : null}
 
       <div className="grid shrink-0 grid-cols-3 gap-1.5 sm:grid-cols-6">
-        {Array.from({ length: OV2_CW_MAX_SEATS }, (_, i) => seatBtn(engine.seats[i], i))}
+        {Array.from({ length: OV2_CW_MAX_SEATS }, (_, i) => seatBtn(seatsForUi[i], i))}
       </div>
 
       {Array.isArray(engine.history) && engine.history.length > 0 ? (
@@ -407,7 +418,7 @@ export default function Ov2CwScreen({
               .filter(p => Math.floor(Number(p.roundSeq) || 0) === roundSeq)
               .map(p => {
                 const sn = Math.max(0, Math.min(OV2_CW_MAX_SEATS - 1, Math.floor(Number(p.seatIndex) || 0)));
-                const nm = engine.seats?.[sn]?.displayName;
+                const nm = seatsForUi[sn]?.displayName;
                 return (
                   <li key={p.playId} className="flex justify-between gap-2 text-[10px] text-zinc-400">
                     <span className="min-w-0 truncate">
