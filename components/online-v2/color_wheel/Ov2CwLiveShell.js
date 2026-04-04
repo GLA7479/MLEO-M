@@ -202,6 +202,7 @@ export default function Ov2CwLiveShell() {
         title="Color Wheel"
         subtitle="Five permanent live tables"
         useAppViewportHeight
+        chromePreset="c21_flat"
         infoPanel={infoPanel}
       >
         <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
@@ -250,15 +251,16 @@ export default function Ov2CwLiveShell() {
       title="Color Wheel"
       subtitle={`Live · table ${formatTierLabel(tableStake)}`}
       useAppViewportHeight
+      chromePreset="c21_flat"
       infoPanel={infoPanel}
     >
       <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1.5 overflow-hidden sm:gap-2">
-        <div className="flex w-full min-w-0 shrink-0 flex-nowrap items-center gap-2 overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-r from-black/50 via-zinc-950/80 to-black/50 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-2.5 sm:px-2.5 sm:py-2">
+        <div className="flex w-full min-w-0 shrink-0 flex-nowrap items-center gap-2 overflow-hidden px-2 py-1.5 sm:gap-2.5 sm:px-2.5 sm:py-2">
           <input
             value={nameDraft}
             onChange={e => setNameDraft(e.target.value)}
             onBlur={persistName}
-            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/[0.1] bg-[#08090a]/95 px-2.5 py-2 text-[11px] text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] placeholder:text-zinc-600 focus:border-amber-500/25 focus:outline-none"
+            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/[0.08] bg-black/25 px-2.5 py-2 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
             placeholder="Display name"
           />
           <button

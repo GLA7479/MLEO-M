@@ -165,6 +165,7 @@ export default function Ov2CcLiveShell() {
         title="Community Cards"
         subtitle="Ten permanent live tables"
         useAppViewportHeight
+        chromePreset="cc_flat"
         infoPanel={infoPanel}
       >
         <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
@@ -223,7 +224,13 @@ export default function Ov2CcLiveShell() {
 
   if (!tableConfig) {
     return (
-      <OnlineV2GamePageShell title="Community Cards" subtitle="Loading…" useAppViewportHeight infoPanel={infoPanel}>
+      <OnlineV2GamePageShell
+        title="Community Cards"
+        subtitle="Loading…"
+        useAppViewportHeight
+        chromePreset="cc_flat"
+        infoPanel={infoPanel}
+      >
         <div className="flex h-full items-center justify-center text-sm text-zinc-400">Loading table…</div>
       </OnlineV2GamePageShell>
     );
@@ -234,8 +241,8 @@ export default function Ov2CcLiveShell() {
       title="Community Cards"
       subtitle={`Live · ${formatTierLabel(tableConfig.tablePrice)} · ${tableConfig.maxSeats}-max`}
       useAppViewportHeight
+      chromePreset="cc_flat"
       infoPanel={infoPanel}
-      chromePreset="cc_live_table"
     >
       <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
         <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-white/[0.05] pb-1.5 pt-0.5">

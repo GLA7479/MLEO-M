@@ -194,18 +194,17 @@ export default function Ov2CcScreen({
     const base =
       "flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-xl border px-1 py-1.5 text-center transition touch-manipulation sm:min-h-[60px] sm:rounded-2xl sm:px-1.5 sm:py-2";
     if (!occupied) {
-      return `${base} border-dashed border-emerald-600/35 bg-emerald-950/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] hover:border-emerald-500/45 hover:bg-emerald-950/25`;
+      return `${base} border-dashed border-emerald-600/35 bg-emerald-950/15 shadow-none hover:border-emerald-500/45 hover:bg-emerald-950/25`;
     }
-    let state = "border-white/[0.12] bg-black/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_14px_rgba(0,0,0,0.35)]";
-    if (folded) state = "border-white/[0.08] bg-black/25 opacity-[0.42] grayscale-[0.35]";
-    else if (sitOut) state = "border-zinc-600/25 bg-zinc-950/40 opacity-80";
-    else if (allIn) state = "border-amber-600/35 bg-amber-950/20 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.12)]";
+    let state = "border-white/[0.08] bg-black/25 shadow-none";
+    if (folded) state = "border-white/[0.08] bg-black/25 opacity-[0.42] grayscale-[0.35] shadow-none";
+    else if (sitOut) state = "border-zinc-600/25 bg-zinc-950/40 opacity-80 shadow-none";
+    else if (allIn) state = "border-amber-600/35 bg-amber-950/20 shadow-none";
     let turn = "";
     if (isAct && handBettingLive && !folded) {
-      turn =
-        "ring-2 ring-amber-400/50 ring-offset-2 ring-offset-[#061510] shadow-[0_0_0_1px_rgba(251,191,36,0.18),0_8px_22px_rgba(0,0,0,0.42)]";
+      turn = "ring-2 ring-amber-400/50 ring-offset-2 ring-offset-[#030506] shadow-none";
     } else if (isYou) {
-      turn = "ring-1 ring-sky-400/45 ring-offset-1 ring-offset-[#061510]";
+      turn = "ring-1 ring-sky-400/45 ring-offset-1 ring-offset-[#030506] shadow-none";
     }
     return `${base} ${state} ${turn}`;
   };
@@ -299,15 +298,15 @@ export default function Ov2CcScreen({
       : [];
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-0 overflow-hidden bg-[#050708] text-zinc-100 max-sm:gap-0 sm:gap-1.5">
+    <div className="flex h-full min-h-0 flex-col gap-0 overflow-hidden bg-[#030506] text-zinc-100 max-sm:gap-0 sm:gap-1.5">
       <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-0 max-sm:gap-0 sm:gap-2 lg:max-w-6xl lg:gap-2.5">
         <div className="relative flex min-h-0 flex-1 flex-col">
           {/* Mobile: one felt height for all phases (see ov2CcLayoutConstants). */}
           <div
-            className={`relative mx-auto h-full min-h-0 w-full max-w-[920px] sm:min-h-[min(56vh,440px)] flex-1 rounded-[1.55rem] border border-black/55 bg-gradient-to-b from-[#5c4030] via-[#2e1e16] to-[#120b08] p-[2px] shadow-[0_28px_72px_rgba(0,0,0,0.58),inset_0_1px_0_rgba(255,255,255,0.06)] sm:rounded-[2.35rem] sm:p-1 md:min-h-[min(58vh,500px)] lg:rounded-[2.55rem] lg:p-[7px] ${OV2_CC_MOBILE_FELT_HEIGHT_CLASSES}`}
+            className={`relative mx-auto h-full min-h-0 w-full max-w-[920px] sm:min-h-[min(56vh,440px)] flex-1 rounded-[1.55rem] border-0 bg-gradient-to-b from-[#5c4030] via-[#2e1e16] to-[#120b08] p-[2px] shadow-none sm:rounded-[2.35rem] sm:p-1 md:min-h-[min(58vh,500px)] lg:rounded-[2.55rem] lg:p-[7px] ${OV2_CC_MOBILE_FELT_HEIGHT_CLASSES}`}
           >
             <div
-              className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[1.45rem] border border-black/45 shadow-[inset_0_2px_24px_rgba(0,0,0,0.35)] sm:rounded-[1.85rem] md:rounded-[2.05rem]"
+              className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[1.45rem] border-0 shadow-none sm:rounded-[1.85rem] md:rounded-[2.05rem]"
               style={{
                 background:
                   "radial-gradient(ellipse 86% 68% at 50% 42%, #168047 0%, #0e5c32 36%, #083a1f 70%, #03150c 100%)",
@@ -320,9 +319,6 @@ export default function Ov2CcScreen({
                     "radial-gradient(ellipse 58% 42% at 50% 36%, rgba(255,255,255,0.09) 0%, transparent 52%)",
                 }}
               />
-              <div className="pointer-events-none absolute inset-[4px] rounded-[1.2rem] border border-black/25 max-sm:inset-[3px] sm:inset-2 sm:rounded-[1.55rem] md:rounded-[1.75rem]" />
-              <div className="pointer-events-none absolute inset-[7px] rounded-[1.05rem] border border-white/[0.06] max-sm:inset-[5px] sm:inset-3 sm:rounded-[1.35rem] md:rounded-[1.55rem]" />
-
               <div className="relative z-[4] flex min-h-0 flex-1 flex-col">
                 <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-0 pb-0 max-sm:-translate-y-[3rem] max-sm:px-[6%] sm:-translate-y-10 md:-translate-y-8 sm:px-[13%] sm:pt-1.5 sm:pb-1 md:px-[15%] md:pt-2 md:pb-1.5">
                   <div className="mb-1 flex w-full max-w-md flex-col items-center gap-0.5 max-sm:mb-2 sm:mb-1 sm:max-w-lg sm:gap-1 md:gap-1.5">
@@ -382,7 +378,7 @@ export default function Ov2CcScreen({
                           <span className="text-[9px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[10px]">
                             Pot
                           </span>
-                          <div className="flex min-h-[2.4rem] items-center justify-center overflow-visible rounded-xl border border-black/35 bg-black/45 px-5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_6px_20px_rgba(0,0,0,0.42)] sm:rounded-2xl sm:px-7 sm:py-2.5">
+                          <div className="flex min-h-[2.4rem] items-center justify-center overflow-visible rounded-xl border-0 bg-black/35 px-5 py-2 shadow-none sm:rounded-2xl sm:px-7 sm:py-2.5">
                             <span className="relative block translate-y-px text-[18px] font-extrabold leading-none text-amber-100 sm:translate-y-0 sm:font-mono sm:text-2xl sm:font-bold sm:leading-[1.25] sm:tabular-nums md:text-3xl">
                               {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
                             </span>
@@ -468,7 +464,7 @@ export default function Ov2CcScreen({
                           <span className="text-[9px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[10px]">
                             Pot
                           </span>
-                          <div className="flex min-h-[2.4rem] items-center justify-center overflow-visible rounded-xl border border-black/35 bg-black/45 px-5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_6px_20px_rgba(0,0,0,0.42)] sm:rounded-2xl sm:px-7 sm:py-2.5">
+                          <div className="flex min-h-[2.4rem] items-center justify-center overflow-visible rounded-xl border-0 bg-black/35 px-5 py-2 shadow-none sm:rounded-2xl sm:px-7 sm:py-2.5">
                             <span className="relative block translate-y-px text-[18px] font-extrabold leading-none text-amber-100 sm:translate-y-0 sm:font-mono sm:text-2xl sm:font-bold sm:leading-[1.25] sm:tabular-nums md:text-3xl">
                               {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
                             </span>
@@ -648,9 +644,7 @@ export default function Ov2CcScreen({
 
       {mySeat ? (
         <div
-          className={`relative z-10 flex shrink-0 flex-col border-t border-white/[0.06] bg-[#070a0d] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-16px_48px_rgba(0,0,0,0.55)] sm:px-4 sm:pb-3 sm:pt-3 ${
-            canAct ? "min-h-[134px] sm:min-h-[140px]" : "min-h-0"
-          }`}
+          className="relative z-10 flex min-h-[134px] shrink-0 flex-col border-t-0 bg-transparent px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-none sm:min-h-[140px] sm:px-4 sm:pb-3 sm:pt-3"
         >
           {canAct ? (
             <div className="mx-auto w-full max-w-lg">
@@ -727,17 +721,22 @@ export default function Ov2CcScreen({
             </div>
           </div>
           ) : (
-            <div className="mx-auto w-full max-w-lg rounded-xl border border-white/[0.1] bg-[#0c1216] px-3 py-2.5 shadow-[0_8px_28px_rgba(0,0,0,0.45)] max-sm:max-h-[min(48vh,20rem)] max-sm:overflow-y-auto sm:rounded-lg sm:px-2 sm:py-1 sm:shadow-[0_6px_20px_rgba(0,0,0,0.4)] md:px-2 md:py-1">
-              <div className="flex items-start justify-between gap-2 sm:items-center sm:gap-1.5">
-                <p className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 sm:pt-0 sm:text-[10px] sm:leading-tight sm:tracking-[0.14em]">
-                  Your stack
-                </p>
-                <div className="flex shrink-0 flex-wrap justify-end gap-1.5 sm:gap-1">
+            <div className="mx-auto w-full max-w-lg max-sm:max-h-[min(48vh,20rem)] max-sm:overflow-y-auto">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                    Your stack
+                  </span>
+                  <span className="min-w-0 truncate font-mono text-lg font-bold leading-none tabular-nums text-white sm:text-xl">
+                    {Math.floor(mySeat.stack || 0).toLocaleString?.() ?? Math.floor(mySeat.stack || 0)}
+                  </span>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
                   {!mySeat.sitOut && !mySeat.pendingSitOutAfterHand ? (
                     <button
                       type="button"
                       disabled={operateBusy}
-                      className="min-h-[36px] rounded-lg border border-zinc-600/35 bg-zinc-900/60 px-3 py-1.5 text-[11px] font-semibold text-zinc-200 touch-manipulation sm:min-h-[28px] sm:rounded-md sm:px-2 sm:py-0.5 sm:text-[10px] sm:leading-tight"
+                      className="h-8 shrink-0 rounded-md border border-zinc-600/35 bg-zinc-900/60 px-2.5 text-[10px] font-semibold leading-none text-zinc-200 touch-manipulation sm:h-7 sm:px-2 sm:text-[9px]"
                       onClick={() => void runGameOp("sit_out")}
                     >
                       {betweenHands ? "Sit out" : "Next hand out"}
@@ -747,7 +746,7 @@ export default function Ov2CcScreen({
                     <button
                       type="button"
                       disabled={operateBusy || mySeat.pendingSitOutAfterHand}
-                      className="min-h-[36px] rounded-lg border border-sky-600/35 bg-sky-950/40 px-3 py-1.5 text-[11px] font-semibold text-sky-100 touch-manipulation disabled:opacity-40 sm:min-h-[28px] sm:rounded-md sm:px-2 sm:py-0.5 sm:text-[10px] sm:leading-tight"
+                      className="h-8 shrink-0 rounded-md border border-sky-600/35 bg-sky-950/40 px-2.5 text-[10px] font-semibold leading-none text-sky-100 touch-manipulation disabled:opacity-40 sm:h-7 sm:px-2 sm:text-[9px]"
                       onClick={() => void runGameOp("sit_in")}
                       title={mySeat.pendingSitOutAfterHand ? "Wait until this hand ends" : undefined}
                     >
@@ -756,64 +755,53 @@ export default function Ov2CcScreen({
                   ) : null}
                 </div>
               </div>
-              <div className="mt-2 space-y-2.5 sm:mt-1 sm:space-y-1">
-                <p className="text-center font-mono text-2xl font-bold leading-tight tabular-nums text-white sm:text-lg sm:leading-none md:text-xl">
-                  {Math.floor(mySeat.stack || 0).toLocaleString?.() ?? Math.floor(mySeat.stack || 0)}
-                </p>
-                <div className="min-h-[48px] shrink-0 sm:min-h-[28px]">
-                  {betweenHands ? (
-                    <div className="flex gap-2 sm:gap-1.5">
-                      <input
-                        className="min-w-0 flex-1 rounded-xl border border-white/12 bg-black/45 px-3 py-2 text-sm text-white placeholder:text-zinc-600 sm:rounded-lg sm:px-2 sm:py-1 sm:text-[11px] sm:leading-tight"
-                        value={topUpDraft}
-                        onChange={e => setTopUpDraft(e.target.value.replace(/[^\d]/g, ""))}
-                        placeholder={`Top-up (max +${maxBuy - Math.floor(mySeat.stack || 0)})`}
-                        inputMode="numeric"
-                      />
-                      <button
-                        type="button"
-                        disabled={operateBusy}
-                        className="min-h-[44px] shrink-0 rounded-xl border border-emerald-600/40 bg-emerald-950/50 px-4 text-sm font-bold text-emerald-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:min-h-[28px] sm:rounded-lg sm:px-2 sm:text-[11px] sm:leading-tight"
-                        onClick={async () => {
-                          setFormHint("");
-                          const cap = maxBuy - Math.floor(mySeat.stack || 0);
-                          const n = Math.max(0, Math.floor(Number(topUpDraft) || 0));
-                          if (n <= 0) {
-                            setFormHint("Enter a top-up amount.");
-                            return;
-                          }
-                          if (n > cap) {
-                            setFormHint(`Top-up cannot exceed ${cap}.`);
-                            return;
-                          }
-                          const r = await doOp("top_up", { amount: n });
-                          if (r?.ok) {
-                            setTopUpDraft("");
-                            setFormHint("");
-                          } else {
-                            setTopUpDraft(String(n));
-                            setFormHint(
-                              String(r?.code || r?.json?.code || r?.error?.payload?.code || "Top-up failed."),
-                            );
-                          }
-                        }}
-                      >
-                        Top-up
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="h-[48px] w-full shrink-0 sm:h-[24px]" aria-hidden />
-                  )}
+              {betweenHands ? (
+                <div className="mt-1.5 flex items-stretch gap-1.5">
+                  <input
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-white/12 bg-black/45 px-2.5 text-[13px] text-white placeholder:text-zinc-600 sm:h-8 sm:px-2 sm:text-[11px] sm:leading-tight"
+                    value={topUpDraft}
+                    onChange={e => setTopUpDraft(e.target.value.replace(/[^\d]/g, ""))}
+                    placeholder={`Top-up (max +${maxBuy - Math.floor(mySeat.stack || 0)})`}
+                    inputMode="numeric"
+                  />
+                  <button
+                    type="button"
+                    disabled={operateBusy}
+                    className="h-9 shrink-0 rounded-lg border border-emerald-600/40 bg-emerald-950/50 px-3 text-[11px] font-bold leading-none text-emerald-50 touch-manipulation sm:h-8 sm:px-2.5 sm:text-[10px]"
+                    onClick={async () => {
+                      setFormHint("");
+                      const cap = maxBuy - Math.floor(mySeat.stack || 0);
+                      const n = Math.max(0, Math.floor(Number(topUpDraft) || 0));
+                      if (n <= 0) {
+                        setFormHint("Enter a top-up amount.");
+                        return;
+                      }
+                      if (n > cap) {
+                        setFormHint(`Top-up cannot exceed ${cap}.`);
+                        return;
+                      }
+                      const r = await doOp("top_up", { amount: n });
+                      if (r?.ok) {
+                        setTopUpDraft("");
+                        setFormHint("");
+                      } else {
+                        setTopUpDraft(String(n));
+                        setFormHint(
+                          String(r?.code || r?.json?.code || r?.error?.payload?.code || "Top-up failed."),
+                        );
+                      }
+                    }}
+                  >
+                    Top-up
+                  </button>
                 </div>
-                <div className="min-h-[22px] shrink-0 sm:min-h-[14px]">
-                  {mySeat.pendingSitOutAfterHand && !betweenHands ? (
-                    <p className="text-center text-[11px] text-amber-400/90 sm:text-[10px] sm:leading-tight">Leaving after this hand</p>
-                  ) : null}
-                </div>
-                {formHint ? (
-                  <p className="text-center text-[12px] text-rose-400/90 sm:text-[10px] sm:leading-tight">{formHint}</p>
-                ) : null}
-              </div>
+              ) : null}
+              {mySeat.pendingSitOutAfterHand && !betweenHands ? (
+                <p className="mt-1 text-center text-[10px] leading-tight text-amber-400/90">Leaving after this hand</p>
+              ) : null}
+              {formHint ? (
+                <p className="mt-1 text-center text-[11px] leading-tight text-rose-400/90 sm:text-[10px]">{formHint}</p>
+              ) : null}
             </div>
           )}
         </div>

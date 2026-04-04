@@ -532,14 +532,14 @@ export default function Ov2CwScreen({
 
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-xl flex-col overflow-hidden sm:max-w-2xl md:max-w-3xl lg:max-w-6xl">
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.1] bg-gradient-to-b from-zinc-900/40 via-zinc-950/50 to-black/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-0 bg-gradient-to-b from-zinc-900/35 via-zinc-950/45 to-black/50 shadow-none">
         <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden p-2 sm:gap-2 sm:p-3 lg:gap-2 lg:p-4">
           {/* Live / phase — full width of table card */}
           <div
-            className={`flex w-full min-w-0 shrink-0 items-center gap-2 rounded-lg border px-2.5 py-1.5 sm:rounded-xl sm:px-3 sm:py-1.5 ${
+            className={`flex w-full min-w-0 shrink-0 items-center gap-2 rounded-lg border-0 px-2.5 py-1.5 sm:rounded-xl sm:px-3 sm:py-1.5 ${
               resultPhase
-                ? "border-amber-500/25 bg-amber-950/20"
-                : "border-white/[0.08] bg-zinc-950/70"
+                ? "bg-amber-950/15"
+                : "bg-black/20"
             }`}
           >
             <div className="min-w-0 flex-1 leading-tight">
@@ -767,14 +767,14 @@ export default function Ov2CwScreen({
                 </div>
               </div>
               <div
-                className="relative z-[1] mt-0 aspect-square w-full overflow-visible rounded-full p-1 shadow-[0_0_0_1px_rgba(251,191,36,0.1),0_8px_32px_rgba(0,0,0,0.45)] ring-1 ring-amber-500/15 sm:p-[3px]"
+                className="relative z-[1] mt-0 aspect-square w-full overflow-visible rounded-full p-1 shadow-none ring-0 sm:p-[3px]"
                 style={{
                   background: "linear-gradient(145deg, rgba(39,39,42,0.85) 0%, rgba(9,9,11,0.92) 55%, rgba(50,28,8,0.3) 100%)",
                 }}
               >
             <div className="relative h-full w-full overflow-visible">
               <div
-                className="relative h-full w-full overflow-visible rounded-full border-2 border-zinc-800/95 shadow-[inset_0_2px_10px_rgba(0,0,0,0.45)]"
+                className="relative h-full w-full overflow-visible rounded-full border border-zinc-800/70 shadow-none"
                 style={{
                   transform: `rotate(${wheelDisplayDeg}deg)`,
                   transition:
@@ -829,7 +829,7 @@ export default function Ov2CwScreen({
                   })}
                 </div>
                 <div
-                  className="absolute inset-[18%] z-20 flex flex-col items-center justify-center rounded-full border border-white/[0.12] bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_1px_0_rgba(255,255,255,0.05)] sm:inset-[18%] lg:inset-[19%]"
+                  className="absolute inset-[18%] z-20 flex flex-col items-center justify-center rounded-full border-0 bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-none sm:inset-[18%] lg:inset-[19%]"
                   style={{
                     transform: `rotate(${viewerHorizontalLabelDeg(wheelDisplayDeg)}deg)`,
                     transition:
@@ -934,9 +934,9 @@ export default function Ov2CwScreen({
             {Array.from({ length: OV2_CW_MAX_SEATS }, (_, i) => seatBtn(seatsForUi[i], i))}
           </div>
 
-          <div className="relative flex min-h-0 w-full shrink-0 flex-col gap-1.5 overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/35 via-black/28 to-black/45 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] [grid-area:myplays] sm:gap-2 sm:p-2 lg:min-h-0 lg:flex-1">
+          <div className="relative flex min-h-0 w-full shrink-0 flex-col gap-1.5 overflow-hidden rounded-xl border-0 bg-gradient-to-b from-zinc-900/25 via-black/20 to-black/35 p-1.5 shadow-none [grid-area:myplays] sm:gap-2 sm:p-2 lg:min-h-0 lg:flex-1">
             <div
-              className="rounded-lg border border-white/[0.06] bg-black/35 p-2 sm:p-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+              className="rounded-lg border-0 bg-black/20 p-2 sm:p-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
               aria-label="My plays"
             >
               {myPlays.length === 0 ? (

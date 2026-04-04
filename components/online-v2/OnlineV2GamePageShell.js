@@ -23,6 +23,7 @@ export default function OnlineV2GamePageShell({
   /**
    * Optional immersive chrome for specific routes only (default unchanged for all other games).
    * `cc_live_table`: compact header, darker frame, more viewport for the table body.
+   * `cc_flat`: same layout as `cc_live_table` + solid bg, no header rule, subtle ad (Community Cards).
    * `c21_flat`: solid page bg, no header rule, subtle reserved-ad strip (21 Challenge only).
    */
   chromePreset = "default",
@@ -45,6 +46,8 @@ export default function OnlineV2GamePageShell({
   const subtitleText = typeof subtitle === "string" ? subtitle.trim() : "";
   const shouldRenderSubtitle = showSubtitle && Boolean(subtitleText);
   const isCcLiveTable = chromePreset === "cc_live_table";
+  const isCcFlat = chromePreset === "cc_flat";
+  const useCcCompactLayout = isCcLiveTable || isCcFlat;
   const isC21Flat = chromePreset === "c21_flat";
 
   const mainHeightClass = useAppViewportHeight
@@ -55,20 +58,24 @@ export default function OnlineV2GamePageShell({
     <Layout title={title}>
       <main
         className={`online-v2-game-main ${mainHeightClass} overflow-hidden text-white ${
-          isCcLiveTable
-            ? "bg-gradient-to-b from-[#030506] via-[#06090c] to-[#030506]"
+          useCcCompactLayout
+            ? isCcFlat
+              ? "bg-[#030506]"
+              : "bg-gradient-to-b from-[#030506] via-[#06090c] to-[#030506]"
             : isC21Flat
               ? "bg-[#030506]"
               : "bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950"
         }`}
         style={{
-          paddingTop: isCcLiveTable ? "max(4px, env(safe-area-inset-top))" : "max(8px, env(safe-area-inset-top))",
-          paddingBottom: isCcLiveTable ? "max(4px, env(safe-area-inset-bottom))" : "max(8px, env(safe-area-inset-bottom))",
+          paddingTop: useCcCompactLayout ? "max(4px, env(safe-area-inset-top))" : "max(8px, env(safe-area-inset-top))",
+          paddingBottom: useCcCompactLayout
+            ? "max(4px, env(safe-area-inset-bottom))"
+            : "max(8px, env(safe-area-inset-bottom))",
         }}
       >
         <div
           className={
-            isCcLiveTable
+            useCcCompactLayout
               ? "mx-auto flex h-full w-full min-h-0 max-w-2xl flex-col gap-1 overflow-hidden px-2 md:max-w-5xl md:gap-1 md:px-3 lg:max-w-6xl lg:gap-1.5 lg:px-5 xl:max-w-7xl xl:px-7 2xl:max-w-7xl"
               : "mx-auto flex h-full w-full min-h-0 max-w-2xl flex-col gap-2 px-2 md:max-w-4xl md:gap-2 md:px-3 lg:max-w-5xl lg:gap-2.5 lg:px-5 xl:max-w-6xl xl:px-7 2xl:max-w-7xl"
           }
@@ -77,12 +84,14 @@ export default function OnlineV2GamePageShell({
             className={`shrink-0 ${
               isCcLiveTable
                 ? "border-b border-white/[0.04] pb-1 pt-0.5"
-                : isC21Flat
-                  ? "pb-0.5 pt-1 md:pb-0.5"
-                  : "border-b border-white/[0.06] pb-0.5 pt-1 md:pb-0.5"
+                : isCcFlat
+                  ? "pb-1 pt-0.5"
+                  : isC21Flat
+                    ? "pb-0.5 pt-1 md:pb-0.5"
+                    : "border-b border-white/[0.06] pb-0.5 pt-1 md:pb-0.5"
             }`}
           >
-            {isCcLiveTable ? (
+            {useCcCompactLayout ? (
               <div className="flex items-center gap-2">
                 <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
                   <Link href="/online-v2" className={OV2_HUD_CHROME_BTN}>
@@ -186,7 +195,7 @@ export default function OnlineV2GamePageShell({
             </OnlineV2GameOverlay>
           </div>
 
-          <OnlineV2ReservedAdSlot variant={isC21Flat ? "subtle" : "default"} />
+          <OnlineV2ReservedAdSlot variant={isC21Flat || isCcFlat ? "subtle" : "default"} />
         </div>
       </main>
     </Layout>
