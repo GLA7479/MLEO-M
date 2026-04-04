@@ -95,6 +95,9 @@ function normalizeCwAngleDeg(x) {
 const OV2_CW_PLACING_DRIFT_DEG_PER_SEC = 165;
 const OV2_CW_DRIFT_MAX_DT_SEC = 0.12;
 
+/** Delay before showing fixed-table auto-switch / sit status toast (avoid flash on fast joins). */
+const OV2_CW_SIT_SWITCH_TOAST_DELAY_MS = 350;
+
 /** Counter parent wheel rotation so rim digits stay horizontal to the viewer (same reading direction always). */
 function viewerHorizontalLabelDeg(wheelDeg) {
   return -wheelDeg;
@@ -134,6 +137,9 @@ export default function Ov2CwScreen({
   const prevPhaseForSheetRef = useRef(null);
   const [roundOutcomeFlash, setRoundOutcomeFlash] = useState(null);
   const lastOutcomeFlashKeyRef = useRef("");
+  const [sitSwitchToastVisible, setSitSwitchToastVisible] = useState(false);
+  const sitSwitchDelayTimerRef = useRef(null);
+  const sitInFlightRef = useRef(false);
 
   useEffect(() => {
     setPlayAmount(String(Math.max(1, Math.floor(Number(tableStakeUnits) || 1))));
@@ -184,6 +190,15 @@ export default function Ov2CwScreen({
   useEffect(() => {
     setPendingPlayKeys([]);
   }, [roundSeq]);
+
+  useEffect(() => {
+    return () => {
+      if (sitSwitchDelayTimerRef.current) {
+        window.clearTimeout(sitSwitchDelayTimerRef.current);
+        sitSwitchDelayTimerRef.current = null;
+      }
+    };
+  }, []);
 
   void tick;
   const countdown = useMemo(() => {
@@ -362,7 +377,26 @@ export default function Ov2CwScreen({
 
   const onSit = useCallback(
     async seatIndex => {
-      await doOp("sit", { seatIndex, displayName });
+      if (sitSwitchDelayTimerRef.current) {
+        window.clearTimeout(sitSwitchDelayTimerRef.current);
+        sitSwitchDelayTimerRef.current = null;
+      }
+      sitInFlightRef.current = true;
+      setSitSwitchToastVisible(false);
+      sitSwitchDelayTimerRef.current = window.setTimeout(() => {
+        sitSwitchDelayTimerRef.current = null;
+        if (sitInFlightRef.current) setSitSwitchToastVisible(true);
+      }, OV2_CW_SIT_SWITCH_TOAST_DELAY_MS);
+      try {
+        await doOp("sit", { seatIndex, displayName });
+      } finally {
+        sitInFlightRef.current = false;
+        if (sitSwitchDelayTimerRef.current) {
+          window.clearTimeout(sitSwitchDelayTimerRef.current);
+          sitSwitchDelayTimerRef.current = null;
+        }
+        setSitSwitchToastVisible(false);
+      }
     },
     [doOp, displayName],
   );
@@ -542,6 +576,21 @@ export default function Ov2CwScreen({
 
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-xl flex-col overflow-hidden sm:max-w-2xl md:max-w-3xl lg:max-w-6xl">
+      {sitSwitchToastVisible ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed left-1/2 top-3 z-[200] w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl border border-amber-500/35 bg-zinc-950/95 px-3 py-2.5 shadow-lg shadow-black/50 sm:px-3.5 sm:py-3"
+        >
+          <p className="text-center text-xs font-bold leading-tight text-amber-100 sm:text-sm">Switching tables…</p>
+          <p className="mt-1 text-center text-[11px] leading-snug text-zinc-300 max-sm:hidden sm:text-xs">
+            Releasing your previous seat and joining the new one. This may take a few seconds.
+          </p>
+          <p className="mt-1 text-center text-[11px] leading-snug text-zinc-300 sm:hidden">
+            Joining table… this may take a few seconds.
+          </p>
+        </div>
+      ) : null}
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-0 bg-gradient-to-b from-zinc-900/35 via-zinc-950/45 to-black/50 shadow-none">
         <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden p-2 max-lg:gap-1 max-lg:p-1.5 sm:gap-2 sm:p-3 lg:gap-2 lg:p-4">
           {/* Live / phase — full width of table card */}

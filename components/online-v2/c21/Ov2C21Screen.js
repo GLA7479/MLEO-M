@@ -10,6 +10,9 @@ import {
 } from "../../../lib/online-v2/onlineV2VaultBridge";
 import { OV2_C21_BETTING_PRE_LOCK_FREEZE_MS } from "../../../lib/online-v2/c21/ov2C21ClientConstants";
 
+/** Same delay as `Ov2CwScreen` sit switch toast — only show if sit is slow. */
+const OV2_C21_SIT_SWITCH_TOAST_DELAY_MS = 350;
+
 function fmt(n) {
   const x = Math.floor(Number(n) || 0);
   if (x >= 1e6) return `${(x / 1e6).toFixed(2)}M`;
@@ -357,6 +360,9 @@ export default function Ov2C21Screen({
   const betLockRef = useRef(false);
   const quickAddLockRef = useRef(false);
   const sitLockRef = useRef(false);
+  const [sitSwitchToastVisible, setSitSwitchToastVisible] = useState(false);
+  const sitSwitchDelayTimerRef = useRef(null);
+  const sitInFlightRef = useRef(false);
   const engineRef = useRef(engine);
   engineRef.current = engine;
   const [playDraftStr, setPlayDraftStr] = useState("");
@@ -368,6 +374,15 @@ export default function Ov2C21Screen({
   useEffect(() => {
     const id = window.setInterval(() => setNowTick(Date.now()), 500);
     return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (sitSwitchDelayTimerRef.current) {
+        window.clearTimeout(sitSwitchDelayTimerRef.current);
+        sitSwitchDelayTimerRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -974,33 +989,48 @@ export default function Ov2C21Screen({
   );
 
   const trySit = useCallback(
-    idx => {
+    async idx => {
       if (sitLockRef.current || operateBusy) return;
       if (vaultBalance < minBet) {
         setEconomyHint("Not enough vault for this minimum play.");
         return;
       }
       sitLockRef.current = true;
-      void onOperate("sit", { seatIndex: idx, displayName: displayName || "Guest" })
-        .then(async r => {
-          if (!r?.ok) {
-            const code = r?.error?.code || r?.error?.payload?.code || "";
-            setEconomyHint(
-              code === "insufficient_vault_for_table"
-                ? "Not enough vault for this level."
-                : code === "DEVICE_REQUIRED"
-                  ? "Session required to take a seat."
-                  : code === "ALREADY_SEATED_ELSEWHERE"
-                    ? r?.error?.message || "You already have a seat at another table."
-                    : "",
-            );
-          }
-        })
-        .finally(() => {
-          window.setTimeout(() => {
-            sitLockRef.current = false;
-          }, 450);
-        });
+      if (sitSwitchDelayTimerRef.current) {
+        window.clearTimeout(sitSwitchDelayTimerRef.current);
+        sitSwitchDelayTimerRef.current = null;
+      }
+      sitInFlightRef.current = true;
+      setSitSwitchToastVisible(false);
+      sitSwitchDelayTimerRef.current = window.setTimeout(() => {
+        sitSwitchDelayTimerRef.current = null;
+        if (sitInFlightRef.current) setSitSwitchToastVisible(true);
+      }, OV2_C21_SIT_SWITCH_TOAST_DELAY_MS);
+      try {
+        const r = await onOperate("sit", { seatIndex: idx, displayName: displayName || "Guest" });
+        if (!r?.ok) {
+          const code = r?.error?.code || r?.error?.payload?.code || "";
+          setEconomyHint(
+            code === "insufficient_vault_for_table"
+              ? "Not enough vault for this level."
+              : code === "DEVICE_REQUIRED"
+                ? "Session required to take a seat."
+                : code === "ALREADY_SEATED_ELSEWHERE"
+                  ? r?.error?.message || "You already have a seat at another table."
+                  : "",
+          );
+        }
+      } finally {
+        sitInFlightRef.current = false;
+        if (sitSwitchDelayTimerRef.current) {
+          window.clearTimeout(sitSwitchDelayTimerRef.current);
+          sitSwitchDelayTimerRef.current = null;
+        }
+        setSitSwitchToastVisible(false);
+        window.setTimeout(() => {
+          sitLockRef.current = false;
+        }, 450);
+      }
     },
     [displayName, minBet, onOperate, operateBusy, vaultBalance],
   );
@@ -1028,6 +1058,21 @@ export default function Ov2C21Screen({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#030506] text-zinc-100">
+      {sitSwitchToastVisible ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed left-1/2 top-3 z-[200] w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl border border-amber-500/35 bg-zinc-950/95 px-3 py-2.5 shadow-lg shadow-black/50 sm:px-3.5 sm:py-3"
+        >
+          <p className="text-center text-xs font-bold leading-tight text-amber-100 sm:text-sm">Switching tables…</p>
+          <p className="mt-1 text-center text-[11px] leading-snug text-zinc-300 max-sm:hidden sm:text-xs">
+            Releasing your previous seat and joining the new one. This may take a few seconds.
+          </p>
+          <p className="mt-1 text-center text-[11px] leading-snug text-zinc-300 sm:hidden">
+            Joining table… this may take a few seconds.
+          </p>
+        </div>
+      ) : null}
       {loadError ? (
         <div className="shrink-0 px-0.5 text-center text-[10px] leading-tight text-red-300/95" role="alert">
           {loadError}
@@ -1142,7 +1187,7 @@ export default function Ov2C21Screen({
                           });
                           return;
                         }
-                        trySit(idx);
+                        void trySit(idx);
                       }}
                       className={`flex h-full min-h-0 w-full touch-manipulation flex-col overflow-hidden rounded-lg border border-white/[0.06] bg-black/25 px-px py-0 text-left shadow-none transition ${actingHere} ${inspectorSeatIdx === idx ? "ring-1 ring-emerald-400/50 ring-offset-2 ring-offset-[#030506]" : ""} ${!taken && (operateBusy || !canSitToPlay) ? "opacity-40" : ""}`}
                     >

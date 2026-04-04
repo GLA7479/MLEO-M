@@ -15,6 +15,9 @@ import {
 } from "../../../lib/online-v2/community_cards/ov2CcSeatRingGeometry";
 import Ov2CcPlayingCard from "./Ov2CcPlayingCard";
 
+/** Same delay as `Ov2CwScreen` sit switch toast — only show if sit is slow. */
+const OV2_CC_SIT_SWITCH_TOAST_DELAY_MS = 350;
+
 export default function Ov2CcScreen({
   roomId,
   engine,
@@ -36,6 +39,9 @@ export default function Ov2CcScreen({
   const [actionHint, setActionHint] = useState("");
   const [betweenTick, setBetweenTick] = useState(0);
   const prevHandSeqRef = useRef(null);
+  const [sitSwitchToastVisible, setSitSwitchToastVisible] = useState(false);
+  const sitSwitchDelayTimerRef = useRef(null);
+  const sitInFlightRef = useRef(false);
 
   useEffect(() => {
     setBuyInDraft(String(minBuy));
@@ -105,6 +111,41 @@ export default function Ov2CcScreen({
       return r;
     },
     [onOperate],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (sitSwitchDelayTimerRef.current) {
+        window.clearTimeout(sitSwitchDelayTimerRef.current);
+        sitSwitchDelayTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const runSitWithSwitchToast = useCallback(
+    async payload => {
+      if (sitSwitchDelayTimerRef.current) {
+        window.clearTimeout(sitSwitchDelayTimerRef.current);
+        sitSwitchDelayTimerRef.current = null;
+      }
+      sitInFlightRef.current = true;
+      setSitSwitchToastVisible(false);
+      sitSwitchDelayTimerRef.current = window.setTimeout(() => {
+        sitSwitchDelayTimerRef.current = null;
+        if (sitInFlightRef.current) setSitSwitchToastVisible(true);
+      }, OV2_CC_SIT_SWITCH_TOAST_DELAY_MS);
+      try {
+        return await doOp("sit", payload);
+      } finally {
+        sitInFlightRef.current = false;
+        if (sitSwitchDelayTimerRef.current) {
+          window.clearTimeout(sitSwitchDelayTimerRef.current);
+          sitSwitchDelayTimerRef.current = null;
+        }
+        setSitSwitchToastVisible(false);
+      }
+    },
+    [doOp],
   );
 
   useEffect(() => {
@@ -346,6 +387,21 @@ export default function Ov2CcScreen({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-0 overflow-hidden bg-[#030506] text-zinc-100 max-sm:gap-0 sm:gap-1.5">
+      {sitSwitchToastVisible ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed left-1/2 top-3 z-[200] w-[min(92vw,22rem)] -translate-x-1/2 rounded-xl border border-amber-500/35 bg-zinc-950/95 px-3 py-2.5 shadow-lg shadow-black/50 sm:px-3.5 sm:py-3"
+        >
+          <p className="text-center text-xs font-bold leading-tight text-amber-100 sm:text-sm">Switching tables…</p>
+          <p className="mt-1 text-center text-[11px] leading-snug text-zinc-300 max-sm:hidden sm:text-xs">
+            Releasing your previous seat and joining the new one. This may take a few seconds.
+          </p>
+          <p className="mt-1 text-center text-[11px] leading-snug text-zinc-300 sm:hidden">
+            Joining table… this may take a few seconds.
+          </p>
+        </div>
+      ) : null}
       <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-0 max-sm:gap-0 sm:gap-2 lg:max-w-6xl lg:gap-2.5">
         <div className="relative flex min-h-0 flex-1 flex-col">
           {/* Mobile: one felt height for all phases (see ov2CcLayoutConstants). */}
@@ -684,7 +740,7 @@ export default function Ov2CcScreen({
                     setFormHint(`Use ${minBuy}–${maxBuy}.`);
                     return;
                   }
-                  const r = await doOp("sit", {
+                  const r = await runSitWithSwitchToast({
                     seatIndex: pickSeat,
                     buyIn: n,
                     displayName,
