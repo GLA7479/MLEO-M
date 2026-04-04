@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase } from "../lib/supabaseClients";
 import { getOv2ParticipantId } from "../lib/online-v2/ov2ParticipantId";
+import { isOv2RoomIdQueryParam } from "../lib/online-v2/onlineV2GameRegistry";
 import { postOv2C21Operate } from "../lib/online-v2/c21/ov2C21Api";
 import { creditOnlineV2VaultForSettlementLine, readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import { OV2_C21_PRODUCT_GAME_ID } from "../lib/online-v2/c21/ov2C21TableIds";
@@ -84,6 +85,11 @@ async function flushC21OperateSideEffects(json, participantKey, traceCtx) {
 }
 
 export function useOv2C21Session(roomId, tableStakeUnits) {
+  const resolvedRoomId = useMemo(() => {
+    const s = String(roomId ?? "").trim();
+    return s && isOv2RoomIdQueryParam(s) ? s : null;
+  }, [roomId]);
+
   const [engine, setEngine] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [operateBusy, setOperateBusy] = useState(false);

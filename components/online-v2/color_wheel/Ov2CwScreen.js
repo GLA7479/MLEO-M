@@ -877,18 +877,43 @@ export default function Ov2CwScreen({
                   }}
                 >
                   <div
-                    className="pointer-events-none absolute inset-0 rounded-full border border-zinc-600/50 shadow-[inset_0_3px_10px_rgba(255,255,255,0.14),inset_0_-8px_18px_rgba(0,0,0,0.85),0_0_0_1px_rgba(0,0,0,0.6)]"
+                    className="pointer-events-none absolute inset-0 rounded-full border border-zinc-500/45 shadow-[inset_0_4px_12px_rgba(255,255,255,0.12),inset_0_-10px_22px_rgba(0,0,0,0.88),0_0_0_1px_rgba(0,0,0,0.65)]"
                     style={{
                       background:
-                        "linear-gradient(145deg, #71717a 0%, #3f3f46 22%, #18181b 55%, #09090b 100%)",
+                        "linear-gradient(145deg, #a1a1aa 0%, #71717a 14%, #3f3f46 32%, #18181b 58%, #09090b 100%)",
                     }}
                     aria-hidden
                   />
                   <div
-                    className="pointer-events-none absolute inset-[7%] rounded-full border border-zinc-800/80 bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-[inset_0_2px_6px_rgba(255,255,255,0.06),inset_0_-6px_14px_rgba(0,0,0,0.9)]"
+                    className="pointer-events-none absolute inset-[5%] rounded-full border border-zinc-800/70 shadow-[inset_0_2px_10px_rgba(255,255,255,0.05),inset_0_-12px_28px_rgba(0,0,0,0.92)]"
+                    style={{
+                      background:
+                        "radial-gradient(ellipse 115% 115% at 40% 34%, rgba(63,63,70,0.98) 0%, rgba(39,39,42,0.95) 28%, rgba(24,24,27,0.96) 52%, rgba(9,9,11,0.99) 78%, #000000 100%), linear-gradient(168deg, #27272a 0%, #0c0c0d 55%, #000000 100%)",
+                    }}
                     aria-hidden
                   />
-                  <div className="relative z-[1] flex flex-col items-center justify-center px-1">
+                  <div
+                    className="pointer-events-none absolute inset-[10%] rounded-full border border-zinc-500/12 shadow-[inset_0_0_8px_rgba(0,0,0,0.55)]"
+                    aria-hidden
+                  />
+                  <div className="pointer-events-none absolute inset-[15%] rounded-full border border-zinc-400/8" aria-hidden />
+                  <div
+                    className="pointer-events-none absolute inset-[26%] z-0 rounded-full border border-zinc-700/50 shadow-[inset_0_2px_6px_rgba(255,255,255,0.22),inset_0_-5px_14px_rgba(0,0,0,0.88),0_3px_10px_rgba(0,0,0,0.55)]"
+                    style={{
+                      background:
+                        "linear-gradient(155deg, #d4d4d8 0%, #71717a 22%, #3f3f46 48%, #18181b 78%, #0a0a0a 100%)",
+                    }}
+                    aria-hidden
+                  />
+                  <div
+                    className="pointer-events-none absolute inset-[31%] z-0 rounded-full border border-black/40 shadow-[inset_0_4px_10px_rgba(0,0,0,0.82)]"
+                    style={{
+                      background:
+                        "radial-gradient(circle at 36% 30%, rgba(255,255,255,0.18) 0%, transparent 42%), linear-gradient(185deg, #1c1c1f 0%, #050505 100%)",
+                    }}
+                    aria-hidden
+                  />
+                  <div className="relative z-[10] flex min-h-[3.25rem] flex-col items-center justify-center px-2 py-1 sm:min-h-[3.5rem]">
               {resultPhase && centerResult != null && centerResult >= 0 ? (
                 <>
                   <span
@@ -902,14 +927,29 @@ export default function Ov2CwScreen({
                   >
                     {centerResult}
                   </span>
-                  <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-widest text-zinc-500">Result</span>
+                  <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-widest text-zinc-400">Result</span>
                 </>
               ) : spinning ? (
-                <span className="text-sm font-semibold text-zinc-500 sm:text-base">…</span>
+                <div className="flex flex-col items-center gap-1.5">
+                  <span
+                    className="inline-block h-4 w-4 animate-pulse rounded-full border-2 border-amber-400/50 border-t-amber-200 sm:h-5 sm:w-5"
+                    aria-hidden
+                  />
+                  <span className="text-[9px] font-semibold uppercase tracking-widest text-zinc-500">Spinning</span>
+                </div>
               ) : (
-                <span className="px-2 text-center text-[9px] font-medium leading-snug text-zinc-500 sm:text-[10px]">
-                  Color Wheel
-                </span>
+                <div className="flex flex-col items-center gap-1">
+                  <span
+                    className="h-2 w-2 rounded-full bg-gradient-to-b from-amber-200 to-amber-600 shadow-[0_0_10px_rgba(251,191,36,0.45)] ring-1 ring-amber-500/30"
+                    aria-hidden
+                  />
+                  <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-zinc-300 sm:text-[10px]">
+                    Color Wheel
+                  </span>
+                  <span className="max-w-[6.5rem] text-center text-[8px] font-medium leading-tight text-zinc-500 sm:max-w-[7.5rem] sm:text-[9px]">
+                    {placingLive ? "Place your bets" : "Stand by"}
+                  </span>
+                </div>
               )}
                   </div>
                 </div>
