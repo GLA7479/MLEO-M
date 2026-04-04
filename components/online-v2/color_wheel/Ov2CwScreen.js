@@ -260,7 +260,7 @@ export default function Ov2CwScreen({
     const mine = s.participantKey === participantKey;
     const isRoundController = occ && leaderPk && s.participantKey === leaderPk;
     const base =
-      "relative flex min-h-0 flex-col items-center justify-center gap-0 rounded-md border px-0.5 py-0.5 text-center touch-manipulation transition-[box-shadow,border-color,transform] active:scale-[0.99] max-sm:min-h-[1.5rem] max-sm:leading-none sm:min-h-[3.25rem] sm:gap-0.5 sm:rounded-xl sm:px-2 sm:py-1.5 sm:text-[11px] lg:min-h-[3.5rem]";
+      "relative flex min-h-0 flex-col items-center justify-center gap-0 rounded-md border px-0.5 py-0.5 text-center touch-manipulation transition-[box-shadow,border-color,transform] active:scale-[0.99] max-sm:min-h-[1.5rem] max-sm:leading-none sm:min-h-[3.25rem] sm:gap-0.5 sm:rounded-xl sm:px-2 sm:py-1.5 sm:text-[11px] lg:min-h-[2.5rem] lg:rounded-lg lg:px-1.5 lg:py-1 lg:text-[10px]";
     if (!occ) {
       return (
         <button
@@ -310,57 +310,64 @@ export default function Ov2CwScreen({
       : "Waiting for table controller."
     : "";
 
-  return (
-    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-xl flex-col gap-1.5 overflow-y-auto overflow-x-hidden pb-2 sm:max-w-2xl sm:gap-2 sm:pb-3 md:max-w-3xl lg:max-w-4xl xl:max-w-5xl">
-      {/* Live status — compact broadcast strip (no vault, no timer) */}
-      <div
-        className={`flex shrink-0 items-center gap-2 rounded-lg border px-2 py-1 sm:rounded-xl sm:px-3 sm:py-1.5 ${
-          resultPhase
-            ? "border-amber-500/25 bg-amber-950/20"
-            : "border-white/[0.08] bg-zinc-950/70"
-        }`}
-      >
-        <div className="min-w-0 flex-1 leading-tight">
-          <span className="text-[7px] font-semibold uppercase tracking-wider text-amber-200/45 sm:text-[8px]">Live</span>
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0">
-            <span className="text-[13px] font-bold text-white sm:text-sm">{phaseLabel}</span>
-            {statusSub ? (
-              <span className="min-w-0 truncate text-[9px] text-zinc-500 sm:text-[10px]">{statusSub}</span>
-            ) : null}
-          </div>
-        </div>
-      </div>
+  const wheelColMax =
+    "max-w-[min(88vw,16.5rem)] sm:max-w-[19.5rem] md:max-w-[20rem] lg:max-w-[min(100%,22rem)] xl:max-w-[24rem]";
 
-      {/* Wheel stage — timer pinned to wheel face (non-rotating); rim labels upright inside disk */}
-      <div className="relative mx-auto flex w-full max-w-[min(88vw,16.5rem)] shrink-0 flex-col items-center sm:max-w-[19.5rem] md:max-w-[22rem] lg:max-w-[24rem] xl:max-w-[25rem]">
-        <div
-          className="pointer-events-none absolute -inset-4 rounded-full bg-amber-500/[0.06] blur-2xl sm:-inset-6"
-          aria-hidden
-        />
-        <div className="pointer-events-none absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-0.5">
-          <div className="flex flex-col items-center drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]">
-            <div className="h-0 w-0 border-x-[8px] border-x-transparent border-t-[11px] border-t-amber-300 sm:border-x-[9px] sm:border-t-[13px]" />
-            <div className="-mt-px h-0.5 w-1.5 rounded-sm bg-gradient-to-b from-amber-200 to-amber-600" />
+  return (
+    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-xl flex-col gap-2 overflow-y-auto overflow-x-hidden pb-2 sm:max-w-2xl sm:gap-2.5 sm:pb-3 md:max-w-3xl lg:max-w-[min(100%,72rem)] lg:gap-0 lg:pb-6 xl:max-w-[min(100%,82rem)]">
+      <div className="grid w-full grid-cols-1 gap-2.5 lg:grid-cols-[minmax(min(100%,35rem),47.5rem)_minmax(22.5rem,28.75rem)] lg:items-start lg:gap-8 lg:rounded-2xl lg:border lg:border-white/[0.1] lg:bg-gradient-to-br lg:from-zinc-900/45 lg:via-zinc-950/55 lg:to-black/60 lg:p-6 lg:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="flex min-w-0 flex-col gap-2 sm:gap-2.5 lg:min-h-0 lg:gap-4">
+          {/* Live status — compact broadcast strip (no vault, no timer) */}
+          <div
+            className={`flex shrink-0 items-center gap-2 rounded-lg border px-2 py-1 sm:rounded-xl sm:px-3 sm:py-1.5 lg:rounded-xl ${
+              resultPhase
+                ? "border-amber-500/25 bg-amber-950/20"
+                : "border-white/[0.08] bg-zinc-950/70"
+            }`}
+          >
+            <div className="min-w-0 flex-1 leading-tight">
+              <span className="text-[7px] font-semibold uppercase tracking-wider text-amber-200/45 sm:text-[8px]">Live</span>
+              <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0">
+                <span className="text-[13px] font-bold text-white sm:text-sm">{phaseLabel}</span>
+                {statusSub ? (
+                  <span className="min-w-0 truncate text-[9px] text-zinc-500 sm:text-[10px]">{statusSub}</span>
+                ) : null}
+              </div>
+            </div>
           </div>
-        </div>
-        <div
-          className="relative mt-1 aspect-square w-full rounded-full p-1 shadow-[0_0_0_1px_rgba(251,191,36,0.1),0_8px_32px_rgba(0,0,0,0.45)] ring-1 ring-amber-500/15 sm:mt-1.5 sm:p-[3px]"
-          style={{
-            background: "linear-gradient(145deg, rgba(39,39,42,0.85) 0%, rgba(9,9,11,0.92) 55%, rgba(50,28,8,0.3) 100%)",
-          }}
-        >
-          <div className="relative h-full w-full">
+
+          {/* Wheel + mobile floating Play Panel trigger */}
+          <div className="relative w-full shrink-0">
+            <div
+              className={`relative mx-auto flex w-full shrink-0 flex-col items-center ${wheelColMax}`}
+            >
+          <div
+            className="pointer-events-none absolute -inset-4 rounded-full bg-amber-500/[0.06] blur-2xl sm:-inset-6"
+            aria-hidden
+          />
+          <div className="pointer-events-none absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-0.5">
+            <div className="flex flex-col items-center drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]">
+              <div className="h-0 w-0 border-x-[8px] border-x-transparent border-t-[11px] border-t-amber-300 sm:border-x-[9px] sm:border-t-[13px]" />
+              <div className="-mt-px h-0.5 w-1.5 rounded-sm bg-gradient-to-b from-amber-200 to-amber-600" />
+            </div>
+          </div>
+          <div
+            className="relative mt-1 aspect-square w-full rounded-full p-1 shadow-[0_0_0_1px_rgba(251,191,36,0.1),0_8px_32px_rgba(0,0,0,0.45)] ring-1 ring-amber-500/15 sm:mt-1.5 sm:p-[3px]"
+            style={{
+              background: "linear-gradient(145deg, rgba(39,39,42,0.85) 0%, rgba(9,9,11,0.92) 55%, rgba(50,28,8,0.3) 100%)",
+            }}
+          >
             {countdown != null ? (
               <div
-                className={`pointer-events-none absolute right-px top-px z-50 sm:right-0.5 sm:top-0.5 ${
+                className={`absolute right-1 top-1 z-[60] rounded border px-1 py-0.5 shadow-md backdrop-blur-sm sm:right-1.5 sm:top-1.5 sm:px-1.5 sm:py-0.5 lg:right-1.5 lg:top-1.5 lg:px-2 lg:py-1 ${
                   placingLive && countdown <= 5
-                    ? "border-amber-400/50 bg-black/90"
-                    : "border-white/20 bg-black/80"
-                } rounded px-1 py-px shadow-sm backdrop-blur-sm sm:px-1.5 sm:py-0.5`}
+                    ? "border-amber-400/55 bg-black/92"
+                    : "border-white/25 bg-black/88"
+                }`}
               >
-                <span className="block text-[5px] font-semibold uppercase leading-none text-zinc-500 sm:text-[6px]">Time</span>
+                <span className="block text-[5px] font-semibold uppercase leading-none text-zinc-500 sm:text-[6px] lg:text-[6px]">Time</span>
                 <span
-                  className={`font-mono text-[11px] font-bold tabular-nums leading-none sm:text-xs ${
+                  className={`font-mono text-[11px] font-bold tabular-nums leading-none sm:text-xs lg:text-sm ${
                     placingLive && countdown <= 5 ? "text-amber-300" : "text-amber-100/90"
                   }`}
                 >
@@ -368,46 +375,56 @@ export default function Ov2CwScreen({
                 </span>
               </div>
             ) : null}
-            <div
-              className="relative h-full w-full overflow-hidden rounded-full border-2 border-zinc-800/95 shadow-[inset_0_2px_10px_rgba(0,0,0,0.45)]"
-              style={{
-                background: CONIC_BG,
-                transform: `rotate(${wheelDisplayDeg}deg)`,
-                transition: spinning ? "none" : "transform 0.35s ease-out",
-              }}
-            >
-              {OV2_CW_WHEEL_NUMBERS.map((entry, i) => {
-                const thetaFromTop = (i + 0.5) * OV2_CW_SEGMENT_DEG;
-                const rad = (thetaFromTop * Math.PI) / 180;
-                const rimPct = 33;
-                const xPct = 50 + rimPct * Math.sin(rad);
-                const yPct = 50 - rimPct * Math.cos(rad);
-                const uprightDeg = -(wheelDisplayDeg + thetaFromTop);
-                const tc =
-                  entry.color === "red"
-                    ? "text-white"
-                    : entry.color === "black"
-                      ? "text-zinc-50"
-                      : "text-white";
-                return (
-                  <div
-                    key={`rim-${entry.num}-${i}`}
-                    className="pointer-events-none absolute z-[5]"
-                    style={{
-                      left: `${xPct}%`,
-                      top: `${yPct}%`,
-                      transform: `translate(-50%, -50%) rotate(${uprightDeg}deg)`,
-                    }}
-                  >
-                    <span
-                      className={`block text-center text-[6px] font-black tabular-nums leading-none sm:text-[7px] ${tc} [text-shadow:0_0_2px_rgba(0,0,0,1),0_1px_2px_rgba(0,0,0,0.85)]`}
-                    >
-                      {entry.num}
-                    </span>
-                  </div>
-                );
-              })}
-            <div className="absolute inset-[16%] z-20 flex flex-col items-center justify-center rounded-full border border-white/[0.12] bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_1px_0_rgba(255,255,255,0.05)] sm:inset-[17%]">
+            <div className="relative h-full w-full">
+              <div
+                className="relative h-full w-full overflow-visible rounded-full border-2 border-zinc-800/95 shadow-[inset_0_2px_10px_rgba(0,0,0,0.45)]"
+                style={{
+                  transform: `rotate(${wheelDisplayDeg}deg)`,
+                  transition: spinning ? "none" : "transform 0.35s ease-out",
+                }}
+              >
+                <div
+                  className="absolute inset-0 overflow-hidden rounded-full"
+                  style={{ background: CONIC_BG }}
+                  aria-hidden
+                />
+                <div
+                  className="pointer-events-none absolute inset-0 z-[10] overflow-visible"
+                  aria-hidden
+                >
+                  {OV2_CW_WHEEL_NUMBERS.map((entry, i) => {
+                    const thetaFromTop = (i + 0.5) * OV2_CW_SEGMENT_DEG;
+                    const rad = (thetaFromTop * Math.PI) / 180;
+                    const rimPct = 37;
+                    const xPct = 50 + rimPct * Math.sin(rad);
+                    const yPct = 50 - rimPct * Math.cos(rad);
+                    const uprightDeg = -(wheelDisplayDeg + thetaFromTop);
+                    const tc =
+                      entry.color === "red"
+                        ? "text-white"
+                        : entry.color === "black"
+                          ? "text-zinc-100"
+                          : "text-white";
+                    return (
+                      <div
+                        key={`rim-${entry.num}-${i}`}
+                        className="absolute z-[10]"
+                        style={{
+                          left: `${xPct}%`,
+                          top: `${yPct}%`,
+                          transform: `translate(-50%, -50%) rotate(${uprightDeg}deg)`,
+                        }}
+                      >
+                        <span
+                          className={`block min-w-[1.15em] text-center text-[11px] font-black tabular-nums leading-none sm:text-xs lg:text-sm xl:text-[0.95rem] ${tc} [text-shadow:0_0_4px_rgba(0,0,0,1),0_0_2px_rgba(0,0,0,1),0_1px_3px_rgba(0,0,0,0.95)]`}
+                        >
+                          {entry.num}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="absolute inset-[18%] z-20 flex flex-col items-center justify-center rounded-full border border-white/[0.12] bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_1px_0_rgba(255,255,255,0.05)] sm:inset-[18%] lg:inset-[19%]">
               {resultPhase && centerResult != null && centerResult >= 0 ? (
                 <>
                   <span
@@ -430,168 +447,174 @@ export default function Ov2CwScreen({
                   Color Wheel
                 </span>
               )}
-            </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {lobby && imLeader ? (
-        <button
-          type="button"
-          disabled={operateBusy}
-          onClick={() => void doOp("start_round", {})}
-          className="mx-auto shrink-0 rounded-xl border border-amber-500/35 bg-gradient-to-b from-amber-700/85 to-amber-950/90 px-5 py-2 text-xs font-bold text-white shadow-md touch-manipulation disabled:opacity-40 sm:px-6 sm:py-2.5 sm:text-sm"
-        >
-          Start Round
-        </button>
-      ) : null}
+        {lobby && imLeader ? (
+          <button
+            type="button"
+            disabled={operateBusy}
+            onClick={() => void doOp("start_round", {})}
+            className="mx-auto mt-1 shrink-0 rounded-xl border border-amber-500/35 bg-gradient-to-b from-amber-700/85 to-amber-950/90 px-5 py-2 text-xs font-bold text-white shadow-md touch-manipulation disabled:opacity-40 sm:mt-1.5 sm:px-6 sm:py-2.5 sm:text-sm"
+          >
+            Start Round
+          </button>
+        ) : null}
 
-      <div className="grid shrink-0 grid-cols-6 gap-0.5 sm:gap-2 lg:gap-2.5">
-        {Array.from({ length: OV2_CW_MAX_SEATS }, (_, i) => seatBtn(seatsForUi[i], i))}
-      </div>
-
-      {/* Table surface: history + plays — floating Play Panel (mobile) is absolute, out of flow */}
-      <div className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/40 via-black/30 to-black/50 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-3 sm:p-3">
         {placingLive && mySeat ? (
           <button
             type="button"
             disabled={operateBusy}
             onClick={() => openMobileSheetManual()}
-            className="absolute bottom-[max(1rem,calc(0.5rem+env(safe-area-inset-bottom,0px)))] left-1/2 z-30 flex min-w-[10.5rem] -translate-x-1/2 items-center justify-center rounded-full border border-amber-500/45 bg-gradient-to-b from-amber-800/90 to-amber-950/95 px-5 py-2 text-[11px] font-bold tracking-wide text-amber-50 shadow-[0_4px_18px_rgba(0,0,0,0.5)] touch-manipulation disabled:opacity-40 sm:hidden"
+            className="absolute -bottom-2 left-3 z-40 flex min-w-[9.5rem] items-center justify-center rounded-full border border-amber-500/50 bg-gradient-to-b from-amber-800/92 to-amber-950/95 px-4 py-2 text-[11px] font-bold tracking-wide text-amber-50 shadow-[0_6px_22px_rgba(0,0,0,0.55)] touch-manipulation disabled:opacity-40 lg:hidden"
           >
             Play Panel
           </button>
         ) : null}
-        {Array.isArray(engine.history) && engine.history.length > 0 ? (
-          <div className="shrink-0">
-            <div className="mb-1.5 flex items-center gap-2">
-              <span className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/25 to-transparent" aria-hidden />
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/70">Last Results</p>
-              <span className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/25 to-transparent" aria-hidden />
-            </div>
-            <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 [&::-webkit-scrollbar]:hidden">
-              {engine.history.slice(0, 10).map((h, idx) => {
-                const n = Math.floor(Number(h.resultNumber) || 0);
-                const c = String(h.resultColor || ov2CwColorForNumber(n));
-                return (
-                  <div
-                    key={`${h.roundSeq}-${idx}`}
-                    className={`flex h-10 min-w-[2.5rem] flex-col items-center justify-center rounded-xl border text-xs font-black tabular-nums shadow-sm sm:h-11 sm:min-w-[2.75rem] sm:text-sm ${
-                      c === "red"
-                        ? "border-red-500/35 bg-gradient-to-b from-red-950/70 to-red-950/40 text-red-100"
-                        : c === "black"
-                          ? "border-zinc-600/50 bg-gradient-to-b from-zinc-800 to-zinc-950 text-zinc-100"
-                          : "border-emerald-500/35 bg-gradient-to-b from-emerald-950/70 to-emerald-950/35 text-emerald-100"
-                    }`}
-                  >
-                    {n}
-                  </div>
-                );
-              })}
-            </div>
           </div>
-        ) : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-white/[0.06] bg-black/35 p-2.5 sm:p-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-400">My Plays</p>
-          {myPlays.length === 0 ? (
-            <div className="mt-3 flex flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-zinc-950/40 py-6 text-center">
-              <p className="text-[11px] font-medium text-zinc-500">No plays this round.</p>
-            </div>
-          ) : (
-            <ul className="mt-2 space-y-1.5">
-              {myPlays.map(p => {
-                const won =
-                  resultPhase && engine.resultNumber != null
-                    ? ov2CwPlayWins(p.playType, p.playValue, Math.floor(Number(engine.resultNumber)))
-                    : null;
-                const st =
-                  placingLive || spinning
-                    ? "pending"
-                    : won === true
-                      ? "win"
-                      : won === false
-                        ? "loss"
-                        : "pending";
-                const color =
-                  st === "win" ? "text-emerald-300" : st === "loss" ? "text-rose-300" : "text-zinc-400";
-                return (
-                  <li
-                    key={p.playId}
-                    className={`flex justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-2 py-1.5 text-[11px] ${color}`}
-                  >
-                    <span className="min-w-0 truncate">
-                      {p.playType}
-                      {p.playValue != null && p.playType === "number" ? ` ${p.playValue}` : ""}
-                      {p.playValue != null && (p.playType === "dozen" || p.playType === "column") ? ` ${p.playValue}` : ""}
-                    </span>
-                    <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setAllPlaysOpen(v => !v)}
-            className="mt-3 w-full rounded-lg border border-white/[0.08] bg-zinc-900/50 py-2 text-[11px] font-semibold text-amber-200/80 transition-colors hover:border-amber-500/25 hover:bg-zinc-900/80"
-          >
-            {allPlaysOpen ? "Hide all plays" : "Show all plays"}
-          </button>
-          {allPlaysOpen ? (
-            <ul className="mt-2 space-y-1 border-t border-white/[0.06] pt-2">
-              {plays
-                .filter(p => Math.floor(Number(p.roundSeq) || 0) === roundSeq)
-                .map(p => {
-                  const sn = Math.max(0, Math.min(OV2_CW_MAX_SEATS - 1, Math.floor(Number(p.seatIndex) || 0)));
-                  const nm = seatsForUi[sn]?.displayName;
+          {Array.isArray(engine.history) && engine.history.length > 0 ? (
+            <div className={`mx-auto w-full shrink-0 ${wheelColMax}`}>
+              <div className="mb-1 flex items-center gap-2 lg:mb-1.5">
+                <span className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/25 to-transparent" aria-hidden />
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/70">Last Results</p>
+                <span className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/25 to-transparent" aria-hidden />
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 [&::-webkit-scrollbar]:hidden">
+                {engine.history.slice(0, 10).map((h, idx) => {
+                  const n = Math.floor(Number(h.resultNumber) || 0);
+                  const c = String(h.resultColor || ov2CwColorForNumber(n));
                   return (
-                    <li
-                      key={p.playId}
-                      className="flex justify-between gap-2 rounded-md px-1 py-0.5 text-[10px] text-zinc-400"
+                    <div
+                      key={`${h.roundSeq}-${idx}`}
+                      className={`flex h-9 min-w-[2.35rem] flex-col items-center justify-center rounded-lg border text-[11px] font-black tabular-nums shadow-sm sm:h-10 sm:min-w-[2.5rem] sm:text-xs lg:h-10 lg:min-w-[2.5rem] ${
+                        c === "red"
+                          ? "border-red-500/35 bg-gradient-to-b from-red-950/70 to-red-950/40 text-red-100"
+                          : c === "black"
+                            ? "border-zinc-600/50 bg-gradient-to-b from-zinc-800 to-zinc-950 text-zinc-100"
+                            : "border-emerald-500/35 bg-gradient-to-b from-emerald-950/70 to-emerald-950/35 text-emerald-100"
+                      }`}
                     >
-                      <span className="min-w-0 truncate">
-                        {nm || `Seat ${sn + 1}`} · {p.playType}{" "}
-                        {p.playValue != null ? String(p.playValue) : ""}
-                      </span>
-                      <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
-                    </li>
+                      {n}
+                    </div>
                   );
                 })}
-            </ul>
+              </div>
+            </div>
           ) : null}
+
+          <div className={`mx-auto grid w-full shrink-0 grid-cols-6 gap-0.5 sm:gap-2 lg:gap-2 ${wheelColMax}`}>
+            {Array.from({ length: OV2_CW_MAX_SEATS }, (_, i) => seatBtn(seatsForUi[i], i))}
+          </div>
+
+          <div className="relative flex min-h-[11rem] w-full flex-1 flex-col gap-2 overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/40 via-black/30 to-black/50 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-3 sm:p-3 lg:min-h-[12rem]">
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-white/[0.06] bg-black/35 p-2.5 sm:p-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-400">My Plays</p>
+              {myPlays.length === 0 ? (
+                <div className="mt-3 flex flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-zinc-950/40 py-6 text-center">
+                  <p className="text-[11px] font-medium text-zinc-500">No plays this round.</p>
+                </div>
+              ) : (
+                <ul className="mt-2 space-y-1.5">
+                  {myPlays.map(p => {
+                    const won =
+                      resultPhase && engine.resultNumber != null
+                        ? ov2CwPlayWins(p.playType, p.playValue, Math.floor(Number(engine.resultNumber)))
+                        : null;
+                    const st =
+                      placingLive || spinning
+                        ? "pending"
+                        : won === true
+                          ? "win"
+                          : won === false
+                            ? "loss"
+                            : "pending";
+                    const color =
+                      st === "win" ? "text-emerald-300" : st === "loss" ? "text-rose-300" : "text-zinc-400";
+                    return (
+                      <li
+                        key={p.playId}
+                        className={`flex justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-2 py-1.5 text-[11px] ${color}`}
+                      >
+                        <span className="min-w-0 truncate">
+                          {p.playType}
+                          {p.playValue != null && p.playType === "number" ? ` ${p.playValue}` : ""}
+                          {p.playValue != null && (p.playType === "dozen" || p.playType === "column") ? ` ${p.playValue}` : ""}
+                        </span>
+                        <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setAllPlaysOpen(v => !v)}
+                className="mt-3 w-full rounded-lg border border-white/[0.08] bg-zinc-900/50 py-2 text-[11px] font-semibold text-amber-200/80 transition-colors hover:border-amber-500/25 hover:bg-zinc-900/80"
+              >
+                {allPlaysOpen ? "Hide all plays" : "Show all plays"}
+              </button>
+              {allPlaysOpen ? (
+                <ul className="mt-2 space-y-1 border-t border-white/[0.06] pt-2">
+                  {plays
+                    .filter(p => Math.floor(Number(p.roundSeq) || 0) === roundSeq)
+                    .map(p => {
+                      const sn = Math.max(0, Math.min(OV2_CW_MAX_SEATS - 1, Math.floor(Number(p.seatIndex) || 0)));
+                      const nm = seatsForUi[sn]?.displayName;
+                      return (
+                        <li
+                          key={p.playId}
+                          className="flex justify-between gap-2 rounded-md px-1 py-0.5 text-[10px] text-zinc-400"
+                        >
+                          <span className="min-w-0 truncate">
+                            {nm || `Seat ${sn + 1}`} · {p.playType}{" "}
+                            {p.playValue != null ? String(p.playValue) : ""}
+                          </span>
+                          <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
+                        </li>
+                      );
+                    })}
+                </ul>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="hidden min-h-0 lg:flex lg:flex-col">
+          <div className="sticky top-4 flex w-full max-h-[calc(100dvh-6rem)] flex-col overflow-hidden rounded-2xl border border-amber-500/35 bg-gradient-to-b from-amber-950/35 via-zinc-950/85 to-black/60 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_32px_-8px_rgba(0,0,0,0.45)] xl:p-5">
+            <div className="mb-3 flex shrink-0 items-center gap-2 border-b border-white/[0.06] pb-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200/75">Play Panel</span>
+              <span className="text-[10px] text-zinc-500">Amount · type · place</span>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5">
+              <PlayForm
+                minPlay={minPlay}
+                maxPlay={maxPlay}
+                playAmount={playAmount}
+                setPlayAmount={setPlayAmount}
+                playKind={playKind}
+                setPlayKind={setPlayKind}
+                numberPick={numberPick}
+                setNumberPick={setNumberPick}
+                groupPick={groupPick}
+                setGroupPick={setGroupPick}
+                disabled={!mySeat || !placingLive || operateBusy}
+                onSubmit={() => void submitPlay()}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
       {hint ? <p className="shrink-0 text-center text-[11px] text-rose-300">{hint}</p> : null}
 
-      {/* Desktop inline panel */}
-      <div className="hidden shrink-0 rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-950/35 via-zinc-950/80 to-black/60 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_32px_-8px_rgba(0,0,0,0.5)] sm:block sm:p-4">
-        <div className="mb-3 flex items-center gap-2 border-b border-white/[0.06] pb-2">
-          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200/75">Play Panel</span>
-          <span className="text-[10px] text-zinc-500">Amount · type · place</span>
-        </div>
-        <PlayForm
-          minPlay={minPlay}
-          maxPlay={maxPlay}
-          playAmount={playAmount}
-          setPlayAmount={setPlayAmount}
-          playKind={playKind}
-          setPlayKind={setPlayKind}
-          numberPick={numberPick}
-          setNumberPick={setNumberPick}
-          groupPick={groupPick}
-          setGroupPick={setGroupPick}
-          disabled={!mySeat || !placingLive || operateBusy}
-          onSubmit={() => void submitPlay()}
-        />
-      </div>
-
       {sheetOpen ? (
         <div
-          className="fixed inset-0 z-30 flex flex-col justify-end bg-black/70 backdrop-blur-[2px] sm:hidden"
+          className="fixed inset-0 z-30 flex flex-col justify-end bg-black/70 backdrop-blur-[2px] lg:hidden"
           role="presentation"
           onClick={() => dismissMobileSheet()}
         >
