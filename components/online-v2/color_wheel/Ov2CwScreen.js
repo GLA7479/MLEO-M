@@ -27,6 +27,22 @@ function fmtVaultDelta(n) {
   return `${sign}${fmt(Math.abs(x))}`;
 }
 
+/** Shown in UI for a play line (low/high/dozen as ranges; engine still uses playType ids). */
+function ov2CwPlayDisplayText(playType, playValue) {
+  const t = String(playType || "").trim();
+  if (t === "low") return "1–18";
+  if (t === "high") return "19–36";
+  if (t === "dozen") {
+    const v = Math.floor(Number(playValue) || 0);
+    if (v === 1) return "1–12";
+    if (v === 2) return "13–24";
+    if (v === 3) return "25–36";
+    return t;
+  }
+  if (playValue != null && (t === "number" || t === "column")) return `${t} ${playValue}`;
+  return t;
+}
+
 function phaseEndsMs(v) {
   if (v == null) return 0;
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -618,11 +634,7 @@ export default function Ov2CwScreen({
                                 className={`flex justify-between gap-1 rounded border border-white/[0.06] bg-white/[0.03] px-1.5 py-1 text-[10px] ${color}`}
                               >
                                 <span className="min-w-0 truncate">
-                                  {p.playType}
-                                  {p.playValue != null && p.playType === "number" ? ` ${p.playValue}` : ""}
-                                  {p.playValue != null && (p.playType === "dozen" || p.playType === "column")
-                                    ? ` ${p.playValue}`
-                                    : ""}
+                                  {ov2CwPlayDisplayText(p.playType, p.playValue)}
                                 </span>
                                 <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
                               </li>
@@ -656,8 +668,7 @@ export default function Ov2CwScreen({
                                     className="flex justify-between gap-1 rounded px-0.5 py-0.5 text-[9px] text-zinc-400"
                                   >
                                     <span className="min-w-0 truncate">
-                                      {nm || `Seat ${sn + 1}`} · {p.playType}{" "}
-                                      {p.playValue != null ? String(p.playValue) : ""}
+                                      {nm || `Seat ${sn + 1}`} · {ov2CwPlayDisplayText(p.playType, p.playValue)}
                                     </span>
                                     <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
                                   </li>
@@ -933,11 +944,7 @@ export default function Ov2CwScreen({
                         : st === "loss"
                           ? "border-rose-500/35 bg-rose-950/15"
                           : "border-white/[0.08] bg-white/[0.04]";
-                    const label = `${p.playType}${
-                      p.playValue != null && (p.playType === "number" || p.playType === "dozen" || p.playType === "column")
-                        ? ` ${p.playValue}`
-                        : ""
-                    } · ${fmt(p.amount)}`;
+                    const label = `${ov2CwPlayDisplayText(p.playType, p.playValue)} · ${fmt(p.amount)}`;
                     return (
                       <div
                         key={p.playId}
@@ -945,11 +952,7 @@ export default function Ov2CwScreen({
                         className={`flex min-h-[2.35rem] min-w-[2.75rem] max-w-[4.5rem] flex-col items-center justify-center rounded-md border px-1 py-0.5 text-center shadow-sm ${borderCls}`}
                       >
                         <span className="line-clamp-2 text-[8px] font-semibold capitalize leading-tight text-zinc-200 sm:text-[9px]">
-                          {p.playType}
-                          {p.playValue != null && p.playType === "number" ? ` ${p.playValue}` : ""}
-                          {p.playValue != null && (p.playType === "dozen" || p.playType === "column")
-                            ? ` ${p.playValue}`
-                            : ""}
+                          {ov2CwPlayDisplayText(p.playType, p.playValue)}
                         </span>
                         <span className="mt-0.5 font-mono text-[8px] font-bold tabular-nums text-amber-200/90 sm:text-[9px]">
                           {fmt(p.amount)}
@@ -980,13 +983,13 @@ export default function Ov2CwScreen({
                 aria-label="Play panel"
               >
                 <div className="mx-auto mt-2 h-1 w-11 shrink-0 rounded-full bg-zinc-600 lg:hidden" aria-hidden />
-                <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/[0.06] px-4 pb-2.5 pt-3">
-                  <div className="min-w-0 flex-1 text-center lg:text-left">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200/70">Play Panel</p>
-                  </div>
+                <div className="relative flex min-h-[2.75rem] shrink-0 items-center justify-center border-b border-white/[0.06] px-4 py-2.5">
+                  <p className="pointer-events-none absolute left-1/2 top-1/2 max-w-[calc(100%-5.5rem)] -translate-x-1/2 -translate-y-1/2 truncate text-center text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200/70">
+                    Play Panel
+                  </p>
                   <button
                     type="button"
-                    className="shrink-0 rounded-lg border border-white/10 bg-zinc-900/90 px-2.5 py-1.5 text-[10px] font-semibold text-zinc-300 hover:border-white/20 hover:text-white sm:text-[11px]"
+                    className="absolute right-3 top-1/2 z-[1] -translate-y-1/2 rounded-lg border border-white/10 bg-zinc-900/90 px-2.5 py-1.5 text-[10px] font-semibold text-zinc-300 hover:border-white/20 hover:text-white sm:right-4 sm:text-[11px]"
                     onClick={() => dismissMobileSheet()}
                     aria-label="Close play panel"
                   >
@@ -1153,11 +1156,7 @@ export default function Ov2CwScreen({
                           className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-1.5 text-[11px]"
                         >
                           <span className="min-w-0 truncate text-zinc-200">
-                            {p.playType}
-                            {p.playValue != null && p.playType === "number" ? ` ${p.playValue}` : ""}
-                            {p.playValue != null && (p.playType === "dozen" || p.playType === "column")
-                              ? ` ${p.playValue}`
-                              : ""}
+                            {ov2CwPlayDisplayText(p.playType, p.playValue)}
                           </span>
                           <span className="shrink-0 font-mono tabular-nums text-amber-200/90">{fmt(p.amount)}</span>
                           <span className={`shrink-0 text-[10px] font-semibold ${stColor}`}>{stLabel}</span>
@@ -1340,32 +1339,32 @@ function PlayForm({ minPlay, maxPlay, playAmount, setPlayAmount, pendingPlayKeys
     { id: "black", label: "Black" },
     { id: "even", label: "Even" },
     { id: "odd", label: "Odd" },
-    { id: "low", label: "Low 1–18" },
-    { id: "high", label: "High 19–36" },
+    { id: "low", label: "1–18" },
+    { id: "high", label: "19–36" },
   ];
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col gap-2 lg:gap-4">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-2">
       <div className="shrink-0 rounded-lg border border-white/[0.08] bg-black/40 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:rounded-xl lg:p-3">
         <div className="flex items-center gap-1.5 lg:gap-2">
           <div className="flex shrink-0 gap-1 lg:gap-1.5">
             <button
               type="button"
-              className="min-h-[30px] rounded-md border border-white/[0.1] bg-zinc-900/80 px-2 text-[10px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30 lg:min-h-[36px] lg:rounded-lg lg:px-2.5 lg:text-[11px]"
+              className="min-h-[30px] rounded-md border border-white/[0.1] bg-zinc-900/80 px-2 text-[12px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30 lg:min-h-[36px] lg:rounded-lg lg:px-2.5 lg:text-[13px]"
               onClick={() => bump(-minPlay)}
             >
               −min
             </button>
             <button
               type="button"
-              className="min-h-[30px] rounded-md border border-white/[0.1] bg-zinc-900/80 px-2 text-[10px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30 lg:min-h-[36px] lg:rounded-lg lg:px-2.5 lg:text-[11px]"
+              className="min-h-[30px] rounded-md border border-white/[0.1] bg-zinc-900/80 px-2 text-[12px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30 lg:min-h-[36px] lg:rounded-lg lg:px-2.5 lg:text-[13px]"
               onClick={() => bump(minPlay)}
             >
               +min
             </button>
             <button
               type="button"
-              className="min-h-[30px] rounded-md border border-white/[0.1] bg-zinc-900/80 px-2 text-[10px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30 lg:min-h-[36px] lg:rounded-lg lg:px-2.5 lg:text-[11px]"
+              className="min-h-[30px] rounded-md border border-white/[0.1] bg-zinc-900/80 px-2 text-[12px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30 lg:min-h-[36px] lg:rounded-lg lg:px-2.5 lg:text-[13px]"
               onClick={() => bump(minPlay * 4)}
             >
               +4×
@@ -1381,61 +1380,59 @@ function PlayForm({ minPlay, maxPlay, playAmount, setPlayAmount, pendingPlayKeys
         </div>
       </div>
 
-      <div className="shrink-0">
-        <div className="grid grid-cols-3 gap-1 sm:grid-cols-3 lg:gap-1.5">
-          {kinds.map(k => (
-            <button
-              key={k.id}
-              type="button"
-              onClick={() => togglePendingPlay(k.id, null)}
-              className={`flex h-10 min-h-10 max-h-10 items-center justify-center rounded-lg px-1.5 text-[8px] font-bold leading-tight transition-[filter,box-shadow] sm:text-[9px] lg:h-11 lg:min-h-11 lg:max-h-11 lg:rounded-xl lg:px-2 lg:text-[10px] ${ov2CwPlayKindClasses(
-                k.id,
-                has(k.id, null),
-              )}`}
-            >
-              {k.label}
-            </button>
-          ))}
-        </div>
+      <div className="grid shrink-0 grid-cols-3 gap-x-1 gap-y-2 sm:grid-cols-3 lg:gap-x-1.5 lg:gap-y-2">
+        {kinds.map(k => (
+          <button
+            key={k.id}
+            type="button"
+            onClick={() => togglePendingPlay(k.id, null)}
+            className={`min-h-[2rem] rounded-lg px-1.5 py-1 text-[11px] font-bold leading-tight transition-[filter,box-shadow] lg:min-h-[2.5rem] lg:rounded-xl lg:px-2 lg:py-1.5 lg:text-[14px] ${ov2CwPlayKindClasses(
+              k.id,
+              has(k.id, null),
+            )}`}
+          >
+            {k.label}
+          </button>
+        ))}
       </div>
 
-      <div className="shrink-0 flex flex-col gap-1.5">
-        <div className="flex gap-1.5 lg:gap-2">
-          {[1, 2, 3].map(g => (
-            <button
-              key={`dg${g}`}
-              type="button"
-              onClick={() => togglePendingPlay("dozen", g)}
-              className={`flex h-10 min-h-10 max-h-10 flex-1 items-center justify-center rounded-lg text-[11px] font-extrabold transition-[filter,box-shadow] lg:h-11 lg:min-h-11 lg:max-h-11 lg:rounded-xl lg:text-xs ${ov2CwGroupSlotClasses(
-                "dozen",
-                g,
-                has("dozen", g),
-                true,
-              )}`}
-              aria-label={`Group ${g}, toggle`}
-            >
-              G{g}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-1.5 lg:gap-2">
-          {[1, 2, 3].map(g => (
-            <button
-              key={`cg${g}`}
-              type="button"
-              onClick={() => togglePendingPlay("column", g)}
-              className={`flex h-10 min-h-10 max-h-10 flex-1 items-center justify-center rounded-lg text-[11px] font-extrabold transition-[filter,box-shadow] lg:h-11 lg:min-h-11 lg:max-h-11 lg:rounded-xl lg:text-xs ${ov2CwGroupSlotClasses(
-                "column",
-                g,
-                has("column", g),
-                true,
-              )}`}
-              aria-label={`Column ${g}, toggle`}
-            >
-              C{g}
-            </button>
-          ))}
-        </div>
+      <div className="flex shrink-0 gap-1.5 lg:gap-2">
+        {[1, 2, 3].map(g => (
+          <button
+            key={`dg${g}`}
+            type="button"
+            onClick={() => togglePendingPlay("dozen", g)}
+            className={`flex min-h-[2rem] flex-1 items-center justify-center rounded-lg px-1.5 py-1 text-[11px] font-bold leading-tight transition-[filter,box-shadow] lg:min-h-[2.5rem] lg:rounded-xl lg:px-2 lg:py-1.5 lg:text-[14px] ${ov2CwGroupSlotClasses(
+              "dozen",
+              g,
+              has("dozen", g),
+              true,
+            )}`}
+            aria-label={
+              g === 1 ? "Dozen 1–12, toggle" : g === 2 ? "Dozen 13–24, toggle" : "Dozen 25–36, toggle"
+            }
+          >
+            {g === 1 ? "1–12" : g === 2 ? "13–24" : "25–36"}
+          </button>
+        ))}
+      </div>
+      <div className="flex shrink-0 gap-1.5 lg:gap-2">
+        {[1, 2, 3].map(g => (
+          <button
+            key={`cg${g}`}
+            type="button"
+            onClick={() => togglePendingPlay("column", g)}
+            className={`flex min-h-[2rem] flex-1 items-center justify-center rounded-lg px-1.5 py-1 text-[11px] font-bold leading-tight transition-[filter,box-shadow] lg:min-h-[2.5rem] lg:rounded-xl lg:px-2 lg:py-1.5 lg:text-[14px] ${ov2CwGroupSlotClasses(
+              "column",
+              g,
+              has("column", g),
+              true,
+            )}`}
+            aria-label={`Column ${g}, toggle`}
+          >
+            C{g}
+          </button>
+        ))}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:min-h-[11rem]">
@@ -1450,7 +1447,7 @@ function PlayForm({ minPlay, maxPlay, playAmount, setPlayAmount, pendingPlayKeys
                 key={n}
                 type="button"
                 onClick={() => togglePendingPlay("number", n)}
-                className={`flex h-10 min-h-10 max-h-10 w-full items-center justify-center rounded-md text-[10px] font-bold transition-[filter,box-shadow] lg:h-11 lg:min-h-11 lg:max-h-11 lg:rounded-lg lg:text-xs ${ov2CwExactTileClasses(
+                className={`flex aspect-square max-h-[1.85rem] min-h-0 w-full items-center justify-center rounded-md text-[12px] font-bold leading-none transition-[filter,box-shadow] lg:max-h-10 lg:rounded-lg lg:text-base ${ov2CwExactTileClasses(
                   n,
                   has("number", n),
                 )}`}
