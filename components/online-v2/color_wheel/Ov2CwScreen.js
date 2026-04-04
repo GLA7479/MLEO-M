@@ -64,9 +64,18 @@ function conicGradientStops() {
 
 const CONIC_BG = conicGradientStops();
 
-function easeOutCubic(t) {
-  return 1 - (1 - t) ** 3;
+/** Stronger deceleration tail than cubic — fast start, long slow settle (roulette feel). */
+function easeOutQuint(t) {
+  return 1 - (1 - t) ** 5;
 }
+
+function normalizeCwAngleDeg(x) {
+  return ((x % 360) + 360) % 360;
+}
+
+/** Steady clockwise drift during place window — same RAF pipeline as spin, reads believable next to deceleration. */
+const OV2_CW_PLACING_DRIFT_DEG_PER_SEC = 165;
+const OV2_CW_DRIFT_MAX_DT_SEC = 0.12;
 
 /** Counter parent wheel rotation so rim digits stay horizontal to the viewer (same reading direction always). */
 function viewerHorizontalLabelDeg(wheelDeg) {
@@ -98,6 +107,10 @@ export default function Ov2CwScreen({
   const wheelRotRef = useRef(0);
   const [wheelDisplayDeg, setWheelDisplayDeg] = useState(0);
   const spinRafRef = useRef(null);
+  const placingDriftRafRef = useRef(null);
+  /** Latest engine for spin RAF only — avoids restarting animation on every realtime `engine` reference change. */
+  const engineSpinRef = useRef(engine);
+  engineSpinRef.current = engine;
   /** When user dismisses the mobile sheet during a round, hold `roundSeq` to block auto-reopen until the next round. */
   const sheetDismissedRoundRef = useRef(null);
   const prevPhaseForSheetRef = useRef(null);
@@ -149,14 +162,29 @@ export default function Ov2CwScreen({
   }, [engine?.phaseEndsAt, tick]);
 
   useEffect(() => {
-    if (!spinning || engine?.pendingResultNumber == null) {
+    if (!spinning) {
       if (spinRafRef.current) {
         cancelAnimationFrame(spinRafRef.current);
         spinRafRef.current = null;
       }
       return undefined;
     }
-    const pending = Math.floor(Number(engine.pendingResultNumber));
+
+    if (placingDriftRafRef.current) {
+      cancelAnimationFrame(placingDriftRafRef.current);
+      placingDriftRafRef.current = null;
+    }
+
+    const eng = engineSpinRef.current;
+    if (eng?.pendingResultNumber == null) {
+      if (spinRafRef.current) {
+        cancelAnimationFrame(spinRafRef.current);
+        spinRafRef.current = null;
+      }
+      return undefined;
+    }
+
+    const pending = Math.floor(Number(eng.pendingResultNumber));
     const winIdx = OV2_CW_WHEEL_NUMBERS.findIndex(e => e.num === pending);
     if (winIdx < 0) {
       if (spinRafRef.current) {
@@ -165,19 +193,22 @@ export default function Ov2CwScreen({
       }
       return undefined;
     }
-    /** Segment center on disk (top-CW); must match conic + rim. Stop with that pocket under the top pointer. */
+
+    /** Segment center on disk (top-CW). Need final rotate(to) with to ≡ -thetaSeg (mod 360) for top pointer. */
     const thetaSeg = ov2CwIndexToCenterAngle(winIdx);
     const from = wheelRotRef.current;
-    const turns = 6;
-    const targetAngle = from + thetaSeg;
-    const to = from + turns * 360 - targetAngle;
+    const turns = 8;
+    const targetRem = normalizeCwAngleDeg(-thetaSeg);
+    const fromRem = normalizeCwAngleDeg(from);
+    const remainder = (targetRem - fromRem + 360) % 360;
+    const to = from + remainder + turns * 360;
     const t0 = performance.now();
     const dur = OV2_CW_SPINNING_MS;
 
     const step = now => {
       const elapsed = now - t0;
       const p = Math.min(1, elapsed / dur);
-      const e = easeOutCubic(p);
+      const e = easeOutQuint(p);
       const cur = from + (to - from) * e;
       wheelRotRef.current = cur;
       setWheelDisplayDeg(cur);
@@ -192,7 +223,34 @@ export default function Ov2CwScreen({
       if (spinRafRef.current) cancelAnimationFrame(spinRafRef.current);
       spinRafRef.current = null;
     };
-  }, [spinning, engine?.pendingResultNumber, engine?.roundSeq]);
+  }, [spinning]);
+
+  useEffect(() => {
+    if (!placingLive || spinning) {
+      if (placingDriftRafRef.current) {
+        cancelAnimationFrame(placingDriftRafRef.current);
+        placingDriftRafRef.current = null;
+      }
+      return undefined;
+    }
+
+    let last = performance.now();
+    const step = now => {
+      const dt = Math.min(OV2_CW_DRIFT_MAX_DT_SEC, Math.max(0, (now - last) / 1000));
+      last = now;
+      const next = wheelRotRef.current + OV2_CW_PLACING_DRIFT_DEG_PER_SEC * dt;
+      wheelRotRef.current = next;
+      setWheelDisplayDeg(next);
+      placingDriftRafRef.current = requestAnimationFrame(step);
+    };
+    placingDriftRafRef.current = requestAnimationFrame(step);
+    return () => {
+      if (placingDriftRafRef.current) {
+        cancelAnimationFrame(placingDriftRafRef.current);
+        placingDriftRafRef.current = null;
+      }
+    };
+  }, [placingLive, spinning]);
 
   const dismissMobileSheet = useCallback(() => {
     if (placingLive) {
@@ -390,13 +448,11 @@ export default function Ov2CwScreen({
           type="button"
           key={i}
           disabled={operateBusy}
+          aria-label="Join table"
           onClick={() => void onSit(i)}
           className={`${base} border-amber-500/25 bg-gradient-to-b from-zinc-900/60 to-black/50 text-amber-100/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-amber-400/40 hover:shadow-[0_0_20px_-6px_rgba(245,158,11,0.35)] disabled:opacity-40 max-sm:text-[7px] sm:text-[10px]`}
         >
           <span className="font-bold leading-none text-amber-100 max-sm:text-[8px]">Join</span>
-          <span className="font-mono tabular-nums leading-none text-zinc-500 max-sm:text-[6px] sm:text-[10px]">
-            {i + 1}
-          </span>
         </button>
       );
     }
@@ -411,7 +467,7 @@ export default function Ov2CwScreen({
         }}
         aria-haspopup="dialog"
         aria-expanded={seatInspectorIndex === i}
-        aria-label={`Player details, seat ${i + 1}`}
+        aria-label={`Player: ${s.displayName || "Player"}`}
         className={`${base} cursor-pointer border-white/[0.12] bg-gradient-to-b from-zinc-900/90 to-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.35)] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${
           mine
             ? "z-[1] border-amber-400/45 shadow-[0_0_0_1px_rgba(251,191,36,0.25),0_0_28px_-8px_rgba(245,158,11,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]"
@@ -426,11 +482,6 @@ export default function Ov2CwScreen({
         ) : null}
         <span className="w-full min-w-0 truncate font-semibold tracking-tight text-zinc-50 max-sm:text-[7px] max-sm:leading-tight sm:text-xs">
           {s.displayName || "Player"}
-        </span>
-        <span
-          className={`font-medium leading-none max-sm:text-[6px] sm:text-[10px] ${mine ? "text-amber-300/90" : "text-zinc-500"}`}
-        >
-          {mine ? "You" : `${i + 1}`}
         </span>
       </button>
     );
@@ -476,32 +527,24 @@ export default function Ov2CwScreen({
           <div className="relative w-full min-w-0 shrink-0">
             {countdown != null ? (
               <div
-                className={`pointer-events-none absolute right-0 top-0 z-[61] rounded border px-1 py-px shadow-md backdrop-blur-sm sm:px-1 sm:py-0.5 lg:px-1.5 lg:py-0.5 ${
-                  placingLive && countdown <= 5
-                    ? "border-amber-400/55 bg-black/92"
-                    : "border-white/25 bg-black/88"
-                }`}
+                className="pointer-events-none absolute right-0 top-0 z-[61] px-0.5 py-0 sm:px-1 sm:py-0.5"
+                aria-label={`${countdown} seconds`}
               >
-                <span className="block text-[5px] font-semibold uppercase leading-none text-zinc-500 sm:text-[6px]">Time</span>
-                <span
-                  className={`font-mono text-[11px] font-bold tabular-nums leading-none sm:text-xs lg:text-sm ${
-                    placingLive && countdown <= 5 ? "text-amber-300" : "text-amber-100/90"
-                  }`}
-                >
+                <span className="inline-block bg-gradient-to-b from-amber-100 to-amber-400 bg-clip-text text-[13px] font-bold tabular-nums leading-tight tracking-wide text-transparent drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)] sm:text-[15px] lg:text-[18px]">
                   {countdown}
                 </span>
               </div>
             ) : null}
-            {placingLive && mySeat && !sheetOpen ? (
+            {mySeat && !sheetOpen && (placingLive || spinning || resultPhase) ? (
               <button
                 type="button"
-                disabled={operateBusy}
-                onClick={() => openMobileSheetManual()}
-                title="Play panel"
-                aria-label="Open play panel"
-                className="absolute left-0 top-0 z-[61] rounded-md border border-amber-500/45 bg-gradient-to-b from-amber-900/90 to-amber-950/95 px-1.5 py-0.5 text-[7px] font-bold leading-tight tracking-wide text-amber-50 shadow-md touch-manipulation disabled:opacity-40 sm:px-2 sm:py-1 sm:text-[8px]"
+                disabled={placingLive && operateBusy}
+                onClick={() => (placingLive ? openMobileSheetManual() : dismissMobileSheet())}
+                title={placingLive ? "Play panel" : "Close"}
+                aria-label={placingLive ? "Open play panel" : "Close"}
+                className="absolute left-0 top-0 z-[61] rounded-md border border-amber-500/45 bg-gradient-to-b from-amber-900/90 to-amber-950/95 px-2.5 py-1.5 text-[9px] font-bold leading-tight tracking-wide text-amber-50 shadow-md touch-manipulation disabled:opacity-40 sm:px-3 sm:py-2 sm:text-[10px] lg:text-[11px]"
               >
-                PLAY PANEL
+                {placingLive ? "PLAY PANEL" : "CLOSE"}
               </button>
             ) : null}
 
@@ -514,7 +557,7 @@ export default function Ov2CwScreen({
                     setLastResultPopupOpen(false);
                     setMyPlayPopupOpen(v => !v);
                   }}
-                  className="rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:px-2 sm:py-1 sm:text-[10px]"
+                  className="rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-2.5 py-1.5 text-[11px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:px-3 sm:py-2 sm:text-[12px] lg:text-[13px]"
                   aria-expanded={myPlayPopupOpen}
                   aria-label="My play quick view"
                 >
@@ -625,7 +668,7 @@ export default function Ov2CwScreen({
                     setMyPlayPopupOpen(false);
                     setLastResultPopupOpen(v => !v);
                   }}
-                  className="rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:px-2 sm:py-1 sm:text-[10px]"
+                  className="rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-2.5 py-1.5 text-[11px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:px-3 sm:py-2 sm:text-[12px] lg:text-[13px]"
                   aria-expanded={lastResultPopupOpen}
                   aria-label="Last results quick view"
                 >
@@ -702,7 +745,8 @@ export default function Ov2CwScreen({
                 className="relative h-full w-full overflow-visible rounded-full border-2 border-zinc-800/95 shadow-[inset_0_2px_10px_rgba(0,0,0,0.45)]"
                 style={{
                   transform: `rotate(${wheelDisplayDeg}deg)`,
-                  transition: spinning ? "none" : "transform 0.35s ease-out",
+                  transition:
+                    spinning || placingLive ? "none" : "transform 0.35s ease-out",
                 }}
               >
                 <div
@@ -756,7 +800,8 @@ export default function Ov2CwScreen({
                   className="absolute inset-[18%] z-20 flex flex-col items-center justify-center rounded-full border border-white/[0.12] bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_1px_0_rgba(255,255,255,0.05)] sm:inset-[18%] lg:inset-[19%]"
                   style={{
                     transform: `rotate(${viewerHorizontalLabelDeg(wheelDisplayDeg)}deg)`,
-                    transition: spinning ? "none" : "transform 0.35s ease-out",
+                    transition:
+                      spinning || placingLive ? "none" : "transform 0.35s ease-out",
                   }}
                 >
               {resultPhase && centerResult != null && centerResult >= 0 ? (
@@ -1044,11 +1089,18 @@ export default function Ov2CwScreen({
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/85">Player</p>
                   <p className="truncate text-sm font-semibold text-white">{inspectorSeat.displayName || "Player"}</p>
-                  <p className="text-[10px] text-zinc-500">
-                    Seat {seatInspectorIndex + 1}
-                    {inspectorSeat.participantKey === participantKey ? " · You" : ""}
-                    {leaderPk && inspectorSeat.participantKey === leaderPk ? " · Lead" : ""}
-                  </p>
+                  {inspectorSeat.participantKey === participantKey ||
+                  (leaderPk && inspectorSeat.participantKey === leaderPk) ? (
+                    <p className="text-[10px] text-zinc-500">
+                      {inspectorSeat.participantKey === participantKey ? "You" : ""}
+                      {inspectorSeat.participantKey === participantKey &&
+                      leaderPk &&
+                      inspectorSeat.participantKey === leaderPk
+                        ? " · "
+                        : ""}
+                      {leaderPk && inspectorSeat.participantKey === leaderPk ? "Lead" : ""}
+                    </p>
+                  ) : null}
                 </div>
                 <button
                   type="button"
