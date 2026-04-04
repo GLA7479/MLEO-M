@@ -476,7 +476,7 @@ export default function Ov2CwScreen({
     const mine = s.participantKey === participantKey;
     const isRoundController = occ && leaderPk && s.participantKey === leaderPk;
     const base =
-      "relative flex min-h-0 flex-col items-center justify-center gap-0 rounded-md border px-0.5 py-2.5 text-center touch-manipulation transition-[box-shadow,border-color,transform] active:scale-[0.99] max-sm:min-h-[2rem] max-sm:leading-none sm:min-h-[4.125rem] sm:gap-0.5 sm:rounded-xl sm:px-2 sm:py-3.5 sm:text-[11px] lg:min-h-[3.5rem] lg:rounded-lg lg:px-1.5 lg:py-3 lg:text-[10px]";
+      "relative flex min-h-0 flex-col items-center justify-center gap-0 rounded-md border px-0.5 py-2.5 text-center touch-manipulation transition-[box-shadow,border-color,transform] active:scale-[0.99] max-sm:min-h-[2rem] max-sm:leading-none sm:min-h-[4.125rem] sm:gap-0.5 sm:rounded-xl sm:px-2 sm:py-3.5 sm:text-[11px] max-lg:sm:min-h-[3rem] max-lg:sm:py-2 max-lg:sm:px-1.5 lg:min-h-[3.5rem] lg:rounded-lg lg:px-1.5 lg:py-3 lg:text-[10px]";
     if (!occ) {
       return (
         <button
@@ -524,7 +524,8 @@ export default function Ov2CwScreen({
 
   const statusSub = lobby ? "Sit in a seat to begin the round." : "";
 
-  const wheelStageMax = "max-w-[min(92vw,17.5rem)] lg:max-w-[min(100%,19rem)] xl:max-w-[20rem]";
+  const wheelStageMax =
+    "w-full max-lg:mx-auto max-lg:max-w-[min(92vw,17.5rem,35dvh,35vh)] lg:max-w-[min(100%,19rem)] xl:max-w-[20rem]";
 
   const inspectorSeat =
     seatInspectorIndex != null && seatsForUi[seatInspectorIndex]?.participantKey
@@ -534,10 +535,10 @@ export default function Ov2CwScreen({
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-xl flex-col overflow-hidden sm:max-w-2xl md:max-w-3xl lg:max-w-6xl">
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-0 bg-gradient-to-b from-zinc-900/35 via-zinc-950/45 to-black/50 shadow-none">
-        <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden p-2 sm:gap-2 sm:p-3 lg:gap-2 lg:p-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden p-2 max-lg:gap-1 max-lg:p-1.5 sm:gap-2 sm:p-3 lg:gap-2 lg:p-4">
           {/* Live / phase — full width of table card */}
           <div
-            className={`flex w-full min-w-0 shrink-0 items-center gap-2 rounded-lg border-0 px-2.5 py-1.5 sm:rounded-xl sm:px-3 sm:py-1.5 ${
+            className={`flex w-full min-w-0 shrink-0 items-center gap-2 rounded-lg border-0 px-2.5 py-1.5 max-lg:px-2 max-lg:py-1 sm:rounded-xl sm:px-3 sm:py-1.5 ${
               resultPhase
                 ? "bg-amber-950/15"
                 : "bg-black/20"
@@ -556,7 +557,7 @@ export default function Ov2CwScreen({
 
           {/* Desktop lg: seats | wheel | results+myplays; mobile column order unchanged */}
           <div
-            className="grid min-h-0 w-full flex-1 gap-2 sm:gap-2 lg:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_minmax(0,11.5rem)] lg:grid-rows-[auto_minmax(0,1fr)] lg:items-stretch lg:gap-3 max-lg:grid-cols-1 max-lg:[grid-template-areas:'wheel'_'results'_'seats'_'myplays'] lg:[grid-template-areas:'seats_wheel_results'_'seats_wheel_myplays']"
+            className="grid min-h-0 w-full flex-1 gap-2 max-lg:gap-1 sm:gap-2 lg:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_minmax(0,11.5rem)] lg:grid-rows-[auto_minmax(0,1fr)] lg:items-stretch lg:gap-3 max-lg:grid-cols-1 max-lg:[grid-template-areas:'wheel'_'results'_'seats'_'myplays'] lg:[grid-template-areas:'seats_wheel_results'_'seats_wheel_myplays']"
           >
           <div className="relative min-h-0 w-full min-w-0 shrink-0 [grid-area:wheel] lg:min-h-0 lg:self-center">
             {countdown != null ? (
@@ -753,7 +754,9 @@ export default function Ov2CwScreen({
               </div>
             </div>
 
-            <div className={`relative z-[59] mx-auto w-full shrink-0 px-1 py-2 sm:px-1.5 sm:py-2.5 ${wheelStageMax}`}>
+            <div
+              className={`relative z-[59] mx-auto w-full shrink-0 px-1 py-2 max-lg:py-1 sm:px-1.5 sm:py-2.5 ${wheelStageMax}`}
+            >
             <div className="relative flex w-full flex-col items-center overflow-visible">
               <div
                 className="pointer-events-none absolute -inset-3 rounded-full bg-amber-500/[0.06] blur-2xl sm:-inset-4"
@@ -766,7 +769,7 @@ export default function Ov2CwScreen({
                 </div>
               </div>
               <div
-                className="relative z-[1] mt-0 aspect-square w-full overflow-visible rounded-full p-1 shadow-none ring-0 sm:p-[3px]"
+                className="relative z-[1] mt-0 aspect-square w-full max-lg:shrink-0 overflow-visible rounded-full p-1 shadow-none ring-0 sm:p-[3px]"
                 style={{
                   background: "linear-gradient(145deg, rgba(39,39,42,0.85) 0%, rgba(9,9,11,0.92) 55%, rgba(50,28,8,0.3) 100%)",
                 }}
@@ -881,7 +884,7 @@ export default function Ov2CwScreen({
           </div>
 
           <div className="min-h-0 w-full min-w-0 shrink-0 [grid-area:results] lg:flex lg:min-h-0 lg:flex-col lg:overflow-visible">
-            <div className="mb-1 flex items-center gap-2 lg:mb-1 lg:justify-center">
+            <div className="mb-1 flex items-center gap-2 max-lg:mb-0.5 lg:mb-1 lg:justify-center">
               <span
                 className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/25 to-transparent lg:hidden"
                 aria-hidden
@@ -894,7 +897,7 @@ export default function Ov2CwScreen({
                 aria-hidden
               />
             </div>
-            <div className="flex min-h-[1.75rem] flex-wrap content-start justify-start gap-1 pb-0.5 sm:min-h-[1.75rem] sm:gap-1.5 lg:min-h-[1.75rem] lg:flex-row lg:flex-wrap lg:justify-center lg:gap-1 lg:overflow-visible lg:pb-0">
+            <div className="flex min-h-[1.75rem] flex-wrap content-start justify-start gap-1 pb-0.5 max-lg:min-h-[1.5rem] max-lg:gap-0.5 sm:min-h-[1.75rem] sm:gap-1.5 lg:min-h-[1.75rem] lg:flex-row lg:flex-wrap lg:justify-center lg:gap-1 lg:overflow-visible lg:pb-0">
               {Array.isArray(engine.history) && engine.history.length > 0 ? (
                 engine.history.slice(0, 10).map((h, idx) => {
                   const n = Math.floor(Number(h.resultNumber) || 0);
@@ -924,13 +927,13 @@ export default function Ov2CwScreen({
             {Array.from({ length: OV2_CW_MAX_SEATS }, (_, i) => seatBtn(seatsForUi[i], i))}
           </div>
 
-          <div className="relative flex min-h-0 w-full shrink-0 flex-col gap-1.5 overflow-hidden rounded-xl border-0 bg-gradient-to-b from-zinc-900/25 via-black/20 to-black/35 p-1.5 shadow-none [grid-area:myplays] sm:gap-2 sm:p-2 lg:min-h-0 lg:flex-1">
+          <div className="relative flex min-h-0 w-full shrink-0 flex-col gap-1.5 overflow-hidden rounded-xl border-0 bg-gradient-to-b from-zinc-900/25 via-black/20 to-black/35 p-1.5 max-lg:gap-1 max-lg:p-1 shadow-none [grid-area:myplays] sm:gap-2 sm:p-2 lg:min-h-0 lg:flex-1">
             <div
-              className="rounded-lg border-0 bg-black/20 p-2 sm:p-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+              className="rounded-lg border-0 bg-black/20 p-2 max-lg:p-1.5 sm:p-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
               aria-label="My plays"
             >
               {myPlays.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-white/10 bg-zinc-950/40 py-3 text-center">
+                <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-white/10 bg-zinc-950/40 py-3 max-lg:py-2 text-center">
                   <p className="text-[10px] font-medium text-zinc-500">No plays this round.</p>
                 </div>
               ) : (

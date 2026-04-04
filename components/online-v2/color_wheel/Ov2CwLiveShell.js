@@ -161,8 +161,8 @@ function Ov2CwTableLive({ roomId, router, nameDraft, setNameDraft, persistName, 
       chromePreset="c21_flat"
       infoPanel={infoPanel}
     >
-      <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1.5 overflow-hidden sm:gap-2">
-        <div className="flex w-full min-w-0 shrink-0 flex-nowrap items-center gap-2 overflow-hidden px-2 py-1.5 sm:gap-2.5 sm:px-2.5 sm:py-2">
+      <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1.5 overflow-hidden max-lg:gap-1 sm:gap-2">
+        <div className="flex w-full min-w-0 shrink-0 flex-nowrap items-center gap-2 overflow-hidden px-2 py-1.5 max-lg:gap-1.5 max-lg:px-1.5 max-lg:py-1 sm:gap-2.5 sm:px-2.5 sm:py-2">
           <input
             value={nameDraft}
             onChange={e => setNameDraft(e.target.value)}
