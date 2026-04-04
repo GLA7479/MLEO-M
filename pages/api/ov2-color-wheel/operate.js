@@ -292,6 +292,7 @@ export default async function handler(req, res) {
         vaultEffects,
         localVaultRefreshHint,
         vaultTouchedForCaller,
+        serverNowMs: Date.now(),
       });
     }
 

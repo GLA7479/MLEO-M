@@ -51,10 +51,11 @@ function phaseEndsMs(v) {
   return Number.isFinite(p) ? p : 0;
 }
 
-function secsLeft(phaseEndsAt) {
+function secsLeft(phaseEndsAt, clockSkewMs = 0) {
   const t = phaseEndsMs(phaseEndsAt);
   if (!t) return 0;
-  return Math.max(0, Math.ceil((t - Date.now()) / 1000));
+  const approxServerNow = Date.now() + Math.floor(Number(clockSkewMs) || 0);
+  return Math.max(0, Math.ceil((t - approxServerNow) / 1000));
 }
 
 function roundLeaderPk(engine) {
@@ -108,6 +109,7 @@ export default function Ov2CwScreen({
   onOperate,
   operateBusy,
   loadError,
+  clockSkewMs = 0,
 }) {
   const [tick, setTick] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -186,8 +188,8 @@ export default function Ov2CwScreen({
   void tick;
   const countdown = useMemo(() => {
     if (!engine?.phaseEndsAt) return null;
-    return secsLeft(engine.phaseEndsAt);
-  }, [engine?.phaseEndsAt, tick]);
+    return secsLeft(engine.phaseEndsAt, clockSkewMs);
+  }, [engine?.phaseEndsAt, tick, clockSkewMs]);
 
   useEffect(() => {
     if (!spinning) {

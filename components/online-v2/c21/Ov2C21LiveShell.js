@@ -365,6 +365,15 @@ export default function Ov2C21LiveShell() {
   }, []);
 
   useEffect(() => {
+    if (!router.isReady) return;
+    const q = router.query.room;
+    const raw = q == null ? "" : String(Array.isArray(q) ? q[0] : q).trim();
+    if (raw && !isOv2RoomIdQueryParam(raw)) {
+      void router.replace("/ov2-21-challenge");
+    }
+  }, [router.isReady, router.query.room]);
+
+  useEffect(() => {
     if (!roomId) {
       setC21RoomValidated(false);
       return;
@@ -379,11 +388,14 @@ export default function Ov2C21LiveShell() {
         .eq("id", roomId)
         .maybeSingle();
       if (cancelled) return;
-      if (!error && (!data || String(data.product_game_id) !== OV2_C21_PRODUCT_GAME_ID)) {
+      if (error) {
         await router.replace("/ov2-21-challenge");
         return;
       }
-      if (error) return;
+      if (!data || String(data.product_game_id) !== OV2_C21_PRODUCT_GAME_ID) {
+        await router.replace("/ov2-21-challenge");
+        return;
+      }
       setTableStake(Math.max(10, Math.floor(Number(data.stake_per_seat) || 10)));
       setC21RoomValidated(true);
     })();

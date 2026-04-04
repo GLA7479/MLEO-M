@@ -202,6 +202,7 @@ function Ov2CwTableLive({ roomId, router, nameDraft, setNameDraft, persistName, 
             onOperate={session.operate}
             operateBusy={session.operateBusy}
             loadError={session.loadError}
+            clockSkewMs={session.clockSkewMs}
           />
         </div>
       </div>
@@ -245,6 +246,15 @@ export default function Ov2CwLiveShell() {
   }, []);
 
   useEffect(() => {
+    if (!router.isReady) return;
+    const q = router.query.room;
+    const raw = q == null ? "" : String(Array.isArray(q) ? q[0] : q).trim();
+    if (raw && !isOv2RoomIdQueryParam(raw)) {
+      void router.replace("/ov2-color-wheel");
+    }
+  }, [router.isReady, router.query.room]);
+
+  useEffect(() => {
     if (!roomId) {
       setCwRoomValidated(false);
       return;
@@ -259,11 +269,14 @@ export default function Ov2CwLiveShell() {
         .eq("id", roomId)
         .maybeSingle();
       if (cancelled) return;
-      if (!error && (!data || String(data.product_game_id) !== OV2_CW_PRODUCT_GAME_ID)) {
+      if (error) {
         await router.replace("/ov2-color-wheel");
         return;
       }
-      if (error) return;
+      if (!data || String(data.product_game_id) !== OV2_CW_PRODUCT_GAME_ID) {
+        await router.replace("/ov2-color-wheel");
+        return;
+      }
       if (data?.stake_per_seat != null) {
         setTableStake(Math.max(1, Math.floor(Number(data.stake_per_seat) || 1)));
       }

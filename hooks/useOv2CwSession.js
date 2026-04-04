@@ -55,6 +55,11 @@ async function flushCwOperateSideEffects(json, participantKey) {
   }
 }
 
+function applyCwServerClockSample(json, setSkew) {
+  if (!json?.ok || typeof json.serverNowMs !== "number" || !Number.isFinite(json.serverNowMs)) return;
+  setSkew(json.serverNowMs - Date.now());
+}
+
 export function useOv2CwSession(roomId, _tableStakeUnits) {
   const resolvedRoomId = useMemo(() => {
     const s = String(roomId ?? "").trim();
@@ -64,6 +69,7 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
   const [engine, setEngine] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [operateBusy, setOperateBusy] = useState(false);
+  const [clockSkewMs, setClockSkewMs] = useState(0);
   const participantKey = useMemo(() => getOv2ParticipantId(), []);
   const tickBusyRef = useRef(false);
   const lastTickAtRef = useRef(0);
@@ -103,6 +109,7 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
         });
         if (cancelled) return;
         if (json?.engine) setEngine(json.engine);
+        applyCwServerClockSample(json, setClockSkewMs);
         void flushCwOperateSideEffects(json, participantKey);
       } catch {
         /* table may not exist until migration */
@@ -147,6 +154,7 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
           payload,
         });
         if (json?.engine) setEngine(json.engine);
+        applyCwServerClockSample(json, setClockSkewMs);
         void flushCwOperateSideEffects(json, participantKey);
         return { ok: Boolean(json?.ok), json };
       } catch (e) {
@@ -181,6 +189,7 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
             payload: {},
           });
           if (json?.engine) setEngine(json.engine);
+          applyCwServerClockSample(json, setClockSkewMs);
           void flushCwOperateSideEffects(json, participantKey);
         } catch {
           /* ignore */
@@ -199,5 +208,6 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
     operateBusy,
     operate,
     reloadFromDb,
+    clockSkewMs,
   };
 }

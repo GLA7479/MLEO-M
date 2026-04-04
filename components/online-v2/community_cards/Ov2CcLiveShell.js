@@ -206,6 +206,15 @@ export default function Ov2CcLiveShell() {
   }, []);
 
   useEffect(() => {
+    if (!router.isReady) return;
+    const q = router.query.room;
+    const raw = q == null ? "" : String(Array.isArray(q) ? q[0] : q).trim();
+    if (raw && !isOv2RoomIdQueryParam(raw)) {
+      void router.replace("/ov2-community-cards");
+    }
+  }, [router.isReady, router.query.room]);
+
+  useEffect(() => {
     if (!roomId) {
       setTableConfig(null);
       return;
@@ -220,7 +229,10 @@ export default function Ov2CcLiveShell() {
         .eq("id", roomId)
         .maybeSingle();
       if (cancelled) return;
-      if (error) return;
+      if (error) {
+        await router.replace("/ov2-community-cards");
+        return;
+      }
       const c = resolveOv2CcTableConfigFromRoomRow(data);
       if (!c) {
         await router.replace("/ov2-community-cards");
