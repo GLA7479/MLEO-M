@@ -4,6 +4,7 @@
  * Configure in Vercel:
  * 1. Set env `CRON_SECRET` or `OV2_WAVE_PRIVATE_SWEEP_SECRET` to a long random string.
  * 2. `vercel.json` schedules GET this route (Vercel Cron sends `Authorization: Bearer <CRON_SECRET>` when CRON_SECRET is set in the project).
+ *    On Vercel Hobby, crons may run at most once per day (see schedule in vercel.json).
  *
  * If you use only `OV2_WAVE_PRIVATE_SWEEP_SECRET`, set the same value as Vercel’s CRON_SECRET or send the matching Bearer from an external scheduler.
  *

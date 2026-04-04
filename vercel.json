@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/ov2-wave/private-sweep-cron",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 3 * * *"
     }
   ],
   "framework": "nextjs",
