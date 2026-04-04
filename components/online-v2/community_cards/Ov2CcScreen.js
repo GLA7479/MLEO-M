@@ -324,8 +324,8 @@ export default function Ov2CcScreen({
               <div className="pointer-events-none absolute inset-[7px] rounded-[1.05rem] border border-white/[0.06] max-sm:inset-[5px] sm:inset-3 sm:rounded-[1.35rem] md:rounded-[1.55rem]" />
 
               <div className="relative z-[4] flex min-h-0 flex-1 flex-col">
-                <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-1 pb-2 max-sm:px-[6%] sm:px-[13%] sm:pt-2 sm:pb-3 md:px-[15%] md:pt-2 md:pb-4">
-                  <div className="flex w-full max-w-md flex-col items-center gap-1 sm:max-w-lg sm:gap-2 md:gap-2.5">
+                <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-0 pb-0.5 max-sm:-translate-y-[4.75rem] max-sm:px-[6%] sm:-translate-y-11 md:-translate-y-8 sm:px-[13%] sm:pt-1.5 sm:pb-1 md:px-[15%] md:pt-2 md:pb-1.5">
+                  <div className="flex w-full max-w-md flex-col items-center gap-0.5 sm:max-w-lg sm:gap-1 md:gap-1.5">
                     {handBettingLive ? (
                       <>
                         <div className="w-full text-center">
@@ -378,7 +378,7 @@ export default function Ov2CcScreen({
                           )}
                         </div>
 
-                        <div className="relative z-[2] flex max-sm:mt-1 flex-col items-center gap-0.5">
+                        <div className="relative z-[2] flex flex-col items-center gap-0.5 max-sm:mt-0">
                           <span className="text-[9px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[10px]">
                             Pot
                           </span>
@@ -387,7 +387,7 @@ export default function Ov2CcScreen({
                               {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
                             </span>
                           </div>
-                          <p className="mt-1 text-center text-[10px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[11px]">
+                          <p className="mt-1 w-full min-h-[1.125rem] shrink-0 text-center text-[10px] font-medium uppercase leading-tight tracking-[0.14em] text-emerald-200/35 sm:min-h-[1.25rem] sm:text-[11px]">
                             {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/{bb}
                           </p>
                         </div>
@@ -464,7 +464,7 @@ export default function Ov2CcScreen({
                           })}
                         </div>
 
-                        <div className="relative z-[2] flex max-sm:mt-1 flex-col items-center gap-0.5">
+                        <div className="relative z-[2] flex flex-col items-center gap-0.5 max-sm:mt-0">
                           <span className="text-[9px] font-semibold uppercase tracking-[0.24em] text-emerald-200/40 sm:text-[10px]">
                             Pot
                           </span>
@@ -473,7 +473,7 @@ export default function Ov2CcScreen({
                               {Math.floor(pot || 0).toLocaleString?.() ?? Math.floor(pot || 0)}
                             </span>
                           </div>
-                          <p className="mt-1 text-center text-[10px] font-medium uppercase tracking-[0.14em] text-emerald-200/35 sm:text-[11px]">
+                          <p className="mt-1 w-full min-h-[1.125rem] shrink-0 text-center text-[10px] font-medium uppercase leading-tight tracking-[0.14em] text-emerald-200/35 sm:min-h-[1.25rem] sm:text-[11px]">
                             {maxSeats}-max · {minBuy.toLocaleString?.() ?? minBuy}–{maxBuy.toLocaleString?.() ?? maxBuy} · {sb}/{bb}
                           </p>
                         </div>
@@ -483,10 +483,10 @@ export default function Ov2CcScreen({
                 </div>
 
                 <div
-                  className={`relative z-[10] flex w-full shrink-0 justify-center px-1 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] pt-0 pointer-events-none sm:h-[8.5rem] sm:max-h-none sm:items-center ${OV2_CC_MOBILE_HERO_ZONE_CLASSES}`}
+                  className={`relative z-[10] flex w-full shrink-0 justify-center px-1 pb-[max(0.15rem,env(safe-area-inset-bottom,0px))] pt-0 pointer-events-none sm:h-[8.5rem] sm:max-h-none sm:items-center ${OV2_CC_MOBILE_HERO_ZONE_CLASSES}`}
                 >
                   {mySeat ? (
-                    <div className="flex max-h-full w-full max-w-[98%] flex-wrap items-center justify-center gap-3 drop-shadow-[0_10px_28px_rgba(0,0,0,0.55)] max-sm:max-h-none sm:items-end sm:gap-4">
+                    <div className="flex max-h-full w-full max-w-[98%] flex-wrap items-center justify-center gap-2 drop-shadow-[0_10px_28px_rgba(0,0,0,0.55)] max-sm:max-h-none max-sm:-translate-y-4 max-sm:gap-2.5 sm:-translate-y-4 sm:items-end sm:gap-4 md:-translate-y-3">
                       {holeCardsToShow.length > 0
                         ? holeCardsToShow.map((c, idx) => (
                             <Ov2CcPlayingCard key={`felt-h-${idx}`} code={c} size="hero" />
@@ -504,7 +504,7 @@ export default function Ov2CcScreen({
 
               {engine.winnersDisplay?.seats?.length ? (
                 <div
-                  className="pointer-events-none absolute left-1/2 z-[8] flex w-full max-w-sm -translate-x-1/2 justify-center px-3 max-sm:bottom-[10.5rem] sm:bottom-[9.25rem]"
+                  className="pointer-events-none absolute left-1/2 z-[8] flex w-full max-w-sm -translate-x-1/2 justify-center px-3 max-sm:bottom-[7.75rem] sm:bottom-[9.25rem]"
                   aria-live="polite"
                 >
                   <div className="max-w-sm rounded-lg border border-emerald-500/22 bg-black/55 px-2.5 py-1.5 text-center text-[12px] text-emerald-200/95 shadow-[0_8px_24px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-[1px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-[13px]">
