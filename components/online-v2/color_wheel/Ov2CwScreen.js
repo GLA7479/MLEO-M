@@ -796,13 +796,13 @@ export default function Ov2CwScreen({
                     /** Match `conic-gradient(from -90deg, …)`: stop 0° sits at 9 o'clock; angles increase CW → add 270° to segment mid-angle from top. */
                     const thetaFromTop = (270 + (i + 0.5) * OV2_CW_SEGMENT_DEG) % 360;
                     const rad = (thetaFromTop * Math.PI) / 180;
-                    /** Outer track toward bezel; tuned so digits hug rim without clipping the circle. */
-                    const rimPct = 45.6;
+                    /** Outer track toward bezel; inset vs original (45.6/2.15) for smaller wheel, nudged back out slightly. */
+                    const rimPct = 44.2;
                     const xPct = 50 + rimPct * Math.sin(rad);
                     const yPct = 50 - rimPct * Math.cos(rad);
                     const uprightDeg = viewerHorizontalLabelDeg(wheelDisplayDeg);
-                    /** Extra push along radius (wheel-local % of box). */
-                    const outPct = 2.15;
+                    /** Nudge along radius (wheel-local %). */
+                    const outPct = 1.45;
                     const leftPct = xPct + outPct * Math.sin(rad);
                     const topPct = yPct - outPct * Math.cos(rad);
                     const tc =
@@ -822,7 +822,7 @@ export default function Ov2CwScreen({
                         }}
                       >
                         <span
-                          className={`block min-w-[1.15em] text-center text-[11px] font-black tabular-nums leading-none sm:text-xs lg:text-sm xl:text-[0.95rem] ${tc} [text-shadow:0_0_4px_rgba(0,0,0,1),0_0_2px_rgba(0,0,0,1),0_1px_3px_rgba(0,0,0,0.95)]`}
+                          className={`block min-w-[1.1em] text-center text-[10px] font-black tabular-nums leading-none sm:text-[11px] lg:text-[13px] xl:text-[0.9rem] ${tc} [text-shadow:0_0_4px_rgba(0,0,0,1),0_0_2px_rgba(0,0,0,1),0_1px_3px_rgba(0,0,0,0.95)]`}
                         >
                           {entry.num}
                         </span>
