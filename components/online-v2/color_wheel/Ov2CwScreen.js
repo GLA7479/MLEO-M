@@ -101,9 +101,8 @@ export default function Ov2CwScreen({
   const [seatInspectorIndex, setSeatInspectorIndex] = useState(null);
   const [hint, setHint] = useState("");
   const [playAmount, setPlayAmount] = useState(String(tableStakeUnits || 100));
-  const [playKind, setPlayKind] = useState("red");
-  const [numberPick, setNumberPick] = useState(7);
-  const [groupPick, setGroupPick] = useState(1);
+  /** Staged play panel picks (toggle until Place Play): keys `red` | `number:7` | `dozen:2` | … */
+  const [pendingPlayKeys, setPendingPlayKeys] = useState([]);
   const wheelRotRef = useRef(0);
   const [wheelDisplayDeg, setWheelDisplayDeg] = useState(0);
   const spinRafRef = useRef(null);
@@ -120,6 +119,15 @@ export default function Ov2CwScreen({
   useEffect(() => {
     setPlayAmount(String(Math.max(100, Math.floor(Number(tableStakeUnits) || 100))));
   }, [tableStakeUnits]);
+
+  const togglePendingPlay = useCallback((playType, playValue = null) => {
+    const key =
+      playValue == null || playValue === ""
+        ? String(playType || "").trim()
+        : `${String(playType || "").trim()}:${Math.floor(Number(playValue))}`;
+    if (!key) return;
+    setPendingPlayKeys(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]));
+  }, []);
 
   useEffect(() => {
     const id = window.setInterval(() => setTick(x => x + 1), 500);
@@ -154,6 +162,10 @@ export default function Ov2CwScreen({
   const resultPhase = phase === "result";
   const lobby = phase === "lobby";
   const roundSeq = Math.max(0, Math.floor(Number(engine?.roundSeq) || 0));
+
+  useEffect(() => {
+    setPendingPlayKeys([]);
+  }, [roundSeq]);
 
   void tick;
   const countdown = useMemo(() => {
@@ -332,18 +344,18 @@ export default function Ov2CwScreen({
   );
 
   const submitPlay = useCallback(async () => {
+    if (pendingPlayKeys.length === 0) return;
     const amt = Math.floor(Number(playAmount) || 0);
-    let playType = playKind;
-    let playValue = null;
-    if (playKind === "number") {
-      playType = "number";
-      playValue = Math.floor(Number(numberPick) || 0);
-    } else if (playKind === "dozen" || playKind === "column") {
-      playType = playKind;
-      playValue = Math.floor(Number(groupPick) || 1);
-    }
-    await doOp("place_play", { playType, playValue, amount: amt });
-  }, [doOp, playAmount, playKind, numberPick, groupPick]);
+    const items = pendingPlayKeys.map(k => {
+      const s = String(k);
+      const i = s.indexOf(":");
+      if (i < 0) return { playType: s, playValue: null };
+      return { playType: s.slice(0, i), playValue: Math.floor(Number(s.slice(i + 1))) };
+    });
+    const r = await doOp("place_plays", { amount: amt, items });
+    if (r?.skipped) return;
+    if (r?.ok) setPendingPlayKeys([]);
+  }, [doOp, playAmount, pendingPlayKeys]);
 
   const plays = Array.isArray(engine?.plays) ? engine.plays : [];
   const myPlays = useMemo(
@@ -676,7 +688,7 @@ export default function Ov2CwScreen({
                 </button>
                 {lastResultPopupOpen ? (
                   <div
-                    className="absolute bottom-full right-0 z-[62] mb-1 flex max-h-[min(14rem,36vh)] w-[min(13rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-lg border border-white/[0.12] bg-zinc-950/98 shadow-xl backdrop-blur-sm"
+                    className="absolute bottom-full right-0 z-[62] mb-1 flex max-h-[min(20rem,55vh)] w-[min(13rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-lg border border-white/[0.12] bg-zinc-950/98 shadow-xl backdrop-blur-sm"
                     role="dialog"
                     aria-label="Last results"
                     onClick={e => e.stopPropagation()}
@@ -691,12 +703,12 @@ export default function Ov2CwScreen({
                         Close
                       </button>
                     </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 py-2 [-webkit-overflow-scrolling:touch]">
                       {!Array.isArray(engine.history) || engine.history.length === 0 ? (
                         <p className="text-center text-[10px] text-zinc-500">No results yet.</p>
                       ) : (
-                        <div className="flex max-w-full flex-nowrap gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-overflow-scrolling:touch]">
-                          {engine.history.slice(0, 12).map((h, idx) => {
+                        <div className="flex max-w-full flex-wrap content-start gap-1">
+                          {engine.history.slice(0, 24).map((h, idx) => {
                             const n = Math.floor(Number(h.resultNumber) || 0);
                             const c = String(h.resultColor || ov2CwColorForNumber(n));
                             return (
@@ -895,10 +907,9 @@ export default function Ov2CwScreen({
           </div>
 
           <div className="relative flex w-full shrink-0 flex-col gap-1.5 overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/35 via-black/28 to-black/45 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-2 sm:p-2">
-            <div className="rounded-lg border border-white/[0.06] bg-black/35 p-2 sm:p-2">
-              <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-400">My Plays</p>
+            <div className="rounded-lg border border-white/[0.06] bg-black/35 p-2 sm:p-2" aria-label="My plays">
               {myPlays.length === 0 ? (
-                <div className="mt-2 flex flex-col items-center justify-center rounded-md border border-dashed border-white/10 bg-zinc-950/40 py-3 text-center">
+                <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-white/10 bg-zinc-950/40 py-3 text-center">
                   <p className="text-[10px] font-medium text-zinc-500">No plays this round.</p>
                 </div>
               ) : (
@@ -988,18 +999,14 @@ export default function Ov2CwScreen({
                     maxPlay={maxPlay}
                     playAmount={playAmount}
                     setPlayAmount={setPlayAmount}
-                    playKind={playKind}
-                    setPlayKind={setPlayKind}
-                    numberPick={numberPick}
-                    setNumberPick={setNumberPick}
-                    groupPick={groupPick}
-                    setGroupPick={setGroupPick}
+                    pendingPlayKeys={pendingPlayKeys}
+                    togglePendingPlay={togglePendingPlay}
                   />
                 </div>
                 <div className="shrink-0 border-t border-white/[0.06] bg-zinc-950/95 p-3 pt-2.5 shadow-[0_-8px_24px_rgba(0,0,0,0.35)]">
                   <button
                     type="button"
-                    disabled={!mySeat || !placingLive || operateBusy}
+                    disabled={!mySeat || !placingLive || operateBusy || pendingPlayKeys.length === 0}
                     onClick={() => {
                       void submitPlay();
                     }}
@@ -1272,11 +1279,10 @@ function ov2CwPlayKindClasses(kindId, isSelected) {
 }
 
 /** G1–G3 / C1–C3 — distinct hues per slot when active (classic dozen / column bands). */
-function ov2CwGroupSlotClasses(playKind, slot, groupPick, groupActive) {
-  if (!groupActive) {
+function ov2CwGroupSlotClasses(playKind, slot, selected, enabled = true) {
+  if (!enabled) {
     return "cursor-not-allowed border border-white/[0.05] bg-zinc-950/40 text-zinc-600 opacity-50";
   }
-  const selected = groupPick === slot;
   const ring = selected ? _cwSelRing : "hover:brightness-110";
 
   if (playKind === "dozen") {
@@ -1308,18 +1314,7 @@ function ov2CwGroupSlotClasses(playKind, slot, groupPick, groupActive) {
   return `${bySlot[slot]} ${ring}`;
 }
 
-function PlayForm({
-  minPlay,
-  maxPlay,
-  playAmount,
-  setPlayAmount,
-  playKind,
-  setPlayKind,
-  numberPick,
-  setNumberPick,
-  groupPick,
-  setGroupPick,
-}) {
+function PlayForm({ minPlay, maxPlay, playAmount, setPlayAmount, pendingPlayKeys, togglePendingPlay }) {
   const bump = useCallback(
     m => {
       const cur = Math.floor(Number(playAmount) || 0);
@@ -1329,6 +1324,17 @@ function PlayForm({
     [playAmount, minPlay, maxPlay, setPlayAmount],
   );
 
+  const has = useCallback(
+    (playType, playValue = null) => {
+      const key =
+        playValue == null || playValue === ""
+          ? String(playType || "").trim()
+          : `${String(playType || "").trim()}:${Math.floor(Number(playValue))}`;
+      return pendingPlayKeys.includes(key);
+    },
+    [pendingPlayKeys],
+  );
+
   const kinds = [
     { id: "red", label: "Red" },
     { id: "black", label: "Black" },
@@ -1336,13 +1342,7 @@ function PlayForm({
     { id: "odd", label: "Odd" },
     { id: "low", label: "Low 1–18" },
     { id: "high", label: "High 19–36" },
-    { id: "dozen", label: "Group" },
-    { id: "column", label: "Column" },
-    { id: "number", label: "Number" },
   ];
-
-  const groupActive = playKind === "dozen" || playKind === "column";
-  const numberActive = playKind === "number";
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col gap-2 lg:gap-4">
@@ -1382,15 +1382,15 @@ function PlayForm({
       </div>
 
       <div className="shrink-0">
-        <div className="grid grid-cols-3 gap-1 sm:grid-cols-4 lg:gap-1.5">
+        <div className="grid grid-cols-3 gap-1 sm:grid-cols-3 lg:gap-1.5">
           {kinds.map(k => (
             <button
               key={k.id}
               type="button"
-              onClick={() => setPlayKind(k.id)}
-              className={`min-h-[2rem] rounded-lg px-1.5 py-1 text-[9px] font-bold leading-tight transition-[filter,box-shadow] lg:min-h-[2.5rem] lg:rounded-xl lg:px-2 lg:py-1.5 lg:text-[11px] ${ov2CwPlayKindClasses(
+              onClick={() => togglePendingPlay(k.id, null)}
+              className={`flex h-10 min-h-10 max-h-10 items-center justify-center rounded-lg px-1.5 text-[8px] font-bold leading-tight transition-[filter,box-shadow] sm:text-[9px] lg:h-11 lg:min-h-11 lg:max-h-11 lg:rounded-xl lg:px-2 lg:text-[10px] ${ov2CwPlayKindClasses(
                 k.id,
-                playKind === k.id,
+                has(k.id, null),
               )}`}
             >
               {k.label}
@@ -1399,29 +1399,40 @@ function PlayForm({
         </div>
       </div>
 
-      <div className="shrink-0">
+      <div className="shrink-0 flex flex-col gap-1.5">
         <div className="flex gap-1.5 lg:gap-2">
           {[1, 2, 3].map(g => (
             <button
-              key={g}
+              key={`dg${g}`}
               type="button"
-              disabled={!groupActive}
-              onClick={() => setGroupPick(g)}
-              className={`min-h-[2.35rem] flex-1 rounded-lg py-1.5 text-[11px] font-extrabold transition-[filter,box-shadow] lg:min-h-[2.75rem] lg:rounded-xl lg:py-2 lg:text-xs ${ov2CwGroupSlotClasses(
-                playKind,
+              onClick={() => togglePendingPlay("dozen", g)}
+              className={`flex h-10 min-h-10 max-h-10 flex-1 items-center justify-center rounded-lg text-[11px] font-extrabold transition-[filter,box-shadow] lg:h-11 lg:min-h-11 lg:max-h-11 lg:rounded-xl lg:text-xs ${ov2CwGroupSlotClasses(
+                "dozen",
                 g,
-                groupPick,
-                groupActive,
+                has("dozen", g),
+                true,
               )}`}
-              aria-label={
-                playKind === "dozen"
-                  ? `Group ${g}`
-                  : playKind === "column"
-                    ? `Column ${g}`
-                    : `Column ${g} (pick Group or Column first)`
-              }
+              aria-label={`Group ${g}, toggle`}
             >
-              {playKind === "dozen" ? `G${g}` : `C${g}`}
+              G{g}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1.5 lg:gap-2">
+          {[1, 2, 3].map(g => (
+            <button
+              key={`cg${g}`}
+              type="button"
+              onClick={() => togglePendingPlay("column", g)}
+              className={`flex h-10 min-h-10 max-h-10 flex-1 items-center justify-center rounded-lg text-[11px] font-extrabold transition-[filter,box-shadow] lg:h-11 lg:min-h-11 lg:max-h-11 lg:rounded-xl lg:text-xs ${ov2CwGroupSlotClasses(
+                "column",
+                g,
+                has("column", g),
+                true,
+              )}`}
+              aria-label={`Column ${g}, toggle`}
+            >
+              C{g}
             </button>
           ))}
         </div>
@@ -1429,26 +1440,19 @@ function PlayForm({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:min-h-[11rem]">
         <div
-          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-white/[0.06] bg-black/30 [-webkit-overflow-scrolling:touch] lg:max-h-44 ${
-            numberActive ? "" : "opacity-45"
-          }`}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-white/[0.06] bg-black/30 [-webkit-overflow-scrolling:touch] lg:max-h-44"
           role="listbox"
-          aria-label="Pick number"
-          aria-disabled={!numberActive}
+          aria-label="Pick numbers"
         >
-          <div
-            className={`grid grid-cols-7 gap-0.5 p-1.5 lg:gap-1 lg:p-2 ${numberActive ? "" : "pointer-events-none"}`}
-          >
+          <div className="grid grid-cols-7 gap-0.5 p-1.5 lg:gap-1 lg:p-2">
             {Array.from({ length: 37 }, (_, n) => (
               <button
                 key={n}
                 type="button"
-                disabled={!numberActive}
-                tabIndex={numberActive ? 0 : -1}
-                onClick={() => setNumberPick(n)}
-                className={`flex aspect-square max-h-[1.85rem] min-h-0 w-full items-center justify-center rounded-md text-[10px] font-bold transition-[filter,box-shadow] lg:max-h-10 lg:rounded-lg lg:text-xs ${ov2CwExactTileClasses(
+                onClick={() => togglePendingPlay("number", n)}
+                className={`flex h-10 min-h-10 max-h-10 w-full items-center justify-center rounded-md text-[10px] font-bold transition-[filter,box-shadow] lg:h-11 lg:min-h-11 lg:max-h-11 lg:rounded-lg lg:text-xs ${ov2CwExactTileClasses(
                   n,
-                  numberPick === n,
+                  has("number", n),
                 )}`}
               >
                 {n}
