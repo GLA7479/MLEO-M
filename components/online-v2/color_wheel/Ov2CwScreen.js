@@ -521,7 +521,9 @@ export default function Ov2CwScreen({
       : "Waiting for table controller."
     : "";
 
-  const wheelStageMax = "max-w-[min(92vw,17.5rem)] lg:max-w-[min(100%,22rem)] xl:max-w-[24rem]";
+  const wheelStageMax = "max-w-[min(92vw,17.5rem)] lg:max-w-[min(100%,19rem)] xl:max-w-[20rem]";
+
+  const hasHistory = Array.isArray(engine.history) && engine.history.length > 0;
 
   const inspectorSeat =
     seatInspectorIndex != null && seatsForUi[seatInspectorIndex]?.participantKey
@@ -529,7 +531,7 @@ export default function Ov2CwScreen({
       : null;
 
   return (
-    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-xl flex-col overflow-hidden sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
+    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-xl flex-col overflow-hidden sm:max-w-2xl md:max-w-3xl lg:max-w-6xl">
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.1] bg-gradient-to-b from-zinc-900/40 via-zinc-950/50 to-black/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden p-2 sm:gap-2 sm:p-3 lg:gap-2 lg:p-4">
           {/* Live / phase — full width of table card */}
@@ -551,8 +553,15 @@ export default function Ov2CwScreen({
             </div>
           </div>
 
-          {/* Full-width game surface anchor: timer / Play sit at table corners; wheel stays in narrow stage */}
-          <div className="relative w-full min-w-0 shrink-0">
+          {/* Desktop lg: seats | wheel | results+myplays; mobile column order unchanged */}
+          <div
+            className={`grid min-h-0 w-full flex-1 gap-2 sm:gap-2 lg:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_minmax(0,11.5rem)] lg:grid-rows-[auto_minmax(0,1fr)] lg:items-stretch lg:gap-3 ${
+              hasHistory
+                ? "max-lg:grid-cols-1 max-lg:[grid-template-areas:'wheel'_'results'_'seats'_'myplays'] lg:[grid-template-areas:'seats_wheel_results'_'seats_wheel_myplays']"
+                : "max-lg:grid-cols-1 max-lg:[grid-template-areas:'wheel'_'seats'_'myplays'] lg:[grid-template-areas:'seats_wheel_myplays'_'seats_wheel_myplays']"
+            }`}
+          >
+          <div className="relative min-h-0 w-full min-w-0 shrink-0 [grid-area:wheel] lg:min-h-0 lg:self-center">
             {countdown != null ? (
               <div
                 className="pointer-events-none absolute right-0 top-0 z-[61] px-0.5 py-0 sm:px-1 sm:py-0.5"
@@ -854,6 +863,7 @@ export default function Ov2CwScreen({
             </div>
           </div>
             </div>
+            </div>
 
           {lobby && imLeader ? (
             <button
@@ -865,7 +875,6 @@ export default function Ov2CwScreen({
               Start Round
             </button>
           ) : null}
-            </div>
 
           {myPlayPopupOpen || lastResultPopupOpen ? (
             <button
@@ -883,21 +892,29 @@ export default function Ov2CwScreen({
 
           </div>
 
-          {Array.isArray(engine.history) && engine.history.length > 0 ? (
-            <div className="w-full min-w-0 shrink-0">
-              <div className="mb-1 flex items-center gap-2 lg:mb-1.5">
-                <span className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/25 to-transparent" aria-hidden />
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/70">Last Results</p>
-                <span className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/25 to-transparent" aria-hidden />
+          {hasHistory ? (
+            <div className="min-h-0 w-full min-w-0 shrink-0 [grid-area:results] lg:flex lg:min-h-0 lg:flex-col lg:overflow-visible">
+              <div className="mb-1 flex items-center gap-2 lg:mb-1 lg:justify-center">
+                <span
+                  className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/25 to-transparent lg:hidden"
+                  aria-hidden
+                />
+                <p className="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/70 lg:text-[9px]">
+                  Last Results
+                </p>
+                <span
+                  className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/25 to-transparent lg:hidden"
+                  aria-hidden
+                />
               </div>
-              <div className="flex flex-wrap content-start gap-1 pb-0.5 sm:gap-1.5">
-                {engine.history.slice(0, 8).map((h, idx) => {
+              <div className="flex flex-wrap content-start justify-start gap-1 pb-0.5 sm:gap-1.5 lg:flex-row lg:flex-wrap lg:justify-center lg:gap-1 lg:overflow-visible lg:pb-0">
+                {engine.history.slice(0, 10).map((h, idx) => {
                   const n = Math.floor(Number(h.resultNumber) || 0);
                   const c = String(h.resultColor || ov2CwColorForNumber(n));
                   return (
                     <div
                       key={`${h.roundSeq}-${idx}`}
-                      className={`flex h-7 min-w-[1.6rem] shrink-0 items-center justify-center rounded-md border px-0.5 text-[10px] font-black tabular-nums shadow-sm sm:h-7 sm:min-w-[1.75rem] sm:text-[11px] ${
+                      className={`flex h-7 min-w-[1.6rem] shrink-0 items-center justify-center rounded-md border px-0.5 text-[10px] font-black tabular-nums leading-none shadow-sm sm:h-7 sm:min-w-[1.75rem] sm:text-[11px] lg:size-7 lg:shrink-0 lg:rounded-md lg:px-0 lg:text-[9px] ${
                         c === "red"
                           ? "border-red-500/35 bg-gradient-to-b from-red-950/70 to-red-950/40 text-red-100"
                           : c === "black"
@@ -913,18 +930,21 @@ export default function Ov2CwScreen({
             </div>
           ) : null}
 
-          <div className="grid w-full min-w-0 shrink-0 grid-cols-6 gap-0.5 sm:gap-2 lg:gap-2">
+          <div className="grid w-full min-w-0 shrink-0 grid-cols-6 gap-0.5 [grid-area:seats] sm:gap-2 lg:grid-cols-2 lg:grid-rows-3 lg:gap-2 lg:self-start">
             {Array.from({ length: OV2_CW_MAX_SEATS }, (_, i) => seatBtn(seatsForUi[i], i))}
           </div>
 
-          <div className="relative flex w-full shrink-0 flex-col gap-1.5 overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/35 via-black/28 to-black/45 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-2 sm:p-2">
-            <div className="rounded-lg border border-white/[0.06] bg-black/35 p-2 sm:p-2" aria-label="My plays">
+          <div className="relative flex min-h-0 w-full shrink-0 flex-col gap-1.5 overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/35 via-black/28 to-black/45 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] [grid-area:myplays] sm:gap-2 sm:p-2 lg:min-h-0 lg:flex-1">
+            <div
+              className="rounded-lg border border-white/[0.06] bg-black/35 p-2 sm:p-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+              aria-label="My plays"
+            >
               {myPlays.length === 0 ? (
                 <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-white/10 bg-zinc-950/40 py-3 text-center">
                   <p className="text-[10px] font-medium text-zinc-500">No plays this round.</p>
                 </div>
               ) : (
-                <div className="mt-1.5 flex max-h-[min(5.5rem,30svh)] flex-wrap content-start gap-1 overflow-y-auto overscroll-y-contain [-ms-overflow-style:none] [scrollbar-width:none] sm:max-h-[6rem] lg:max-h-[7rem] [&::-webkit-scrollbar]:hidden">
+                <div className="mt-1.5 flex max-h-[min(5.5rem,30svh)] flex-wrap content-start gap-1 overflow-y-auto overscroll-y-contain [-ms-overflow-style:none] [scrollbar-width:none] sm:max-h-[6rem] lg:mt-1 lg:max-h-none lg:min-h-0 lg:flex-1 lg:flex-wrap lg:content-start lg:overflow-y-auto lg:[scrollbar-width:thin] [&::-webkit-scrollbar]:hidden">
                   {myPlays.map(p => {
                     const won =
                       resultPhase && engine.resultNumber != null
@@ -963,6 +983,8 @@ export default function Ov2CwScreen({
                 </div>
               )}
             </div>
+          </div>
+
           </div>
 
           {hint ? <p className="shrink-0 text-center text-[11px] text-rose-300">{hint}</p> : null}
