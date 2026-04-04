@@ -81,12 +81,12 @@ function CwInfoPanelBody({ roomId, tableStakeUnits }) {
           </p>
         )}
         <p className="mt-0.5">
-          The chip row picks red/black, even/odd, low/high, group, column, or exact #. G1–G3 / C1–C3 apply when Group or Column is selected (dimmed when not).
-          The 0–36 grid is only for Exact #.
+          The chip row picks red/black, even/odd, low/high, group, column, or Number. G1–G3 / C1–C3 apply when Group or Column is selected (dimmed when not).
+          The 0–36 grid is only for Number.
         </p>
         <p className="mt-0.5">
           European wheel 0–36, single green. Winning plays credit{" "}
-          <span className="font-mono text-zinc-200">floor(stake × (1 + m))</span>: <span className="text-zinc-200">m = 35</span> exact number,{" "}
+          <span className="font-mono text-zinc-200">floor(stake × (1 + m))</span>: <span className="text-zinc-200">m = 35</span> on Number,{" "}
           <span className="text-zinc-200">m = 2</span> red/black/even/odd/low/high, <span className="text-zinc-200">m = 3</span> group/column.
         </p>
       </section>

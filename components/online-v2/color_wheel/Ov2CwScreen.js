@@ -1124,6 +1124,118 @@ export default function Ov2CwScreen({
   );
 }
 
+const _cwSelRing =
+  "z-[1] ring-2 ring-amber-400 ring-offset-1 ring-offset-zinc-950 shadow-[0_0_12px_-2px_rgba(245,158,11,0.45)]";
+
+/** Number grid tile — matches European wheel red/black/green per `ov2CwColorForNumber`. */
+function ov2CwExactTileClasses(num, isSelected) {
+  const color = ov2CwColorForNumber(num);
+  const ring = isSelected ? _cwSelRing : "hover:brightness-110";
+  if (color === "green") {
+    return `border border-emerald-800/60 bg-gradient-to-b from-emerald-600 to-emerald-950 text-emerald-50 ${ring}`;
+  }
+  if (color === "red") {
+    return `border border-red-900/55 bg-gradient-to-b from-red-600 to-red-950 text-red-50 ${ring}`;
+  }
+  return `border border-zinc-700/70 bg-gradient-to-b from-zinc-700 to-zinc-950 text-zinc-100 ${ring}`;
+}
+
+/** Play-type chip colors (conventional roulette / table cues). */
+function ov2CwPlayKindClasses(kindId, isSelected) {
+  const ring = isSelected ? _cwSelRing : "hover:brightness-110";
+  const pick = (on, off) => (isSelected ? `${on} ${ring}` : `${off} ${ring}`);
+
+  switch (kindId) {
+    case "red":
+      return pick(
+        "border border-red-500/55 bg-gradient-to-b from-red-500 to-red-950 text-red-50",
+        "border border-red-900/45 bg-gradient-to-b from-red-900/70 to-red-950 text-red-200",
+      );
+    case "black":
+      return pick(
+        "border border-zinc-500/50 bg-gradient-to-b from-zinc-600 to-black text-zinc-50",
+        "border border-zinc-700/55 bg-gradient-to-b from-zinc-800 to-zinc-950 text-zinc-200",
+      );
+    case "even":
+      return pick(
+        "border border-sky-400/50 bg-gradient-to-b from-sky-600 to-sky-950 text-sky-50",
+        "border border-sky-900/40 bg-gradient-to-b from-sky-900/55 to-sky-950 text-sky-200",
+      );
+    case "odd":
+      return pick(
+        "border border-violet-400/50 bg-gradient-to-b from-violet-600 to-violet-950 text-violet-50",
+        "border border-violet-900/40 bg-gradient-to-b from-violet-900/55 to-violet-950 text-violet-200",
+      );
+    case "low":
+      return pick(
+        "border border-emerald-400/50 bg-gradient-to-b from-emerald-600 to-emerald-950 text-emerald-50",
+        "border border-emerald-900/40 bg-gradient-to-b from-emerald-900/55 to-emerald-950 text-emerald-200",
+      );
+    case "high":
+      return pick(
+        "border border-orange-400/50 bg-gradient-to-b from-orange-600 to-orange-950 text-orange-50",
+        "border border-orange-900/40 bg-gradient-to-b from-orange-900/55 to-orange-950 text-orange-200",
+      );
+    case "dozen":
+      return pick(
+        "border border-indigo-400/50 bg-gradient-to-b from-indigo-600 to-indigo-950 text-indigo-50",
+        "border border-indigo-900/40 bg-gradient-to-b from-indigo-900/55 to-indigo-950 text-indigo-200",
+      );
+    case "column":
+      return pick(
+        "border border-cyan-400/50 bg-gradient-to-b from-cyan-600 to-cyan-950 text-cyan-50",
+        "border border-cyan-900/40 bg-gradient-to-b from-cyan-900/55 to-cyan-950 text-cyan-200",
+      );
+    case "number":
+      return pick(
+        "border border-emerald-400/55 bg-gradient-to-b from-emerald-600 to-emerald-950 text-emerald-50",
+        "border border-emerald-900/45 bg-gradient-to-b from-emerald-900/60 to-emerald-950 text-emerald-200",
+      );
+    default:
+      return pick(
+        "border border-amber-400/55 bg-gradient-to-b from-amber-600/35 to-amber-950/50 text-amber-50",
+        "border border-white/[0.08] bg-zinc-900/50 text-zinc-400",
+      );
+  }
+}
+
+/** G1–G3 / C1–C3 — distinct hues per slot when active (classic dozen / column bands). */
+function ov2CwGroupSlotClasses(playKind, slot, groupPick, groupActive) {
+  if (!groupActive) {
+    return "cursor-not-allowed border border-white/[0.05] bg-zinc-950/40 text-zinc-600 opacity-50";
+  }
+  const selected = groupPick === slot;
+  const ring = selected ? _cwSelRing : "hover:brightness-110";
+
+  if (playKind === "dozen") {
+    const bySlot = {
+      1: selected
+        ? "border border-emerald-400/50 bg-gradient-to-b from-emerald-600 to-emerald-950 text-emerald-50"
+        : "border border-emerald-900/40 bg-gradient-to-b from-emerald-900/50 to-emerald-950 text-emerald-200",
+      2: selected
+        ? "border border-sky-400/50 bg-gradient-to-b from-sky-600 to-sky-950 text-sky-50"
+        : "border border-sky-900/40 bg-gradient-to-b from-sky-900/50 to-sky-950 text-sky-200",
+      3: selected
+        ? "border border-violet-400/50 bg-gradient-to-b from-violet-600 to-violet-950 text-violet-50"
+        : "border border-violet-900/40 bg-gradient-to-b from-violet-900/50 to-violet-950 text-violet-200",
+    };
+    return `${bySlot[slot]} ${ring}`;
+  }
+
+  const bySlot = {
+    1: selected
+      ? "border border-rose-400/50 bg-gradient-to-b from-rose-600 to-rose-950 text-rose-50"
+      : "border border-rose-900/40 bg-gradient-to-b from-rose-900/50 to-rose-950 text-rose-200",
+    2: selected
+      ? "border border-amber-400/50 bg-gradient-to-b from-amber-600 to-amber-950 text-amber-50"
+      : "border border-amber-900/40 bg-gradient-to-b from-amber-900/50 to-amber-950 text-amber-200",
+    3: selected
+      ? "border border-teal-400/50 bg-gradient-to-b from-teal-600 to-teal-950 text-teal-50"
+      : "border border-teal-900/40 bg-gradient-to-b from-teal-900/50 to-teal-950 text-teal-200",
+  };
+  return `${bySlot[slot]} ${ring}`;
+}
+
 function PlayForm({
   minPlay,
   maxPlay,
@@ -1154,7 +1266,7 @@ function PlayForm({
     { id: "high", label: "High 19–36" },
     { id: "dozen", label: "Group" },
     { id: "column", label: "Column" },
-    { id: "number", label: "Exact #" },
+    { id: "number", label: "Number" },
   ];
 
   const groupActive = playKind === "dozen" || playKind === "column";
@@ -1204,11 +1316,10 @@ function PlayForm({
               key={k.id}
               type="button"
               onClick={() => setPlayKind(k.id)}
-              className={`min-h-[2rem] rounded-lg border px-1.5 py-1 text-[9px] font-bold leading-tight lg:min-h-[2.5rem] lg:rounded-xl lg:px-2 lg:py-1.5 lg:text-[11px] ${
-                playKind === k.id
-                  ? "border-amber-400/55 bg-gradient-to-b from-amber-600/35 to-amber-950/50 text-amber-50 shadow-[0_0_20px_-8px_rgba(245,158,11,0.5),inset_0_1px_0_rgba(255,255,255,0.08)]"
-                  : "border-white/[0.08] bg-zinc-900/50 text-zinc-400 hover:border-white/15 hover:bg-zinc-800/50 hover:text-zinc-200"
-              }`}
+              className={`min-h-[2rem] rounded-lg px-1.5 py-1 text-[9px] font-bold leading-tight transition-[filter,box-shadow] lg:min-h-[2.5rem] lg:rounded-xl lg:px-2 lg:py-1.5 lg:text-[11px] ${ov2CwPlayKindClasses(
+                k.id,
+                playKind === k.id,
+              )}`}
             >
               {k.label}
             </button>
@@ -1224,13 +1335,12 @@ function PlayForm({
               type="button"
               disabled={!groupActive}
               onClick={() => setGroupPick(g)}
-              className={`min-h-[2.35rem] flex-1 rounded-lg border py-1.5 text-[11px] font-extrabold lg:min-h-[2.75rem] lg:rounded-xl lg:py-2 lg:text-xs ${
-                !groupActive
-                  ? "cursor-not-allowed border-white/[0.05] bg-zinc-950/40 text-zinc-600 opacity-50"
-                  : groupPick === g
-                    ? "border-amber-400/50 bg-gradient-to-b from-amber-600/30 to-amber-950/40 text-amber-50"
-                    : "border-white/[0.08] bg-zinc-900/60 text-zinc-400"
-              }`}
+              className={`min-h-[2.35rem] flex-1 rounded-lg py-1.5 text-[11px] font-extrabold transition-[filter,box-shadow] lg:min-h-[2.75rem] lg:rounded-xl lg:py-2 lg:text-xs ${ov2CwGroupSlotClasses(
+                playKind,
+                g,
+                groupPick,
+                groupActive,
+              )}`}
               aria-label={
                 playKind === "dozen"
                   ? `Group ${g}`
@@ -1251,7 +1361,7 @@ function PlayForm({
             numberActive ? "" : "opacity-45"
           }`}
           role="listbox"
-          aria-label="Pick exact number"
+          aria-label="Pick number"
           aria-disabled={!numberActive}
         >
           <div
@@ -1264,11 +1374,10 @@ function PlayForm({
                 disabled={!numberActive}
                 tabIndex={numberActive ? 0 : -1}
                 onClick={() => setNumberPick(n)}
-                className={`flex aspect-square max-h-[1.85rem] min-h-0 w-full items-center justify-center rounded-md text-[10px] font-bold lg:max-h-10 lg:rounded-lg lg:text-xs ${
-                  numberPick === n
-                    ? "bg-gradient-to-b from-amber-500 to-amber-700 text-white shadow-md"
-                    : "bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700"
-                }`}
+                className={`flex aspect-square max-h-[1.85rem] min-h-0 w-full items-center justify-center rounded-md text-[10px] font-bold transition-[filter,box-shadow] lg:max-h-10 lg:rounded-lg lg:text-xs ${ov2CwExactTileClasses(
+                  n,
+                  numberPick === n,
+                )}`}
               >
                 {n}
               </button>
