@@ -95,6 +95,116 @@ function CwInfoPanelBody({ roomId, tableStakeUnits }) {
   );
 }
 
+/**
+ * Live table chrome + `useOv2CwSession` — only mounted when `roomId` is a valid query room id,
+ * so lobby/tier-picker never runs tick/interval `operate` traffic.
+ */
+function Ov2CwTableLive({ roomId, router, nameDraft, setNameDraft, persistName, tableStake }) {
+  const session = useOv2CwSession(roomId, tableStake);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const leaveInFlightRef = useRef(false);
+  const displayName = String(nameDraft || "").trim() || "Guest";
+  const runCwOp = session.operate;
+
+  const onLeaveTable = useCallback(async () => {
+    if (leaveInFlightRef.current || !roomId) return;
+    leaveInFlightRef.current = true;
+    setLeaveBusy(true);
+    try {
+      const tryLeave = async () => {
+        let r = await runCwOp("leave_seat", {});
+        if (r?.skipped) {
+          await new Promise(res => setTimeout(res, 220));
+          r = await runCwOp("leave_seat", {});
+        }
+        return r;
+      };
+      let r = await tryLeave();
+      let okLeave = r?.ok === true || r?.code === "not_seated";
+      if (!okLeave && r?.code === "REVISION_CONFLICT") {
+        await new Promise(res => setTimeout(res, 240));
+        r = await tryLeave();
+        okLeave = r?.ok === true || r?.code === "not_seated";
+      }
+      if (okLeave) {
+        await router.replace("/ov2-color-wheel");
+      }
+    } finally {
+      leaveInFlightRef.current = false;
+      setLeaveBusy(false);
+    }
+  }, [roomId, router, runCwOp]);
+
+  const infoPanel = useMemo(
+    () => (
+      <>
+        <CwInfoPanelBody roomId={roomId} tableStakeUnits={tableStake} />
+        <p className="mt-2 text-[11px] text-zinc-500">
+          <button
+            type="button"
+            className="text-sky-300 underline"
+            onClick={() => void session.reloadFromDb()}
+          >
+            Refresh state
+          </button>
+        </p>
+      </>
+    ),
+    [roomId, tableStake, session.reloadFromDb],
+  );
+
+  return (
+    <OnlineV2GamePageShell
+      title="Color Wheel"
+      subtitle={`Live · table ${formatTierLabel(tableStake)}`}
+      useAppViewportHeight
+      chromePreset="c21_flat"
+      infoPanel={infoPanel}
+    >
+      <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1.5 overflow-hidden sm:gap-2">
+        <div className="flex w-full min-w-0 shrink-0 flex-nowrap items-center gap-2 overflow-hidden px-2 py-1.5 sm:gap-2.5 sm:px-2.5 sm:py-2">
+          <input
+            value={nameDraft}
+            onChange={e => setNameDraft(e.target.value)}
+            onBlur={persistName}
+            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/[0.08] bg-black/25 px-2.5 py-2 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
+            placeholder="Display name"
+          />
+          <button
+            type="button"
+            title="Pick another table without leaving your seat"
+            onClick={() => router.push("/ov2-color-wheel")}
+            className={OV2_HUD_CHROME_BTN}
+          >
+            Tables
+          </button>
+          <button
+            type="button"
+            title="Vacate seat and return to table list"
+            disabled={leaveBusy}
+            onClick={() => void onLeaveTable()}
+            className={`${OV2_HUD_CHROME_BTN} shrink-0 border-rose-500/35 bg-rose-950/35 text-rose-100 hover:border-rose-400/45 hover:bg-rose-950/50 disabled:opacity-45`}
+          >
+            {leaveBusy ? "…" : "Leave"}
+          </button>
+        </div>
+        <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden">
+          <Ov2CwScreen
+            roomId={roomId}
+            engine={session.engine}
+            tableStakeUnits={tableStake}
+            participantKey={session.participantKey}
+            displayName={displayName}
+            onOperate={session.operate}
+            operateBusy={session.operateBusy}
+            loadError={session.loadError}
+          />
+        </div>
+      </div>
+    </OnlineV2GamePageShell>
+  );
+}
+
 export default function Ov2CwLiveShell() {
   const router = useRouter();
   const roomId = useMemo(() => parseRoomQuery(router), [router.isReady, router.query.room]);
@@ -105,10 +215,6 @@ export default function Ov2CwLiveShell() {
   const [nameDraft, setNameDraft] = useState(() =>
     typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
   );
-  const [leaveBusy, setLeaveBusy] = useState(false);
-  const leaveInFlightRef = useRef(false);
-
-  const session = useOv2CwSession(roomId, tableStake);
 
   const cwLobbyRoomIds = useMemo(
     () => OV2_CW_STAKE_TIERS.flatMap(t => [...OV2_CW_ROOM_IDS_BY_STAKE[t]]),
@@ -147,60 +253,13 @@ export default function Ov2CwLiveShell() {
     })();
   }, [roomId]);
 
-  const displayName = String(nameDraft || "").trim() || "Guest";
-  const runCwOp = session.operate;
-
-  const onLeaveTable = useCallback(async () => {
-    if (leaveInFlightRef.current || !roomId) return;
-    leaveInFlightRef.current = true;
-    setLeaveBusy(true);
-    try {
-      const tryLeave = async () => {
-        let r = await runCwOp("leave_seat", {});
-        if (r?.skipped) {
-          await new Promise(res => setTimeout(res, 220));
-          r = await runCwOp("leave_seat", {});
-        }
-        return r;
-      };
-      let r = await tryLeave();
-      let okLeave = r?.ok === true || r?.code === "not_seated";
-      if (!okLeave && r?.code === "REVISION_CONFLICT") {
-        await new Promise(res => setTimeout(res, 240));
-        r = await tryLeave();
-        okLeave = r?.ok === true || r?.code === "not_seated";
-      }
-      if (okLeave) {
-        await router.replace("/ov2-color-wheel");
-      }
-    } finally {
-      leaveInFlightRef.current = false;
-      setLeaveBusy(false);
-    }
-  }, [roomId, router, runCwOp]);
-
   const persistName = () => {
     writeOv2SharedDisplayName(nameDraft);
   };
 
-  const infoPanel = useMemo(
-    () => (
-      <>
-        <CwInfoPanelBody roomId={roomId} tableStakeUnits={tableStake} />
-        <p className="mt-2 text-[11px] text-zinc-500">
-          {roomId ? (
-            <button
-              type="button"
-              className="text-sky-300 underline"
-              onClick={() => void session.reloadFromDb()}
-            >
-              Refresh state
-            </button>
-          ) : null}
-        </p>
-      </>
-    ),
-    [roomId, tableStake, session.reloadFromDb],
+  const lobbyInfoPanel = useMemo(
+    () => <CwInfoPanelBody roomId={null} tableStakeUnits={tableStake} />,
+    [tableStake],
   );
 
   if (!roomId) {
@@ -210,7 +269,7 @@ export default function Ov2CwLiveShell() {
         subtitle="Public tables · private rooms"
         useAppViewportHeight
         chromePreset="c21_flat"
-        infoPanel={infoPanel}
+        infoPanel={lobbyInfoPanel}
       >
         <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
           <Ov2WavePrivateRoomModal
@@ -296,53 +355,13 @@ export default function Ov2CwLiveShell() {
   }
 
   return (
-    <OnlineV2GamePageShell
-      title="Color Wheel"
-      subtitle={`Live · table ${formatTierLabel(tableStake)}`}
-      useAppViewportHeight
-      chromePreset="c21_flat"
-      infoPanel={infoPanel}
-    >
-      <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1.5 overflow-hidden sm:gap-2">
-        <div className="flex w-full min-w-0 shrink-0 flex-nowrap items-center gap-2 overflow-hidden px-2 py-1.5 sm:gap-2.5 sm:px-2.5 sm:py-2">
-          <input
-            value={nameDraft}
-            onChange={e => setNameDraft(e.target.value)}
-            onBlur={persistName}
-            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/[0.08] bg-black/25 px-2.5 py-2 text-[11px] text-zinc-100 placeholder:text-zinc-600 focus:outline-none"
-            placeholder="Display name"
-          />
-          <button
-            type="button"
-            title="Pick another table without leaving your seat"
-            onClick={() => router.push("/ov2-color-wheel")}
-            className={OV2_HUD_CHROME_BTN}
-          >
-            Tables
-          </button>
-          <button
-            type="button"
-            title="Vacate seat and return to table list"
-            disabled={leaveBusy}
-            onClick={() => void onLeaveTable()}
-            className={`${OV2_HUD_CHROME_BTN} shrink-0 border-rose-500/35 bg-rose-950/35 text-rose-100 hover:border-rose-400/45 hover:bg-rose-950/50 disabled:opacity-45`}
-          >
-            {leaveBusy ? "…" : "Leave"}
-          </button>
-        </div>
-        <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden">
-          <Ov2CwScreen
-            roomId={roomId}
-            engine={session.engine}
-            tableStakeUnits={tableStake}
-            participantKey={session.participantKey}
-            displayName={displayName}
-            onOperate={session.operate}
-            operateBusy={session.operateBusy}
-            loadError={session.loadError}
-          />
-        </div>
-      </div>
-    </OnlineV2GamePageShell>
+    <Ov2CwTableLive
+      roomId={roomId}
+      router={router}
+      nameDraft={nameDraft}
+      setNameDraft={setNameDraft}
+      persistName={persistName}
+      tableStake={tableStake}
+    />
   );
 }

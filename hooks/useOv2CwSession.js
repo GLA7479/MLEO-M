@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase } from "../lib/supabaseClients";
 import { getOv2ParticipantId } from "../lib/online-v2/ov2ParticipantId";
+import { isOv2RoomIdQueryParam } from "../lib/online-v2/onlineV2GameRegistry";
 import { postOv2CwOperate } from "../lib/online-v2/color_wheel/ov2CwApi";
 import { creditOnlineV2VaultForSettlementLine, readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import { OV2_CW_PRODUCT_GAME_ID } from "../lib/online-v2/color_wheel/ov2CwTableIds";
@@ -55,6 +56,11 @@ async function flushCwOperateSideEffects(json, participantKey) {
 }
 
 export function useOv2CwSession(roomId, _tableStakeUnits) {
+  const resolvedRoomId = useMemo(() => {
+    const s = String(roomId ?? "").trim();
+    return s && isOv2RoomIdQueryParam(s) ? s : null;
+  }, [roomId]);
+
   const [engine, setEngine] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [operateBusy, setOperateBusy] = useState(false);
@@ -64,12 +70,12 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
   const operateInFlightRef = useRef(false);
 
   const reloadFromDb = useCallback(async () => {
-    if (!roomId) return;
+    if (!resolvedRoomId) return;
     setLoadError("");
     const { data, error } = await supabase
       .from("ov2_color_wheel_live_state")
       .select("engine, match_seq, revision")
-      .eq("room_id", roomId)
+      .eq("room_id", resolvedRoomId)
       .maybeSingle();
     if (error) {
       setLoadError(error.message || String(error));
@@ -78,19 +84,19 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
     if (data?.engine && typeof data.engine === "object") {
       setEngine(data.engine);
     }
-  }, [roomId]);
+  }, [resolvedRoomId]);
 
   useEffect(() => {
     void reloadFromDb();
   }, [reloadFromDb]);
 
   useEffect(() => {
-    if (!roomId) return undefined;
+    if (!resolvedRoomId) return undefined;
     let cancelled = false;
     void (async () => {
       try {
         const json = await postOv2CwOperate({
-          roomId,
+          roomId: resolvedRoomId,
           participantKey,
           op: "tick",
           payload: {},
@@ -105,15 +111,15 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
     return () => {
       cancelled = true;
     };
-  }, [roomId, participantKey]);
+  }, [resolvedRoomId, participantKey]);
 
   useEffect(() => {
-    if (!roomId) return undefined;
+    if (!resolvedRoomId) return undefined;
     const channel = supabase
-      .channel(`ov2_cw_${roomId}`)
+      .channel(`ov2_cw_${resolvedRoomId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "ov2_color_wheel_live_state", filter: `room_id=eq.${roomId}` },
+        { event: "*", schema: "public", table: "ov2_color_wheel_live_state", filter: `room_id=eq.${resolvedRoomId}` },
         payload => {
           const row = payload.new || payload.old;
           if (row?.engine && typeof row.engine === "object") {
@@ -125,17 +131,17 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [roomId]);
+  }, [resolvedRoomId]);
 
   const operate = useCallback(
     async (op, payload = {}) => {
-      if (!roomId) return { ok: false };
+      if (!resolvedRoomId) return { ok: false };
       if (operateInFlightRef.current) return { ok: false, skipped: true };
       operateInFlightRef.current = true;
       setOperateBusy(true);
       try {
         const json = await postOv2CwOperate({
-          roomId,
+          roomId: resolvedRoomId,
           participantKey,
           op,
           payload,
@@ -155,11 +161,11 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
         setOperateBusy(false);
       }
     },
-    [roomId, participantKey],
+    [resolvedRoomId, participantKey],
   );
 
   useEffect(() => {
-    if (!roomId) return undefined;
+    if (!resolvedRoomId) return undefined;
     const id = window.setInterval(() => {
       const now = Date.now();
       if (now - lastTickAtRef.current < 900) return;
@@ -169,7 +175,7 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
       void (async () => {
         try {
           const json = await postOv2CwOperate({
-            roomId,
+            roomId: resolvedRoomId,
             participantKey,
             op: "tick",
             payload: {},
@@ -184,7 +190,7 @@ export function useOv2CwSession(roomId, _tableStakeUnits) {
       })();
     }, 1000);
     return () => window.clearInterval(id);
-  }, [roomId, participantKey]);
+  }, [resolvedRoomId, participantKey]);
 
   return {
     engine,
