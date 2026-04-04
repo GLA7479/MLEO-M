@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isOv2CcHandBettingLive } from "../../../lib/online-v2/community_cards/ov2CcClientConstants";
+import {
+  isOv2CcHandBettingLive,
+  OV2_CC_COMMUNITY_REVEAL_STAGGER_MS,
+} from "../../../lib/online-v2/community_cards/ov2CcClientConstants";
 import {
   OV2_CC_MOBILE_FELT_HEIGHT_CLASSES,
   OV2_CC_MOBILE_HERO_ZONE_CLASSES,
@@ -139,6 +142,45 @@ export default function Ov2CcScreen({
   /** Tablet/desktop (≥640px): keep the same board + seat ring as live streets — no idle “widen” or alternate center stack (avoids jumps at showdown / between hands). */
   const ccPadDkStableLayout = seatRingBp === "pad" || seatRingBp === "dk";
 
+  const board = useMemo(
+    () => (Array.isArray(engine?.communityCards) ? engine.communityCards : []),
+    [engine?.communityCards],
+  );
+  const boardSig = board.join(",");
+  const boardHandSeq = Math.floor(Number(engine?.handSeq) || 0);
+  const [boardRevealCount, setBoardRevealCount] = useState(0);
+  const boardStaggerHsRef = useRef(null);
+
+  useEffect(() => {
+    if (!engine) return;
+    const len = board.length;
+    const hs = boardHandSeq;
+    if (boardStaggerHsRef.current === null) {
+      boardStaggerHsRef.current = hs;
+      setBoardRevealCount(len);
+      return;
+    }
+    if (boardStaggerHsRef.current !== hs) {
+      boardStaggerHsRef.current = hs;
+      setBoardRevealCount(len);
+      return;
+    }
+    setBoardRevealCount(prev => (len < prev ? len : prev));
+  }, [engine, board.length, boardSig, boardHandSeq]);
+
+  useEffect(() => {
+    if (!engine) return undefined;
+    const target = board.length;
+    if (target === 0) return undefined;
+    const id = window.setTimeout(() => {
+      setBoardRevealCount(prev => {
+        if (prev >= target) return prev;
+        return prev + 1;
+      });
+    }, OV2_CC_COMMUNITY_REVEAL_STAGGER_MS);
+    return () => window.clearTimeout(id);
+  }, [engine, board.length, boardSig, boardRevealCount]);
+
   if (!engine) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center text-sm text-zinc-500">
@@ -147,7 +189,7 @@ export default function Ov2CcScreen({
     );
   }
 
-  const { maxSeats, pot, communityCards, phase, currentBet, sb, bb } = engine;
+  const { maxSeats, pot, phase, currentBet, sb, bb } = engine;
   const street = engine.street;
   const betweenHands = phase === "idle" || phase === "between_hands";
   const seats = Array.isArray(engine.seats) ? engine.seats : [];
@@ -350,24 +392,16 @@ export default function Ov2CcScreen({
                               BTN {engine.buttonSeat + 1} · SB {engine.sbSeat + 1} · BB {engine.bbSeat + 1}
                             </p>
                           ) : null}
-                          {phase === "between_hands" && nextHandInSec != null ? (
-                            <p className="mt-0.5 text-[11px] font-medium text-amber-200/80 sm:text-[12px]">
-                              Next hand ~{nextHandInSec}s
-                            </p>
-                          ) : null}
-                          {engine.tableNotice ? (
-                            <p className="mt-0.5 text-[11px] text-amber-200/75 sm:text-[12px]">{engine.tableNotice}</p>
-                          ) : null}
                         </div>
 
                         <div className="relative z-[1] flex min-h-[2.75rem] flex-nowrap items-center justify-center gap-1.5 max-sm:drop-shadow-[0_3px_8px_rgba(0,0,0,0.32)] drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.1rem] sm:gap-2 md:min-h-[3.35rem]">
-                          {(communityCards || []).length === 0 ? (
+                          {board.length === 0 ? (
                             <span className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center text-[12px] font-medium tracking-wide text-emerald-200/30 sm:text-[13px]">
                               Community cards
                             </span>
                           ) : null}
                           {Array.from({ length: 5 }, (_, i) => {
-                            const c = (communityCards || [])[i];
+                            const c = i < boardRevealCount ? board[i] : undefined;
                             return (
                               <div key={`board-live-slot-${i}`} className="relative z-[1] flex shrink-0 items-center justify-center">
                                 {c ? (
@@ -439,21 +473,15 @@ export default function Ov2CcScreen({
                             )}
                           </p>
                           <p className="min-h-[1.125rem] text-[11px] font-medium leading-tight sm:min-h-[1.25rem] sm:text-[12px]">
-                            {engine.tableNotice ? (
-                              <span className="text-amber-200/75">{engine.tableNotice}</span>
-                            ) : phase === "between_hands" && nextHandInSec != null ? (
-                              <span className="text-amber-200/80">Next hand ~{nextHandInSec}s</span>
-                            ) : (
-                              <span className="invisible" aria-hidden>
-                                &nbsp;
-                              </span>
-                            )}
+                            <span className="invisible" aria-hidden>
+                              &nbsp;
+                            </span>
                           </p>
                         </div>
 
                         <div className="relative z-[1] flex min-h-[2.75rem] flex-nowrap items-center justify-center gap-1.5 max-sm:drop-shadow-[0_3px_8px_rgba(0,0,0,0.32)] drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.1rem] sm:gap-2 md:min-h-[3.35rem]">
                           {Array.from({ length: 5 }, (_, i) => {
-                            const c = (communityCards || [])[i];
+                            const c = i < boardRevealCount ? board[i] : undefined;
                             return (
                               <div key={`board-slot-${i}`} className="flex shrink-0 items-center justify-center">
                                 {c ? (
@@ -537,10 +565,13 @@ export default function Ov2CcScreen({
               >
                 {canAct && turnSecondsLeft != null ? (
                   <div
-                    className="flex min-w-[2.5rem] flex-col items-center justify-center rounded-lg border border-amber-500/30 bg-black/55 px-2 py-1 text-center shadow-[0_4px_14px_rgba(0,0,0,0.35)] sm:min-w-[2.75rem] sm:rounded-full sm:px-2.5 sm:py-1"
+                    className="flex min-w-[3.25rem] flex-col items-center justify-center rounded-lg border border-amber-500/30 bg-black/55 px-2 py-1 text-center shadow-[0_4px_14px_rgba(0,0,0,0.35)] sm:min-w-[3.5rem] sm:rounded-full sm:px-2.5 sm:py-1"
                     aria-label={`Your turn · ${turnSecondsLeft} seconds`}
                   >
-                    <span className="font-mono text-sm font-bold tabular-nums text-amber-100 sm:text-base">
+                    <span className="block w-full text-center text-[10px] font-medium tracking-wide text-amber-200/80 sm:text-[11px]">
+                      YOU
+                    </span>
+                    <span className="font-mono text-xs font-bold tabular-nums text-amber-100 sm:text-sm">
                       {turnSecondsLeft}
                     </span>
                   </div>
@@ -564,6 +595,24 @@ export default function Ov2CcScreen({
                   </div>
                 ) : null}
               </div>
+
+              {engine.tableNotice || (phase === "between_hands" && nextHandInSec != null) ? (
+                <div
+                  className="pointer-events-none absolute right-2 bottom-[max(0.45rem,env(safe-area-inset-bottom,0px))] z-[12] flex max-w-[min(42vw,9.5rem)] flex-col items-end gap-1 text-right sm:right-3 sm:bottom-3 sm:max-w-[11rem] md:max-w-[12rem] lg:bottom-4"
+                  aria-live="polite"
+                >
+                  {engine.tableNotice ? (
+                    <p className="rounded-md border border-amber-500/22 bg-black/50 px-2 py-1 text-[11px] font-medium leading-snug text-amber-200/88 shadow-[0_4px_12px_rgba(0,0,0,0.3)] sm:px-2.5 sm:py-1.5 sm:text-[12px]">
+                      {engine.tableNotice}
+                    </p>
+                  ) : null}
+                  {phase === "between_hands" && nextHandInSec != null ? (
+                    <p className="rounded-md border border-amber-500/28 bg-black/45 px-2 py-1 text-[11px] font-medium text-amber-200/88 shadow-[0_4px_12px_rgba(0,0,0,0.28)] sm:px-2.5 sm:py-1.5 sm:text-[12px]">
+                      Next hand ~{nextHandInSec}s
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="pointer-events-none absolute inset-0 z-[7]">
                 {seats.length === 0 ? null : seats.map((s, i) => renderSeatNode(s, i))}
