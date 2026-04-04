@@ -769,14 +769,14 @@ export default function Ov2CwScreen({
                 </div>
               </div>
               <div
-                className="relative z-[1] mt-0 aspect-square w-full max-lg:shrink-0 overflow-visible rounded-full p-1 shadow-none ring-0 sm:p-[3px]"
+                className="relative z-[1] mt-0 aspect-square w-full max-lg:shrink-0 overflow-visible rounded-full p-1 shadow-[0_10px_36px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.07)] ring-0 sm:p-[3px]"
                 style={{
                   background: "linear-gradient(145deg, rgba(39,39,42,0.85) 0%, rgba(9,9,11,0.92) 55%, rgba(50,28,8,0.3) 100%)",
                 }}
               >
             <div className="relative h-full w-full overflow-visible">
               <div
-                className="relative h-full w-full overflow-visible rounded-full border border-zinc-800/70 shadow-none"
+                className="relative h-full w-full overflow-hidden rounded-full border border-zinc-700/80 shadow-[inset_0_2px_14px_rgba(0,0,0,0.55),inset_0_-6px_20px_rgba(0,0,0,0.35)]"
                 style={{
                   transform: `rotate(${wheelDisplayDeg}deg)`,
                   transition:
@@ -786,6 +786,44 @@ export default function Ov2CwScreen({
                 <div
                   className="absolute inset-0 overflow-hidden rounded-full"
                   style={{ background: CONIC_BG }}
+                  aria-hidden
+                />
+                <div
+                  className="pointer-events-none absolute inset-0 z-[1] overflow-hidden rounded-full mix-blend-soft-light"
+                  style={{
+                    background:
+                      "radial-gradient(ellipse 85% 75% at 35% 28%, rgba(255,255,255,0.22) 0%, transparent 52%), radial-gradient(ellipse 70% 60% at 72% 78%, rgba(0,0,0,0.45) 0%, transparent 55%)",
+                  }}
+                  aria-hidden
+                />
+                <div
+                  className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-full"
+                  style={{
+                    boxShadow:
+                      "inset 0 0 28px rgba(0,0,0,0.5), inset 0 -12px 24px rgba(0,0,0,0.35)",
+                  }}
+                  aria-hidden
+                />
+                {Array.from({ length: OV2_CW_WHEEL_NUMBERS.length }, (_, k) => {
+                  const thetaFromTop = (270 + k * OV2_CW_SEGMENT_DEG) % 360;
+                  return (
+                    <div
+                      key={`fret-${k}`}
+                      className="pointer-events-none absolute left-1/2 top-1/2 z-[3] h-[44.5%] w-[2px] -translate-x-1/2 origin-top bg-gradient-to-b from-zinc-200/90 via-zinc-500/75 to-zinc-900/25"
+                      style={{
+                        transform: `translate(-50%, 0) rotate(${thetaFromTop - 180}deg)`,
+                        boxShadow: "0 0 1px rgba(0,0,0,0.9), 1px 0 0 rgba(255,255,255,0.08)",
+                      }}
+                      aria-hidden
+                    />
+                  );
+                })}
+                <div
+                  className="pointer-events-none absolute inset-[1.5%] z-[4] overflow-hidden rounded-full border border-zinc-500/20 shadow-[inset_0_0_10px_rgba(0,0,0,0.4)]"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, rgba(82,82,91,0.35) 0%, rgba(24,24,27,0.15) 40%, rgba(9,9,11,0.25) 100%)",
+                  }}
                   aria-hidden
                 />
                 <div
@@ -831,17 +869,30 @@ export default function Ov2CwScreen({
                   })}
                 </div>
                 <div
-                  className="absolute inset-[18%] z-20 flex flex-col items-center justify-center rounded-full border-0 bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-none sm:inset-[18%] lg:inset-[19%]"
+                  className="absolute inset-[18%] z-20 flex flex-col items-center justify-center overflow-hidden rounded-full sm:inset-[18%] lg:inset-[19%]"
                   style={{
                     transform: `rotate(${viewerHorizontalLabelDeg(wheelDisplayDeg)}deg)`,
                     transition:
                       spinning || placingLive ? "none" : "transform 0.35s ease-out",
                   }}
                 >
+                  <div
+                    className="pointer-events-none absolute inset-0 rounded-full border border-zinc-600/50 shadow-[inset_0_3px_10px_rgba(255,255,255,0.14),inset_0_-8px_18px_rgba(0,0,0,0.85),0_0_0_1px_rgba(0,0,0,0.6)]"
+                    style={{
+                      background:
+                        "linear-gradient(145deg, #71717a 0%, #3f3f46 22%, #18181b 55%, #09090b 100%)",
+                    }}
+                    aria-hidden
+                  />
+                  <div
+                    className="pointer-events-none absolute inset-[7%] rounded-full border border-zinc-800/80 bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-[inset_0_2px_6px_rgba(255,255,255,0.06),inset_0_-6px_14px_rgba(0,0,0,0.9)]"
+                    aria-hidden
+                  />
+                  <div className="relative z-[1] flex flex-col items-center justify-center px-1">
               {resultPhase && centerResult != null && centerResult >= 0 ? (
                 <>
                   <span
-                    className={`text-3xl font-black tabular-nums drop-shadow-sm sm:text-4xl md:text-5xl ${
+                    className={`text-3xl font-black tabular-nums drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] sm:text-4xl md:text-5xl ${
                       centerColor === "red"
                         ? "text-red-400"
                         : centerColor === "black"
@@ -860,6 +911,7 @@ export default function Ov2CwScreen({
                   Color Wheel
                 </span>
               )}
+                  </div>
                 </div>
               </div>
             </div>
