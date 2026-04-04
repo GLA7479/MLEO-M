@@ -907,7 +907,6 @@ export default function Ov2CwScreen({
                 <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/[0.06] px-4 pb-2.5 pt-3">
                   <div className="min-w-0 flex-1 text-center lg:text-left">
                     <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200/70">Play Panel</p>
-                    <p className="text-xs text-zinc-500">Amount · type · place</p>
                   </div>
                   <button
                     type="button"
@@ -1164,7 +1163,6 @@ function PlayForm({
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col gap-2 lg:gap-4">
       <div className="shrink-0 rounded-lg border border-white/[0.08] bg-black/40 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:rounded-xl lg:p-3">
-        <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-500 lg:mb-2 lg:text-[9px]">Amount</p>
         <div className="flex items-center gap-1.5 lg:gap-2">
           <div className="flex shrink-0 gap-1 lg:gap-1.5">
             <button
@@ -1200,7 +1198,6 @@ function PlayForm({
       </div>
 
       <div className="shrink-0">
-        <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-500 lg:mb-2 lg:text-[9px]">Play type</p>
         <div className="grid grid-cols-3 gap-1 sm:grid-cols-4 lg:gap-1.5">
           {kinds.map(k => (
             <button
@@ -1220,7 +1217,6 @@ function PlayForm({
       </div>
 
       <div className="shrink-0">
-        <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-500 lg:mb-2 lg:text-[9px]">Group / column</p>
         <div className="flex gap-1.5 lg:gap-2">
           {[1, 2, 3].map(g => (
             <button
@@ -1250,13 +1246,6 @@ function PlayForm({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:min-h-[11rem]">
-        <p
-          className={`mb-1 shrink-0 text-[8px] font-bold uppercase tracking-[0.12em] lg:mb-2 lg:text-[9px] ${
-            numberActive ? "text-zinc-500" : "text-zinc-600"
-          }`}
-        >
-          Exact number
-        </p>
         <div
           className={`min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-white/[0.06] bg-black/30 [-webkit-overflow-scrolling:touch] lg:max-h-44 ${
             numberActive ? "" : "opacity-45"
@@ -1287,9 +1276,6 @@ function PlayForm({
           </div>
         </div>
       </div>
-      <p className="shrink-0 text-center text-[9px] leading-snug text-zinc-500 lg:text-[10px] lg:leading-relaxed">
-        Min {fmt(minPlay)} · Max {fmt(maxPlay)}. Successful plays return stake plus a multiplier set by play type (see info).
-      </p>
     </div>
   );
 }

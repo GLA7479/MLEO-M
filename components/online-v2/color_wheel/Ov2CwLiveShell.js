@@ -31,7 +31,17 @@ function formatTierLabel(tier) {
   return String(tier);
 }
 
-function CwInfoPanelBody() {
+function fmtInfoAmount(n) {
+  const x = Math.floor(Number(n) || 0);
+  if (x >= 1e6) return `${(x / 1e6).toFixed(2)}M`;
+  if (x >= 1e3) return `${(x / 1e3).toFixed(2)}K`;
+  return String(x);
+}
+
+function CwInfoPanelBody({ roomId, tableStakeUnits }) {
+  const minP = Math.max(100, Math.floor(Number(tableStakeUnits) || 100));
+  const maxP = Math.min(minP * 200, 10_000_000);
+
   return (
     <div className="space-y-2 text-[11px] leading-snug text-zinc-300">
       <section>
@@ -58,9 +68,26 @@ function CwInfoPanelBody() {
         </ul>
       </section>
       <section>
-        <p className="font-semibold text-zinc-100">Play types</p>
+        <p className="font-semibold text-zinc-100">Play panel</p>
+        {roomId ? (
+          <p className="mt-0.5">
+            This table: min play <span className="font-mono tabular-nums text-zinc-200">{fmtInfoAmount(minP)}</span>, max{" "}
+            <span className="font-mono tabular-nums text-zinc-200">{fmtInfoAmount(maxP)}</span> per accepted play. Use −min, +min, and +4× to step the
+            amount field.
+          </p>
+        ) : (
+          <p className="mt-0.5">
+            Min play is the table stake; max is 200× that stake (capped at 10,000,000). Open a table to see exact limits for that room.
+          </p>
+        )}
         <p className="mt-0.5">
-          Exact number, red / black, even / odd, low / high ranges, three number groups, and three columns — same logic as the classic European wheel layout (0–36, single green).
+          The chip row picks red/black, even/odd, low/high, group, column, or exact #. G1–G3 / C1–C3 apply when Group or Column is selected (dimmed when not).
+          The 0–36 grid is only for Exact #.
+        </p>
+        <p className="mt-0.5">
+          European wheel 0–36, single green. Winning plays credit{" "}
+          <span className="font-mono text-zinc-200">floor(stake × (1 + m))</span>: <span className="text-zinc-200">m = 35</span> exact number,{" "}
+          <span className="text-zinc-200">m = 2</span> red/black/even/odd/low/high, <span className="text-zinc-200">m = 3</span> group/column.
         </p>
       </section>
     </div>
@@ -152,7 +179,7 @@ export default function Ov2CwLiveShell() {
   const infoPanel = useMemo(
     () => (
       <>
-        <CwInfoPanelBody />
+        <CwInfoPanelBody roomId={roomId} tableStakeUnits={tableStake} />
         <p className="mt-2 text-[11px] text-zinc-500">
           {roomId ? (
             <button
@@ -166,7 +193,7 @@ export default function Ov2CwLiveShell() {
         </p>
       </>
     ),
-    [roomId, session.reloadFromDb],
+    [roomId, tableStake, session.reloadFromDb],
   );
 
   if (!roomId) {
