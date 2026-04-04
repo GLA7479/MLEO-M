@@ -79,10 +79,11 @@ export default function Ov2CwScreen({
 }) {
   const [tick, setTick] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [allPlaysOpen, setAllPlaysOpen] = useState(false);
   const [myPlayPopupOpen, setMyPlayPopupOpen] = useState(false);
   const [lastResultPopupOpen, setLastResultPopupOpen] = useState(false);
   const [myPlayPopupAllOpen, setMyPlayPopupAllOpen] = useState(false);
+  /** Occupied seat index for read-only player + bets + recent results panel */
+  const [seatInspectorIndex, setSeatInspectorIndex] = useState(null);
   const [hint, setHint] = useState("");
   const [playAmount, setPlayAmount] = useState(String(tableStakeUnits || 100));
   const [playKind, setPlayKind] = useState("red");
@@ -186,6 +187,7 @@ export default function Ov2CwScreen({
     setMyPlayPopupOpen(false);
     setLastResultPopupOpen(false);
     setMyPlayPopupAllOpen(false);
+    setSeatInspectorIndex(null);
     setSheetOpen(true);
   }, []);
 
@@ -194,8 +196,24 @@ export default function Ov2CwScreen({
       setMyPlayPopupOpen(false);
       setLastResultPopupOpen(false);
       setMyPlayPopupAllOpen(false);
+      setSeatInspectorIndex(null);
     }
   }, [sheetOpen]);
+
+  useEffect(() => {
+    if (seatInspectorIndex == null) return;
+    const s = seatsForUi[seatInspectorIndex];
+    if (!s?.participantKey) setSeatInspectorIndex(null);
+  }, [seatInspectorIndex, seatsForUi]);
+
+  useEffect(() => {
+    if (seatInspectorIndex == null) return undefined;
+    const onKey = e => {
+      if (e.key === "Escape") setSeatInspectorIndex(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [seatInspectorIndex]);
 
   useEffect(() => {
     if (!myPlayPopupOpen) setMyPlayPopupAllOpen(false);
@@ -256,6 +274,16 @@ export default function Ov2CwScreen({
     [plays, participantKey, roundSeq],
   );
 
+  const inspectorSeatPlays = useMemo(() => {
+    if (seatInspectorIndex == null) return [];
+    const s = seatsForUi[seatInspectorIndex];
+    const pk = String(s?.participantKey || "").trim();
+    if (!pk) return [];
+    return plays.filter(
+      p => String(p.participantKey || "").trim() === pk && Math.floor(Number(p.roundSeq) || 0) === roundSeq,
+    );
+  }, [seatInspectorIndex, seatsForUi, plays, roundSeq]);
+
   const centerResult =
     resultPhase || spinning
       ? spinning
@@ -287,7 +315,7 @@ export default function Ov2CwScreen({
     const mine = s.participantKey === participantKey;
     const isRoundController = occ && leaderPk && s.participantKey === leaderPk;
     const base =
-      "relative flex min-h-0 flex-col items-center justify-center gap-0 rounded-md border px-0.5 py-0.5 text-center touch-manipulation transition-[box-shadow,border-color,transform] active:scale-[0.99] max-sm:min-h-[1.5rem] max-sm:leading-none sm:min-h-[3.25rem] sm:gap-0.5 sm:rounded-xl sm:px-2 sm:py-1.5 sm:text-[11px] lg:min-h-[2.5rem] lg:rounded-lg lg:px-1.5 lg:py-1 lg:text-[10px]";
+      "relative flex min-h-0 flex-col items-center justify-center gap-0 rounded-md border px-0.5 py-2.5 text-center touch-manipulation transition-[box-shadow,border-color,transform] active:scale-[0.99] max-sm:min-h-[2rem] max-sm:leading-none sm:min-h-[4.125rem] sm:gap-0.5 sm:rounded-xl sm:px-2 sm:py-3.5 sm:text-[11px] lg:min-h-[3.5rem] lg:rounded-lg lg:px-1.5 lg:py-3 lg:text-[10px]";
     if (!occ) {
       return (
         <button
@@ -305,9 +333,18 @@ export default function Ov2CwScreen({
       );
     }
     return (
-      <div
+      <button
+        type="button"
         key={i}
-        className={`${base} border-white/[0.12] bg-gradient-to-b from-zinc-900/90 to-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.35)] ${
+        onClick={() => {
+          setMyPlayPopupOpen(false);
+          setLastResultPopupOpen(false);
+          setSeatInspectorIndex(i);
+        }}
+        aria-haspopup="dialog"
+        aria-expanded={seatInspectorIndex === i}
+        aria-label={`Player details, seat ${i + 1}`}
+        className={`${base} cursor-pointer border-white/[0.12] bg-gradient-to-b from-zinc-900/90 to-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.35)] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${
           mine
             ? "z-[1] border-amber-400/45 shadow-[0_0_0_1px_rgba(251,191,36,0.25),0_0_28px_-8px_rgba(245,158,11,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]"
             : ""
@@ -327,7 +364,7 @@ export default function Ov2CwScreen({
         >
           {mine ? "You" : `${i + 1}`}
         </span>
-      </div>
+      </button>
     );
   };
 
@@ -338,6 +375,11 @@ export default function Ov2CwScreen({
     : "";
 
   const wheelStageMax = "max-w-[min(92vw,17.5rem)] lg:max-w-[min(100%,22rem)] xl:max-w-[24rem]";
+
+  const inspectorSeat =
+    seatInspectorIndex != null && seatsForUi[seatInspectorIndex]?.participantKey
+      ? seatsForUi[seatInspectorIndex]
+      : null;
 
   return (
     <div className="relative mx-auto flex h-full min-h-0 w-full max-w-xl flex-col overflow-hidden sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
@@ -398,10 +440,11 @@ export default function Ov2CwScreen({
             <button
               type="button"
               onClick={() => {
+                setSeatInspectorIndex(null);
                 setLastResultPopupOpen(false);
                 setMyPlayPopupOpen(v => !v);
               }}
-              className="absolute left-0 top-8 z-[61] rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:top-9 sm:px-2 sm:py-1 sm:text-[10px]"
+              className="absolute left-0 top-10 z-[61] rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:top-11 sm:px-2 sm:py-1 sm:text-[10px]"
               aria-expanded={myPlayPopupOpen}
               aria-label="My play quick view"
             >
@@ -410,10 +453,11 @@ export default function Ov2CwScreen({
             <button
               type="button"
               onClick={() => {
+                setSeatInspectorIndex(null);
                 setMyPlayPopupOpen(false);
                 setLastResultPopupOpen(v => !v);
               }}
-              className="absolute right-0 top-10 z-[61] rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:top-11 sm:px-2 sm:py-1 sm:text-[10px]"
+              className="absolute right-0 top-12 z-[61] rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:top-14 sm:px-2 sm:py-1 sm:text-[10px]"
               aria-expanded={lastResultPopupOpen}
               aria-label="Last results quick view"
             >
@@ -537,13 +581,14 @@ export default function Ov2CwScreen({
               onClick={() => {
                 setMyPlayPopupOpen(false);
                 setLastResultPopupOpen(false);
+                setSeatInspectorIndex(null);
               }}
             />
           ) : null}
 
           {myPlayPopupOpen ? (
             <div
-              className="absolute left-0 top-[4.35rem] z-[62] flex max-h-[min(15rem,38vh)] w-[min(13rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-lg border border-white/[0.12] bg-zinc-950/98 shadow-xl backdrop-blur-sm sm:top-[4.85rem]"
+              className="absolute left-0 top-[6rem] z-[62] flex max-h-[min(15rem,38vh)] w-[min(13rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-lg border border-white/[0.12] bg-zinc-950/98 shadow-xl backdrop-blur-sm sm:top-[6.5rem]"
               role="dialog"
               aria-label="My play"
               onClick={e => e.stopPropagation()}
@@ -635,7 +680,7 @@ export default function Ov2CwScreen({
 
           {lastResultPopupOpen ? (
             <div
-              className="absolute right-0 top-[4.35rem] z-[62] flex max-h-[min(15rem,38vh)] w-[min(13rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-lg border border-white/[0.12] bg-zinc-950/98 shadow-xl backdrop-blur-sm sm:top-[4.85rem]"
+              className="absolute right-0 top-[6rem] z-[62] flex max-h-[min(15rem,38vh)] w-[min(13rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-lg border border-white/[0.12] bg-zinc-950/98 shadow-xl backdrop-blur-sm sm:top-[6.5rem]"
               role="dialog"
               aria-label="Last results"
               onClick={e => e.stopPropagation()}
@@ -688,14 +733,14 @@ export default function Ov2CwScreen({
                 <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/70">Last Results</p>
                 <span className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/25 to-transparent" aria-hidden />
               </div>
-              <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 [&::-webkit-scrollbar]:hidden">
-                {engine.history.slice(0, 10).map((h, idx) => {
+              <div className="flex flex-wrap content-start gap-1 pb-0.5 sm:gap-1.5">
+                {engine.history.map((h, idx) => {
                   const n = Math.floor(Number(h.resultNumber) || 0);
                   const c = String(h.resultColor || ov2CwColorForNumber(n));
                   return (
                     <div
                       key={`${h.roundSeq}-${idx}`}
-                      className={`flex h-9 min-w-[2.35rem] flex-col items-center justify-center rounded-lg border text-[11px] font-black tabular-nums shadow-sm sm:h-10 sm:min-w-[2.5rem] sm:text-xs lg:h-10 lg:min-w-[2.5rem] ${
+                      className={`flex h-7 min-w-[1.6rem] shrink-0 items-center justify-center rounded-md border px-0.5 text-[10px] font-black tabular-nums shadow-sm sm:h-7 sm:min-w-[1.75rem] sm:text-[11px] ${
                         c === "red"
                           ? "border-red-500/35 bg-gradient-to-b from-red-950/70 to-red-950/40 text-red-100"
                           : c === "black"
@@ -715,15 +760,15 @@ export default function Ov2CwScreen({
             {Array.from({ length: OV2_CW_MAX_SEATS }, (_, i) => seatBtn(seatsForUi[i], i))}
           </div>
 
-          <div className="relative flex min-h-0 w-full flex-1 flex-col gap-2 overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/35 via-black/28 to-black/45 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-2.5">
-            <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-white/[0.06] bg-black/35 p-2.5 sm:p-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-400">My Plays</p>
+          <div className="relative flex w-full shrink-0 flex-col gap-1.5 overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/35 via-black/28 to-black/45 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-2 sm:p-2">
+            <div className="rounded-lg border border-white/[0.06] bg-black/35 p-2 sm:p-2">
+              <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-400">My Plays</p>
               {myPlays.length === 0 ? (
-                <div className="mt-3 flex flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-zinc-950/40 py-6 text-center">
-                  <p className="text-[11px] font-medium text-zinc-500">No plays this round.</p>
+                <div className="mt-2 flex flex-col items-center justify-center rounded-md border border-dashed border-white/10 bg-zinc-950/40 py-3 text-center">
+                  <p className="text-[10px] font-medium text-zinc-500">No plays this round.</p>
                 </div>
               ) : (
-                <ul className="mt-2 space-y-1.5">
+                <div className="mt-1.5 flex max-h-[min(5.5rem,22vh)] flex-wrap content-start gap-1 overflow-y-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] sm:max-h-[6rem] [&::-webkit-scrollbar]:hidden">
                   {myPlays.map(p => {
                     const won =
                       resultPhase && engine.resultNumber != null
@@ -737,54 +782,38 @@ export default function Ov2CwScreen({
                           : won === false
                             ? "loss"
                             : "pending";
-                    const color =
-                      st === "win" ? "text-emerald-300" : st === "loss" ? "text-rose-300" : "text-zinc-400";
+                    const borderCls =
+                      st === "win"
+                        ? "border-emerald-500/35 bg-emerald-950/20"
+                        : st === "loss"
+                          ? "border-rose-500/35 bg-rose-950/15"
+                          : "border-white/[0.08] bg-white/[0.04]";
+                    const label = `${p.playType}${
+                      p.playValue != null && (p.playType === "number" || p.playType === "dozen" || p.playType === "column")
+                        ? ` ${p.playValue}`
+                        : ""
+                    } · ${fmt(p.amount)}`;
                     return (
-                      <li
+                      <div
                         key={p.playId}
-                        className={`flex justify-between gap-2 rounded-lg border border-white/[0.05] bg-white/[0.02] px-2 py-1.5 text-[11px] ${color}`}
+                        title={label}
+                        className={`flex min-h-[2.35rem] min-w-[2.75rem] max-w-[4.5rem] flex-col items-center justify-center rounded-md border px-1 py-0.5 text-center shadow-sm ${borderCls}`}
                       >
-                        <span className="min-w-0 truncate">
+                        <span className="line-clamp-2 text-[8px] font-semibold capitalize leading-tight text-zinc-200 sm:text-[9px]">
                           {p.playType}
                           {p.playValue != null && p.playType === "number" ? ` ${p.playValue}` : ""}
-                          {p.playValue != null && (p.playType === "dozen" || p.playType === "column") ? ` ${p.playValue}` : ""}
+                          {p.playValue != null && (p.playType === "dozen" || p.playType === "column")
+                            ? ` ${p.playValue}`
+                            : ""}
                         </span>
-                        <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
-                      </li>
+                        <span className="mt-0.5 font-mono text-[8px] font-bold tabular-nums text-amber-200/90 sm:text-[9px]">
+                          {fmt(p.amount)}
+                        </span>
+                      </div>
                     );
                   })}
-                </ul>
+                </div>
               )}
-
-              <button
-                type="button"
-                onClick={() => setAllPlaysOpen(v => !v)}
-                className="mt-3 w-full rounded-lg border border-white/[0.08] bg-zinc-900/50 py-2 text-[11px] font-semibold text-amber-200/80 transition-colors hover:border-amber-500/25 hover:bg-zinc-900/80"
-              >
-                {allPlaysOpen ? "Hide all plays" : "Show all plays"}
-              </button>
-              {allPlaysOpen ? (
-                <ul className="mt-2 space-y-1 border-t border-white/[0.06] pt-2">
-                  {plays
-                    .filter(p => Math.floor(Number(p.roundSeq) || 0) === roundSeq)
-                    .map(p => {
-                      const sn = Math.max(0, Math.min(OV2_CW_MAX_SEATS - 1, Math.floor(Number(p.seatIndex) || 0)));
-                      const nm = seatsForUi[sn]?.displayName;
-                      return (
-                        <li
-                          key={p.playId}
-                          className="flex justify-between gap-2 rounded-md px-1 py-0.5 text-[10px] text-zinc-400"
-                        >
-                          <span className="min-w-0 truncate">
-                            {nm || `Seat ${sn + 1}`} · {p.playType}{" "}
-                            {p.playValue != null ? String(p.playValue) : ""}
-                          </span>
-                          <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
-                        </li>
-                      );
-                    })}
-                </ul>
-              ) : null}
             </div>
           </div>
 
@@ -837,6 +866,124 @@ export default function Ov2CwScreen({
                     Close
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {inspectorSeat ? (
+          <div
+            className="absolute inset-0 z-[75] flex items-end justify-center p-2 sm:items-center sm:p-3"
+            role="presentation"
+          >
+            <button
+              type="button"
+              tabIndex={-1}
+              aria-label="Close player details"
+              className="absolute inset-0 border-0 bg-black/55 p-0 backdrop-blur-[1px]"
+              onClick={() => setSeatInspectorIndex(null)}
+            />
+            <div
+              role="dialog"
+              aria-label="Player details"
+              className="relative z-10 flex max-h-[min(78dvh,32rem)] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-white/[0.12] bg-zinc-950/98 shadow-2xl backdrop-blur-sm"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.08] px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/85">Player</p>
+                  <p className="truncate text-sm font-semibold text-white">{inspectorSeat.displayName || "Player"}</p>
+                  <p className="text-[10px] text-zinc-500">
+                    Seat {seatInspectorIndex + 1}
+                    {inspectorSeat.participantKey === participantKey ? " · You" : ""}
+                    {leaderPk && inspectorSeat.participantKey === leaderPk ? " · Lead" : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-lg border border-white/10 bg-zinc-900/90 px-2 py-1 text-[10px] font-semibold text-zinc-300 hover:text-white"
+                  onClick={() => setSeatInspectorIndex(null)}
+                >
+                  Close
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2.5">
+                {resultPhase && engine.resultNumber != null ? (
+                  <p className="mb-2 text-center text-[11px] text-zinc-400">
+                    This round:{" "}
+                    <span className="font-mono font-bold tabular-nums text-amber-200">
+                      {Math.floor(Number(engine.resultNumber))}
+                    </span>
+                  </p>
+                ) : null}
+                <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-zinc-500">Plays this round</p>
+                {inspectorSeatPlays.length === 0 ? (
+                  <p className="mt-1.5 text-center text-[11px] text-zinc-500">No plays this round.</p>
+                ) : (
+                  <ul className="mt-1.5 space-y-1">
+                    {inspectorSeatPlays.map(p => {
+                      const won =
+                        resultPhase && engine.resultNumber != null
+                          ? ov2CwPlayWins(p.playType, p.playValue, Math.floor(Number(engine.resultNumber)))
+                          : null;
+                      const st =
+                        placingLive || spinning
+                          ? "pending"
+                          : won === true
+                            ? "win"
+                            : won === false
+                              ? "loss"
+                              : "pending";
+                      const stLabel = st === "win" ? "Win" : st === "loss" ? "Loss" : "Pending";
+                      const stColor =
+                        st === "win" ? "text-emerald-400" : st === "loss" ? "text-rose-400" : "text-zinc-500";
+                      return (
+                        <li
+                          key={p.playId}
+                          className="flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-2 py-1.5 text-[11px]"
+                        >
+                          <span className="min-w-0 truncate text-zinc-200">
+                            {p.playType}
+                            {p.playValue != null && p.playType === "number" ? ` ${p.playValue}` : ""}
+                            {p.playValue != null && (p.playType === "dozen" || p.playType === "column")
+                              ? ` ${p.playValue}`
+                              : ""}
+                          </span>
+                          <span className="shrink-0 font-mono tabular-nums text-amber-200/90">{fmt(p.amount)}</span>
+                          <span className={`shrink-0 text-[10px] font-semibold ${stColor}`}>{stLabel}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {inspectorSeat.participantKey === participantKey && placingLive ? (
+                  <p className="mt-3 text-center text-[10px] text-zinc-500">Use Play to place plays.</p>
+                ) : null}
+                <p className="mt-4 text-[9px] font-bold uppercase tracking-[0.1em] text-zinc-500">Last results</p>
+                {!Array.isArray(engine.history) || engine.history.length === 0 ? (
+                  <p className="mt-1 text-[11px] text-zinc-600">No results yet.</p>
+                ) : (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {engine.history.slice(0, 16).map((h, idx) => {
+                      const n = Math.floor(Number(h.resultNumber) || 0);
+                      const c = String(h.resultColor || ov2CwColorForNumber(n));
+                      return (
+                        <div
+                          key={`insp-${h.roundSeq}-${idx}`}
+                          className={`flex h-7 min-w-[1.65rem] items-center justify-center rounded-md border text-[10px] font-black tabular-nums ${
+                            c === "red"
+                              ? "border-red-500/35 bg-red-950/50 text-red-100"
+                              : c === "black"
+                                ? "border-zinc-600/50 bg-zinc-800/80 text-zinc-100"
+                                : "border-emerald-500/35 bg-emerald-950/50 text-emerald-100"
+                          }`}
+                        >
+                          {n}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
