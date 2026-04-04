@@ -67,13 +67,9 @@ function easeOutCubic(t) {
   return 1 - (1 - t) ** 3;
 }
 
-/** Rim digit rotation so labels stay horizontal/readable (avoids upside-down on lower half). */
-function viewerUprightLabelDeg(wheelDeg, thetaFromTopDeg) {
-  let r = -(wheelDeg + thetaFromTopDeg);
-  r = ((r + 180) % 360) - 180;
-  if (r > 90) r -= 180;
-  if (r < -90) r += 180;
-  return r;
+/** Counter parent wheel rotation so rim digits stay horizontal to the viewer (same reading direction always). */
+function viewerHorizontalLabelDeg(wheelDeg) {
+  return -wheelDeg;
 }
 
 export default function Ov2CwScreen({
@@ -671,8 +667,8 @@ export default function Ov2CwScreen({
               </div>
             </div>
 
-            <div className={`relative z-[59] mx-auto w-full shrink-0 ${wheelStageMax}`}>
-            <div className="relative flex w-full flex-col items-center">
+            <div className={`relative z-[59] mx-auto w-full shrink-0 px-1 py-2 sm:px-1.5 sm:py-2.5 ${wheelStageMax}`}>
+            <div className="relative flex w-full flex-col items-center overflow-visible">
               <div
                 className="pointer-events-none absolute -inset-3 rounded-full bg-amber-500/[0.06] blur-2xl sm:-inset-4"
                 aria-hidden
@@ -684,12 +680,12 @@ export default function Ov2CwScreen({
                 </div>
               </div>
               <div
-                className="relative z-[1] mt-0 aspect-square w-full rounded-full p-1 shadow-[0_0_0_1px_rgba(251,191,36,0.1),0_8px_32px_rgba(0,0,0,0.45)] ring-1 ring-amber-500/15 sm:p-[3px]"
+                className="relative z-[1] mt-0 aspect-square w-full overflow-visible rounded-full p-1 shadow-[0_0_0_1px_rgba(251,191,36,0.1),0_8px_32px_rgba(0,0,0,0.45)] ring-1 ring-amber-500/15 sm:p-[3px]"
                 style={{
                   background: "linear-gradient(145deg, rgba(39,39,42,0.85) 0%, rgba(9,9,11,0.92) 55%, rgba(50,28,8,0.3) 100%)",
                 }}
               >
-            <div className="relative h-full w-full">
+            <div className="relative h-full w-full overflow-visible">
               <div
                 className="relative h-full w-full overflow-visible rounded-full border-2 border-zinc-800/95 shadow-[inset_0_2px_10px_rgba(0,0,0,0.45)]"
                 style={{
@@ -709,10 +705,15 @@ export default function Ov2CwScreen({
                   {OV2_CW_WHEEL_NUMBERS.map((entry, i) => {
                     const thetaFromTop = (i + 0.5) * OV2_CW_SEGMENT_DEG;
                     const rad = (thetaFromTop * Math.PI) / 180;
-                    const rimPct = 37;
+                    /** Outer track toward bezel; tuned so digits hug rim without clipping the circle. */
+                    const rimPct = 45.6;
                     const xPct = 50 + rimPct * Math.sin(rad);
                     const yPct = 50 - rimPct * Math.cos(rad);
-                    const uprightDeg = viewerUprightLabelDeg(wheelDisplayDeg, thetaFromTop);
+                    const uprightDeg = viewerHorizontalLabelDeg(wheelDisplayDeg);
+                    /** Extra push along radius (wheel-local % of box). */
+                    const outPct = 2.15;
+                    const leftPct = xPct + outPct * Math.sin(rad);
+                    const topPct = yPct - outPct * Math.cos(rad);
                     const tc =
                       entry.color === "red"
                         ? "text-white"
@@ -724,8 +725,8 @@ export default function Ov2CwScreen({
                         key={`rim-${entry.num}-${i}`}
                         className="absolute z-[10]"
                         style={{
-                          left: `${xPct}%`,
-                          top: `${yPct}%`,
+                          left: `${leftPct}%`,
+                          top: `${topPct}%`,
                           transform: `translate(-50%, -50%) rotate(${uprightDeg}deg)`,
                         }}
                       >
