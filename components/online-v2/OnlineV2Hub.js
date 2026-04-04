@@ -76,6 +76,12 @@ export default function OnlineV2Hub() {
                     >
                       Community Cards (live tables)
                     </Link>
+                    <Link
+                      href="/ov2-color-wheel"
+                      className="flex min-h-[48px] w-full items-center justify-center rounded-xl border border-amber-500/40 bg-amber-950/30 px-4 py-3 text-sm font-bold text-amber-100 md:min-h-[52px] md:text-base"
+                    >
+                      Color Wheel (live tables)
+                    </Link>
                   </div>
                 </article>
               </div>

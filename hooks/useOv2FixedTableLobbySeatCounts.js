@@ -9,6 +9,11 @@ function seatedFromSeats(seats) {
 }
 
 /** @param {unknown} engine */
+export function ov2CwSeatCountFromEngine(engine) {
+  return ov2C21SeatCountFromEngine(engine);
+}
+
+/** @param {unknown} engine */
 export function ov2C21SeatCountFromEngine(engine) {
   if (!engine || typeof engine !== "object") return { seated: 0, max: 6 };
   const seats = /** @type {{ seats?: unknown }} */ (engine).seats;
@@ -43,7 +48,7 @@ export function ov2CcSeatCountFromEngine(engine, roomId, roomMaxById) {
 /**
  * Live seated counts for fixed OV2 tables (lobby picker). Reads `ov2_*_live_state.engine` only.
  * @param {readonly string[]} roomIds
- * @param {'ov2_c21_live_state' | 'ov2_community_cards_live_state'} table
+ * @param {'ov2_c21_live_state' | 'ov2_community_cards_live_state' | 'ov2_color_wheel_live_state'} table
  * @param {(engine: unknown, roomId: string) => Ov2SeatCountSnap} parseEngine
  */
 export function useOv2FixedTableLobbySeatCounts(roomIds, table, parseEngine) {
