@@ -297,6 +297,7 @@ export default function Ov2C21LiveShell() {
         title="21 Challenge"
         subtitle="Five permanent live tables"
         useAppViewportHeight
+        chromePreset="c21_flat"
         infoPanel={infoPanel}
       >
         <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
@@ -345,15 +346,16 @@ export default function Ov2C21LiveShell() {
         title="21 Challenge"
         subtitle={`Live · table play ${formatTierLabel(tableStake)}`}
         useAppViewportHeight
+        chromePreset="c21_flat"
         infoPanel={infoPanel}
       >
       <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
-        <div className="flex shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden border-b border-white/[0.06] pb-1 sm:gap-2">
+        <div className="flex shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden pb-1 sm:gap-2">
           <input
             value={nameDraft}
             onChange={e => setNameDraft(e.target.value)}
             onBlur={persistName}
-            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/[0.1] bg-[#050708]/85 px-2 py-1.5 text-[11px] text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/[0.08] bg-black/25 px-2 py-1.5 text-[11px] text-zinc-100"
             placeholder="Display name"
           />
           <button

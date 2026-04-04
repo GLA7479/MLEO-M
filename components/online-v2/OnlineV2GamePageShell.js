@@ -23,6 +23,7 @@ export default function OnlineV2GamePageShell({
   /**
    * Optional immersive chrome for specific routes only (default unchanged for all other games).
    * `cc_live_table`: compact header, darker frame, more viewport for the table body.
+   * `c21_flat`: solid page bg, no header rule, subtle reserved-ad strip (21 Challenge only).
    */
   chromePreset = "default",
 }) {
@@ -44,6 +45,7 @@ export default function OnlineV2GamePageShell({
   const subtitleText = typeof subtitle === "string" ? subtitle.trim() : "";
   const shouldRenderSubtitle = showSubtitle && Boolean(subtitleText);
   const isCcLiveTable = chromePreset === "cc_live_table";
+  const isC21Flat = chromePreset === "c21_flat";
 
   const mainHeightClass = useAppViewportHeight
     ? "h-[var(--app-100vh,100svh)] max-h-[var(--app-100vh,100svh)] min-h-0 overscroll-y-contain"
@@ -55,7 +57,9 @@ export default function OnlineV2GamePageShell({
         className={`online-v2-game-main ${mainHeightClass} overflow-hidden text-white ${
           isCcLiveTable
             ? "bg-gradient-to-b from-[#030506] via-[#06090c] to-[#030506]"
-            : "bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950"
+            : isC21Flat
+              ? "bg-[#030506]"
+              : "bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950"
         }`}
         style={{
           paddingTop: isCcLiveTable ? "max(4px, env(safe-area-inset-top))" : "max(8px, env(safe-area-inset-top))",
@@ -70,7 +74,13 @@ export default function OnlineV2GamePageShell({
           }
         >
           <header
-            className={`shrink-0 ${isCcLiveTable ? "border-b border-white/[0.04] pb-1 pt-0.5" : "border-b border-white/[0.06] pb-0.5 pt-1 md:pb-0.5"}`}
+            className={`shrink-0 ${
+              isCcLiveTable
+                ? "border-b border-white/[0.04] pb-1 pt-0.5"
+                : isC21Flat
+                  ? "pb-0.5 pt-1 md:pb-0.5"
+                  : "border-b border-white/[0.06] pb-0.5 pt-1 md:pb-0.5"
+            }`}
           >
             {isCcLiveTable ? (
               <div className="flex items-center gap-2">
@@ -176,7 +186,7 @@ export default function OnlineV2GamePageShell({
             </OnlineV2GameOverlay>
           </div>
 
-          <OnlineV2ReservedAdSlot />
+          <OnlineV2ReservedAdSlot variant={isC21Flat ? "subtle" : "default"} />
         </div>
       </main>
     </Layout>

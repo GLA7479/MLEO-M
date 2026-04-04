@@ -1025,7 +1025,7 @@ export default function Ov2C21Screen({
   const dealerGap = dealerRevealVisibleCount >= 4 ? "gap-0.5" : "gap-1";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#040608] text-zinc-100">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#030506] text-zinc-100">
       {loadError ? (
         <div className="shrink-0 px-0.5 text-center text-[10px] leading-tight text-red-300/95" role="alert">
           {loadError}
@@ -1034,7 +1034,7 @@ export default function Ov2C21Screen({
       {/* Table felt: dealer-first stack; bottom rail stays outside for toast offset compatibility */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden overflow-x-hidden px-1 pb-1 pt-0.5 sm:px-2 sm:pb-1.5 sm:pt-1">
         <div
-          className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-black/50 shadow-[0_14px_40px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.05)] sm:rounded-[1.35rem]"
+          className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-0 shadow-none sm:rounded-[1.35rem]"
           style={{
             background:
               "radial-gradient(ellipse 95% 80% at 50% 0%, #14532d 0%, #0d3d24 42%, #071912 78%, #030806 100%)",
@@ -1047,12 +1047,11 @@ export default function Ov2C21Screen({
                 "radial-gradient(ellipse 55% 35% at 50% 12%, rgba(255,255,255,0.06) 0%, transparent 55%)",
             }}
           />
-          <div className="pointer-events-none absolute inset-[4px] rounded-[1.4rem] border border-white/[0.05] sm:inset-[5px] sm:rounded-[1.2rem]" />
 
           <div className="relative z-[1] flex min-h-0 flex-1 flex-col overflow-hidden">
             {/* DEALER — fixed interior geometry preserved */}
             <div className="relative h-[11.375rem] shrink-0 overflow-hidden px-1 pt-0.5 sm:h-[10.375rem] sm:px-1.5 sm:pt-0.5">
-              <div className="relative h-full overflow-hidden rounded-xl border border-black/35 bg-gradient-to-b from-[#1a120d]/95 via-[#0f0c0a]/90 to-black/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_8px_28px_rgba(0,0,0,0.45)]">
+              <div className="relative h-full overflow-hidden rounded-xl border-0 bg-gradient-to-b from-[#1a120d]/95 via-[#0f0c0a]/90 to-black/75 shadow-none">
                 <div className="pointer-events-none absolute inset-x-1 top-0.5 z-10 grid h-[1.05rem] grid-cols-3 items-center leading-none">
                   <span className="min-w-0 truncate text-left text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/90">
                     Opponent
@@ -1109,7 +1108,7 @@ export default function Ov2C21Screen({
                 const otherPlayLbl = otherSeatCommittedPlayLabel(seat, phase, minBet);
                 const isActingSeat = phase === "acting" && currentTurn?.seatIndex === idx;
                 const actingHere = isActingSeat
-                  ? "ring-2 ring-amber-400/55 ring-offset-2 ring-offset-[#071510]"
+                  ? "ring-2 ring-amber-400/55 ring-offset-2 ring-offset-[#030506]"
                   : "";
                 const ariaSeat = taken
                   ? `${String(seat.displayName || "Player").trim() || "Player"}${isActingSeat ? " — turn to act" : ""}`
@@ -1143,7 +1142,7 @@ export default function Ov2C21Screen({
                         }
                         trySit(idx);
                       }}
-                      className={`flex h-full min-h-0 w-full touch-manipulation flex-col overflow-hidden rounded-lg border border-white/[0.1] bg-black/45 px-px py-0 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition ${actingHere} ${inspectorSeatIdx === idx ? "ring-1 ring-emerald-400/50 ring-offset-2 ring-offset-[#071510]" : ""} ${!taken && (operateBusy || !canSitToPlay) ? "opacity-40" : ""}`}
+                      className={`flex h-full min-h-0 w-full touch-manipulation flex-col overflow-hidden rounded-lg border border-white/[0.06] bg-black/25 px-px py-0 text-left shadow-none transition ${actingHere} ${inspectorSeatIdx === idx ? "ring-1 ring-emerald-400/50 ring-offset-2 ring-offset-[#030506]" : ""} ${!taken && (operateBusy || !canSitToPlay) ? "opacity-40" : ""}`}
                     >
                       <div className="grid h-[11px] max-h-[11px] shrink-0 grid-cols-3 items-center gap-px overflow-hidden leading-none">
                         {taken ? (
@@ -1201,7 +1200,7 @@ export default function Ov2C21Screen({
 
             {/* YOUR HAND — same internal measurements */}
             <div className="relative z-[1] h-[11.375rem] shrink-0 overflow-hidden px-1 pb-1 sm:h-[10.375rem] sm:px-1.5 sm:pb-1.5">
-              <div className="relative h-full overflow-hidden rounded-xl border border-emerald-900/35 bg-gradient-to-b from-[#0c1612]/95 via-[#050a08]/92 to-black/80 shadow-[inset_0_1px_0_rgba(167,243,208,0.06),0_6px_22px_rgba(0,0,0,0.4)]">
+              <div className="relative h-full overflow-hidden rounded-xl border-0 bg-gradient-to-b from-[#0c1612]/95 via-[#050a08]/92 to-black/80 shadow-none">
                 <div className="absolute inset-x-1 top-0.5 z-20 grid h-[1.05rem] grid-cols-3 items-center leading-none">
                   <span className="pointer-events-none min-w-0 truncate text-left text-[10px] font-bold uppercase leading-none tracking-[0.1em] text-emerald-200/88">
                     Your hand
@@ -1318,14 +1317,14 @@ export default function Ov2C21Screen({
 
       {/* Bottom controls — heights unchanged for toast math */}
       <div
-        className={`flex shrink-0 flex-col justify-center gap-0 border-t border-white/[0.07] bg-[#05070a] ${
+        className={`flex shrink-0 flex-col justify-center gap-0 border-t-0 bg-transparent ${
           phase === "acting" && isMyTurn
             ? "max-sm:h-auto max-sm:min-h-0 max-sm:overflow-visible max-sm:py-1 max-sm:pb-[max(0.35rem,env(safe-area-inset-bottom,0px))] sm:h-[3.95rem] sm:overflow-hidden sm:py-0 sm:pb-1 sm:pt-px"
             : "h-[6.25rem] overflow-hidden pb-[max(0.2rem,env(safe-area-inset-bottom,0px))] pt-0 sm:h-[4.5rem] sm:pb-1 sm:pt-px"
         }`}
       >
         {phase === "betting" && mySeat ? (
-          <div className="flex h-full min-h-0 flex-col justify-center gap-0 rounded-t-lg border border-white/[0.08] border-b-0 bg-[#0a0d12] px-1 py-0 sm:px-1.5 sm:py-0">
+          <div className="flex h-full min-h-0 flex-col justify-center gap-0 rounded-none border-0 bg-transparent px-1 py-0 sm:px-1.5 sm:py-0">
             <div className="flex min-h-0 w-full min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <div className="relative min-w-0 flex-1">
                 <input
