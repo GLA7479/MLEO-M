@@ -431,14 +431,187 @@ export default function Ov2CwScreen({
                 onClick={() => openMobileSheetManual()}
                 title="Play panel"
                 aria-label="Open play panel"
-                className="absolute left-0 top-0 z-[61] rounded-md border border-amber-500/45 bg-gradient-to-b from-amber-900/90 to-amber-950/95 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide text-amber-50 shadow-md touch-manipulation disabled:opacity-40 sm:px-2 sm:py-1 sm:text-[10px]"
+                className="absolute left-0 top-0 z-[61] rounded-md border border-amber-500/45 bg-gradient-to-b from-amber-900/90 to-amber-950/95 px-1.5 py-0.5 text-[7px] font-bold leading-tight tracking-wide text-amber-50 shadow-md touch-manipulation disabled:opacity-40 sm:px-2 sm:py-1 sm:text-[8px]"
               >
-                Play
+                PLAY PANEL
               </button>
             ) : null}
 
+            <div className="absolute left-0 bottom-0 z-[61]">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSeatInspectorIndex(null);
+                    setLastResultPopupOpen(false);
+                    setMyPlayPopupOpen(v => !v);
+                  }}
+                  className="rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:px-2 sm:py-1 sm:text-[10px]"
+                  aria-expanded={myPlayPopupOpen}
+                  aria-label="My play quick view"
+                >
+                  My Play
+                </button>
+                {myPlayPopupOpen ? (
+                  <div
+                    className="absolute bottom-full left-0 z-[62] mb-1 flex max-h-[min(14rem,36vh)] w-[min(13rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-lg border border-white/[0.12] bg-zinc-950/98 shadow-xl backdrop-blur-sm"
+                    role="dialog"
+                    aria-label="My play"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.08] px-2 py-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/80">My Play</p>
+                      <button
+                        type="button"
+                        className="rounded border border-white/10 bg-zinc-900/80 px-1.5 py-px text-[9px] font-semibold text-zinc-400 hover:text-zinc-200"
+                        onClick={() => setMyPlayPopupOpen(false)}
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+                      {myPlays.length === 0 ? (
+                        <p className="text-center text-[10px] text-zinc-500">No plays this round.</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {myPlays.map(p => {
+                            const won =
+                              resultPhase && engine.resultNumber != null
+                                ? ov2CwPlayWins(p.playType, p.playValue, Math.floor(Number(engine.resultNumber)))
+                                : null;
+                            const st =
+                              placingLive || spinning
+                                ? "pending"
+                                : won === true
+                                  ? "win"
+                                  : won === false
+                                    ? "loss"
+                                    : "pending";
+                            const color =
+                              st === "win" ? "text-emerald-300" : st === "loss" ? "text-rose-300" : "text-zinc-400";
+                            return (
+                              <li
+                                key={p.playId}
+                                className={`flex justify-between gap-1 rounded border border-white/[0.06] bg-white/[0.03] px-1.5 py-1 text-[10px] ${color}`}
+                              >
+                                <span className="min-w-0 truncate">
+                                  {p.playType}
+                                  {p.playValue != null && p.playType === "number" ? ` ${p.playValue}` : ""}
+                                  {p.playValue != null && (p.playType === "dozen" || p.playType === "column")
+                                    ? ` ${p.playValue}`
+                                    : ""}
+                                </span>
+                                <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setMyPlayPopupAllOpen(v => !v)}
+                        className="mt-2 w-full rounded border border-white/[0.1] bg-zinc-900/70 py-1 text-[9px] font-semibold text-amber-200/85 hover:border-amber-500/25"
+                      >
+                        {myPlayPopupAllOpen ? "Hide all plays" : "Show all plays"}
+                      </button>
+                      {myPlayPopupAllOpen ? (
+                        <ul className="mt-1.5 space-y-0.5 border-t border-white/[0.06] pt-1.5">
+                          {plays.filter(p => Math.floor(Number(p.roundSeq) || 0) === roundSeq).length === 0 ? (
+                            <li className="py-0.5 text-center text-[9px] text-zinc-500">No table plays.</li>
+                          ) : (
+                            plays
+                              .filter(p => Math.floor(Number(p.roundSeq) || 0) === roundSeq)
+                              .map(p => {
+                                const sn = Math.max(
+                                  0,
+                                  Math.min(OV2_CW_MAX_SEATS - 1, Math.floor(Number(p.seatIndex) || 0)),
+                                );
+                                const nm = seatsForUi[sn]?.displayName;
+                                return (
+                                  <li
+                                    key={p.playId}
+                                    className="flex justify-between gap-1 rounded px-0.5 py-0.5 text-[9px] text-zinc-400"
+                                  >
+                                    <span className="min-w-0 truncate">
+                                      {nm || `Seat ${sn + 1}`} · {p.playType}{" "}
+                                      {p.playValue != null ? String(p.playValue) : ""}
+                                    </span>
+                                    <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
+                                  </li>
+                                );
+                              })
+                          )}
+                        </ul>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <div className="absolute right-0 bottom-0 z-[61]">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSeatInspectorIndex(null);
+                    setMyPlayPopupOpen(false);
+                    setLastResultPopupOpen(v => !v);
+                  }}
+                  className="rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:px-2 sm:py-1 sm:text-[10px]"
+                  aria-expanded={lastResultPopupOpen}
+                  aria-label="Last results quick view"
+                >
+                  Last Result
+                </button>
+                {lastResultPopupOpen ? (
+                  <div
+                    className="absolute bottom-full right-0 z-[62] mb-1 flex max-h-[min(14rem,36vh)] w-[min(13rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-lg border border-white/[0.12] bg-zinc-950/98 shadow-xl backdrop-blur-sm"
+                    role="dialog"
+                    aria-label="Last results"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.08] px-2 py-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/80">Last Results</p>
+                      <button
+                        type="button"
+                        className="rounded border border-white/10 bg-zinc-900/80 px-1.5 py-px text-[9px] font-semibold text-zinc-400 hover:text-zinc-200"
+                        onClick={() => setLastResultPopupOpen(false)}
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+                      {!Array.isArray(engine.history) || engine.history.length === 0 ? (
+                        <p className="text-center text-[10px] text-zinc-500">No results yet.</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {engine.history.slice(0, 12).map((h, idx) => {
+                            const n = Math.floor(Number(h.resultNumber) || 0);
+                            const c = String(h.resultColor || ov2CwColorForNumber(n));
+                            return (
+                              <div
+                                key={`${h.roundSeq}-${idx}-pop`}
+                                className={`flex h-7 min-w-[1.75rem] items-center justify-center rounded-md border text-[10px] font-black tabular-nums ${
+                                  c === "red"
+                                    ? "border-red-500/35 bg-red-950/50 text-red-100"
+                                    : c === "black"
+                                      ? "border-zinc-600/50 bg-zinc-800/80 text-zinc-100"
+                                      : "border-emerald-500/35 bg-emerald-950/50 text-emerald-100"
+                                }`}
+                              >
+                                {n}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
             <div className={`relative z-[59] mx-auto w-full shrink-0 ${wheelStageMax}`}>
-            <div className="relative w-full overflow-visible">
             <div className="relative flex w-full flex-col items-center">
               <div
                 className="pointer-events-none absolute -inset-3 rounded-full bg-amber-500/[0.06] blur-2xl sm:-inset-4"
@@ -532,179 +705,6 @@ export default function Ov2CwScreen({
               </div>
             </div>
           </div>
-            </div>
-
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[61] flex items-end justify-between gap-1">
-              <div className="pointer-events-auto relative shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSeatInspectorIndex(null);
-                    setLastResultPopupOpen(false);
-                    setMyPlayPopupOpen(v => !v);
-                  }}
-                  className="rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:px-2 sm:py-1 sm:text-[10px]"
-                  aria-expanded={myPlayPopupOpen}
-                  aria-label="My play quick view"
-                >
-                  My Play
-                </button>
-                {myPlayPopupOpen ? (
-                  <div
-                    className="absolute left-0 top-full z-[62] mt-1 flex max-h-[min(14rem,36vh)] w-[min(13rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-lg border border-white/[0.12] bg-zinc-950/98 shadow-xl backdrop-blur-sm"
-                    role="dialog"
-                    aria-label="My play"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.08] px-2 py-1.5">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/80">My Play</p>
-                      <button
-                        type="button"
-                        className="rounded border border-white/10 bg-zinc-900/80 px-1.5 py-px text-[9px] font-semibold text-zinc-400 hover:text-zinc-200"
-                        onClick={() => setMyPlayPopupOpen(false)}
-                      >
-                        Close
-                      </button>
-                    </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
-                      {myPlays.length === 0 ? (
-                        <p className="text-center text-[10px] text-zinc-500">No plays this round.</p>
-                      ) : (
-                        <ul className="space-y-1">
-                          {myPlays.map(p => {
-                            const won =
-                              resultPhase && engine.resultNumber != null
-                                ? ov2CwPlayWins(p.playType, p.playValue, Math.floor(Number(engine.resultNumber)))
-                                : null;
-                            const st =
-                              placingLive || spinning
-                                ? "pending"
-                                : won === true
-                                  ? "win"
-                                  : won === false
-                                    ? "loss"
-                                    : "pending";
-                            const color =
-                              st === "win" ? "text-emerald-300" : st === "loss" ? "text-rose-300" : "text-zinc-400";
-                            return (
-                              <li
-                                key={p.playId}
-                                className={`flex justify-between gap-1 rounded border border-white/[0.06] bg-white/[0.03] px-1.5 py-1 text-[10px] ${color}`}
-                              >
-                                <span className="min-w-0 truncate">
-                                  {p.playType}
-                                  {p.playValue != null && p.playType === "number" ? ` ${p.playValue}` : ""}
-                                  {p.playValue != null && (p.playType === "dozen" || p.playType === "column")
-                                    ? ` ${p.playValue}`
-                                    : ""}
-                                </span>
-                                <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setMyPlayPopupAllOpen(v => !v)}
-                        className="mt-2 w-full rounded border border-white/[0.1] bg-zinc-900/70 py-1 text-[9px] font-semibold text-amber-200/85 hover:border-amber-500/25"
-                      >
-                        {myPlayPopupAllOpen ? "Hide all plays" : "Show all plays"}
-                      </button>
-                      {myPlayPopupAllOpen ? (
-                        <ul className="mt-1.5 space-y-0.5 border-t border-white/[0.06] pt-1.5">
-                          {plays.filter(p => Math.floor(Number(p.roundSeq) || 0) === roundSeq).length === 0 ? (
-                            <li className="py-0.5 text-center text-[9px] text-zinc-500">No table plays.</li>
-                          ) : (
-                            plays
-                              .filter(p => Math.floor(Number(p.roundSeq) || 0) === roundSeq)
-                              .map(p => {
-                                const sn = Math.max(
-                                  0,
-                                  Math.min(OV2_CW_MAX_SEATS - 1, Math.floor(Number(p.seatIndex) || 0)),
-                                );
-                                const nm = seatsForUi[sn]?.displayName;
-                                return (
-                                  <li
-                                    key={p.playId}
-                                    className="flex justify-between gap-1 rounded px-0.5 py-0.5 text-[9px] text-zinc-400"
-                                  >
-                                    <span className="min-w-0 truncate">
-                                      {nm || `Seat ${sn + 1}`} · {p.playType}{" "}
-                                      {p.playValue != null ? String(p.playValue) : ""}
-                                    </span>
-                                    <span className="shrink-0 font-mono tabular-nums">{fmt(p.amount)}</span>
-                                  </li>
-                                );
-                              })
-                          )}
-                        </ul>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-              <div className="pointer-events-auto relative shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSeatInspectorIndex(null);
-                    setMyPlayPopupOpen(false);
-                    setLastResultPopupOpen(v => !v);
-                  }}
-                  className="rounded-md border border-amber-500/40 bg-gradient-to-b from-zinc-800/95 to-black/90 px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wide text-amber-100/90 shadow-md touch-manipulation sm:px-2 sm:py-1 sm:text-[10px]"
-                  aria-expanded={lastResultPopupOpen}
-                  aria-label="Last results quick view"
-                >
-                  Last Result
-                </button>
-                {lastResultPopupOpen ? (
-                  <div
-                    className="absolute right-0 top-full z-[62] mt-1 flex max-h-[min(14rem,36vh)] w-[min(13rem,calc(100vw-1.25rem))] flex-col overflow-hidden rounded-lg border border-white/[0.12] bg-zinc-950/98 shadow-xl backdrop-blur-sm"
-                    role="dialog"
-                    aria-label="Last results"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/[0.08] px-2 py-1.5">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/80">Last Results</p>
-                      <button
-                        type="button"
-                        className="rounded border border-white/10 bg-zinc-900/80 px-1.5 py-px text-[9px] font-semibold text-zinc-400 hover:text-zinc-200"
-                        onClick={() => setLastResultPopupOpen(false)}
-                      >
-                        Close
-                      </button>
-                    </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
-                      {!Array.isArray(engine.history) || engine.history.length === 0 ? (
-                        <p className="text-center text-[10px] text-zinc-500">No results yet.</p>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {engine.history.slice(0, 12).map((h, idx) => {
-                            const n = Math.floor(Number(h.resultNumber) || 0);
-                            const c = String(h.resultColor || ov2CwColorForNumber(n));
-                            return (
-                              <div
-                                key={`${h.roundSeq}-${idx}-pop`}
-                                className={`flex h-7 min-w-[1.75rem] items-center justify-center rounded-md border text-[10px] font-black tabular-nums ${
-                                  c === "red"
-                                    ? "border-red-500/35 bg-red-950/50 text-red-100"
-                                    : c === "black"
-                                      ? "border-zinc-600/50 bg-zinc-800/80 text-zinc-100"
-                                      : "border-emerald-500/35 bg-emerald-950/50 text-emerald-100"
-                                }`}
-                              >
-                                {n}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </div>
             </div>
 
           {lobby && imLeader ? (
