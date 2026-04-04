@@ -1,6 +1,9 @@
 import { getSupabaseAdmin } from "../../../lib/server/supabaseAdmin";
 import { assertWaveFixedNoForeignActiveSeat } from "../../../lib/server/ov2WaveFixedSeatRegistry";
+import { isOv2RoomIdQueryParam } from "../../../lib/online-v2/onlineV2GameRegistry";
+import { normalizeWavePrivateRoomCodeInput } from "../../../lib/online-v2/wavePrivateRoomCode";
 import {
+  findWavePrivateRoomIdByJoinCode,
   sweepExpiredOv2WavePrivateRooms,
   verifyOv2WavePrivateRoomPasscode,
 } from "../../../lib/server/ov2WavePrivateFixedRooms";
@@ -20,13 +23,21 @@ export default async function handler(req, res) {
     }
   }
 
-  const roomId = String(body?.roomId || "").trim();
+  const roomIdRaw = String(body?.roomId || "").trim();
+  const roomCodeRaw = body?.roomCode != null ? String(body.roomCode) : "";
   const password = String(body?.password || "");
   const productGameId = String(body?.productGameId || "").trim();
   const participantKey = String(body?.participantKey || "").trim();
 
-  if (!roomId) {
-    return res.status(400).json({ ok: false, code: "ROOM_REQUIRED" });
+  const normalizedCode = normalizeWavePrivateRoomCodeInput(roomCodeRaw);
+  /** @type {string|null} */
+  let roomId = null;
+  if (isOv2RoomIdQueryParam(roomIdRaw)) {
+    roomId = String(roomIdRaw).trim();
+  } else if (normalizedCode) {
+    roomId = null;
+  } else {
+    return res.status(400).json({ ok: false, code: "ROOM_OR_CODE_REQUIRED", message: "Enter the 5-digit room code." });
   }
   if (password.length < 1) {
     return res.status(400).json({ ok: false, code: "PASSWORD_REQUIRED" });
@@ -38,6 +49,19 @@ export default async function handler(req, res) {
   try {
     const admin = getSupabaseAdmin();
     await sweepExpiredOv2WavePrivateRooms(admin);
+
+    if (!roomId && normalizedCode) {
+      const found = await findWavePrivateRoomIdByJoinCode(admin, normalizedCode);
+      if (!found.ok) {
+        const st = found.code === "ROOM_NOT_FOUND" ? 404 : 400;
+        return res.status(st).json({ ok: false, code: found.code, message: found.message });
+      }
+      roomId = found.roomId;
+    }
+
+    if (!roomId) {
+      return res.status(400).json({ ok: false, code: "ROOM_OR_CODE_REQUIRED", message: "Enter the 5-digit room code." });
+    }
 
     const seatGate = await assertWaveFixedNoForeignActiveSeat(admin, participantKey, roomId);
     if (!seatGate.ok) {

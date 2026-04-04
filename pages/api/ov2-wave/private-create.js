@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       const st = out.code === "ROOM_CREATE_FAILED" || out.code === "LIVE_STATE_FAILED" ? 500 : 400;
       return res.status(st).json({ ok: false, code: out.code, message: out.message });
     }
-    return res.status(200).json({ ok: true, roomId: out.roomId });
+    return res.status(200).json({ ok: true, roomId: out.roomId, roomCode: out.roomCode });
   } catch (e) {
     return res.status(500).json({ ok: false, code: "SERVER_ERROR", message: e?.message || String(e) });
   }

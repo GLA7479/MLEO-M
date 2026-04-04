@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
-import { extractOv2RoomUuidFromText } from "../../lib/online-v2/ov2ExtractRoomUuid";
 import { getOv2ParticipantId } from "../../lib/online-v2/ov2ParticipantId";
+import { normalizeWavePrivateRoomCodeInput } from "../../lib/online-v2/wavePrivateRoomCode";
 import { OV2_C21_PRODUCT_GAME_ID, OV2_C21_STAKE_TIERS } from "../../lib/online-v2/c21/ov2C21TableIds";
 import { OV2_CW_PRODUCT_GAME_ID, OV2_CW_STAKE_TIERS } from "../../lib/online-v2/color_wheel/ov2CwTableIds";
 import { OV2_CC_PRODUCT_GAME_ID, OV2_CC_STAKE_TIERS } from "../../lib/online-v2/community_cards/ov2CcTableIds";
@@ -48,9 +48,24 @@ export default function Ov2WavePrivateRoomModal({ open, onClose, game, routeBase
     setCreateStake(stakeList[0]);
   }, [stakeList]);
   const [createPw, setCreatePw] = useState("");
+  const [createDone, setCreateDone] = useState(null);
+  const [codeCopied, setCodeCopied] = useState(false);
 
-  const [joinRaw, setJoinRaw] = useState("");
+  const [joinCode, setJoinCode] = useState("");
   const [joinPw, setJoinPw] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setTab("create");
+      setErr("");
+      setBusy(false);
+      setCreateDone(null);
+      setCodeCopied(false);
+      setJoinCode("");
+      setJoinPw("");
+      setCreatePw("");
+    }
+  }, [open]);
 
   const onCreate = useCallback(async () => {
     setErr("");
@@ -77,18 +92,40 @@ export default function Ov2WavePrivateRoomModal({ open, onClose, game, routeBase
         setErr(String(json?.message || json?.code || "Could not create room."));
         return;
       }
-      onClose();
-      await router.push(`${routeBase}?room=${encodeURIComponent(json.roomId)}`);
+      const code = String(json.roomCode || "").trim();
+      if (!code) {
+        setErr("Room created but code missing. Try again.");
+        return;
+      }
+      setCreateDone({ roomId: String(json.roomId), roomCode: code });
     } finally {
       setBusy(false);
     }
-  }, [createPw, createStake, ccMax, game, onClose, productGameId, routeBase, router]);
+  }, [createPw, createStake, ccMax, game, productGameId]);
+
+  const onCopyRoomCode = useCallback(async () => {
+    if (!createDone?.roomCode) return;
+    setErr("");
+    try {
+      await navigator.clipboard.writeText(createDone.roomCode);
+      setCodeCopied(true);
+      window.setTimeout(() => setCodeCopied(false), 2000);
+    } catch {
+      setErr("Could not copy. Copy the code manually.");
+    }
+  }, [createDone]);
+
+  const onEnterCreatedRoom = useCallback(async () => {
+    if (!createDone?.roomId) return;
+    onClose();
+    await router.push(`${routeBase}?room=${encodeURIComponent(createDone.roomId)}`);
+  }, [createDone, onClose, routeBase, router]);
 
   const onJoin = useCallback(async () => {
     setErr("");
-    const id = extractOv2RoomUuidFromText(joinRaw);
-    if (!id) {
-      setErr("Paste a valid room link or UUID.");
+    const normalized = normalizeWavePrivateRoomCodeInput(joinCode);
+    if (!normalized) {
+      setErr("Enter the 5-digit room code.");
       return;
     }
     if (!joinPw) {
@@ -101,7 +138,7 @@ export default function Ov2WavePrivateRoomModal({ open, onClose, game, routeBase
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          roomId: id,
+          roomCode: normalized,
           password: joinPw,
           productGameId,
           participantKey: getOv2ParticipantId(),
@@ -117,7 +154,7 @@ export default function Ov2WavePrivateRoomModal({ open, onClose, game, routeBase
     } finally {
       setBusy(false);
     }
-  }, [joinPw, joinRaw, onClose, productGameId, routeBase, router]);
+  }, [joinCode, joinPw, onClose, productGameId, routeBase, router]);
 
   if (!open) return null;
 
@@ -153,6 +190,7 @@ export default function Ov2WavePrivateRoomModal({ open, onClose, game, routeBase
               onClick={() => {
                 setTab(k);
                 setErr("");
+                if (k !== "create") setCreateDone(null);
               }}
             >
               {k === "create" ? "Create" : "Join"}
@@ -162,54 +200,83 @@ export default function Ov2WavePrivateRoomModal({ open, onClose, game, routeBase
         <div className="max-h-[min(70vh,520px)] overflow-y-auto overscroll-y-contain px-3 py-3">
           {tab === "create" ? (
             <div className="space-y-3">
-              <div>
-                <label className="text-[11px] text-zinc-500">Table minimum</label>
-                <select
-                  className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2 py-2 text-sm text-white"
-                  value={createStake}
-                  onChange={e => setCreateStake(Math.floor(Number(e.target.value)))}
-                >
-                  {stakeList.map(s => (
-                    <option key={s} value={s}>
-                      {formatStakeLabel(s)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {game === "cc" ? (
-                <div>
-                  <label className="text-[11px] text-zinc-500">Table size</label>
-                  <select
-                    className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2 py-2 text-sm text-white"
-                    value={ccMax}
-                    onChange={e => setCcMax(Math.floor(Number(e.target.value)))}
+              {createDone ? (
+                <div className="rounded-xl border border-emerald-500/35 bg-emerald-950/25 px-3 py-4">
+                  <p className="text-center text-[11px] font-medium uppercase tracking-wide text-emerald-200/90">
+                    Your room code
+                  </p>
+                  <p
+                    className="mt-2 text-center font-mono text-[2rem] font-bold leading-none tracking-[0.35em] text-white sm:text-[2.25rem]"
+                    aria-live="polite"
                   >
-                    <option value={5}>5-max</option>
-                    <option value={9}>9-max</option>
-                  </select>
+                    {createDone.roomCode}
+                  </p>
+                  <p className="mt-2 text-center text-[11px] text-zinc-500">
+                    Share this code so others can join with the password.
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-3 w-full rounded-lg border border-white/15 bg-white/10 py-2.5 text-sm font-semibold text-white touch-manipulation"
+                    onClick={() => void onCopyRoomCode()}
+                  >
+                    {codeCopied ? "Copied" : "Copy code"}
+                  </button>
                 </div>
               ) : null}
-              <div>
-                <label className="text-[11px] text-zinc-500">Password (required)</label>
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2 py-2 text-sm text-white"
-                  value={createPw}
-                  onChange={e => setCreatePw(e.target.value)}
-                  placeholder="Min 4 characters"
-                />
-              </div>
+              {!createDone ? (
+                <>
+                  <div>
+                    <label className="text-[11px] text-zinc-500">Table minimum</label>
+                    <select
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2 py-2 text-sm text-white"
+                      value={createStake}
+                      onChange={e => setCreateStake(Math.floor(Number(e.target.value)))}
+                    >
+                      {stakeList.map(s => (
+                        <option key={s} value={s}>
+                          {formatStakeLabel(s)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {game === "cc" ? (
+                    <div>
+                      <label className="text-[11px] text-zinc-500">Table size</label>
+                      <select
+                        className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2 py-2 text-sm text-white"
+                        value={ccMax}
+                        onChange={e => setCcMax(Math.floor(Number(e.target.value)))}
+                      >
+                        <option value={5}>5-max</option>
+                        <option value={9}>9-max</option>
+                      </select>
+                    </div>
+                  ) : null}
+                  <div>
+                    <label className="text-[11px] text-zinc-500">Password (required)</label>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2 py-2 text-sm text-white"
+                      value={createPw}
+                      onChange={e => setCreatePw(e.target.value)}
+                      placeholder="Min 4 characters"
+                    />
+                  </div>
+                </>
+              ) : null}
             </div>
           ) : (
             <div className="space-y-3">
               <div>
-                <label className="text-[11px] text-zinc-500">Room link or ID</label>
+                <label className="text-[11px] text-zinc-500">5-digit room code</label>
                 <input
+                  inputMode="numeric"
+                  autoComplete="off"
                   className="mt-1 w-full rounded-lg border border-white/15 bg-black/40 px-2 py-2 text-sm text-white"
-                  value={joinRaw}
-                  onChange={e => setJoinRaw(e.target.value)}
-                  placeholder="Paste link or UUID"
+                  value={joinCode}
+                  onChange={e => setJoinCode(e.target.value)}
+                  placeholder="e.g. 01234"
                 />
               </div>
               <div>
@@ -231,9 +298,17 @@ export default function Ov2WavePrivateRoomModal({ open, onClose, game, routeBase
             type="button"
             disabled={busy}
             className="w-full rounded-xl border border-emerald-600/45 bg-emerald-950/50 py-3 text-sm font-bold text-emerald-50 touch-manipulation disabled:opacity-45"
-            onClick={() => void (tab === "create" ? onCreate() : onJoin())}
+            onClick={() =>
+              void (tab === "create" ? (createDone ? onEnterCreatedRoom() : onCreate()) : onJoin())
+            }
           >
-            {busy ? "…" : tab === "create" ? "Create & enter" : "Join room"}
+            {busy
+              ? "…"
+              : tab === "create"
+                ? createDone
+                  ? "Enter room"
+                  : "Create room"
+                : "Join room"}
           </button>
         </div>
       </div>
