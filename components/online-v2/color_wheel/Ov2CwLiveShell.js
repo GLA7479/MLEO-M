@@ -21,6 +21,7 @@ import {
 import { supabaseMP } from "../../../lib/supabaseClients";
 import { useOv2FixedTableLobbySeatCounts, ov2CwSeatCountFromEngine } from "../../../hooks/useOv2FixedTableLobbySeatCounts";
 import Ov2TablePickCardSeatBadge from "../Ov2TablePickCardSeatBadge";
+import { ov2WavePrivateJoinCodeFromRoomRow } from "../../../lib/online-v2/wavePrivateRoomCode";
 
 function parseRoomQuery(router) {
   if (!router.isReady) return null;
@@ -103,7 +104,7 @@ function CwInfoPanelBody({ roomId, tableStakeUnits }) {
  * Live table chrome + `useOv2CwSession` — only mounted when `roomId` is a valid query room id,
  * so lobby/tier-picker never runs tick/interval `operate` traffic.
  */
-function Ov2CwTableLive({ roomId, router, nameDraft, setNameDraft, persistName, tableStake }) {
+function Ov2CwTableLive({ roomId, router, nameDraft, setNameDraft, persistName, tableStake, privateWaveJoinCode }) {
   const session = useOv2CwSession(roomId, tableStake);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const leaveInFlightRef = useRef(false);
@@ -164,6 +165,7 @@ function Ov2CwTableLive({ roomId, router, nameDraft, setNameDraft, persistName, 
       useAppViewportHeight
       chromePreset="c21_flat"
       infoPanel={infoPanel}
+      wavePrivateJoinCode={privateWaveJoinCode}
     >
       <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1.5 overflow-hidden max-lg:gap-1 sm:gap-2">
         <div className="flex w-full min-w-0 shrink-0 flex-nowrap items-center gap-2 overflow-hidden px-2 py-1.5 max-lg:gap-1.5 max-lg:px-1.5 max-lg:py-1 sm:gap-2.5 sm:px-2.5 sm:py-2">
@@ -218,6 +220,7 @@ export default function Ov2CwLiveShell() {
   const [privateOpen, setPrivateOpen] = useState(false);
   const [tableStake, setTableStake] = useState(10_000);
   const [cwRoomValidated, setCwRoomValidated] = useState(false);
+  const [privateWaveJoinCode, setPrivateWaveJoinCode] = useState(null);
   const [nameDraft, setNameDraft] = useState(() =>
     typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
   );
@@ -257,15 +260,17 @@ export default function Ov2CwLiveShell() {
   useEffect(() => {
     if (!roomId) {
       setCwRoomValidated(false);
+      setPrivateWaveJoinCode(null);
       return;
     }
     if (!router.isReady) return;
     setCwRoomValidated(false);
+    setPrivateWaveJoinCode(null);
     let cancelled = false;
     void (async () => {
       const { data, error } = await supabaseMP
         .from("ov2_rooms")
-        .select("stake_per_seat, product_game_id")
+        .select("stake_per_seat, product_game_id, join_code, is_private, meta")
         .eq("id", roomId)
         .maybeSingle();
       if (cancelled) return;
@@ -280,6 +285,7 @@ export default function Ov2CwLiveShell() {
       if (data?.stake_per_seat != null) {
         setTableStake(Math.max(1, Math.floor(Number(data.stake_per_seat) || 1)));
       }
+      setPrivateWaveJoinCode(ov2WavePrivateJoinCodeFromRoomRow(data));
       setCwRoomValidated(true);
     })();
     return () => {
@@ -410,6 +416,7 @@ export default function Ov2CwLiveShell() {
       setNameDraft={setNameDraft}
       persistName={persistName}
       tableStake={tableStake}
+      privateWaveJoinCode={privateWaveJoinCode}
     />
   );
 }

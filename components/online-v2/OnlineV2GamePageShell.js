@@ -18,6 +18,11 @@ export default function OnlineV2GamePageShell({
   infoPanel = null,
   menuPanel = null,
   showSubtitle = true,
+  /**
+   * Wave private tables (21 / CC / CW): show join code as a non-flow overlay in the header only.
+   * Must not affect layout height — rendered `position:absolute` inside `<header>`.
+   */
+  wavePrivateJoinCode = null,
   /** Bingo / iOS: use --app-100vh from _app visualViewport instead of raw 100dvh */
   useAppViewportHeight = false,
   /**
@@ -45,6 +50,13 @@ export default function OnlineV2GamePageShell({
 
   const subtitleText = typeof subtitle === "string" ? subtitle.trim() : "";
   const shouldRenderSubtitle = showSubtitle && Boolean(subtitleText);
+  const waveCode = String(wavePrivateJoinCode || "").trim();
+  const waveBadgeText = (
+    <span className="font-normal text-sky-500/85">
+      Private room:{" "}
+      <span className="font-sans tabular-nums tracking-normal text-inherit">{waveCode}</span>
+    </span>
+  );
   const isCcLiveTable = chromePreset === "cc_live_table";
   const isCcFlat = chromePreset === "cc_flat";
   const useCcCompactLayout = isCcLiveTable || isCcFlat;
@@ -81,7 +93,7 @@ export default function OnlineV2GamePageShell({
           }
         >
           <header
-            className={`shrink-0 ${
+            className={`relative shrink-0 ${
               isCcLiveTable
                 ? "border-b border-white/[0.04] pb-1 pt-0.5"
                 : isCcFlat
@@ -92,30 +104,40 @@ export default function OnlineV2GamePageShell({
             }`}
           >
             {useCcCompactLayout ? (
-              <div className="flex items-center gap-2">
-                <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-                  <Link href="/online-v2" className={OV2_HUD_CHROME_BTN}>
-                    Hub
-                  </Link>
-                  <OnlineV2VaultStrip compact />
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+                    <Link href="/online-v2" className={OV2_HUD_CHROME_BTN}>
+                      Hub
+                    </Link>
+                    <OnlineV2VaultStrip compact />
+                  </div>
+                  <div className="min-w-0 flex-1 px-1 text-center">
+                    <h1 className="truncate text-[11px] font-semibold leading-tight tracking-wide text-zinc-500 sm:text-xs">
+                      <span className="text-zinc-200">{title}</span>
+                      {shouldRenderSubtitle ? (
+                        <span className="font-normal text-zinc-500"> · {subtitleText}</span>
+                      ) : null}
+                    </h1>
+                  </div>
+                  <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-1.5">
+                    <button type="button" onClick={openInfo} className={OV2_HUD_CHROME_BTN} aria-label="Game info and rules">
+                      Info
+                    </button>
+                    <button type="button" onClick={openMenu} className={OV2_HUD_CHROME_BTN} aria-label="Game menu">
+                      Menu
+                    </button>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1 px-1 text-center">
-                  <h1 className="truncate text-[11px] font-semibold leading-tight tracking-wide text-zinc-500 sm:text-xs">
-                    <span className="text-zinc-200">{title}</span>
-                    {shouldRenderSubtitle ? (
-                      <span className="font-normal text-zinc-500"> · {subtitleText}</span>
-                    ) : null}
-                  </h1>
-                </div>
-                <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-1.5">
-                  <button type="button" onClick={openInfo} className={OV2_HUD_CHROME_BTN} aria-label="Game info and rules">
-                    Info
-                  </button>
-                  <button type="button" onClick={openMenu} className={OV2_HUD_CHROME_BTN} aria-label="Game menu">
-                    Menu
-                  </button>
-                </div>
-              </div>
+                {waveCode ? (
+                  <div
+                    className="pointer-events-none absolute bottom-1 left-1/2 z-[5] max-w-[min(82vw,13rem)] -translate-x-1/2 truncate text-center text-[11px] leading-none text-zinc-400 max-[320px]:hidden sm:bottom-1.5 sm:max-w-[min(88vw,16rem)] sm:text-[12px]"
+                    title={`Private room ${waveCode}`}
+                  >
+                    {waveBadgeText}
+                  </div>
+                ) : null}
+              </>
             ) : (
               <>
                 <div className="flex items-center justify-between gap-1.5 sm:gap-2">
@@ -135,7 +157,15 @@ export default function OnlineV2GamePageShell({
                   </div>
                 </div>
                 <div className="-mt-3 flex justify-center">
-                  <div className="mx-auto flex min-w-0 max-w-full flex-col items-center">
+                  <div className="relative mx-auto flex min-w-0 max-w-full flex-col items-center px-2">
+                    {waveCode && isC21Flat ? (
+                      <div
+                        className="pointer-events-none absolute bottom-full left-1/2 z-[5] mb-1 max-w-[min(82vw,14rem)] -translate-x-1/2 truncate text-center text-[11px] leading-none text-zinc-400 max-[320px]:hidden sm:mb-1.5 sm:max-w-[min(90vw,17rem)] sm:text-[12px]"
+                        title={`Private room ${waveCode}`}
+                      >
+                        {waveBadgeText}
+                      </div>
+                    ) : null}
                     <h1 className="max-w-full truncate text-center text-2xl font-black leading-tight tracking-tight text-white sm:text-2xl lg:text-2xl">
                       {title}
                     </h1>

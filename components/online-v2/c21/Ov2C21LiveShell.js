@@ -28,6 +28,7 @@ import {
 import { supabaseMP } from "../../../lib/supabaseClients";
 import { useOv2FixedTableLobbySeatCounts, ov2C21SeatCountFromEngine } from "../../../hooks/useOv2FixedTableLobbySeatCounts";
 import Ov2TablePickCardSeatBadge from "../Ov2TablePickCardSeatBadge";
+import { ov2WavePrivateJoinCodeFromRoomRow } from "../../../lib/online-v2/wavePrivateRoomCode";
 
 function parseRoomQuery(router) {
   if (!router.isReady) return null;
@@ -176,7 +177,7 @@ function C21InfoPanelBody() {
  * Live table chrome + `useOv2C21Session` — only mounted after `roomId` is validated for this product,
  * so the lobby never runs C21 tick / realtime subscriptions.
  */
-function Ov2C21TableLive({ roomId, router, tableStake, nameDraft, setNameDraft, persistName }) {
+function Ov2C21TableLive({ roomId, router, tableStake, nameDraft, setNameDraft, persistName, privateWaveJoinCode }) {
   const session = useOv2C21Session(roomId, tableStake);
   const [autoWatchEnabled, setAutoWatchEnabled] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
@@ -255,6 +256,7 @@ function Ov2C21TableLive({ roomId, router, tableStake, nameDraft, setNameDraft, 
       useAppViewportHeight
       chromePreset="c21_flat"
       infoPanel={infoPanel}
+      wavePrivateJoinCode={privateWaveJoinCode}
     >
       <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
         <div className="flex shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden pb-1 sm:gap-2">
@@ -336,6 +338,7 @@ export default function Ov2C21LiveShell() {
     typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
   );
   const [c21RoomValidated, setC21RoomValidated] = useState(false);
+  const [privateWaveJoinCode, setPrivateWaveJoinCode] = useState(null);
 
   const c21LobbyRoomIds = useMemo(
     () => OV2_C21_STAKE_TIERS.flatMap(t => [...OV2_C21_ROOM_IDS_BY_STAKE[t]]),
@@ -376,15 +379,17 @@ export default function Ov2C21LiveShell() {
   useEffect(() => {
     if (!roomId) {
       setC21RoomValidated(false);
+      setPrivateWaveJoinCode(null);
       return;
     }
     if (!router.isReady) return;
     setC21RoomValidated(false);
+    setPrivateWaveJoinCode(null);
     let cancelled = false;
     void (async () => {
       const { data, error } = await supabaseMP
         .from("ov2_rooms")
-        .select("stake_per_seat, product_game_id")
+        .select("stake_per_seat, product_game_id, join_code, is_private, meta")
         .eq("id", roomId)
         .maybeSingle();
       if (cancelled) return;
@@ -397,6 +402,7 @@ export default function Ov2C21LiveShell() {
         return;
       }
       setTableStake(Math.max(10, Math.floor(Number(data.stake_per_seat) || 10)));
+      setPrivateWaveJoinCode(ov2WavePrivateJoinCodeFromRoomRow(data));
       setC21RoomValidated(true);
     })();
     return () => {
@@ -522,6 +528,7 @@ export default function Ov2C21LiveShell() {
       nameDraft={nameDraft}
       setNameDraft={setNameDraft}
       persistName={persistName}
+      privateWaveJoinCode={privateWaveJoinCode}
     />
   );
 }

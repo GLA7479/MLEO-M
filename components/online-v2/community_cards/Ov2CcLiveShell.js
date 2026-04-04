@@ -15,6 +15,7 @@ import {
 import Ov2WavePrivateRoomModal, { formatOv2CcCategoryLabel } from "../Ov2WavePrivateRoomModal";
 import { useOv2FixedTableLobbySeatCounts, ov2CcSeatCountFromEngine } from "../../../hooks/useOv2FixedTableLobbySeatCounts";
 import Ov2TablePickCardSeatBadge from "../Ov2TablePickCardSeatBadge";
+import { ov2WavePrivateJoinCodeFromRoomRow } from "../../../lib/online-v2/wavePrivateRoomCode";
 import { isOv2RoomIdQueryParam } from "../../../lib/online-v2/onlineV2GameRegistry";
 import {
   OV2_SHARED_DISPLAY_NAME_KEY,
@@ -81,7 +82,7 @@ function CcInfoPanelBody() {
  * Live table chrome + `useOv2CcSession` — only mounted after `roomId` is validated for this product,
  * so the lobby never runs CC tick / realtime subscriptions.
  */
-function Ov2CcTableLive({ roomId, router, tableConfig, nameDraft, setNameDraft, persistName }) {
+function Ov2CcTableLive({ roomId, router, tableConfig, nameDraft, setNameDraft, persistName, privateWaveJoinCode }) {
   const session = useOv2CcSession(roomId);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const leaveInFlightRef = useRef(false);
@@ -126,6 +127,7 @@ function Ov2CcTableLive({ roomId, router, tableConfig, nameDraft, setNameDraft, 
       useAppViewportHeight
       chromePreset="cc_flat"
       infoPanel={infoPanel}
+      wavePrivateJoinCode={privateWaveJoinCode}
     >
       <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden lg:gap-0.5">
         <div className="flex shrink-0 flex-wrap items-center gap-1.5 pb-1 pt-0.5 lg:pb-0.5">
@@ -180,6 +182,7 @@ export default function Ov2CcLiveShell() {
   const [catIndex, setCatIndex] = useState(null);
   const [privateOpen, setPrivateOpen] = useState(false);
   const [tableConfig, setTableConfig] = useState(null);
+  const [privateWaveJoinCode, setPrivateWaveJoinCode] = useState(null);
   const [nameDraft, setNameDraft] = useState(() =>
     typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
   );
@@ -217,15 +220,17 @@ export default function Ov2CcLiveShell() {
   useEffect(() => {
     if (!roomId) {
       setTableConfig(null);
+      setPrivateWaveJoinCode(null);
       return;
     }
     if (!router.isReady) return;
     setTableConfig(null);
+    setPrivateWaveJoinCode(null);
     let cancelled = false;
     void (async () => {
       const { data, error } = await supabaseMP
         .from("ov2_rooms")
-        .select("id, product_game_id, stake_per_seat, meta")
+        .select("id, product_game_id, stake_per_seat, meta, join_code, is_private")
         .eq("id", roomId)
         .maybeSingle();
       if (cancelled) return;
@@ -238,6 +243,7 @@ export default function Ov2CcLiveShell() {
         await router.replace("/ov2-community-cards");
         return;
       }
+      setPrivateWaveJoinCode(ov2WavePrivateJoinCodeFromRoomRow(data));
       setTableConfig(c);
     })();
     return () => {
@@ -387,6 +393,7 @@ export default function Ov2CcLiveShell() {
       nameDraft={nameDraft}
       setNameDraft={setNameDraft}
       persistName={persistName}
+      privateWaveJoinCode={privateWaveJoinCode}
     />
   );
 }
