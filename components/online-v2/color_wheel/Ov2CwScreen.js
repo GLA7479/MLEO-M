@@ -260,7 +260,7 @@ export default function Ov2CwScreen({
     const mine = s.participantKey === participantKey;
     const isRoundController = occ && leaderPk && s.participantKey === leaderPk;
     const base =
-      "relative flex min-h-[3rem] flex-col items-center justify-center gap-0.5 rounded-xl border px-1.5 py-1 text-center text-[10px] touch-manipulation transition-[box-shadow,border-color,transform] active:scale-[0.99] sm:min-h-[3.25rem] sm:gap-0.5 sm:rounded-2xl sm:px-2 sm:py-1.5 sm:text-[11px] lg:min-h-[3.5rem]";
+      "relative flex min-h-0 flex-col items-center justify-center gap-0 rounded-md border px-0.5 py-0.5 text-center touch-manipulation transition-[box-shadow,border-color,transform] active:scale-[0.99] max-sm:min-h-[1.5rem] max-sm:leading-none sm:min-h-[3.25rem] sm:gap-0.5 sm:rounded-xl sm:px-2 sm:py-1.5 sm:text-[11px] lg:min-h-[3.5rem]";
     if (!occ) {
       return (
         <button
@@ -268,10 +268,12 @@ export default function Ov2CwScreen({
           key={i}
           disabled={operateBusy}
           onClick={() => void onSit(i)}
-          className={`${base} border-amber-500/25 bg-gradient-to-b from-zinc-900/60 to-black/50 text-amber-100/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-amber-400/40 hover:shadow-[0_0_20px_-6px_rgba(245,158,11,0.35)] disabled:opacity-40`}
+          className={`${base} border-amber-500/25 bg-gradient-to-b from-zinc-900/60 to-black/50 text-amber-100/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-amber-400/40 hover:shadow-[0_0_20px_-6px_rgba(245,158,11,0.35)] disabled:opacity-40 max-sm:text-[7px] sm:text-[10px]`}
         >
-          <span className="font-bold text-amber-100">Join</span>
-          <span className="font-mono text-[10px] tabular-nums text-zinc-500 sm:text-[11px]">Seat {i + 1}</span>
+          <span className="font-bold leading-none text-amber-100 max-sm:text-[8px]">Join</span>
+          <span className="font-mono tabular-nums leading-none text-zinc-500 max-sm:text-[6px] sm:text-[10px]">
+            {i + 1}
+          </span>
         </button>
       );
     }
@@ -285,15 +287,18 @@ export default function Ov2CwScreen({
         }`}
       >
         {isRoundController ? (
-          <span className="absolute top-1 right-1 rounded bg-amber-500/20 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-amber-200/90">
-            Lead
+          <span className="absolute top-px right-px rounded bg-amber-500/25 px-0.5 py-px text-[5px] font-bold uppercase leading-none text-amber-200/95 sm:top-1 sm:right-1 sm:px-1 sm:text-[7px]">
+            <span className="sm:hidden">L</span>
+            <span className="hidden sm:inline">Lead</span>
           </span>
         ) : null}
-        <span className="max-w-full truncate text-[11px] font-semibold tracking-tight text-zinc-50 sm:text-xs">
+        <span className="max-w-full truncate font-semibold tracking-tight text-zinc-50 max-sm:max-w-[2.75rem] max-sm:text-[7px] max-sm:leading-tight sm:text-xs">
           {s.displayName || "Player"}
         </span>
-        <span className={`text-[10px] font-medium ${mine ? "text-amber-300/90" : "text-zinc-500"}`}>
-          {mine ? "You" : `Seat ${i + 1}`}
+        <span
+          className={`font-medium leading-none max-sm:text-[6px] sm:text-[10px] ${mine ? "text-amber-300/90" : "text-zinc-500"}`}
+        >
+          {mine ? "You" : `${i + 1}`}
         </span>
       </div>
     );
@@ -326,30 +331,12 @@ export default function Ov2CwScreen({
         </div>
       </div>
 
-      {/* Wheel stage — ~25% smaller footprint; timer badge top-right */}
+      {/* Wheel stage — timer pinned to wheel face (non-rotating); rim labels upright inside disk */}
       <div className="relative mx-auto flex w-full max-w-[min(88vw,16.5rem)] shrink-0 flex-col items-center sm:max-w-[19.5rem] md:max-w-[22rem] lg:max-w-[24rem] xl:max-w-[25rem]">
         <div
           className="pointer-events-none absolute -inset-4 rounded-full bg-amber-500/[0.06] blur-2xl sm:-inset-6"
           aria-hidden
         />
-        {countdown != null ? (
-          <div
-            className={`absolute top-0 right-0 z-30 rounded-lg border px-1.5 py-0.5 shadow-md backdrop-blur-sm sm:top-0.5 sm:right-0.5 sm:px-2 sm:py-1 ${
-              placingLive && countdown <= 5
-                ? "border-amber-400/40 bg-black/80"
-                : "border-white/10 bg-black/65"
-            }`}
-          >
-            <span className="block text-[6px] font-semibold uppercase leading-none text-zinc-500 sm:text-[7px]">Time</span>
-            <span
-              className={`font-mono text-sm font-bold tabular-nums leading-none sm:text-base ${
-                placingLive && countdown <= 5 ? "text-amber-300" : "text-amber-100/90"
-              }`}
-            >
-              {countdown}
-            </span>
-          </div>
-        ) : null}
         <div className="pointer-events-none absolute top-0 left-1/2 z-20 -translate-x-1/2 -translate-y-0.5">
           <div className="flex flex-col items-center drop-shadow-[0_2px_8px_rgba(0,0,0,0.55)]">
             <div className="h-0 w-0 border-x-[8px] border-x-transparent border-t-[11px] border-t-amber-300 sm:border-x-[9px] sm:border-t-[13px]" />
@@ -362,15 +349,65 @@ export default function Ov2CwScreen({
             background: "linear-gradient(145deg, rgba(39,39,42,0.85) 0%, rgba(9,9,11,0.92) 55%, rgba(50,28,8,0.3) 100%)",
           }}
         >
-          <div
-            className="relative h-full w-full overflow-hidden rounded-full border-2 border-zinc-800/95 shadow-[inset_0_2px_10px_rgba(0,0,0,0.45)]"
-            style={{
-              background: CONIC_BG,
-              transform: `rotate(${wheelDisplayDeg}deg)`,
-              transition: spinning ? "none" : "transform 0.35s ease-out",
-            }}
-          >
-            <div className="absolute inset-[16%] flex flex-col items-center justify-center rounded-full border border-white/[0.12] bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_1px_0_rgba(255,255,255,0.05)] sm:inset-[17%]">
+          <div className="relative h-full w-full">
+            {countdown != null ? (
+              <div
+                className={`pointer-events-none absolute right-px top-px z-50 sm:right-0.5 sm:top-0.5 ${
+                  placingLive && countdown <= 5
+                    ? "border-amber-400/50 bg-black/90"
+                    : "border-white/20 bg-black/80"
+                } rounded px-1 py-px shadow-sm backdrop-blur-sm sm:px-1.5 sm:py-0.5`}
+              >
+                <span className="block text-[5px] font-semibold uppercase leading-none text-zinc-500 sm:text-[6px]">Time</span>
+                <span
+                  className={`font-mono text-[11px] font-bold tabular-nums leading-none sm:text-xs ${
+                    placingLive && countdown <= 5 ? "text-amber-300" : "text-amber-100/90"
+                  }`}
+                >
+                  {countdown}
+                </span>
+              </div>
+            ) : null}
+            <div
+              className="relative h-full w-full overflow-hidden rounded-full border-2 border-zinc-800/95 shadow-[inset_0_2px_10px_rgba(0,0,0,0.45)]"
+              style={{
+                background: CONIC_BG,
+                transform: `rotate(${wheelDisplayDeg}deg)`,
+                transition: spinning ? "none" : "transform 0.35s ease-out",
+              }}
+            >
+              {OV2_CW_WHEEL_NUMBERS.map((entry, i) => {
+                const thetaFromTop = (i + 0.5) * OV2_CW_SEGMENT_DEG;
+                const rad = (thetaFromTop * Math.PI) / 180;
+                const rimPct = 33;
+                const xPct = 50 + rimPct * Math.sin(rad);
+                const yPct = 50 - rimPct * Math.cos(rad);
+                const uprightDeg = -(wheelDisplayDeg + thetaFromTop);
+                const tc =
+                  entry.color === "red"
+                    ? "text-white"
+                    : entry.color === "black"
+                      ? "text-zinc-50"
+                      : "text-white";
+                return (
+                  <div
+                    key={`rim-${entry.num}-${i}`}
+                    className="pointer-events-none absolute z-[5]"
+                    style={{
+                      left: `${xPct}%`,
+                      top: `${yPct}%`,
+                      transform: `translate(-50%, -50%) rotate(${uprightDeg}deg)`,
+                    }}
+                  >
+                    <span
+                      className={`block text-center text-[6px] font-black tabular-nums leading-none sm:text-[7px] ${tc} [text-shadow:0_0_2px_rgba(0,0,0,1),0_1px_2px_rgba(0,0,0,0.85)]`}
+                    >
+                      {entry.num}
+                    </span>
+                  </div>
+                );
+              })}
+            <div className="absolute inset-[16%] z-20 flex flex-col items-center justify-center rounded-full border border-white/[0.12] bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_1px_0_rgba(255,255,255,0.05)] sm:inset-[17%]">
               {resultPhase && centerResult != null && centerResult >= 0 ? (
                 <>
                   <span
@@ -394,6 +431,7 @@ export default function Ov2CwScreen({
                 </span>
               )}
             </div>
+            </div>
           </div>
         </div>
       </div>
@@ -409,25 +447,22 @@ export default function Ov2CwScreen({
         </button>
       ) : null}
 
-      {placingLive && mySeat ? (
-        <div className="flex shrink-0 justify-end sm:hidden">
+      <div className="grid shrink-0 grid-cols-6 gap-0.5 sm:gap-2 lg:gap-2.5">
+        {Array.from({ length: OV2_CW_MAX_SEATS }, (_, i) => seatBtn(seatsForUi[i], i))}
+      </div>
+
+      {/* Table surface: history + plays — floating Play Panel (mobile) is absolute, out of flow */}
+      <div className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/40 via-black/30 to-black/50 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-3 sm:p-3">
+        {placingLive && mySeat ? (
           <button
             type="button"
             disabled={operateBusy}
             onClick={() => openMobileSheetManual()}
-            className="rounded-full border border-amber-500/35 bg-amber-950/70 px-3 py-1.5 text-[11px] font-bold text-amber-100 shadow-[0_2px_12px_rgba(0,0,0,0.35)] disabled:opacity-40"
+            className="absolute bottom-[max(1rem,calc(0.5rem+env(safe-area-inset-bottom,0px)))] left-1/2 z-30 flex min-w-[10.5rem] -translate-x-1/2 items-center justify-center rounded-full border border-amber-500/45 bg-gradient-to-b from-amber-800/90 to-amber-950/95 px-5 py-2 text-[11px] font-bold tracking-wide text-amber-50 shadow-[0_4px_18px_rgba(0,0,0,0.5)] touch-manipulation disabled:opacity-40 sm:hidden"
           >
             Play Panel
           </button>
-        </div>
-      ) : null}
-
-      <div className="grid shrink-0 grid-cols-3 gap-1.5 sm:grid-cols-6 sm:gap-2 lg:gap-2.5">
-        {Array.from({ length: OV2_CW_MAX_SEATS }, (_, i) => seatBtn(seatsForUi[i], i))}
-      </div>
-
-      {/* Table surface: history + plays */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-b from-zinc-900/40 via-black/30 to-black/50 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-3 sm:p-3">
+        ) : null}
         {Array.isArray(engine.history) && engine.history.length > 0 ? (
           <div className="shrink-0">
             <div className="mb-1.5 flex items-center gap-2">
