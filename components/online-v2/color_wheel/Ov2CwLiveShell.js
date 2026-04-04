@@ -225,8 +225,8 @@ export default function Ov2CwLiveShell() {
       useAppViewportHeight
       infoPanel={infoPanel}
     >
-      <div className="flex h-full min-h-0 flex-col gap-1.5 overflow-hidden sm:gap-2">
-        <div className="flex shrink-0 flex-nowrap items-center gap-2 overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-r from-black/50 via-zinc-950/80 to-black/50 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-2.5 sm:px-2.5 sm:py-2">
+      <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-1.5 overflow-hidden sm:gap-2">
+        <div className="flex w-full min-w-0 shrink-0 flex-nowrap items-center gap-2 overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-r from-black/50 via-zinc-950/80 to-black/50 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-2.5 sm:px-2.5 sm:py-2">
           <input
             value={nameDraft}
             onChange={e => setNameDraft(e.target.value)}
@@ -252,7 +252,7 @@ export default function Ov2CwLiveShell() {
             {leaveBusy ? "…" : "Leave"}
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden px-0 sm:px-1">
+        <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden">
           <Ov2CwScreen
             roomId={roomId}
             engine={session.engine}
