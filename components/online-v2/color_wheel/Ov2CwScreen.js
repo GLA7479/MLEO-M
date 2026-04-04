@@ -703,7 +703,8 @@ export default function Ov2CwScreen({
                   aria-hidden
                 >
                   {OV2_CW_WHEEL_NUMBERS.map((entry, i) => {
-                    const thetaFromTop = (i + 0.5) * OV2_CW_SEGMENT_DEG;
+                    /** Match `conic-gradient(from -90deg, …)`: stop 0° sits at 9 o'clock; angles increase CW → add 270° to segment mid-angle from top. */
+                    const thetaFromTop = (270 + (i + 0.5) * OV2_CW_SEGMENT_DEG) % 360;
                     const rad = (thetaFromTop * Math.PI) / 180;
                     /** Outer track toward bezel; tuned so digits hug rim without clipping the circle. */
                     const rimPct = 45.6;
@@ -739,7 +740,13 @@ export default function Ov2CwScreen({
                     );
                   })}
                 </div>
-                <div className="absolute inset-[18%] z-20 flex flex-col items-center justify-center rounded-full border border-white/[0.12] bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_1px_0_rgba(255,255,255,0.05)] sm:inset-[18%] lg:inset-[19%]">
+                <div
+                  className="absolute inset-[18%] z-20 flex flex-col items-center justify-center rounded-full border border-white/[0.12] bg-gradient-to-b from-zinc-950 via-zinc-950 to-black shadow-[inset_0_2px_6px_rgba(0,0,0,0.8),0_1px_0_rgba(255,255,255,0.05)] sm:inset-[18%] lg:inset-[19%]"
+                  style={{
+                    transform: `rotate(${viewerHorizontalLabelDeg(wheelDisplayDeg)}deg)`,
+                    transition: spinning ? "none" : "transform 0.35s ease-out",
+                  }}
+                >
               {resultPhase && centerResult != null && centerResult >= 0 ? (
                 <>
                   <span
