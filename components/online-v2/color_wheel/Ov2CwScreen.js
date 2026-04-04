@@ -899,7 +899,7 @@ export default function Ov2CwScreen({
             />
             <div className="pointer-events-none relative z-10 flex min-h-0 w-full flex-1 flex-col justify-end lg:flex-row lg:items-stretch lg:justify-end lg:p-3">
               <div
-                className="pointer-events-auto flex max-h-[min(88dvh,calc(100%-0.5rem))] w-full flex-col overflow-hidden rounded-t-2xl border border-amber-500/30 border-b-0 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[0_-12px_48px_rgba(0,0,0,0.55)] lg:max-h-[min(calc(100%-1.5rem),720px)] lg:min-h-0 lg:w-full lg:max-w-md lg:rounded-2xl lg:border-b lg:shadow-2xl"
+                className="pointer-events-auto flex max-h-[min(88dvh,calc(100%-0.5rem))] w-full flex-col overflow-hidden rounded-t-2xl border border-amber-500/30 border-b-0 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[0_-12px_48px_rgba(0,0,0,0.55)] max-lg:h-[min(88dvh,calc(100%-0.5rem))] lg:max-h-[min(calc(100%-1.5rem),720px)] lg:min-h-0 lg:h-auto lg:w-full lg:max-w-md lg:rounded-2xl lg:border-b lg:shadow-2xl"
                 role="dialog"
                 aria-label="Play panel"
               >
@@ -1158,6 +1158,9 @@ function PlayForm({
     { id: "number", label: "Exact #" },
   ];
 
+  const groupActive = playKind === "dozen" || playKind === "column";
+  const numberActive = playKind === "number";
+
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col gap-2 lg:gap-4">
       <div className="shrink-0 rounded-lg border border-white/[0.08] bg-black/40 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:rounded-xl lg:p-3">
@@ -1204,7 +1207,7 @@ function PlayForm({
               key={k.id}
               type="button"
               onClick={() => setPlayKind(k.id)}
-              className={`min-h-[2rem] rounded-lg border px-1.5 py-1 text-[9px] font-bold leading-tight transition-colors lg:min-h-[2.5rem] lg:rounded-xl lg:px-2 lg:py-1.5 lg:text-[11px] ${
+              className={`min-h-[2rem] rounded-lg border px-1.5 py-1 text-[9px] font-bold leading-tight lg:min-h-[2.5rem] lg:rounded-xl lg:px-2 lg:py-1.5 lg:text-[11px] ${
                 playKind === k.id
                   ? "border-amber-400/55 bg-gradient-to-b from-amber-600/35 to-amber-950/50 text-amber-50 shadow-[0_0_20px_-8px_rgba(245,158,11,0.5),inset_0_1px_0_rgba(255,255,255,0.08)]"
                   : "border-white/[0.08] bg-zinc-900/50 text-zinc-400 hover:border-white/15 hover:bg-zinc-800/50 hover:text-zinc-200"
@@ -1216,53 +1219,74 @@ function PlayForm({
         </div>
       </div>
 
-      {playKind === "number" ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-none">
-          <p className="mb-1 shrink-0 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-500 lg:mb-2 lg:text-[9px]">
-            Exact number
-          </p>
-          <div
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-white/[0.06] bg-black/30 [-webkit-overflow-scrolling:touch] lg:max-h-44 lg:flex-none"
-            role="listbox"
-            aria-label="Pick exact number"
-          >
-            <div className="grid grid-cols-7 gap-0.5 p-1.5 lg:gap-1 lg:p-2">
-              {Array.from({ length: 37 }, (_, n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setNumberPick(n)}
-                  className={`flex aspect-square max-h-[1.85rem] min-h-0 w-full items-center justify-center rounded-md text-[10px] font-bold lg:max-h-10 lg:rounded-lg lg:text-xs ${
-                    numberPick === n
-                      ? "bg-gradient-to-b from-amber-500 to-amber-700 text-white shadow-md"
-                      : "bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700"
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {(playKind === "dozen" || playKind === "column") && (
-        <div className="flex shrink-0 gap-1.5 lg:gap-2">
+      <div className="shrink-0">
+        <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-500 lg:mb-2 lg:text-[9px]">Group / column</p>
+        <div className="flex gap-1.5 lg:gap-2">
           {[1, 2, 3].map(g => (
             <button
               key={g}
               type="button"
+              disabled={!groupActive}
               onClick={() => setGroupPick(g)}
               className={`min-h-[2.35rem] flex-1 rounded-lg border py-1.5 text-[11px] font-extrabold lg:min-h-[2.75rem] lg:rounded-xl lg:py-2 lg:text-xs ${
-                groupPick === g
-                  ? "border-amber-400/50 bg-gradient-to-b from-amber-600/30 to-amber-950/40 text-amber-50"
-                  : "border-white/[0.08] bg-zinc-900/60 text-zinc-400"
+                !groupActive
+                  ? "cursor-not-allowed border-white/[0.05] bg-zinc-950/40 text-zinc-600 opacity-50"
+                  : groupPick === g
+                    ? "border-amber-400/50 bg-gradient-to-b from-amber-600/30 to-amber-950/40 text-amber-50"
+                    : "border-white/[0.08] bg-zinc-900/60 text-zinc-400"
               }`}
+              aria-label={
+                playKind === "dozen"
+                  ? `Group ${g}`
+                  : playKind === "column"
+                    ? `Column ${g}`
+                    : `Column ${g} (pick Group or Column first)`
+              }
             >
               {playKind === "dozen" ? `G${g}` : `C${g}`}
             </button>
           ))}
         </div>
-      )}
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:min-h-[11rem]">
+        <p
+          className={`mb-1 shrink-0 text-[8px] font-bold uppercase tracking-[0.12em] lg:mb-2 lg:text-[9px] ${
+            numberActive ? "text-zinc-500" : "text-zinc-600"
+          }`}
+        >
+          Exact number
+        </p>
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-white/[0.06] bg-black/30 [-webkit-overflow-scrolling:touch] lg:max-h-44 ${
+            numberActive ? "" : "opacity-45"
+          }`}
+          role="listbox"
+          aria-label="Pick exact number"
+          aria-disabled={!numberActive}
+        >
+          <div
+            className={`grid grid-cols-7 gap-0.5 p-1.5 lg:gap-1 lg:p-2 ${numberActive ? "" : "pointer-events-none"}`}
+          >
+            {Array.from({ length: 37 }, (_, n) => (
+              <button
+                key={n}
+                type="button"
+                disabled={!numberActive}
+                tabIndex={numberActive ? 0 : -1}
+                onClick={() => setNumberPick(n)}
+                className={`flex aspect-square max-h-[1.85rem] min-h-0 w-full items-center justify-center rounded-md text-[10px] font-bold lg:max-h-10 lg:rounded-lg lg:text-xs ${
+                  numberPick === n
+                    ? "bg-gradient-to-b from-amber-500 to-amber-700 text-white shadow-md"
+                    : "bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
       <p className="shrink-0 text-center text-[9px] leading-snug text-zinc-500 lg:text-[10px] lg:leading-relaxed">
         Min {fmt(minPlay)} · Max {fmt(maxPlay)}. Successful plays return stake plus a multiplier set by play type (see info).
       </p>
