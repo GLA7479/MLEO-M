@@ -6,7 +6,11 @@ import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
 import { OV2_HUD_CHROME_BTN } from "../OnlineV2GameHudOverlays";
 import Ov2C21Screen from "./Ov2C21Screen";
 import { useOv2C21Session } from "../../../hooks/useOv2C21Session";
-import { OV2_C21_STAKE_TIERS, OV2_C21_ROOM_IDS_BY_STAKE } from "../../../lib/online-v2/c21/ov2C21TableIds";
+import {
+  OV2_C21_PRODUCT_GAME_ID,
+  OV2_C21_STAKE_TIERS,
+  OV2_C21_ROOM_IDS_BY_STAKE,
+} from "../../../lib/online-v2/c21/ov2C21TableIds";
 import Ov2WavePrivateRoomModal from "../Ov2WavePrivateRoomModal";
 import {
   OV2_C21_BETTING_MS,
@@ -168,32 +172,16 @@ function C21InfoPanelBody() {
   );
 }
 
-export default function Ov2C21LiveShell() {
-  const router = useRouter();
-  const roomId = useMemo(() => parseRoomQuery(router), [router.isReady, router.query.room]);
-  const [lobbyStep, setLobbyStep] = useState("category");
-  const [tierPick, setTierPick] = useState(null);
-  const [privateOpen, setPrivateOpen] = useState(false);
-  const [tableStake, setTableStake] = useState(10_000);
-  const [nameDraft, setNameDraft] = useState(() =>
-    typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
-  );
+/**
+ * Live table chrome + `useOv2C21Session` — only mounted after `roomId` is validated for this product,
+ * so the lobby never runs C21 tick / realtime subscriptions.
+ */
+function Ov2C21TableLive({ roomId, router, tableStake, nameDraft, setNameDraft, persistName }) {
+  const session = useOv2C21Session(roomId, tableStake);
   const [autoWatchEnabled, setAutoWatchEnabled] = useState(false);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const leaveInFlightRef = useRef(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
-
-  const session = useOv2C21Session(roomId, tableStake);
-
-  const c21LobbyRoomIds = useMemo(
-    () => OV2_C21_STAKE_TIERS.flatMap(t => [...OV2_C21_ROOM_IDS_BY_STAKE[t]]),
-    [],
-  );
-  const c21LobbySeatCounts = useOv2FixedTableLobbySeatCounts(
-    c21LobbyRoomIds,
-    "ov2_c21_live_state",
-    (engine, _rid) => ov2C21SeatCountFromEngine(engine),
-  );
 
   useEffect(() => {
     const id = window.setInterval(() => setNowTick(Date.now()), 500);
@@ -219,51 +207,17 @@ export default function Ov2C21LiveShell() {
       <>
         <C21InfoPanelBody />
         <p className="mt-2 text-[11px] text-zinc-500">
-          {roomId ? (
-            <button
-              type="button"
-              className="text-sky-300 underline"
-              onClick={() => void session.reloadFromDb()}
-            >
-              Refresh state
-            </button>
-          ) : null}
+          <button type="button" className="text-sky-300 underline" onClick={() => void session.reloadFromDb()}>
+            Refresh state
+          </button>
         </p>
       </>
     ),
-    [roomId, session.reloadFromDb],
+    [session.reloadFromDb],
   );
-
-  useEffect(() => {
-    writeOv2SharedDisplayName(nameDraft);
-  }, [nameDraft]);
-
-  useEffect(() => {
-    const onStorage = e => {
-      if (e.key !== OV2_SHARED_DISPLAY_NAME_KEY || e.storageArea !== window.localStorage) return;
-      setNameDraft(e.newValue ?? "");
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  useEffect(() => {
-    if (!roomId) return;
-    void (async () => {
-      const { data } = await supabaseMP
-        .from("ov2_rooms")
-        .select("stake_per_seat")
-        .eq("id", roomId)
-        .maybeSingle();
-      if (data?.stake_per_seat != null) {
-        setTableStake(Math.max(10, Math.floor(Number(data.stake_per_seat) || 10)));
-      }
-    })();
-  }, [roomId]);
 
   const displayName = String(nameDraft || "").trim() || "Guest";
   const runC21Op = session.operate;
-  const c21OpBusy = session.operateBusy;
 
   const onLeaveTable = useCallback(async () => {
     if (leaveInFlightRef.current || !roomId) return;
@@ -294,6 +248,150 @@ export default function Ov2C21LiveShell() {
     }
   }, [roomId, router, runC21Op]);
 
+  return (
+    <OnlineV2GamePageShell
+      title="21 Challenge"
+      subtitle={`Live · table play ${formatTierLabel(tableStake)}`}
+      useAppViewportHeight
+      chromePreset="c21_flat"
+      infoPanel={infoPanel}
+    >
+      <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
+        <div className="flex shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden pb-1 sm:gap-2">
+          <input
+            value={nameDraft}
+            onChange={e => setNameDraft(e.target.value)}
+            onBlur={persistName}
+            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/[0.08] bg-black/25 px-2 py-1.5 text-[11px] text-zinc-100"
+            placeholder="Display name"
+          />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autoWatchEnabled}
+            title="Open the small hand panel for whoever is acting (not you); hides on your turn."
+            onClick={() => setAutoWatchEnabled(v => !v)}
+            style={{ WebkitTapHighlightColor: "rgba(52, 211, 153, 0.35)" }}
+            className={`relative z-10 inline-flex h-9 min-w-[6.2rem] shrink-0 touch-manipulation select-none items-center justify-center gap-0.5 rounded-full border px-2 text-[11px] font-semibold whitespace-nowrap transition-all duration-150 ease-out sm:h-9 sm:min-w-[6.85rem] sm:px-2.5 sm:text-[11px] lg:h-8 lg:min-h-[32px] lg:px-2.5 lg:text-[11px] ${
+              autoWatchEnabled
+                ? "border-emerald-700/50 bg-emerald-950/70 text-emerald-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-emerald-600/45 hover:bg-emerald-900/55 active:scale-[0.97]"
+                : "border-white/18 bg-white/[0.06] text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-white/28 hover:bg-white/[0.1] active:scale-[0.97]"
+            }`}
+          >
+            {autoWatchEnabled ? (
+              <span className="text-emerald-300" aria-hidden>
+                ✓
+              </span>
+            ) : null}
+            <span>Auto watch</span>
+          </button>
+          <button
+            type="button"
+            title="Pick another table without leaving your seat"
+            onClick={() => router.push("/ov2-21-challenge")}
+            className={OV2_HUD_CHROME_BTN}
+          >
+            Tables
+          </button>
+          <button
+            type="button"
+            title={
+              bettingPreRoundFreezeActive
+                ? "Round about to start — Leave is paused briefly"
+                : "Vacate seat and return to table list"
+            }
+            disabled={leaveBusy || bettingPreRoundFreezeActive}
+            onClick={() => void onLeaveTable()}
+            className={`${OV2_HUD_CHROME_BTN} border-rose-500/35 bg-rose-950/30 text-rose-100 hover:border-rose-400/40 hover:bg-rose-950/45 disabled:opacity-45`}
+          >
+            {leaveBusy ? "…" : "Leave"}
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <Ov2C21Screen
+            roomId={roomId}
+            engine={session.engine}
+            tableStakeUnits={tableStake}
+            participantKey={session.participantKey}
+            displayName={displayName}
+            onOperate={session.operate}
+            operateBusy={session.operateBusy}
+            loadError={session.loadError}
+            autoWatchEnabled={autoWatchEnabled}
+          />
+        </div>
+      </div>
+    </OnlineV2GamePageShell>
+  );
+}
+
+export default function Ov2C21LiveShell() {
+  const router = useRouter();
+  const roomId = useMemo(() => parseRoomQuery(router), [router.isReady, router.query.room]);
+  const [lobbyStep, setLobbyStep] = useState("category");
+  const [tierPick, setTierPick] = useState(null);
+  const [privateOpen, setPrivateOpen] = useState(false);
+  const [tableStake, setTableStake] = useState(10_000);
+  const [nameDraft, setNameDraft] = useState(() =>
+    typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
+  );
+  const [c21RoomValidated, setC21RoomValidated] = useState(false);
+
+  const c21LobbyRoomIds = useMemo(
+    () => OV2_C21_STAKE_TIERS.flatMap(t => [...OV2_C21_ROOM_IDS_BY_STAKE[t]]),
+    [],
+  );
+  const c21LobbySeatCounts = useOv2FixedTableLobbySeatCounts(
+    c21LobbyRoomIds,
+    "ov2_c21_live_state",
+    (engine, _rid) => ov2C21SeatCountFromEngine(engine),
+  );
+
+  const lobbyInfoPanel = useMemo(() => <C21InfoPanelBody />, []);
+
+  const loadingInfoPanel = useMemo(() => <C21InfoPanelBody />, []);
+
+  useEffect(() => {
+    writeOv2SharedDisplayName(nameDraft);
+  }, [nameDraft]);
+
+  useEffect(() => {
+    const onStorage = e => {
+      if (e.key !== OV2_SHARED_DISPLAY_NAME_KEY || e.storageArea !== window.localStorage) return;
+      setNameDraft(e.newValue ?? "");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  useEffect(() => {
+    if (!roomId) {
+      setC21RoomValidated(false);
+      return;
+    }
+    if (!router.isReady) return;
+    setC21RoomValidated(false);
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabaseMP
+        .from("ov2_rooms")
+        .select("stake_per_seat, product_game_id")
+        .eq("id", roomId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (!error && (!data || String(data.product_game_id) !== OV2_C21_PRODUCT_GAME_ID)) {
+        await router.replace("/ov2-21-challenge");
+        return;
+      }
+      if (error) return;
+      setTableStake(Math.max(10, Math.floor(Number(data.stake_per_seat) || 10)));
+      setC21RoomValidated(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, router.isReady]);
+
   const persistName = () => {
     writeOv2SharedDisplayName(nameDraft);
   };
@@ -305,7 +403,7 @@ export default function Ov2C21LiveShell() {
         subtitle="Public tables · private rooms"
         useAppViewportHeight
         chromePreset="c21_flat"
-        infoPanel={infoPanel}
+        infoPanel={lobbyInfoPanel}
       >
         <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-2">
           <Ov2WavePrivateRoomModal
@@ -390,79 +488,28 @@ export default function Ov2C21LiveShell() {
     );
   }
 
-  return (
+  if (!c21RoomValidated) {
+    return (
       <OnlineV2GamePageShell
         title="21 Challenge"
-        subtitle={`Live · table play ${formatTierLabel(tableStake)}`}
+        subtitle="Loading…"
         useAppViewportHeight
         chromePreset="c21_flat"
-        infoPanel={infoPanel}
+        infoPanel={loadingInfoPanel}
       >
-      <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
-        <div className="flex shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden pb-1 sm:gap-2">
-          <input
-            value={nameDraft}
-            onChange={e => setNameDraft(e.target.value)}
-            onBlur={persistName}
-            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/[0.08] bg-black/25 px-2 py-1.5 text-[11px] text-zinc-100"
-            placeholder="Display name"
-          />
-          <button
-            type="button"
-            role="switch"
-            aria-checked={autoWatchEnabled}
-            title="Open the small hand panel for whoever is acting (not you); hides on your turn."
-            onClick={() => setAutoWatchEnabled(v => !v)}
-            style={{ WebkitTapHighlightColor: "rgba(52, 211, 153, 0.35)" }}
-            className={`relative z-10 inline-flex h-9 min-w-[6.2rem] shrink-0 touch-manipulation select-none items-center justify-center gap-0.5 rounded-full border px-2 text-[11px] font-semibold whitespace-nowrap transition-all duration-150 ease-out sm:h-9 sm:min-w-[6.85rem] sm:px-2.5 sm:text-[11px] lg:h-8 lg:min-h-[32px] lg:px-2.5 lg:text-[11px] ${
-              autoWatchEnabled
-                ? "border-emerald-700/50 bg-emerald-950/70 text-emerald-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:border-emerald-600/45 hover:bg-emerald-900/55 active:scale-[0.97]"
-                : "border-white/18 bg-white/[0.06] text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:border-white/28 hover:bg-white/[0.1] active:scale-[0.97]"
-            }`}
-          >
-            {autoWatchEnabled ? (
-              <span className="text-emerald-300" aria-hidden>
-                ✓
-              </span>
-            ) : null}
-            <span>Auto watch</span>
-          </button>
-          <button
-            type="button"
-            title="Pick another table without leaving your seat"
-            onClick={() => router.push("/ov2-21-challenge")}
-            className={OV2_HUD_CHROME_BTN}
-          >
-            Tables
-          </button>
-          <button
-            type="button"
-            title={
-              bettingPreRoundFreezeActive
-                ? "Round about to start — Leave is paused briefly"
-                : "Vacate seat and return to table list"
-            }
-            disabled={leaveBusy || bettingPreRoundFreezeActive}
-            onClick={() => void onLeaveTable()}
-            className={`${OV2_HUD_CHROME_BTN} border-rose-500/35 bg-rose-950/30 text-rose-100 hover:border-rose-400/40 hover:bg-rose-950/45 disabled:opacity-45`}
-          >
-            {leaveBusy ? "…" : "Leave"}
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Ov2C21Screen
-            roomId={roomId}
-            engine={session.engine}
-            tableStakeUnits={tableStake}
-            participantKey={session.participantKey}
-            displayName={displayName}
-            onOperate={session.operate}
-            operateBusy={session.operateBusy}
-            loadError={session.loadError}
-            autoWatchEnabled={autoWatchEnabled}
-          />
-        </div>
-      </div>
-    </OnlineV2GamePageShell>
+        <div className="flex h-full items-center justify-center text-sm text-zinc-400">Loading table…</div>
+      </OnlineV2GamePageShell>
+    );
+  }
+
+  return (
+    <Ov2C21TableLive
+      roomId={roomId}
+      router={router}
+      tableStake={tableStake}
+      nameDraft={nameDraft}
+      setNameDraft={setNameDraft}
+      persistName={persistName}
+    />
   );
 }

@@ -6,7 +6,11 @@ import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
 import { OV2_HUD_CHROME_BTN } from "../OnlineV2GameHudOverlays";
 import Ov2CwScreen from "./Ov2CwScreen";
 import { useOv2CwSession } from "../../../hooks/useOv2CwSession";
-import { OV2_CW_STAKE_TIERS, OV2_CW_ROOM_IDS_BY_STAKE } from "../../../lib/online-v2/color_wheel/ov2CwTableIds";
+import {
+  OV2_CW_PRODUCT_GAME_ID,
+  OV2_CW_STAKE_TIERS,
+  OV2_CW_ROOM_IDS_BY_STAKE,
+} from "../../../lib/online-v2/color_wheel/ov2CwTableIds";
 import Ov2WavePrivateRoomModal from "../Ov2WavePrivateRoomModal";
 import { isOv2RoomIdQueryParam } from "../../../lib/online-v2/onlineV2GameRegistry";
 import {
@@ -212,6 +216,7 @@ export default function Ov2CwLiveShell() {
   const [tierPick, setTierPick] = useState(null);
   const [privateOpen, setPrivateOpen] = useState(false);
   const [tableStake, setTableStake] = useState(10_000);
+  const [cwRoomValidated, setCwRoomValidated] = useState(false);
   const [nameDraft, setNameDraft] = useState(() =>
     typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
   );
@@ -240,18 +245,34 @@ export default function Ov2CwLiveShell() {
   }, []);
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId) {
+      setCwRoomValidated(false);
+      return;
+    }
+    if (!router.isReady) return;
+    setCwRoomValidated(false);
+    let cancelled = false;
     void (async () => {
-      const { data } = await supabaseMP
+      const { data, error } = await supabaseMP
         .from("ov2_rooms")
-        .select("stake_per_seat")
+        .select("stake_per_seat, product_game_id")
         .eq("id", roomId)
         .maybeSingle();
+      if (cancelled) return;
+      if (!error && (!data || String(data.product_game_id) !== OV2_CW_PRODUCT_GAME_ID)) {
+        await router.replace("/ov2-color-wheel");
+        return;
+      }
+      if (error) return;
       if (data?.stake_per_seat != null) {
         setTableStake(Math.max(1, Math.floor(Number(data.stake_per_seat) || 1)));
       }
+      setCwRoomValidated(true);
     })();
-  }, [roomId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, router.isReady]);
 
   const persistName = () => {
     writeOv2SharedDisplayName(nameDraft);
@@ -350,6 +371,20 @@ export default function Ov2CwLiveShell() {
             Private room
           </button>
         </div>
+      </OnlineV2GamePageShell>
+    );
+  }
+
+  if (!cwRoomValidated) {
+    return (
+      <OnlineV2GamePageShell
+        title="Color Wheel"
+        subtitle="Loading…"
+        useAppViewportHeight
+        chromePreset="c21_flat"
+        infoPanel={lobbyInfoPanel}
+      >
+        <div className="flex h-full items-center justify-center text-sm text-zinc-400">Loading table…</div>
       </OnlineV2GamePageShell>
     );
   }

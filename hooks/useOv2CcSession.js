@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabaseMP as supabase } from "../lib/supabaseClients";
 import { getOv2ParticipantId } from "../lib/online-v2/ov2ParticipantId";
+import { isOv2RoomIdQueryParam } from "../lib/online-v2/onlineV2GameRegistry";
 import { postOv2CcOperate } from "../lib/online-v2/community_cards/ov2CcApi";
 import { creditOnlineV2VaultForSettlementLine, readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import { OV2_CC_PRODUCT_GAME_ID } from "../lib/online-v2/community_cards/ov2CcTableIds";
@@ -121,6 +122,11 @@ function ingestOperateJson(json, lastRevisionRef, lastHandSeqRef, setEngine, set
 }
 
 export function useOv2CcSession(roomId) {
+  const resolvedRoomId = useMemo(() => {
+    const s = String(roomId ?? "").trim();
+    return s && isOv2RoomIdQueryParam(s) ? s : null;
+  }, [roomId]);
+
   const [engine, setEngine] = useState(null);
   const [viewerHoleCards, setViewerHoleCards] = useState([]);
   const [loadError, setLoadError] = useState("");
@@ -152,12 +158,12 @@ export function useOv2CcSession(roomId) {
   }, []);
 
   const reloadFromDb = useCallback(async () => {
-    if (!roomId) return;
+    if (!resolvedRoomId) return;
     setLoadError("");
     const { data, error } = await supabase
       .from("ov2_community_cards_live_state")
       .select("engine, match_seq, revision")
-      .eq("room_id", roomId)
+      .eq("room_id", resolvedRoomId)
       .maybeSingle();
     if (error) {
       setLoadError(error.message || String(error));
@@ -177,23 +183,23 @@ export function useOv2CcSession(roomId) {
       }
       setEngine(eng);
     }
-  }, [roomId]);
+  }, [resolvedRoomId]);
 
   useEffect(() => {
     void reloadFromDb();
   }, [reloadFromDb]);
 
   useEffect(() => {
-    if (!roomId) return undefined;
+    if (!resolvedRoomId) return undefined;
     const channel = supabase
-      .channel(`ov2_cc_${roomId}`)
+      .channel(`ov2_cc_${resolvedRoomId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "ov2_community_cards_live_state",
-          filter: `room_id=eq.${roomId}`,
+          filter: `room_id=eq.${resolvedRoomId}`,
         },
         payload => {
           const row = payload.new || payload.old;
@@ -219,7 +225,7 @@ export function useOv2CcSession(roomId) {
           } else if (
             prevHand >= 0 &&
             hs > prevHand &&
-            roomId &&
+            resolvedRoomId &&
             participantKey &&
             (eng.phase === "preflop" || eng.phase === "post_blinds")
           ) {
@@ -237,7 +243,7 @@ export function useOv2CcSession(roomId) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [roomId, participantKey]);
+  }, [resolvedRoomId, participantKey]);
 
   const mySeatInCurrentHand = useMemo(() => {
     if (!engine?.seats || !participantKey) return false;
@@ -253,7 +259,7 @@ export function useOv2CcSession(roomId) {
   }, [engine?.handSeq]);
 
   useEffect(() => {
-    if (!roomId || !participantKey || !mySeatInCurrentHand) return;
+    if (!resolvedRoomId || !participantKey || !mySeatInCurrentHand) return;
     const hs = Math.floor(Number(engine?.handSeq) || 0);
     if (hs <= 0) return;
     const ph = engine?.phase;
@@ -270,11 +276,11 @@ export function useOv2CcSession(roomId) {
       });
     }
     void runBackgroundTickRef.current({ urgent: true });
-  }, [roomId, participantKey, mySeatInCurrentHand, engine?.handSeq, engine?.phase, viewerHoleCards.length]);
+  }, [resolvedRoomId, participantKey, mySeatInCurrentHand, engine?.handSeq, engine?.phase, viewerHoleCards.length]);
 
   const operate = useCallback(
     async (op, payload = {}) => {
-      if (!roomId) return { ok: false };
+      if (!resolvedRoomId) return { ok: false };
       if (operateInFlightRef.current) return { ok: false, skipped: true };
       operateInFlightRef.current = true;
 
@@ -287,7 +293,7 @@ export function useOv2CcSession(roomId) {
 
       const runPost = () =>
         postOv2CcOperate({
-          roomId,
+          roomId: resolvedRoomId,
           participantKey,
           op,
           payload,
@@ -412,11 +418,11 @@ export function useOv2CcSession(roomId) {
         }
       }
     },
-    [roomId, participantKey, pushOperateBusy, popOperateBusy, reloadFromDb],
+    [resolvedRoomId, participantKey, pushOperateBusy, popOperateBusy, reloadFromDb],
   );
 
   useEffect(() => {
-    if (!roomId) return undefined;
+    if (!resolvedRoomId) return undefined;
     let cancelled = false;
     let timeoutId = 0;
 
@@ -438,7 +444,7 @@ export function useOv2CcSession(roomId) {
       try {
         try {
           const json = await postOv2CcOperate({
-            roomId,
+            roomId: resolvedRoomId,
             participantKey,
             op: "tick",
             payload: {},
@@ -466,7 +472,7 @@ export function useOv2CcSession(roomId) {
             applyTickIngest(e.payload);
             await new Promise(r => window.setTimeout(r, 40));
             const json2 = await postOv2CcOperate({
-              roomId,
+              roomId: resolvedRoomId,
               participantKey,
               op: "tick",
               payload: {},
@@ -504,7 +510,7 @@ export function useOv2CcSession(roomId) {
       if (timeoutId) window.clearTimeout(timeoutId);
       runBackgroundTickRef.current = () => Promise.resolve();
     };
-  }, [roomId, participantKey]);
+  }, [resolvedRoomId, participantKey]);
 
   return {
     engine,

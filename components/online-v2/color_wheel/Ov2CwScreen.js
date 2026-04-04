@@ -476,17 +476,20 @@ export default function Ov2CwScreen({
     const mine = s.participantKey === participantKey;
     const isRoundController = occ && leaderPk && s.participantKey === leaderPk;
     const base =
-      "relative flex min-h-0 flex-col items-center justify-center gap-0 rounded-md border px-0.5 py-2.5 text-center touch-manipulation transition-[box-shadow,border-color,transform] active:scale-[0.99] max-sm:min-h-[2rem] max-sm:leading-none sm:min-h-[4.125rem] sm:gap-0.5 sm:rounded-xl sm:px-2 sm:py-3.5 sm:text-[11px] max-lg:sm:min-h-[3rem] max-lg:sm:py-2 max-lg:sm:px-1.5 lg:min-h-[3.5rem] lg:rounded-lg lg:px-1.5 lg:py-3 lg:text-[10px]";
+      "relative flex min-h-0 flex-col items-center justify-center gap-0 rounded-md border px-0.5 py-1 text-center touch-manipulation transition-[box-shadow,border-color,transform] active:scale-[0.99] max-sm:min-h-0 max-sm:py-1 max-sm:leading-none sm:min-h-[3rem] sm:gap-0.5 sm:rounded-xl sm:px-2 sm:py-2 sm:text-[11px] max-lg:sm:min-h-[2.625rem] max-lg:sm:py-1.5 max-lg:sm:px-1.5 lg:min-h-[2.75rem] lg:rounded-lg lg:px-1.5 lg:py-1.5 lg:text-[10px]";
     if (!occ) {
       return (
         <button
           type="button"
           key={i}
           disabled={operateBusy}
-          aria-label="Join table"
+          aria-label={`Seat ${i + 1}, join table`}
           onClick={() => void onSit(i)}
-          className={`${base} border-amber-500/25 bg-gradient-to-b from-zinc-900/60 to-black/50 text-amber-100/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-amber-400/40 hover:shadow-[0_0_20px_-6px_rgba(245,158,11,0.35)] disabled:opacity-40 max-sm:text-[7px] sm:text-[10px]`}
+          className={`${base} max-sm:gap-px max-sm:!py-0.5 border-amber-500/25 bg-gradient-to-b from-zinc-900/60 to-black/50 text-amber-100/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-amber-400/40 hover:shadow-[0_0_20px_-6px_rgba(245,158,11,0.35)] disabled:opacity-40 max-sm:text-[7px] sm:text-[10px]`}
         >
+          <span className="font-bold tabular-nums leading-none tracking-wide text-amber-200/55 max-sm:text-[7px] sm:text-[9px]">
+            S{i + 1}
+          </span>
           <span className="font-bold leading-none text-amber-100 max-sm:text-[8px]">Join</span>
         </button>
       );
@@ -502,8 +505,8 @@ export default function Ov2CwScreen({
         }}
         aria-haspopup="dialog"
         aria-expanded={seatInspectorIndex === i}
-        aria-label={`Player: ${s.displayName || "Player"}`}
-        className={`${base} cursor-pointer border-white/[0.12] bg-gradient-to-b from-zinc-900/90 to-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.35)] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${
+        aria-label={`Seat ${i + 1}, ${s.displayName || "Player"}`}
+        className={`${base} max-sm:!py-0.5 max-sm:gap-px cursor-pointer border-white/[0.12] bg-gradient-to-b from-zinc-900/90 to-zinc-950/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_24px_rgba(0,0,0,0.35)] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${
           mine
             ? "z-[1] border-amber-400/45 shadow-[0_0_0_1px_rgba(251,191,36,0.25),0_0_28px_-8px_rgba(245,158,11,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]"
             : ""
@@ -515,7 +518,10 @@ export default function Ov2CwScreen({
             <span className="hidden sm:inline">Lead</span>
           </span>
         ) : null}
-        <span className="w-full min-w-0 truncate font-semibold tracking-tight text-zinc-50 max-sm:text-[7px] max-sm:leading-tight sm:text-xs">
+        <span className="font-bold tabular-nums leading-none tracking-wide text-zinc-500 max-sm:text-[7px] sm:text-[10px] lg:text-[11px]">
+          S{i + 1}
+        </span>
+        <span className="w-full min-w-0 truncate font-semibold tracking-tight text-zinc-50 max-sm:text-[16px] max-sm:leading-none sm:text-lg sm:leading-tight lg:text-xl lg:leading-tight">
           {s.displayName || "Player"}
         </span>
       </button>
@@ -524,8 +530,9 @@ export default function Ov2CwScreen({
 
   const statusSub = lobby ? "Sit in a seat to begin the round." : "";
 
+  /** Mobile: avoid vh/dvh in max-width — dynamic toolbars change dvh/vh and resize the wheel when phases change. */
   const wheelStageMax =
-    "w-full max-lg:mx-auto max-lg:max-w-[min(92vw,17.5rem,35dvh,35vh)] lg:max-w-[min(100%,19rem)] xl:max-w-[20rem]";
+    "w-full max-lg:mx-auto max-lg:max-w-[min(92vw,17.5rem)] lg:max-w-[min(100%,19rem)] xl:max-w-[20rem]";
 
   const inspectorSeat =
     seatInspectorIndex != null && seatsForUi[seatInspectorIndex]?.participantKey
@@ -913,7 +920,7 @@ export default function Ov2CwScreen({
                     }}
                     aria-hidden
                   />
-                  <div className="relative z-[10] flex min-h-[3.25rem] flex-col items-center justify-center px-2 py-1 sm:min-h-[3.5rem]">
+                  <div className="relative z-[10] flex min-h-[4.25rem] flex-col items-center justify-center px-2 py-1 sm:min-h-[4.5rem]">
               {resultPhase && centerResult != null && centerResult >= 0 ? (
                 <>
                   <span

@@ -100,12 +100,12 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
   const operateInFlightRef = useRef(false);
 
   const reloadFromDb = useCallback(async () => {
-    if (!roomId) return;
+    if (!resolvedRoomId) return;
     setLoadError("");
     const { data, error } = await supabase
       .from("ov2_c21_live_state")
       .select("engine, match_seq, revision")
-      .eq("room_id", roomId)
+      .eq("room_id", resolvedRoomId)
       .maybeSingle();
     if (error) {
       setLoadError(error.message || String(error));
@@ -114,19 +114,19 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
     if (data?.engine && typeof data.engine === "object") {
       setEngine(data.engine);
     }
-  }, [roomId]);
+  }, [resolvedRoomId]);
 
   useEffect(() => {
     void reloadFromDb();
   }, [reloadFromDb]);
 
   useEffect(() => {
-    if (!roomId) return undefined;
+    if (!resolvedRoomId) return undefined;
     let cancelled = false;
     void (async () => {
       try {
         const json = await postOv2C21Operate({
-          roomId,
+          roomId: resolvedRoomId,
           participantKey,
           op: "tick",
           payload: {},
@@ -141,15 +141,15 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
     return () => {
       cancelled = true;
     };
-  }, [roomId, participantKey]);
+  }, [resolvedRoomId, participantKey]);
 
   useEffect(() => {
-    if (!roomId) return undefined;
+    if (!resolvedRoomId) return undefined;
     const channel = supabase
-      .channel(`ov2_c21_${roomId}`)
+      .channel(`ov2_c21_${resolvedRoomId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "ov2_c21_live_state", filter: `room_id=eq.${roomId}` },
+        { event: "*", schema: "public", table: "ov2_c21_live_state", filter: `room_id=eq.${resolvedRoomId}` },
         payload => {
           const row = payload.new || payload.old;
           if (row?.engine && typeof row.engine === "object") {
@@ -161,11 +161,11 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [roomId]);
+  }, [resolvedRoomId]);
 
   const operate = useCallback(
     async (op, payload = {}) => {
-      if (!roomId) return { ok: false };
+      if (!resolvedRoomId) return { ok: false };
       if (operateInFlightRef.current) return { ok: false, skipped: true };
       operateInFlightRef.current = true;
       setOperateBusy(true);
@@ -175,7 +175,7 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
       let tAfterApply = 0;
       try {
         const json = await postOv2C21Operate({
-          roomId,
+          roomId: resolvedRoomId,
           participantKey,
           op,
           payload,
@@ -216,11 +216,11 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
         }
       }
     },
-    [roomId, participantKey],
+    [resolvedRoomId, participantKey],
   );
 
   useEffect(() => {
-    if (!roomId) return undefined;
+    if (!resolvedRoomId) return undefined;
     const id = window.setInterval(() => {
       const now = Date.now();
       if (now - lastTickAtRef.current < 900) return;
@@ -230,7 +230,7 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
       void (async () => {
         try {
           const json = await postOv2C21Operate({
-            roomId,
+            roomId: resolvedRoomId,
             participantKey,
             op: "tick",
             payload: {},
@@ -245,7 +245,7 @@ export function useOv2C21Session(roomId, tableStakeUnits) {
       })();
     }, 1000);
     return () => window.clearInterval(id);
-  }, [roomId, participantKey]);
+  }, [resolvedRoomId, participantKey]);
 
   return {
     engine,

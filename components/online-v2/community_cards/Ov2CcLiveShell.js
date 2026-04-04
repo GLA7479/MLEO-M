@@ -77,55 +77,14 @@ function CcInfoPanelBody() {
   );
 }
 
-export default function Ov2CcLiveShell() {
-  const router = useRouter();
-  const roomId = useMemo(() => parseRoomQuery(router), [router.isReady, router.query.room]);
-  const [lobbyStep, setLobbyStep] = useState("category");
-  const [catIndex, setCatIndex] = useState(null);
-  const [privateOpen, setPrivateOpen] = useState(false);
-  const [tableConfig, setTableConfig] = useState(null);
-  const [nameDraft, setNameDraft] = useState(() =>
-    typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
-  );
+/**
+ * Live table chrome + `useOv2CcSession` — only mounted after `roomId` is validated for this product,
+ * so the lobby never runs CC tick / realtime subscriptions.
+ */
+function Ov2CcTableLive({ roomId, router, tableConfig, nameDraft, setNameDraft, persistName }) {
+  const session = useOv2CcSession(roomId);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const leaveInFlightRef = useRef(false);
-
-  const session = useOv2CcSession(roomId);
-
-  const ccLobbySeatCounts = useOv2FixedTableLobbySeatCounts(
-    OV2_CC_ALL_ROOM_IDS,
-    "ov2_community_cards_live_state",
-    (engine, rid) => ov2CcSeatCountFromEngine(engine, rid, OV2_CC_ROOM_MAX_SEATS_BY_ID),
-  );
-
-  const infoPanel = useMemo(() => <CcInfoPanelBody />, []);
-
-  useEffect(() => {
-    writeOv2SharedDisplayName(nameDraft);
-  }, [nameDraft]);
-
-  useEffect(() => {
-    const onStorage = e => {
-      if (e.key !== OV2_SHARED_DISPLAY_NAME_KEY || e.storageArea !== window.localStorage) return;
-      setNameDraft(e.newValue ?? "");
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  useEffect(() => {
-    if (!roomId) return;
-    void (async () => {
-      const { data } = await supabaseMP
-        .from("ov2_rooms")
-        .select("id, product_game_id, stake_per_seat, meta")
-        .eq("id", roomId)
-        .maybeSingle();
-      const c = resolveOv2CcTableConfigFromRoomRow(data);
-      if (c) setTableConfig(c);
-    })();
-  }, [roomId]);
-
   const displayName = String(nameDraft || "").trim() || "Guest";
   const runOp = session.operate;
 
@@ -157,6 +116,122 @@ export default function Ov2CcLiveShell() {
       setLeaveBusy(false);
     }
   }, [roomId, router, runOp]);
+
+  const infoPanel = useMemo(() => <CcInfoPanelBody />, []);
+
+  return (
+    <OnlineV2GamePageShell
+      title="Community Cards"
+      subtitle={`Live · ${formatTierLabel(tableConfig.tablePrice)} · ${tableConfig.maxSeats}-max`}
+      useAppViewportHeight
+      chromePreset="cc_flat"
+      infoPanel={infoPanel}
+    >
+      <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden lg:gap-0.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 pb-1 pt-0.5 lg:pb-0.5">
+          <input
+            value={nameDraft}
+            onChange={e => setNameDraft(e.target.value)}
+            onBlur={persistName}
+            className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-black/55 px-2 py-1.5 text-[10px] text-white placeholder:text-zinc-600 sm:text-[11px]"
+            placeholder="Display name"
+          />
+          <button
+            type="button"
+            title="Pick another table without leaving your seat"
+            onClick={() => router.push("/ov2-community-cards")}
+            className={`${OV2_HUD_CHROME_BTN} text-[10px] sm:text-xs`}
+          >
+            Tables
+          </button>
+          <button
+            type="button"
+            title="Leave table and return chips to vault when allowed"
+            disabled={leaveBusy}
+            onClick={() => void onLeaveTable()}
+            className={`${OV2_HUD_CHROME_BTN} border-rose-500/30 bg-rose-950/25 text-rose-100/95 hover:border-rose-400/35 hover:bg-rose-950/40 disabled:opacity-45 text-[10px] sm:text-xs`}
+          >
+            {leaveBusy ? "…" : "Leave"}
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <Ov2CcScreen
+            roomId={roomId}
+            engine={session.engine}
+            viewerHoleCards={session.viewerHoleCards}
+            tableConfig={tableConfig}
+            participantKey={session.participantKey}
+            displayName={displayName}
+            onOperate={session.operate}
+            operateBusy={session.operateBusy}
+            operateSubmitStatus={session.operateSubmitStatus}
+            loadError={session.loadError}
+          />
+        </div>
+      </div>
+    </OnlineV2GamePageShell>
+  );
+}
+
+export default function Ov2CcLiveShell() {
+  const router = useRouter();
+  const roomId = useMemo(() => parseRoomQuery(router), [router.isReady, router.query.room]);
+  const [lobbyStep, setLobbyStep] = useState("category");
+  const [catIndex, setCatIndex] = useState(null);
+  const [privateOpen, setPrivateOpen] = useState(false);
+  const [tableConfig, setTableConfig] = useState(null);
+  const [nameDraft, setNameDraft] = useState(() =>
+    typeof window === "undefined" ? "" : readOv2SharedDisplayName(),
+  );
+
+  const ccLobbySeatCounts = useOv2FixedTableLobbySeatCounts(
+    OV2_CC_ALL_ROOM_IDS,
+    "ov2_community_cards_live_state",
+    (engine, rid) => ov2CcSeatCountFromEngine(engine, rid, OV2_CC_ROOM_MAX_SEATS_BY_ID),
+  );
+
+  const infoPanel = useMemo(() => <CcInfoPanelBody />, []);
+
+  useEffect(() => {
+    writeOv2SharedDisplayName(nameDraft);
+  }, [nameDraft]);
+
+  useEffect(() => {
+    const onStorage = e => {
+      if (e.key !== OV2_SHARED_DISPLAY_NAME_KEY || e.storageArea !== window.localStorage) return;
+      setNameDraft(e.newValue ?? "");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  useEffect(() => {
+    if (!roomId) {
+      setTableConfig(null);
+      return;
+    }
+    if (!router.isReady) return;
+    setTableConfig(null);
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabaseMP
+        .from("ov2_rooms")
+        .select("id, product_game_id, stake_per_seat, meta")
+        .eq("id", roomId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) return;
+      const c = resolveOv2CcTableConfigFromRoomRow(data);
+      if (!c) {
+        await router.replace("/ov2-community-cards");
+        return;
+      }
+      setTableConfig(c);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, router.isReady]);
 
   const persistName = () => {
     writeOv2SharedDisplayName(nameDraft);
@@ -293,55 +368,13 @@ export default function Ov2CcLiveShell() {
   }
 
   return (
-    <OnlineV2GamePageShell
-      title="Community Cards"
-      subtitle={`Live · ${formatTierLabel(tableConfig.tablePrice)} · ${tableConfig.maxSeats}-max`}
-      useAppViewportHeight
-      chromePreset="cc_flat"
-      infoPanel={infoPanel}
-    >
-      <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden lg:gap-0.5">
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5 pb-1 pt-0.5 lg:pb-0.5">
-          <input
-            value={nameDraft}
-            onChange={e => setNameDraft(e.target.value)}
-            onBlur={persistName}
-            className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-black/55 px-2 py-1.5 text-[10px] text-white placeholder:text-zinc-600 sm:text-[11px]"
-            placeholder="Display name"
-          />
-          <button
-            type="button"
-            title="Pick another table without leaving your seat"
-            onClick={() => router.push("/ov2-community-cards")}
-            className={`${OV2_HUD_CHROME_BTN} text-[10px] sm:text-xs`}
-          >
-            Tables
-          </button>
-          <button
-            type="button"
-            title="Leave table and return chips to vault when allowed"
-            disabled={leaveBusy}
-            onClick={() => void onLeaveTable()}
-            className={`${OV2_HUD_CHROME_BTN} border-rose-500/30 bg-rose-950/25 text-rose-100/95 hover:border-rose-400/35 hover:bg-rose-950/40 disabled:opacity-45 text-[10px] sm:text-xs`}
-          >
-            {leaveBusy ? "…" : "Leave"}
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Ov2CcScreen
-            roomId={roomId}
-            engine={session.engine}
-            viewerHoleCards={session.viewerHoleCards}
-            tableConfig={tableConfig}
-            participantKey={session.participantKey}
-            displayName={displayName}
-            onOperate={session.operate}
-            operateBusy={session.operateBusy}
-            operateSubmitStatus={session.operateSubmitStatus}
-            loadError={session.loadError}
-          />
-        </div>
-      </div>
-    </OnlineV2GamePageShell>
+    <Ov2CcTableLive
+      roomId={roomId}
+      router={router}
+      tableConfig={tableConfig}
+      nameDraft={nameDraft}
+      setNameDraft={setNameDraft}
+      persistName={persistName}
+    />
   );
 }
