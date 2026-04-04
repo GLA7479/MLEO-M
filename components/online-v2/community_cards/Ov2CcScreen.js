@@ -742,13 +742,23 @@ export default function Ov2CcScreen({
                       {betweenHands ? "Sit out" : "Next hand out"}
                     </button>
                   ) : null}
+                  {mySeat.pendingSitOutAfterHand && !betweenHands ? (
+                    <button
+                      type="button"
+                      disabled={operateBusy}
+                      className="h-8 shrink-0 rounded-md border border-sky-500/45 bg-sky-900/45 px-2.5 text-[10px] font-semibold leading-none text-sky-100 touch-manipulation sm:h-7 sm:px-2 sm:text-[9px]"
+                      title="Cancel leaving after this hand — stay seated"
+                      onClick={() => void runGameOp("sit_in")}
+                    >
+                      Stay
+                    </button>
+                  ) : null}
                   {betweenHands && (mySeat.sitOut || mySeat.pendingSitOutAfterHand) ? (
                     <button
                       type="button"
-                      disabled={operateBusy || mySeat.pendingSitOutAfterHand}
+                      disabled={operateBusy}
                       className="h-8 shrink-0 rounded-md border border-sky-600/35 bg-sky-950/40 px-2.5 text-[10px] font-semibold leading-none text-sky-100 touch-manipulation disabled:opacity-40 sm:h-7 sm:px-2 sm:text-[9px]"
                       onClick={() => void runGameOp("sit_in")}
-                      title={mySeat.pendingSitOutAfterHand ? "Wait until this hand ends" : undefined}
                     >
                       I&apos;m back
                     </button>
@@ -797,7 +807,9 @@ export default function Ov2CcScreen({
                 </div>
               ) : null}
               {mySeat.pendingSitOutAfterHand && !betweenHands ? (
-                <p className="mt-1 text-center text-[10px] leading-tight text-amber-400/90">Leaving after this hand</p>
+                <p className="mt-1 text-center text-[10px] leading-tight text-amber-400/90">
+                  Leaving after this hand — tap <span className="font-semibold text-amber-200/95">Stay</span> to undo
+                </p>
               ) : null}
               {formHint ? (
                 <p className="mt-1 text-center text-[11px] leading-tight text-rose-400/90 sm:text-[10px]">{formHint}</p>
