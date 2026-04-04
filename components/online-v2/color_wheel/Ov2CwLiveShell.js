@@ -225,13 +225,13 @@ export default function Ov2CwLiveShell() {
       useAppViewportHeight
       infoPanel={infoPanel}
     >
-      <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
-        <div className="flex shrink-0 flex-nowrap items-center gap-1.5 overflow-hidden border-b border-white/[0.06] pb-1 sm:gap-2">
+      <div className="flex h-full min-h-0 flex-col gap-1.5 overflow-hidden sm:gap-2">
+        <div className="flex shrink-0 flex-nowrap items-center gap-2 overflow-hidden rounded-xl border border-white/[0.08] bg-gradient-to-r from-black/50 via-zinc-950/80 to-black/50 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-2.5 sm:px-2.5 sm:py-2">
           <input
             value={nameDraft}
             onChange={e => setNameDraft(e.target.value)}
             onBlur={persistName}
-            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/[0.1] bg-[#050708]/85 px-2 py-1.5 text-[11px] text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+            className="min-w-0 flex-1 basis-0 rounded-lg border border-white/[0.1] bg-[#08090a]/95 px-2.5 py-2 text-[11px] text-zinc-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] placeholder:text-zinc-600 focus:border-amber-500/25 focus:outline-none"
             placeholder="Display name"
           />
           <button
@@ -247,12 +247,12 @@ export default function Ov2CwLiveShell() {
             title="Vacate seat and return to table list"
             disabled={leaveBusy}
             onClick={() => void onLeaveTable()}
-            className={`${OV2_HUD_CHROME_BTN} border-rose-500/35 bg-rose-950/30 text-rose-100 hover:border-rose-400/40 hover:bg-rose-950/45 disabled:opacity-45`}
+            className={`${OV2_HUD_CHROME_BTN} shrink-0 border-rose-500/35 bg-rose-950/35 text-rose-100 hover:border-rose-400/45 hover:bg-rose-950/50 disabled:opacity-45`}
           >
             {leaveBusy ? "…" : "Leave"}
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-hidden px-0 sm:px-1">
           <Ov2CwScreen
             roomId={roomId}
             engine={session.engine}
