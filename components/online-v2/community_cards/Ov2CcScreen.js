@@ -324,8 +324,8 @@ export default function Ov2CcScreen({
               <div className="pointer-events-none absolute inset-[7px] rounded-[1.05rem] border border-white/[0.06] max-sm:inset-[5px] sm:inset-3 sm:rounded-[1.35rem] md:rounded-[1.55rem]" />
 
               <div className="relative z-[4] flex min-h-0 flex-1 flex-col">
-                <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-0 pb-0.5 max-sm:-translate-y-[4.75rem] max-sm:px-[6%] sm:-translate-y-11 md:-translate-y-8 sm:px-[13%] sm:pt-1.5 sm:pb-1 md:px-[15%] md:pt-2 md:pb-1.5">
-                  <div className="flex w-full max-w-md flex-col items-center gap-0.5 sm:max-w-lg sm:gap-1 md:gap-1.5">
+                <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-0 pb-0 max-sm:-translate-y-[3rem] max-sm:px-[6%] sm:-translate-y-10 md:-translate-y-8 sm:px-[13%] sm:pt-1.5 sm:pb-1 md:px-[15%] md:pt-2 md:pb-1.5">
+                  <div className="mb-1 flex w-full max-w-md flex-col items-center gap-0.5 max-sm:mb-2 sm:mb-1 sm:max-w-lg sm:gap-1 md:gap-1.5">
                     {handBettingLive ? (
                       <>
                         <div className="w-full text-center">
@@ -486,7 +486,7 @@ export default function Ov2CcScreen({
                   className={`relative z-[10] flex w-full shrink-0 justify-center px-1 pb-[max(0.15rem,env(safe-area-inset-bottom,0px))] pt-0 pointer-events-none sm:h-[8.5rem] sm:max-h-none sm:items-center ${OV2_CC_MOBILE_HERO_ZONE_CLASSES}`}
                 >
                   {mySeat ? (
-                    <div className="flex max-h-full w-full max-w-[98%] flex-wrap items-center justify-center gap-2 drop-shadow-[0_10px_28px_rgba(0,0,0,0.55)] max-sm:max-h-none max-sm:-translate-y-4 max-sm:gap-2.5 sm:-translate-y-4 sm:items-end sm:gap-4 md:-translate-y-3">
+                    <div className="flex max-h-full w-full max-w-[98%] flex-wrap items-center justify-center gap-2 drop-shadow-[0_10px_28px_rgba(0,0,0,0.55)] max-sm:max-h-none max-sm:-translate-y-7 max-sm:gap-2.5 sm:-translate-y-7 sm:items-end sm:gap-4 md:-translate-y-5">
                       {holeCardsToShow.length > 0
                         ? holeCardsToShow.map((c, idx) => (
                             <Ov2CcPlayingCard key={`felt-h-${idx}`} code={c} size="hero" />
