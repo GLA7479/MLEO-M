@@ -352,9 +352,8 @@ export default function Ov2CwScreen({
       if (!r?.ok) {
         const pl = r?.error?.payload;
         const c = pl?.code || r?.json?.code || r?.code || r?.error?.code || "rejected";
-        setHint(
-          c === "ALREADY_SEATED_ELSEWHERE" && pl?.message ? String(pl.message) : String(c),
-        );
+        const msg = pl?.message != null && String(pl.message).trim() !== "" ? String(pl.message).trim() : "";
+        setHint(msg || String(c));
       }
       return r;
     },

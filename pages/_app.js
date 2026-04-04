@@ -45,7 +45,22 @@ export default function App({ Component, pageProps }) {
       window.sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
       window.location.reload();
     };
-    const onUnhandledRejection = (event) => reloadOnceForChunkError(event?.reason);
+    const isBenignArcadeDeviceRejection = (reason) => {
+      const msg = String(reason?.message || reason || "");
+      return (
+        /arcade device unavailable/i.test(msg) ||
+        /failed to initialize arcade device/i.test(msg) ||
+        /arcade device init failed/i.test(msg)
+      );
+    };
+    const onUnhandledRejection = (event) => {
+      if (isBenignArcadeDeviceRejection(event?.reason)) {
+        event.preventDefault?.();
+        console.warn("[mleo] Arcade device / vault sync deferred:", event?.reason?.message || event?.reason);
+        return;
+      }
+      reloadOnceForChunkError(event?.reason);
+    };
     const onWindowError = (event) => reloadOnceForChunkError(event?.error || event?.message);
     window.addEventListener("unhandledrejection", onUnhandledRejection);
     window.addEventListener("error", onWindowError);

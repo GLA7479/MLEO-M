@@ -21,10 +21,21 @@ export default function handler(req, res) {
   } catch (err) {
     const msg = String(err?.message || err || "");
     console.error("[api/arcade/device]", msg);
-    const config = /missing signing secret/i.test(msg);
-    return res.status(config ? 503 : 500).json({
+    const config =
+      /missing signing secret/i.test(msg) ||
+      /missing csrf_secret/i.test(msg) ||
+      /missing csrf secret/i.test(msg);
+    if (config) {
+      return res.status(503).json({
+        success: false,
+        code: "ARCADE_SIGNING_SECRET_REQUIRED",
+        message:
+          "Server signing secret is not configured. Set CSRF_SECRET or NEXTAUTH_SECRET (or SESSION_COOKIE_SECRET / ARCADE_DEVICE_COOKIE_SECRET). For local `next start` without .env, you may set MLEO_ALLOW_INSECURE_SIGNING_PLACEHOLDER=true (not for real production).",
+      });
+    }
+    return res.status(500).json({
       success: false,
-      code: config ? "ARCADE_SIGNING_SECRET_REQUIRED" : "ARCADE_DEVICE_ERROR",
+      code: "ARCADE_DEVICE_ERROR",
       message: msg || "Arcade device initialization failed",
     });
   }
