@@ -564,99 +564,6 @@ export default function Ov2CcScreen({
             </div>
           </div>
         </div>
-
-        <div className="shrink-0 rounded-2xl border border-white/[0.08] bg-[#0c1216] px-3 py-2.5 shadow-[0_8px_28px_rgba(0,0,0,0.45)] sm:px-4 sm:py-3">
-          {mySeat ? (
-            <div className="flex items-start justify-between gap-2">
-              <p className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 sm:text-[12px]">Your stack</p>
-              <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                {!mySeat.sitOut && !mySeat.pendingSitOutAfterHand ? (
-                  <button
-                    type="button"
-                    disabled={operateBusy}
-                    className="min-h-[36px] rounded-lg border border-zinc-600/35 bg-zinc-900/60 px-3 py-1.5 text-[11px] font-semibold text-zinc-200 touch-manipulation sm:min-h-[40px] sm:rounded-xl sm:px-4 sm:text-[12px]"
-                    onClick={() => void runGameOp("sit_out")}
-                  >
-                    {betweenHands ? "Sit out" : "Next hand out"}
-                  </button>
-                ) : null}
-                {betweenHands && (mySeat.sitOut || mySeat.pendingSitOutAfterHand) ? (
-                  <button
-                    type="button"
-                    disabled={operateBusy || mySeat.pendingSitOutAfterHand}
-                    className="min-h-[36px] rounded-lg border border-sky-600/35 bg-sky-950/40 px-3 py-1.5 text-[11px] font-semibold text-sky-100 touch-manipulation disabled:opacity-40 sm:min-h-[40px] sm:rounded-xl sm:px-4 sm:text-[12px]"
-                    onClick={() => void runGameOp("sit_in")}
-                    title={mySeat.pendingSitOutAfterHand ? "Wait until this hand ends" : undefined}
-                  >
-                    I&apos;m back
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            <p className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500 sm:text-[12px]">Your stack</p>
-          )}
-          {mySeat ? (
-            <div className="mt-2 space-y-2.5">
-              <p className="text-center font-mono text-2xl font-bold tabular-nums text-white sm:text-3xl">
-                {Math.floor(mySeat.stack || 0).toLocaleString?.() ?? Math.floor(mySeat.stack || 0)}
-              </p>
-              <div className="min-h-[48px] shrink-0">
-                {betweenHands ? (
-                  <div className="flex gap-2">
-                    <input
-                      className="min-w-0 flex-1 rounded-xl border border-white/12 bg-black/45 px-3 py-2 text-sm text-white placeholder:text-zinc-600"
-                      value={topUpDraft}
-                      onChange={e => setTopUpDraft(e.target.value.replace(/[^\d]/g, ""))}
-                      placeholder={`Top-up (max +${maxBuy - Math.floor(mySeat.stack || 0)})`}
-                      inputMode="numeric"
-                    />
-                    <button
-                      type="button"
-                      disabled={operateBusy}
-                      className="min-h-[44px] shrink-0 rounded-xl border border-emerald-600/40 bg-emerald-950/50 px-4 text-sm font-bold text-emerald-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                      onClick={async () => {
-                        setFormHint("");
-                        const cap = maxBuy - Math.floor(mySeat.stack || 0);
-                        const n = Math.max(0, Math.floor(Number(topUpDraft) || 0));
-                        if (n <= 0) {
-                          setFormHint("Enter a top-up amount.");
-                          return;
-                        }
-                        if (n > cap) {
-                          setFormHint(`Top-up cannot exceed ${cap}.`);
-                          return;
-                        }
-                        const r = await doOp("top_up", { amount: n });
-                        if (r?.ok) {
-                          setTopUpDraft("");
-                          setFormHint("");
-                        } else {
-                          setTopUpDraft(String(n));
-                          setFormHint(
-                            String(r?.code || r?.json?.code || r?.error?.payload?.code || "Top-up failed."),
-                          );
-                        }
-                      }}
-                    >
-                      Top-up
-                    </button>
-                  </div>
-                ) : (
-                  <div className="h-[48px] w-full shrink-0" aria-hidden />
-                )}
-              </div>
-              <div className="min-h-[22px] shrink-0">
-                {mySeat.pendingSitOutAfterHand && !betweenHands ? (
-                  <p className="text-center text-[11px] text-amber-400/90 sm:text-[12px]">Leaving after this hand</p>
-                ) : null}
-              </div>
-              {formHint ? <p className="text-center text-[12px] text-rose-400/90 sm:text-[13px]">{formHint}</p> : null}
-            </div>
-          ) : (
-            <p className="mt-2 text-center text-sm text-zinc-500 sm:text-base">Take a seat to join</p>
-          )}
-        </div>
       </div>
 
       {pickSeat != null ? (
@@ -740,8 +647,11 @@ export default function Ov2CcScreen({
       ) : null}
 
       {mySeat ? (
-        /* Mobile felt subtracts OV2_CC_MOBILE_ACTION_RESERVE_PX — keep min-h aligned with that constant */
-        <div className="relative z-10 flex min-h-[134px] shrink-0 flex-col border-t border-white/[0.06] bg-[#070a0d] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-16px_48px_rgba(0,0,0,0.55)] sm:min-h-[140px] sm:px-4 sm:pb-3 sm:pt-3">
+        <div
+          className={`relative z-10 flex shrink-0 flex-col border-t border-white/[0.06] bg-[#070a0d] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-16px_48px_rgba(0,0,0,0.55)] sm:px-4 sm:pb-3 sm:pt-3 ${
+            canAct ? "min-h-[134px] sm:min-h-[140px]" : "min-h-0"
+          }`}
+        >
           {canAct ? (
             <div className="mx-auto w-full max-w-lg">
             <div className="flex items-stretch gap-2">
@@ -817,11 +727,93 @@ export default function Ov2CcScreen({
             </div>
           </div>
           ) : (
-            <div
-              className="mx-auto w-full max-w-lg flex-1 shrink-0 rounded-lg bg-transparent sm:rounded-none"
-              aria-hidden
-            >
-              <div className="min-h-[128px] w-full sm:min-h-[132px]" />
+            <div className="mx-auto w-full max-w-lg rounded-lg border border-white/[0.1] bg-[#0c1216] px-2 py-1.5 shadow-[0_6px_20px_rgba(0,0,0,0.4)] max-sm:max-h-[min(38vh,14rem)] max-sm:overflow-y-auto sm:rounded-xl sm:px-3 sm:py-2 md:px-4 md:py-2.5">
+              <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+                <p className="text-[10px] font-semibold uppercase leading-tight tracking-[0.16em] text-zinc-500 sm:text-[11px] sm:tracking-[0.18em] md:text-[12px]">
+                  Your stack
+                </p>
+                <div className="flex shrink-0 flex-wrap justify-end gap-1 sm:gap-1.5">
+                  {!mySeat.sitOut && !mySeat.pendingSitOutAfterHand ? (
+                    <button
+                      type="button"
+                      disabled={operateBusy}
+                      className="min-h-[32px] rounded-md border border-zinc-600/35 bg-zinc-900/60 px-2 py-1 text-[10px] font-semibold leading-tight text-zinc-200 touch-manipulation sm:min-h-[36px] sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-[11px] md:min-h-[38px] md:text-[12px]"
+                      onClick={() => void runGameOp("sit_out")}
+                    >
+                      {betweenHands ? "Sit out" : "Next hand out"}
+                    </button>
+                  ) : null}
+                  {betweenHands && (mySeat.sitOut || mySeat.pendingSitOutAfterHand) ? (
+                    <button
+                      type="button"
+                      disabled={operateBusy || mySeat.pendingSitOutAfterHand}
+                      className="min-h-[32px] rounded-md border border-sky-600/35 bg-sky-950/40 px-2 py-1 text-[10px] font-semibold leading-tight text-sky-100 touch-manipulation disabled:opacity-40 sm:min-h-[36px] sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-[11px] md:min-h-[38px] md:text-[12px]"
+                      onClick={() => void runGameOp("sit_in")}
+                      title={mySeat.pendingSitOutAfterHand ? "Wait until this hand ends" : undefined}
+                    >
+                      I&apos;m back
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="mt-1 space-y-1 sm:mt-1.5 sm:space-y-1.5 md:space-y-2">
+                <p className="text-center font-mono text-lg font-bold leading-none tabular-nums text-white sm:text-xl md:text-2xl lg:text-3xl">
+                  {Math.floor(mySeat.stack || 0).toLocaleString?.() ?? Math.floor(mySeat.stack || 0)}
+                </p>
+                <div className="min-h-[34px] shrink-0 sm:min-h-[40px] md:min-h-[44px]">
+                  {betweenHands ? (
+                    <div className="flex gap-1.5 sm:gap-2">
+                      <input
+                        className="min-w-0 flex-1 rounded-lg border border-white/12 bg-black/45 px-2 py-1 text-[11px] text-white placeholder:text-zinc-600 sm:rounded-xl sm:px-2.5 sm:py-1.5 sm:text-xs md:px-3 md:py-2 md:text-sm"
+                        value={topUpDraft}
+                        onChange={e => setTopUpDraft(e.target.value.replace(/[^\d]/g, ""))}
+                        placeholder={`Top-up (max +${maxBuy - Math.floor(mySeat.stack || 0)})`}
+                        inputMode="numeric"
+                      />
+                      <button
+                        type="button"
+                        disabled={operateBusy}
+                        className="min-h-[34px] shrink-0 rounded-lg border border-emerald-600/40 bg-emerald-950/50 px-2.5 text-[11px] font-bold text-emerald-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:min-h-[38px] sm:rounded-xl sm:px-3 sm:text-xs md:min-h-[44px] md:px-4 md:text-sm"
+                        onClick={async () => {
+                          setFormHint("");
+                          const cap = maxBuy - Math.floor(mySeat.stack || 0);
+                          const n = Math.max(0, Math.floor(Number(topUpDraft) || 0));
+                          if (n <= 0) {
+                            setFormHint("Enter a top-up amount.");
+                            return;
+                          }
+                          if (n > cap) {
+                            setFormHint(`Top-up cannot exceed ${cap}.`);
+                            return;
+                          }
+                          const r = await doOp("top_up", { amount: n });
+                          if (r?.ok) {
+                            setTopUpDraft("");
+                            setFormHint("");
+                          } else {
+                            setTopUpDraft(String(n));
+                            setFormHint(
+                              String(r?.code || r?.json?.code || r?.error?.payload?.code || "Top-up failed."),
+                            );
+                          }
+                        }}
+                      >
+                        Top-up
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="h-[34px] w-full shrink-0 sm:h-[40px] md:h-[44px]" aria-hidden />
+                  )}
+                </div>
+                <div className="min-h-[14px] shrink-0 sm:min-h-[18px] md:min-h-[22px]">
+                  {mySeat.pendingSitOutAfterHand && !betweenHands ? (
+                    <p className="text-center text-[10px] text-amber-400/90 sm:text-[11px] md:text-[12px]">Leaving after this hand</p>
+                  ) : null}
+                </div>
+                {formHint ? (
+                  <p className="text-center text-[11px] text-rose-400/90 sm:text-[12px] md:text-[13px]">{formHint}</p>
+                ) : null}
+              </div>
             </div>
           )}
         </div>
