@@ -81,7 +81,7 @@ export default function OnlineV2RoomsScreen() {
       if (prev) lastExitedRoomIdRef.current = prev;
       return null;
     });
-    router.replace("/online-v2/rooms", undefined, { shallow: true });
+    router.replace({ pathname: "/online-v2/rooms", query: {} }, undefined, { shallow: true });
   }, [router]);
 
   useEffect(() => {
