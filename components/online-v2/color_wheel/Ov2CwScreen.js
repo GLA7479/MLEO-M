@@ -1047,12 +1047,12 @@ export default function Ov2CwScreen({
 
         {roundOutcomeFlash ? (
           <div
-            className="pointer-events-none absolute inset-0 z-[90] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]"
+            className="pointer-events-none absolute inset-0 z-[90] flex items-center justify-center bg-transparent p-4"
             role="status"
             aria-live="polite"
           >
             <div
-              className={`max-w-[min(19rem,92vw)] rounded-xl border px-3 py-2.5 text-center shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-md sm:max-w-sm sm:px-4 sm:py-3 ${
+              className={`max-w-[min(19rem,92vw)] rounded-xl border px-3 py-2.5 text-center shadow-[0_8px_32px_rgba(0,0,0,0.75),0_0_0_1px_rgba(0,0,0,0.4)] sm:max-w-sm sm:px-4 sm:py-3 ${
                 roundOutcomeFlash.win
                   ? "border-emerald-600/35 bg-[#06120e]/95"
                   : "border-rose-500/40 bg-[#14080a]/95"
