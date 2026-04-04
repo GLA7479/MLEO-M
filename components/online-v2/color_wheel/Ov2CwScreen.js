@@ -7,6 +7,7 @@ import {
   OV2_CW_SEGMENT_DEG,
   ov2CwColorForNumber,
   ov2CwPlayWins,
+  ov2CwPayoutMultiplier,
 } from "../../../lib/online-v2/color_wheel/ov2CwConstants";
 import { OV2_CW_MAX_SEATS } from "../../../lib/online-v2/color_wheel/ov2CwTableIds";
 
@@ -15,6 +16,14 @@ function fmt(n) {
   if (x >= 1e6) return `${(x / 1e6).toFixed(2)}M`;
   if (x >= 1e3) return `${(x / 1e3).toFixed(2)}K`;
   return String(x);
+}
+
+/** Signed compact delta for vault line (matches OV2 C21-style toasts). */
+function fmtVaultDelta(n) {
+  const x = Math.floor(Number(n) || 0);
+  if (x === 0) return "0";
+  const sign = x > 0 ? "+" : "-";
+  return `${sign}${fmt(Math.abs(x))}`;
 }
 
 function phaseEndsMs(v) {
@@ -95,6 +104,8 @@ export default function Ov2CwScreen({
   /** When user dismisses the mobile sheet during a round, hold `roundSeq` to block auto-reopen until the next round. */
   const sheetDismissedRoundRef = useRef(null);
   const prevPhaseForSheetRef = useRef(null);
+  const [roundOutcomeFlash, setRoundOutcomeFlash] = useState(null);
+  const lastOutcomeFlashKeyRef = useRef("");
 
   useEffect(() => {
     setPlayAmount(String(Math.max(100, Math.floor(Number(tableStakeUnits) || 100))));
@@ -283,6 +294,55 @@ export default function Ov2CwScreen({
       p => String(p.participantKey || "").trim() === pk && Math.floor(Number(p.roundSeq) || 0) === roundSeq,
     );
   }, [seatInspectorIndex, seatsForUi, plays, roundSeq]);
+
+  useEffect(() => {
+    if (!resultPhase || engine?.resultNumber == null || !participantKey) return undefined;
+    const rs = roundSeq;
+    const n = Math.floor(Number(engine.resultNumber));
+    const flashKey = `${rs}:${n}`;
+    if (lastOutcomeFlashKeyRef.current === flashKey) return undefined;
+
+    const mine = plays.filter(
+      p => p.participantKey === participantKey && Math.floor(Number(p.roundSeq) || 0) === rs,
+    );
+    if (mine.length === 0) {
+      lastOutcomeFlashKeyRef.current = flashKey;
+      return undefined;
+    }
+
+    let anyWin = false;
+    let risked = 0;
+    let returned = 0;
+    for (const p of mine) {
+      const amt = Math.max(0, Math.floor(Number(p.amount) || 0));
+      risked += amt;
+      const won = ov2CwPlayWins(p.playType, p.playValue, n);
+      if (won) {
+        anyWin = true;
+        const mult = ov2CwPayoutMultiplier(p.playType);
+        returned += Math.floor(amt * (1 + mult));
+      }
+    }
+    const net = returned - risked;
+
+    lastOutcomeFlashKeyRef.current = flashKey;
+    setRoundOutcomeFlash({ win: anyWin, net, returned, risked });
+    const t = window.setTimeout(() => {
+      setRoundOutcomeFlash(null);
+    }, 2000);
+
+    return () => {
+      window.clearTimeout(t);
+      lastOutcomeFlashKeyRef.current = "";
+    };
+  }, [resultPhase, engine?.resultNumber, roundSeq, participantKey, plays]);
+
+  useEffect(() => {
+    if (!resultPhase) {
+      setRoundOutcomeFlash(null);
+      lastOutcomeFlashKeyRef.current = "";
+    }
+  }, [resultPhase]);
 
   const centerResult =
     resultPhase || spinning
@@ -844,11 +904,21 @@ export default function Ov2CwScreen({
                 aria-label="Play panel"
               >
                 <div className="mx-auto mt-2 h-1 w-11 shrink-0 rounded-full bg-zinc-600 lg:hidden" aria-hidden />
-                <div className="border-b border-white/[0.06] px-4 pb-2 pt-3 text-center lg:text-left">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200/70">Play Panel</p>
-                  <p className="text-xs text-zinc-500">Amount · type · place</p>
+                <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/[0.06] px-4 pb-2.5 pt-3">
+                  <div className="min-w-0 flex-1 text-center lg:text-left">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200/70">Play Panel</p>
+                    <p className="text-xs text-zinc-500">Amount · type · place</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-lg border border-white/10 bg-zinc-900/90 px-2.5 py-1.5 text-[10px] font-semibold text-zinc-300 hover:border-white/20 hover:text-white sm:text-[11px]"
+                    onClick={() => dismissMobileSheet()}
+                    aria-label="Close play panel"
+                  >
+                    Close
+                  </button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-3 pt-2">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2 pt-1.5 max-lg:flex max-lg:flex-col max-lg:overflow-hidden sm:px-4 sm:pb-3 sm:pt-2 lg:overflow-y-auto">
                   <PlayForm
                     minPlay={minPlay}
                     maxPlay={maxPlay}
@@ -860,21 +930,74 @@ export default function Ov2CwScreen({
                     setNumberPick={setNumberPick}
                     groupPick={groupPick}
                     setGroupPick={setGroupPick}
-                    disabled={!mySeat || !placingLive || operateBusy}
-                    onSubmit={() => {
-                      void submitPlay();
-                    }}
                   />
                 </div>
-                <div className="shrink-0 border-t border-white/[0.06] p-3">
+                <div className="shrink-0 border-t border-white/[0.06] bg-zinc-950/95 p-3 pt-2.5 shadow-[0_-8px_24px_rgba(0,0,0,0.35)]">
                   <button
                     type="button"
-                    className="w-full rounded-xl border border-white/[0.1] bg-zinc-900/80 py-2.5 text-sm font-semibold text-zinc-300"
-                    onClick={() => dismissMobileSheet()}
+                    disabled={!mySeat || !placingLive || operateBusy}
+                    onClick={() => {
+                      void submitPlay();
+                    }}
+                    className="w-full rounded-2xl border border-amber-400/40 bg-gradient-to-b from-amber-500 via-amber-600 to-amber-900 py-3.5 text-base font-extrabold tracking-tight text-white shadow-[0_4px_24px_-4px_rgba(245,158,11,0.45),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-40 sm:py-4"
                   >
-                    Close
+                    Place Play
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {roundOutcomeFlash ? (
+          <div
+            className="pointer-events-none absolute inset-0 z-[90] flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]"
+            role="status"
+            aria-live="polite"
+          >
+            <div
+              className={`max-w-[min(19rem,92vw)] rounded-xl border px-3 py-2.5 text-center shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-md sm:max-w-sm sm:px-4 sm:py-3 ${
+                roundOutcomeFlash.win
+                  ? "border-emerald-600/35 bg-[#06120e]/95"
+                  : "border-rose-500/40 bg-[#14080a]/95"
+              }`}
+            >
+              <div
+                className={`text-center text-[10px] font-bold uppercase tracking-wide ${
+                  roundOutcomeFlash.win ? "text-emerald-300/90" : "text-rose-300/95"
+                }`}
+              >
+                Round result
+              </div>
+              <div
+                className={`mt-0.5 text-center text-lg font-black sm:text-xl ${
+                  roundOutcomeFlash.win ? "text-emerald-100" : "text-rose-100"
+                }`}
+              >
+                {roundOutcomeFlash.win ? "You won" : "Loss"}
+              </div>
+              <div className="mt-0.5 text-center text-[11px] text-zinc-300">
+                Net vault ·{" "}
+                <span
+                  className={`font-semibold ${
+                    roundOutcomeFlash.net < 0
+                      ? "text-rose-200"
+                      : roundOutcomeFlash.net > 0
+                        ? "text-emerald-200"
+                        : "text-white"
+                  }`}
+                >
+                  {fmtVaultDelta(roundOutcomeFlash.net)}
+                </span>
+                {roundOutcomeFlash.returned > 0 ? (
+                  <span className="text-zinc-500">
+                    {" "}
+                    · back {fmt(roundOutcomeFlash.returned)}
+                    {roundOutcomeFlash.risked > 0 ? ` · in play ${fmt(roundOutcomeFlash.risked)}` : ""}
+                  </span>
+                ) : roundOutcomeFlash.risked > 0 ? (
+                  <span className="text-zinc-500"> · in play {fmt(roundOutcomeFlash.risked)}</span>
+                ) : null}
               </div>
             </div>
           </div>
@@ -1013,8 +1136,6 @@ function PlayForm({
   setNumberPick,
   groupPick,
   setGroupPick,
-  disabled,
-  onSubmit,
 }) {
   const bump = useCallback(
     m => {
@@ -1038,28 +1159,28 @@ function PlayForm({
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-white/[0.08] bg-black/40 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-500">Amount</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1.5">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-2 lg:gap-4">
+      <div className="shrink-0 rounded-lg border border-white/[0.08] bg-black/40 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:rounded-xl lg:p-3">
+        <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-500 lg:mb-2 lg:text-[9px]">Amount</p>
+        <div className="flex items-center gap-1.5 lg:gap-2">
+          <div className="flex shrink-0 gap-1 lg:gap-1.5">
             <button
               type="button"
-              className="min-h-[36px] rounded-lg border border-white/[0.1] bg-zinc-900/80 px-2.5 text-[11px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30"
+              className="min-h-[30px] rounded-md border border-white/[0.1] bg-zinc-900/80 px-2 text-[10px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30 lg:min-h-[36px] lg:rounded-lg lg:px-2.5 lg:text-[11px]"
               onClick={() => bump(-minPlay)}
             >
               −min
             </button>
             <button
               type="button"
-              className="min-h-[36px] rounded-lg border border-white/[0.1] bg-zinc-900/80 px-2.5 text-[11px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30"
+              className="min-h-[30px] rounded-md border border-white/[0.1] bg-zinc-900/80 px-2 text-[10px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30 lg:min-h-[36px] lg:rounded-lg lg:px-2.5 lg:text-[11px]"
               onClick={() => bump(minPlay)}
             >
               +min
             </button>
             <button
               type="button"
-              className="min-h-[36px] rounded-lg border border-white/[0.1] bg-zinc-900/80 px-2.5 text-[11px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30"
+              className="min-h-[30px] rounded-md border border-white/[0.1] bg-zinc-900/80 px-2 text-[10px] font-semibold text-zinc-200 shadow-sm hover:border-amber-500/30 lg:min-h-[36px] lg:rounded-lg lg:px-2.5 lg:text-[11px]"
               onClick={() => bump(minPlay * 4)}
             >
               +4×
@@ -1068,22 +1189,22 @@ function PlayForm({
           <input
             type="number"
             inputMode="numeric"
-            className="ml-auto min-h-[40px] w-[7.5rem] rounded-xl border border-amber-500/25 bg-zinc-950/90 px-3 text-right font-mono text-base font-bold tabular-nums text-amber-50 shadow-[inset_0_2px_6px_rgba(0,0,0,0.4)] focus:border-amber-400/50 focus:outline-none"
+            className="ml-auto min-h-[32px] min-w-0 flex-1 rounded-lg border border-amber-500/25 bg-zinc-950/90 px-2 text-right font-mono text-sm font-bold tabular-nums text-amber-50 shadow-[inset_0_2px_6px_rgba(0,0,0,0.4)] focus:border-amber-400/50 focus:outline-none sm:max-w-[7.5rem] sm:flex-none lg:min-h-[40px] lg:w-[7.5rem] lg:rounded-xl lg:px-3 lg:text-base"
             value={playAmount}
             onChange={e => setPlayAmount(e.target.value)}
           />
         </div>
       </div>
 
-      <div>
-        <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-500">Play type</p>
-        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+      <div className="shrink-0">
+        <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-500 lg:mb-2 lg:text-[9px]">Play type</p>
+        <div className="grid grid-cols-3 gap-1 sm:grid-cols-4 lg:gap-1.5">
           {kinds.map(k => (
             <button
               key={k.id}
               type="button"
               onClick={() => setPlayKind(k.id)}
-              className={`min-h-[2.25rem] rounded-xl border px-2 py-1.5 text-[10px] font-bold leading-tight transition-colors sm:min-h-[2.5rem] sm:text-[11px] ${
+              className={`min-h-[2rem] rounded-lg border px-1.5 py-1 text-[9px] font-bold leading-tight transition-colors lg:min-h-[2.5rem] lg:rounded-xl lg:px-2 lg:py-1.5 lg:text-[11px] ${
                 playKind === k.id
                   ? "border-amber-400/55 bg-gradient-to-b from-amber-600/35 to-amber-950/50 text-amber-50 shadow-[0_0_20px_-8px_rgba(245,158,11,0.5),inset_0_1px_0_rgba(255,255,255,0.08)]"
                   : "border-white/[0.08] bg-zinc-900/50 text-zinc-400 hover:border-white/15 hover:bg-zinc-800/50 hover:text-zinc-200"
@@ -1096,34 +1217,42 @@ function PlayForm({
       </div>
 
       {playKind === "number" ? (
-        <div>
-          <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-500">Exact number</p>
-          <div className="grid max-h-40 grid-cols-7 gap-1 overflow-y-auto rounded-xl border border-white/[0.06] bg-black/30 p-2 sm:max-h-44">
-            {Array.from({ length: 37 }, (_, n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setNumberPick(n)}
-                className={`aspect-square max-h-9 rounded-lg text-[11px] font-bold sm:max-h-10 sm:text-xs ${
-                  numberPick === n
-                    ? "bg-gradient-to-b from-amber-500 to-amber-700 text-white shadow-md"
-                    : "bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-none">
+          <p className="mb-1 shrink-0 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-500 lg:mb-2 lg:text-[9px]">
+            Exact number
+          </p>
+          <div
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-white/[0.06] bg-black/30 [-webkit-overflow-scrolling:touch] lg:max-h-44 lg:flex-none"
+            role="listbox"
+            aria-label="Pick exact number"
+          >
+            <div className="grid grid-cols-7 gap-0.5 p-1.5 lg:gap-1 lg:p-2">
+              {Array.from({ length: 37 }, (_, n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setNumberPick(n)}
+                  className={`flex aspect-square max-h-[1.85rem] min-h-0 w-full items-center justify-center rounded-md text-[10px] font-bold lg:max-h-10 lg:rounded-lg lg:text-xs ${
+                    numberPick === n
+                      ? "bg-gradient-to-b from-amber-500 to-amber-700 text-white shadow-md"
+                      : "bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}
       {(playKind === "dozen" || playKind === "column") && (
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-1.5 lg:gap-2">
           {[1, 2, 3].map(g => (
             <button
               key={g}
               type="button"
               onClick={() => setGroupPick(g)}
-              className={`min-h-[2.75rem] flex-1 rounded-xl border py-2 text-xs font-extrabold ${
+              className={`min-h-[2.35rem] flex-1 rounded-lg border py-1.5 text-[11px] font-extrabold lg:min-h-[2.75rem] lg:rounded-xl lg:py-2 lg:text-xs ${
                 groupPick === g
                   ? "border-amber-400/50 bg-gradient-to-b from-amber-600/30 to-amber-950/40 text-amber-50"
                   : "border-white/[0.08] bg-zinc-900/60 text-zinc-400"
@@ -1134,17 +1263,9 @@ function PlayForm({
           ))}
         </div>
       )}
-      <p className="text-center text-[10px] leading-relaxed text-zinc-500">
+      <p className="shrink-0 text-center text-[9px] leading-snug text-zinc-500 lg:text-[10px] lg:leading-relaxed">
         Min {fmt(minPlay)} · Max {fmt(maxPlay)}. Successful plays return stake plus a multiplier set by play type (see info).
       </p>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onSubmit}
-        className="w-full rounded-2xl border border-amber-400/40 bg-gradient-to-b from-amber-500 via-amber-600 to-amber-900 py-3.5 text-base font-extrabold tracking-tight text-white shadow-[0_4px_24px_-4px_rgba(245,158,11,0.45),inset_0_1px_0_rgba(255,255,255,0.2)] disabled:opacity-40 sm:py-4"
-      >
-        Place Play
-      </button>
     </div>
   );
 }
