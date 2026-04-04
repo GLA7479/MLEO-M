@@ -325,7 +325,7 @@ export default function Ov2CcScreen({
                 }}
               />
               <div className="relative z-[4] flex min-h-0 flex-1 flex-col">
-                <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-0 pb-0 max-sm:-translate-y-[3rem] max-sm:px-[6%] sm:-translate-y-10 md:-translate-y-8 sm:px-[13%] sm:pt-1.5 sm:pb-1 md:px-[15%] md:pt-2 md:pb-1.5 lg:translate-y-0">
+                <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-0 pb-0 max-sm:-translate-y-[3rem] max-sm:px-[6%] sm:-translate-y-10 md:-translate-y-8 sm:px-[13%] sm:pt-1.5 sm:pb-1 md:px-[15%] md:pt-2 md:pb-1.5 lg:translate-y-0 lg:justify-start lg:pt-[clamp(4rem,16vh,8rem)] lg:pb-3">
                   <div className="mb-1 flex w-full max-w-md flex-col items-center gap-0.5 max-sm:mb-2 sm:mb-1 sm:max-w-lg sm:gap-1 md:gap-1.5">
                     {handBettingLive || ccPadDkStableLayout ? (
                       <>
@@ -360,23 +360,30 @@ export default function Ov2CcScreen({
                           ) : null}
                         </div>
 
-                        <div className="relative z-[1] flex min-h-[2.75rem] flex-wrap items-center justify-center gap-1.5 max-sm:drop-shadow-[0_3px_8px_rgba(0,0,0,0.32)] drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.1rem] sm:gap-2 md:min-h-[3.35rem]">
-                          {(communityCards || []).length ? (
-                            (communityCards || []).map((c, idx) => (
-                              <Ov2CcPlayingCard
-                                key={`${c}-${idx}`}
-                                code={c}
-                                size="lg"
-                                className="sm:scale-[1.06] md:scale-110"
-                              />
-                            ))
-                          ) : (
-                            <div className="flex h-[2.75rem] items-center sm:h-[3.1rem]">
-                              <span className="text-[12px] font-medium tracking-wide text-emerald-200/30 sm:text-[13px]">
-                                Community cards
-                              </span>
-                            </div>
-                          )}
+                        <div className="relative z-[1] flex min-h-[2.75rem] flex-nowrap items-center justify-center gap-1.5 max-sm:drop-shadow-[0_3px_8px_rgba(0,0,0,0.32)] drop-shadow-[0_6px_20px_rgba(0,0,0,0.45)] sm:min-h-[3.1rem] sm:gap-2 md:min-h-[3.35rem]">
+                          {(communityCards || []).length === 0 ? (
+                            <span className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center text-[12px] font-medium tracking-wide text-emerald-200/30 sm:text-[13px]">
+                              Community cards
+                            </span>
+                          ) : null}
+                          {Array.from({ length: 5 }, (_, i) => {
+                            const c = (communityCards || [])[i];
+                            return (
+                              <div key={`board-live-slot-${i}`} className="relative z-[1] flex shrink-0 items-center justify-center">
+                                {c ? (
+                                  <Ov2CcPlayingCard
+                                    code={c}
+                                    size="lg"
+                                    className="sm:scale-[1.06] md:scale-110"
+                                  />
+                                ) : (
+                                  <div className="pointer-events-none opacity-0" aria-hidden>
+                                    <Ov2CcPlayingCard faceDown size="lg" className="sm:scale-[1.06] md:scale-110" />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
 
                         <div className="relative z-[2] flex flex-col items-center gap-0.5 max-sm:mt-0">
@@ -530,21 +537,28 @@ export default function Ov2CcScreen({
               >
                 {canAct && turnSecondsLeft != null ? (
                   <div
-                    className="rounded-lg border border-amber-500/30 bg-black/55 px-2 py-1 text-right shadow-[0_4px_14px_rgba(0,0,0,0.35)] sm:rounded-full sm:px-2.5 sm:py-1"
-                    aria-label="Your turn"
+                    className="flex min-w-[2.5rem] flex-col items-center justify-center rounded-lg border border-amber-500/30 bg-black/55 px-2 py-1 text-center shadow-[0_4px_14px_rgba(0,0,0,0.35)] sm:min-w-[2.75rem] sm:rounded-full sm:px-2.5 sm:py-1"
+                    aria-label={`Your turn · ${turnSecondsLeft} seconds`}
                   >
                     <span className="font-mono text-sm font-bold tabular-nums text-amber-100 sm:text-base">
-                      {turnSecondsLeft}s
+                      {turnSecondsLeft}
                     </span>
                   </div>
                 ) : handBettingLive && engine?.actionSeat != null ? (
-                  <div className="rounded-lg border border-white/[0.1] bg-black/45 px-2 py-1 text-right shadow-[0_4px_12px_rgba(0,0,0,0.3)] sm:rounded-full sm:px-2.5">
-                    <span className="block text-[10px] font-medium text-emerald-200/55 sm:text-[11px]">
+                  <div
+                    className="flex min-w-[3.25rem] flex-col items-center justify-center rounded-lg border border-white/[0.1] bg-black/45 px-2 py-1 text-center shadow-[0_4px_12px_rgba(0,0,0,0.3)] sm:min-w-[3.5rem] sm:rounded-full sm:px-2.5"
+                    aria-label={
+                      otherTurnSeconds != null
+                        ? `Seat ${engine.actionSeat + 1} · ${otherTurnSeconds} seconds`
+                        : `Seat ${engine.actionSeat + 1}`
+                    }
+                  >
+                    <span className="block w-full text-center text-[10px] font-medium text-emerald-200/55 sm:text-[11px]">
                       Seat {engine.actionSeat + 1}
                     </span>
                     {otherTurnSeconds != null ? (
                       <span className="font-mono text-xs font-bold tabular-nums text-amber-200/90 sm:text-sm">
-                        {otherTurnSeconds}s
+                        {otherTurnSeconds}
                       </span>
                     ) : null}
                   </div>
