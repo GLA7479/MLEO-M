@@ -862,7 +862,7 @@ export default function Ov2CwScreen({
                     setGroupPick={setGroupPick}
                     disabled={!mySeat || !placingLive || operateBusy}
                     onSubmit={() => {
-                      void submitPlay().then(() => setSheetOpen(false));
+                      void submitPlay();
                     }}
                   />
                 </div>
