@@ -1000,7 +1000,7 @@ export default function Ov2CwScreen({
             />
             <div className="pointer-events-none relative z-10 flex min-h-0 w-full flex-1 flex-col justify-end lg:flex-row lg:items-stretch lg:justify-end lg:p-3">
               <div
-                className="pointer-events-auto flex max-h-[min(88dvh,calc(100%-0.5rem))] w-full flex-col overflow-hidden rounded-t-2xl border border-amber-500/30 border-b-0 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[0_-12px_48px_rgba(0,0,0,0.55)] max-lg:h-[min(88dvh,calc(100%-0.5rem))] lg:max-h-[min(calc(100%-1.5rem),720px)] lg:min-h-0 lg:h-auto lg:w-full lg:max-w-md lg:rounded-2xl lg:border-b lg:shadow-2xl"
+                className="pointer-events-auto flex max-h-[min(88dvh,calc(100%-0.5rem))] w-full flex-col overflow-hidden rounded-t-2xl border border-amber-500/30 border-b-0 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-[0_-12px_48px_rgba(0,0,0,0.55)] max-lg:h-[min(88dvh,calc(100%-0.5rem))] lg:max-h-[min(calc(100%-1.5rem),min(720px,92vh))] lg:min-h-0 lg:h-auto lg:w-full lg:max-w-4xl lg:rounded-2xl lg:border-b lg:shadow-2xl"
                 role="dialog"
                 aria-label="Play panel"
               >
@@ -1018,7 +1018,7 @@ export default function Ov2CwScreen({
                     Close
                   </button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2 pt-1.5 max-lg:flex max-lg:flex-col max-lg:overflow-hidden sm:px-4 sm:pb-3 sm:pt-2 lg:overflow-y-auto">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2 pt-1.5 max-lg:flex max-lg:flex-col max-lg:overflow-hidden sm:px-4 sm:pb-3 sm:pt-2 lg:overflow-hidden lg:overflow-x-hidden lg:overflow-y-hidden">
                   <PlayForm
                     minPlay={minPlay}
                     maxPlay={maxPlay}
@@ -1366,8 +1366,9 @@ function PlayForm({ minPlay, maxPlay, playAmount, setPlayAmount, pendingPlayKeys
   ];
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col gap-2">
-      <div className="shrink-0 rounded-lg border border-white/[0.08] bg-black/40 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:rounded-xl lg:p-3">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-2 lg:grid lg:min-h-0 lg:grid-cols-2 lg:items-start lg:gap-x-5 lg:gap-y-2">
+      <div className="flex min-h-0 w-full flex-col gap-2 lg:min-w-0">
+        <div className="shrink-0 rounded-lg border border-white/[0.08] bg-black/40 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:rounded-xl lg:p-3">
         <div className="flex items-center gap-1.5 lg:gap-2">
           <div className="flex shrink-0 gap-1 lg:gap-1.5">
             <button
@@ -1400,9 +1401,9 @@ function PlayForm({ minPlay, maxPlay, playAmount, setPlayAmount, pendingPlayKeys
             onChange={e => setPlayAmount(e.target.value)}
           />
         </div>
-      </div>
+        </div>
 
-      <div className="grid shrink-0 grid-cols-3 gap-x-1 gap-y-2 sm:grid-cols-3 lg:gap-x-1.5 lg:gap-y-2">
+        <div className="grid shrink-0 grid-cols-3 gap-x-1 gap-y-2 sm:grid-cols-3 lg:gap-x-1.5 lg:gap-y-2">
         {kinds.map(k => (
           <button
             key={k.id}
@@ -1416,9 +1417,9 @@ function PlayForm({ minPlay, maxPlay, playAmount, setPlayAmount, pendingPlayKeys
             {k.label}
           </button>
         ))}
-      </div>
+        </div>
 
-      <div className="flex shrink-0 gap-1.5 lg:gap-2">
+        <div className="flex shrink-0 gap-1.5 lg:gap-2">
         {[1, 2, 3].map(g => (
           <button
             key={`dg${g}`}
@@ -1437,8 +1438,8 @@ function PlayForm({ minPlay, maxPlay, playAmount, setPlayAmount, pendingPlayKeys
             {g === 1 ? "1–12" : g === 2 ? "13–24" : "25–36"}
           </button>
         ))}
-      </div>
-      <div className="flex shrink-0 gap-1.5 lg:gap-2">
+        </div>
+        <div className="flex shrink-0 gap-1.5 lg:gap-2">
         {[1, 2, 3].map(g => (
           <button
             key={`cg${g}`}
@@ -1455,11 +1456,12 @@ function PlayForm({ minPlay, maxPlay, playAmount, setPlayAmount, pendingPlayKeys
             C{g}
           </button>
         ))}
+        </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:min-h-[11rem]">
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden lg:min-h-0 lg:flex-none lg:overflow-visible">
         <div
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-white/[0.06] bg-black/30 [-webkit-overflow-scrolling:touch] lg:max-h-44"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border border-white/[0.06] bg-black/30 [-webkit-overflow-scrolling:touch] lg:max-h-none lg:flex-none lg:overflow-visible"
           role="listbox"
           aria-label="Pick numbers"
         >
@@ -1469,7 +1471,7 @@ function PlayForm({ minPlay, maxPlay, playAmount, setPlayAmount, pendingPlayKeys
                 key={n}
                 type="button"
                 onClick={() => togglePendingPlay("number", n)}
-                className={`flex aspect-square max-h-[1.85rem] min-h-0 w-full items-center justify-center rounded-md text-[12px] font-bold leading-none transition-[filter,box-shadow] lg:max-h-10 lg:rounded-lg lg:text-base ${ov2CwExactTileClasses(
+                className={`flex aspect-square max-h-[1.85rem] min-h-0 w-full items-center justify-center rounded-md text-[12px] font-bold leading-none transition-[filter,box-shadow] lg:max-h-9 lg:rounded-lg lg:text-sm xl:max-h-10 xl:text-base ${ov2CwExactTileClasses(
                   n,
                   has("number", n),
                 )}`}
