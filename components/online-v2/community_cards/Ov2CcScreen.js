@@ -136,6 +136,9 @@ export default function Ov2CcScreen({
     return () => window.removeEventListener("resize", apply);
   }, []);
 
+  /** Tablet/desktop (≥640px): keep the same board + seat ring as live streets — no idle “widen” or alternate center stack (avoids jumps at showdown / between hands). */
+  const ccPadDkStableLayout = seatRingBp === "pad" || seatRingBp === "dk";
+
   if (!engine) {
     return (
       <div className="flex h-full min-h-[200px] items-center justify-center text-sm text-zinc-500">
@@ -213,7 +216,9 @@ export default function Ov2CcScreen({
     const isYou = s.participantKey === participantKey;
     const isAct = engine.actionSeat === i;
     // Felt, hero strip, and bottom action area follow the active/in-hand skeleton; when idle, only seat % may differ.
-    const pos = ov2CcSeatRingPercent(maxSeats, i, seatRingBp, { idleSeatSpreadOverride: !handBettingLive });
+    const pos = ov2CcSeatRingPercent(maxSeats, i, seatRingBp, {
+      idleSeatSpreadOverride: ccPadDkStableLayout ? false : !handBettingLive,
+    });
     return (
       <div
         key={i}
@@ -303,7 +308,7 @@ export default function Ov2CcScreen({
         <div className="relative flex min-h-0 flex-1 flex-col">
           {/* Mobile: one felt height for all phases (see ov2CcLayoutConstants). */}
           <div
-            className={`relative mx-auto h-full min-h-0 w-full max-w-[920px] sm:min-h-[min(56vh,440px)] flex-1 rounded-[1.55rem] border-0 bg-gradient-to-b from-[#5c4030] via-[#2e1e16] to-[#120b08] p-[2px] shadow-none sm:rounded-[2.35rem] sm:p-1 md:min-h-[min(58vh,500px)] lg:rounded-[2.55rem] lg:p-[7px] ${OV2_CC_MOBILE_FELT_HEIGHT_CLASSES}`}
+            className={`relative mx-auto h-full min-h-0 w-full max-w-[920px] sm:min-h-[min(56vh,440px)] flex-1 rounded-[1.55rem] border-0 bg-gradient-to-b from-[#5c4030] via-[#2e1e16] to-[#120b08] p-[2px] shadow-none sm:rounded-[2.35rem] sm:p-1 md:min-h-[min(58vh,500px)] lg:max-w-[min(1100px,96vw)] lg:min-h-[min(69vh,790px)] lg:rounded-[2.55rem] lg:p-[7px] ${OV2_CC_MOBILE_FELT_HEIGHT_CLASSES}`}
           >
             <div
               className="relative flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[1.45rem] border-0 shadow-none sm:rounded-[1.85rem] md:rounded-[2.05rem]"
@@ -320,9 +325,9 @@ export default function Ov2CcScreen({
                 }}
               />
               <div className="relative z-[4] flex min-h-0 flex-1 flex-col">
-                <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-0 pb-0 max-sm:-translate-y-[3rem] max-sm:px-[6%] sm:-translate-y-10 md:-translate-y-8 sm:px-[13%] sm:pt-1.5 sm:pb-1 md:px-[15%] md:pt-2 md:pb-1.5">
+                <div className="pointer-events-none flex min-h-0 flex-1 flex-col items-center justify-end overflow-y-auto overflow-x-hidden px-[7%] pt-0 pb-0 max-sm:-translate-y-[3rem] max-sm:px-[6%] sm:-translate-y-10 md:-translate-y-8 sm:px-[13%] sm:pt-1.5 sm:pb-1 md:px-[15%] md:pt-2 md:pb-1.5 lg:translate-y-0">
                   <div className="mb-1 flex w-full max-w-md flex-col items-center gap-0.5 max-sm:mb-2 sm:mb-1 sm:max-w-lg sm:gap-1 md:gap-1.5">
-                    {handBettingLive ? (
+                    {handBettingLive || ccPadDkStableLayout ? (
                       <>
                         <div className="w-full text-center">
                           <p className="text-[12px] font-medium text-emerald-100/70 sm:text-[13px]">
@@ -479,10 +484,10 @@ export default function Ov2CcScreen({
                 </div>
 
                 <div
-                  className={`relative z-[10] flex w-full shrink-0 justify-center px-1 pb-[max(0.15rem,env(safe-area-inset-bottom,0px))] pt-0 pointer-events-none sm:h-[8.5rem] sm:max-h-none sm:items-center ${OV2_CC_MOBILE_HERO_ZONE_CLASSES}`}
+                  className={`relative z-[10] flex w-full shrink-0 justify-center px-1 pb-[max(0.15rem,env(safe-area-inset-bottom,0px))] pt-0 pointer-events-none sm:h-[8.5rem] sm:max-h-none sm:items-center lg:h-auto lg:min-h-0 lg:pb-4 lg:pt-1 ${OV2_CC_MOBILE_HERO_ZONE_CLASSES}`}
                 >
                   {mySeat ? (
-                    <div className="flex max-h-full w-full max-w-[98%] flex-wrap items-center justify-center gap-2 drop-shadow-[0_10px_28px_rgba(0,0,0,0.55)] max-sm:max-h-none max-sm:-translate-y-7 max-sm:gap-2.5 sm:-translate-y-7 sm:items-end sm:gap-4 md:-translate-y-5">
+                    <div className="flex max-h-full w-full max-w-[98%] flex-wrap items-center justify-center gap-2 drop-shadow-[0_10px_28px_rgba(0,0,0,0.55)] max-sm:max-h-none max-sm:-translate-y-7 max-sm:gap-2.5 sm:-translate-y-7 sm:items-end sm:gap-4 md:-translate-y-5 lg:translate-y-0 lg:items-center lg:gap-3">
                       {holeCardsToShow.length > 0
                         ? holeCardsToShow.map((c, idx) => (
                             <Ov2CcPlayingCard key={`felt-h-${idx}`} code={c} size="hero" />
@@ -644,24 +649,25 @@ export default function Ov2CcScreen({
 
       {mySeat ? (
         <div
-          className="relative z-10 flex min-h-[134px] shrink-0 flex-col border-t-0 bg-transparent px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-none sm:min-h-[140px] sm:px-4 sm:pb-3 sm:pt-3"
+          className="relative z-10 flex min-h-[134px] shrink-0 flex-col border-t-0 bg-transparent px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-none sm:min-h-[140px] sm:px-4 sm:pb-3 sm:pt-3 lg:min-h-[88px] lg:py-2 lg:pb-[max(0.25rem,env(safe-area-inset-bottom))]"
         >
           {canAct ? (
-            <div className="mx-auto w-full max-w-lg">
-            <div className="flex items-stretch gap-2">
+            <div className="mx-auto w-full max-w-lg lg:max-w-5xl">
+            <div className="flex flex-col gap-2.5 lg:flex-row lg:flex-nowrap lg:items-stretch lg:gap-2">
+            <div className="flex items-stretch gap-2 lg:contents">
               <button
                 type="button"
                 disabled={actionClusterLocked}
-                className="flex w-[4.5rem] shrink-0 flex-col justify-center rounded-lg border border-rose-500/55 bg-rose-950/60 py-2.5 text-[15px] font-bold uppercase leading-tight tracking-wide text-rose-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-rose-900/50 disabled:cursor-not-allowed disabled:opacity-45 sm:w-[5rem] sm:text-[17px]"
+                className="flex w-[4.5rem] shrink-0 flex-col justify-center rounded-lg border border-rose-500/55 bg-rose-950/60 py-2.5 text-[15px] font-bold uppercase leading-tight tracking-wide text-rose-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-rose-900/50 disabled:cursor-not-allowed disabled:opacity-45 sm:w-[5rem] sm:text-[17px] lg:min-h-[44px] lg:w-[4.75rem] lg:py-2 lg:text-sm"
                 onClick={() => void runGameOp("fold")}
               >
                 Fold
               </button>
-              <div className="flex min-w-0 flex-1 gap-2">
+              <div className="flex min-w-0 flex-1 gap-2 lg:contents">
                 <button
                   type="button"
                   disabled={actionClusterLocked || canCallChips}
-                  className="min-h-[52px] min-w-0 flex-1 rounded-xl border border-green-500/50 bg-green-900/55 py-2.5 text-[16px] font-bold uppercase leading-snug tracking-wide text-green-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-green-800/50 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg"
+                  className="min-h-[52px] min-w-0 flex-1 rounded-xl border border-green-500/50 bg-green-900/55 py-2.5 text-[16px] font-bold uppercase leading-snug tracking-wide text-green-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-green-800/50 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg lg:min-h-[44px] lg:py-2 lg:text-base"
                   onClick={() => void runGameOp("check")}
                 >
                   Check
@@ -669,7 +675,7 @@ export default function Ov2CcScreen({
                 <button
                   type="button"
                   disabled={actionClusterLocked || !canCallChips}
-                  className="min-h-[52px] min-w-0 flex-1 rounded-xl border border-sky-500/55 bg-sky-800/55 py-2.5 text-[16px] font-bold uppercase leading-snug tracking-wide text-sky-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-sky-700/45 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg"
+                  className="min-h-[52px] min-w-0 flex-1 rounded-xl border border-sky-500/55 bg-sky-800/55 py-2.5 text-[16px] font-bold uppercase leading-snug tracking-wide text-sky-50 touch-manipulation shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] active:bg-sky-700/45 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[54px] sm:text-lg lg:min-h-[44px] lg:py-2 lg:text-base"
                   onClick={() => {
                     if (!canCallChips) return;
                     void runGameOp("call");
@@ -679,12 +685,12 @@ export default function Ov2CcScreen({
                 </button>
               </div>
             </div>
-            <div className="mt-2.5 flex gap-2">
+            <div className="mt-2.5 flex gap-2 lg:mt-0 lg:contents">
               {canBetOpen ? (
                 <button
                   type="button"
                   disabled={actionClusterLocked}
-                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-violet-500/50 bg-violet-900/50 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-violet-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-violet-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
+                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-violet-500/50 bg-violet-900/50 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-violet-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-violet-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base lg:min-h-[44px] lg:py-2 lg:text-sm"
                   onClick={() => void runGameOp("bet", { amount: bb })}
                 >
                   Bet {bb}
@@ -693,7 +699,7 @@ export default function Ov2CcScreen({
                 <button
                   type="button"
                   disabled={actionClusterLocked || !canMinRaiseBtn}
-                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-indigo-500/50 bg-indigo-900/50 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-indigo-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-indigo-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
+                  className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-indigo-500/50 bg-indigo-900/50 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-indigo-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-indigo-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base lg:min-h-[44px] lg:py-2 lg:text-sm"
                   onClick={() => void runGameOp("raise", { amount: minRaiseChips })}
                 >
                   Raise +{minRaiseChips}
@@ -702,7 +708,7 @@ export default function Ov2CcScreen({
               <button
                 type="button"
                 disabled={actionClusterLocked || !canQuickBumpBtn}
-                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-fuchsia-500/50 bg-fuchsia-900/50 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-fuchsia-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-fuchsia-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
+                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-fuchsia-500/50 bg-fuchsia-900/50 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-fuchsia-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] touch-manipulation active:bg-fuchsia-800/45 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base lg:min-h-[44px] lg:py-2 lg:text-sm"
                 onClick={() => {
                   const op = curBet === 0 && toCall === 0 ? "bet" : "raise";
                   void runGameOp(op, { amount: quickAmount });
@@ -713,11 +719,12 @@ export default function Ov2CcScreen({
               <button
                 type="button"
                 disabled={actionClusterLocked}
-                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-amber-500/55 bg-amber-900/45 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] touch-manipulation active:bg-amber-800/40 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base"
+                className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-amber-500/55 bg-amber-900/45 py-2 text-[15px] font-bold uppercase leading-snug tracking-wide text-amber-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] touch-manipulation active:bg-amber-800/40 disabled:cursor-not-allowed disabled:opacity-45 sm:text-base lg:min-h-[44px] lg:py-2 lg:text-sm"
                 onClick={() => void runGameOp("all_in")}
               >
                 All-in
               </button>
+            </div>
             </div>
           </div>
           ) : (

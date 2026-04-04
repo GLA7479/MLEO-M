@@ -195,7 +195,10 @@ export default function OnlineV2GamePageShell({
             </OnlineV2GameOverlay>
           </div>
 
-          <OnlineV2ReservedAdSlot variant={isC21Flat || isCcFlat ? "subtle" : "default"} />
+          <OnlineV2ReservedAdSlot
+            variant={isC21Flat || isCcFlat ? "subtle" : "default"}
+            className={isCcFlat ? "-mt-1.5 lg:-mt-2.5" : ""}
+          />
         </div>
       </main>
     </Layout>

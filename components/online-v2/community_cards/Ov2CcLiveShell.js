@@ -244,8 +244,8 @@ export default function Ov2CcLiveShell() {
       chromePreset="cc_flat"
       infoPanel={infoPanel}
     >
-      <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden">
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5 pb-1.5 pt-0.5">
+      <div className="flex h-full min-h-0 flex-col gap-1 overflow-hidden lg:gap-0.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 pb-1 pt-0.5 lg:pb-0.5">
           <input
             value={nameDraft}
             onChange={e => setNameDraft(e.target.value)}
