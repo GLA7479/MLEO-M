@@ -39,7 +39,7 @@ function fmtInfoAmount(n) {
 }
 
 function CwInfoPanelBody({ roomId, tableStakeUnits }) {
-  const minP = Math.max(100, Math.floor(Number(tableStakeUnits) || 100));
+  const minP = Math.max(1, Math.floor(Number(tableStakeUnits) || 1));
   const maxP = Math.min(minP * 200, 10_000_000);
 
   return (
@@ -135,7 +135,7 @@ export default function Ov2CwLiveShell() {
         .eq("id", roomId)
         .maybeSingle();
       if (data?.stake_per_seat != null) {
-        setTableStake(Math.max(100, Math.floor(Number(data.stake_per_seat) || 100)));
+        setTableStake(Math.max(1, Math.floor(Number(data.stake_per_seat) || 1)));
       }
     })();
   }, [roomId]);

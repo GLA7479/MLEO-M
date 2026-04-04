@@ -116,7 +116,7 @@ export default function Ov2CwScreen({
   /** Occupied seat index for read-only player + bets + recent results panel */
   const [seatInspectorIndex, setSeatInspectorIndex] = useState(null);
   const [hint, setHint] = useState("");
-  const [playAmount, setPlayAmount] = useState(String(tableStakeUnits || 100));
+  const [playAmount, setPlayAmount] = useState(String(Math.max(1, Math.floor(Number(tableStakeUnits) || 1))));
   /** Staged play panel picks (toggle until Place Play): keys `red` | `number:7` | `dozen:2` | … */
   const [pendingPlayKeys, setPendingPlayKeys] = useState([]);
   const wheelRotRef = useRef(0);
@@ -133,7 +133,7 @@ export default function Ov2CwScreen({
   const lastOutcomeFlashKeyRef = useRef("");
 
   useEffect(() => {
-    setPlayAmount(String(Math.max(100, Math.floor(Number(tableStakeUnits) || 100))));
+    setPlayAmount(String(Math.max(1, Math.floor(Number(tableStakeUnits) || 1))));
   }, [tableStakeUnits]);
 
   const togglePendingPlay = useCallback((playType, playValue = null) => {
@@ -150,7 +150,7 @@ export default function Ov2CwScreen({
     return () => window.clearInterval(id);
   }, []);
 
-  const minPlay = Math.max(100, Math.floor(Number(tableStakeUnits) || 100));
+  const minPlay = Math.max(1, Math.floor(Number(tableStakeUnits) || 1));
   const maxPlay = Math.min(minPlay * 200, 10_000_000);
 
   const seatsForUi = useMemo(() => {

@@ -56,3 +56,4 @@ c21/061_ov2_c21_persistent_live_tables.sql
 community_cards/063_ov2_community_cards_persistent_live_tables.sql
 community_cards/064_ov2_cc_economy_entry_policy_explicit.sql
 color_wheel/065_ov2_color_wheel_persistent_live_tables.sql
+color_wheel/066_ov2_color_wheel_stake_1_10_rooms.sql

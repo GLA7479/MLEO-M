@@ -108,7 +108,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, code: "NOT_COLOR_WHEEL_TABLE" });
     }
 
-    const tableStake = Math.max(100, Math.floor(Number(roomRow.stake_per_seat) || 100));
+    const tableStake = Math.max(1, Math.floor(Number(roomRow.stake_per_seat) || 1));
 
     if (op === "sit") {
       if (!participantKey) {
