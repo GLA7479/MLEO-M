@@ -1,4 +1,5 @@
--- OV2 Checkers: authoritative rules (8x8 dark squares, forced capture, multi-jump chain, flying kings).
+-- OV2 Checkers: authoritative rules (8x8 dark squares, men-only forced capture, multi-jump chain, flying kings).
+-- Men: forward move and forward capture only. Kings: any direction; not globally forced to capture.
 -- Apply after 086_ov2_checkers_schema.sql.
 
 BEGIN;
@@ -164,10 +165,14 @@ DECLARE
   v_mid int;
   v_land int;
   v_opp int := CASE WHEN p_turn = 0 THEN 1 ELSE 0 END;
+  v_fwd int := CASE WHEN p_turn = 0 THEN 1 ELSE -1 END;
 BEGIN
   FOR v_dr, v_dc IN
     SELECT x, y FROM (VALUES (-1, -1), (-1, 1), (1, -1), (1, 1)) AS t(x, y)
   LOOP
+    IF v_dr IS DISTINCT FROM v_fwd THEN
+      CONTINUE;
+    END IF;
     v_rm := p_r + v_dr;
     v_cm := p_c + v_dc;
     v_r2 := p_r + 2 * v_dr;
@@ -184,6 +189,40 @@ BEGIN
       CONTINUE;
     END IF;
     IF public.ov2_ck_piece_owner(v_mid) = v_opp THEN
+      RETURN true;
+    END IF;
+  END LOOP;
+  RETURN false;
+END;
+$$;
+
+/* True if any man (not king) of p_turn has a legal forward capture; drives forced-capture mode. */
+CREATE OR REPLACE FUNCTION public.ov2_ck_side_has_men_capture(
+  p_cells jsonb,
+  p_turn int
+)
+RETURNS boolean
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = public
+AS $$
+DECLARE
+  v_i int;
+  v_p int;
+  v_r int;
+  v_c int;
+BEGIN
+  FOR v_i IN 0..63 LOOP
+    v_p := public.ov2_ck_cell_get(p_cells, v_i);
+    IF public.ov2_ck_piece_owner(v_p) IS DISTINCT FROM p_turn THEN
+      CONTINUE;
+    END IF;
+    IF public.ov2_ck_is_king(v_p) THEN
+      CONTINUE;
+    END IF;
+    v_r := v_i / 8;
+    v_c := v_i % 8;
+    IF public.ov2_ck_man_has_capture(p_cells, v_r, v_c, p_turn) THEN
       RETURN true;
     END IF;
   END LOOP;
@@ -414,6 +453,8 @@ DECLARE
   v_cm int;
   v_mid int;
   v_opp int := CASE WHEN p_turn = 0 THEN 1 ELSE 0 END;
+  v_fwd int;
+  v_step_r int;
 BEGIN
   IF p_tr < 0 OR p_tr > 7 OR p_tc < 0 OR p_tc > 7 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'OOB');
@@ -428,6 +469,11 @@ BEGIN
   v_dc := p_tc - p_fc;
   IF abs(v_dr) <> 2 OR abs(v_dc) <> 2 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'CAP_DISTANCE');
+  END IF;
+  v_fwd := CASE WHEN p_turn = 0 THEN 1 ELSE -1 END;
+  v_step_r := CASE WHEN v_dr > 0 THEN 1 WHEN v_dr < 0 THEN -1 ELSE 0 END;
+  IF v_step_r IS DISTINCT FROM v_fwd THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'MAN_FORWARD_CAP');
   END IF;
   v_dr := CASE WHEN v_dr > 0 THEN 1 WHEN v_dr < 0 THEN -1 ELSE 0 END;
   v_dc := CASE WHEN v_dc > 0 THEN 1 WHEN v_dc < 0 THEN -1 ELSE 0 END;
@@ -531,11 +577,11 @@ DECLARE
   v_tr int;
   v_tc int;
   v_p int;
-  v_glob_cap boolean;
+  v_glob_men_cap boolean;
   v_mv jsonb;
   v_cells jsonb := p_cells;
 BEGIN
-  v_glob_cap := public.ov2_ck_side_has_capture(v_cells, p_turn);
+  v_glob_men_cap := public.ov2_ck_side_has_men_capture(v_cells, p_turn);
   FOR v_from IN 0..63 LOOP
     IF p_chain_at IS NOT NULL AND v_from IS DISTINCT FROM p_chain_at THEN
       CONTINUE;
@@ -552,24 +598,33 @@ BEGIN
       v_fc := v_from % 8;
       v_tr := v_to / 8;
       v_tc := v_to % 8;
-      IF v_glob_cap THEN
+      IF p_chain_at IS NOT NULL THEN
         IF public.ov2_ck_is_king(v_p) THEN
           v_mv := public.ov2_ck_try_king_capture(v_cells, v_fr, v_fc, v_tr, v_tc, p_turn);
         ELSE
           v_mv := public.ov2_ck_try_man_capture(v_cells, v_fr, v_fc, v_tr, v_tc, p_turn);
         END IF;
-        IF coalesce((v_mv ->> 'ok')::boolean, false) THEN
-          RETURN true;
+      ELSIF v_glob_men_cap THEN
+        IF public.ov2_ck_is_king(v_p) THEN
+          v_mv := public.ov2_ck_try_king_capture(v_cells, v_fr, v_fc, v_tr, v_tc, p_turn);
+        ELSE
+          v_mv := public.ov2_ck_try_man_capture(v_cells, v_fr, v_fc, v_tr, v_tc, p_turn);
         END IF;
       ELSE
         IF public.ov2_ck_is_king(v_p) THEN
-          v_mv := public.ov2_ck_try_slide_king(v_cells, v_fr, v_fc, v_tr, v_tc);
+          v_mv := public.ov2_ck_try_king_capture(v_cells, v_fr, v_fc, v_tr, v_tc, p_turn);
+          IF NOT coalesce((v_mv ->> 'ok')::boolean, false) THEN
+            v_mv := public.ov2_ck_try_slide_king(v_cells, v_fr, v_fc, v_tr, v_tc);
+          END IF;
         ELSE
-          v_mv := public.ov2_ck_try_slide_man(v_cells, v_fr, v_fc, v_tr, v_tc, p_turn);
+          v_mv := public.ov2_ck_try_man_capture(v_cells, v_fr, v_fc, v_tr, v_tc, p_turn);
+          IF NOT coalesce((v_mv ->> 'ok')::boolean, false) THEN
+            v_mv := public.ov2_ck_try_slide_man(v_cells, v_fr, v_fc, v_tr, v_tc, p_turn);
+          END IF;
         END IF;
-        IF coalesce((v_mv ->> 'ok')::boolean, false) THEN
-          RETURN true;
-        END IF;
+      END IF;
+      IF coalesce((v_mv ->> 'ok')::boolean, false) THEN
+        RETURN true;
       END IF;
     END LOOP;
   END LOOP;
@@ -597,7 +652,7 @@ DECLARE
   v_tr int;
   v_tc int;
   v_p int;
-  v_glob_cap boolean;
+  v_glob_men_cap boolean;
   v_mv jsonb;
   v_new_cells jsonb;
   v_promo int;
@@ -650,18 +705,30 @@ BEGIN
   IF public.ov2_ck_piece_owner(v_p) IS DISTINCT FROM v_turn THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NOT_YOUR_PIECE');
   END IF;
-  v_glob_cap := public.ov2_ck_side_has_capture(v_cells, v_turn);
-  IF public.ov2_ck_is_king(v_p) THEN
-    IF v_glob_cap THEN
+  v_glob_men_cap := public.ov2_ck_side_has_men_capture(v_cells, v_turn);
+  IF v_chain_at IS NOT NULL THEN
+    IF public.ov2_ck_is_king(v_p) THEN
       v_mv := public.ov2_ck_try_king_capture(v_cells, v_fr, v_fc, v_tr, v_tc, v_turn);
     ELSE
-      v_mv := public.ov2_ck_try_slide_king(v_cells, v_fr, v_fc, v_tr, v_tc);
+      v_mv := public.ov2_ck_try_man_capture(v_cells, v_fr, v_fc, v_tr, v_tc, v_turn);
+    END IF;
+  ELSIF public.ov2_ck_is_king(v_p) THEN
+    IF v_glob_men_cap THEN
+      v_mv := public.ov2_ck_try_king_capture(v_cells, v_fr, v_fc, v_tr, v_tc, v_turn);
+    ELSE
+      v_mv := public.ov2_ck_try_king_capture(v_cells, v_fr, v_fc, v_tr, v_tc, v_turn);
+      IF NOT coalesce((v_mv ->> 'ok')::boolean, false) THEN
+        v_mv := public.ov2_ck_try_slide_king(v_cells, v_fr, v_fc, v_tr, v_tc);
+      END IF;
     END IF;
   ELSE
-    IF v_glob_cap THEN
+    IF v_glob_men_cap THEN
       v_mv := public.ov2_ck_try_man_capture(v_cells, v_fr, v_fc, v_tr, v_tc, v_turn);
     ELSE
-      v_mv := public.ov2_ck_try_slide_man(v_cells, v_fr, v_fc, v_tr, v_tc, v_turn);
+      v_mv := public.ov2_ck_try_man_capture(v_cells, v_fr, v_fc, v_tr, v_tc, v_turn);
+      IF NOT coalesce((v_mv ->> 'ok')::boolean, false) THEN
+        v_mv := public.ov2_ck_try_slide_man(v_cells, v_fr, v_fc, v_tr, v_tc, v_turn);
+      END IF;
     END IF;
   END IF;
   IF NOT coalesce((v_mv ->> 'ok')::boolean, false) THEN
