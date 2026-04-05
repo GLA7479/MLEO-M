@@ -10,6 +10,13 @@ import OnlineV2VaultStrip from "./OnlineV2VaultStrip";
 /**
  * Shared OV2 game frame: compact HUD controls + centered title/subtitle + flex game body + reserved ad slot.
  * Info/Menu overlays are scoped to the game body so the shell chrome stays reachable.
+ *
+ * `chromePreset="ov2_board"` — Chess / Checkers: single-row system HUD, tighter vertical rhythm, default zinc shell.
+ *
+ * Design note (Backgammon — not implemented here): same HUD + button + spacing rules as ov2_board; board identity =
+ * rich walnut/mahogany, lacquered points with soft gradients, felt-like center; reuse Checkers-style premium discs;
+ * dice clean/glossy minimal; doubling cube sharp with subtle shadow; bar/bear-off integrated into board plane; palette
+ * warmer than Checkers, “elite table” without neon.
  */
 export default function OnlineV2GamePageShell({
   title,
@@ -30,6 +37,7 @@ export default function OnlineV2GamePageShell({
    * `cc_live_table`: compact header, darker frame, more viewport for the table body.
    * `cc_flat`: same layout as `cc_live_table` + solid bg, no header rule, subtle ad (Community Cards).
    * `c21_flat`: solid page bg, no header rule, subtle reserved-ad strip (21 Challenge only).
+   * `ov2_board`: Chess / Checkers — one-row HUD (Hub · vault · title · Info · Menu), tighter gaps, premium system bar.
    */
   chromePreset = "default",
 }) {
@@ -61,6 +69,8 @@ export default function OnlineV2GamePageShell({
   const isCcFlat = chromePreset === "cc_flat";
   const useCcCompactLayout = isCcLiveTable || isCcFlat;
   const isC21Flat = chromePreset === "c21_flat";
+  const isOv2Board = chromePreset === "ov2_board";
+  const useBoardHudRow = useCcCompactLayout || isOv2Board;
 
   const mainHeightClass = useAppViewportHeight
     ? "h-[var(--app-100vh,100svh)] max-h-[var(--app-100vh,100svh)] min-h-0 overscroll-y-contain"
@@ -79,33 +89,43 @@ export default function OnlineV2GamePageShell({
               : "bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950"
         }`}
         style={{
-          paddingTop: useCcCompactLayout ? "max(4px, env(safe-area-inset-top))" : "max(8px, env(safe-area-inset-top))",
+          paddingTop: useCcCompactLayout
+            ? "max(4px, env(safe-area-inset-top))"
+            : isOv2Board
+              ? "max(6px, env(safe-area-inset-top))"
+              : "max(8px, env(safe-area-inset-top))",
           paddingBottom: useCcCompactLayout
             ? "max(4px, env(safe-area-inset-bottom))"
-            : "max(8px, env(safe-area-inset-bottom))",
+            : isOv2Board
+              ? "max(6px, env(safe-area-inset-bottom))"
+              : "max(8px, env(safe-area-inset-bottom))",
         }}
       >
         <div
           className={
             useCcCompactLayout
               ? "mx-auto flex h-full w-full min-h-0 max-w-2xl flex-col gap-1 overflow-hidden px-2 md:max-w-5xl md:gap-1 md:px-3 lg:max-w-6xl lg:gap-1.5 lg:px-5 xl:max-w-7xl xl:px-7 2xl:max-w-7xl"
-              : "mx-auto flex h-full w-full min-h-0 max-w-2xl flex-col gap-2 px-2 md:max-w-4xl md:gap-2 md:px-3 lg:max-w-5xl lg:gap-2.5 lg:px-5 xl:max-w-6xl xl:px-7 2xl:max-w-7xl"
+              : isOv2Board
+                ? "mx-auto flex h-full w-full min-h-0 max-w-2xl flex-col gap-1.5 overflow-hidden px-2 md:max-w-5xl md:gap-2 md:px-3 lg:max-w-6xl lg:gap-2 lg:px-5 xl:max-w-7xl xl:px-7 2xl:max-w-7xl"
+                : "mx-auto flex h-full w-full min-h-0 max-w-2xl flex-col gap-2 px-2 md:max-w-4xl md:gap-2 md:px-3 lg:max-w-5xl lg:gap-2.5 lg:px-5 xl:max-w-6xl xl:px-7 2xl:max-w-7xl"
           }
         >
           <header
             className={`relative shrink-0 ${
-              isCcLiveTable
-                ? "border-b border-white/[0.04] pb-1 pt-0.5"
-                : isCcFlat
-                  ? "pb-1 pt-0.5"
-                  : isC21Flat
-                    ? "pb-0.5 pt-1 md:pb-0.5"
-                    : "border-b border-white/[0.06] pb-0.5 pt-1 md:pb-0.5"
+              isOv2Board
+                ? "border-b border-white/[0.09] bg-zinc-950/35 pb-1.5 pt-1 shadow-[0_1px_0_rgba(0,0,0,0.35)] sm:pb-2 sm:pt-1.5"
+                : isCcLiveTable
+                  ? "border-b border-white/[0.04] pb-1 pt-0.5"
+                  : isCcFlat
+                    ? "pb-1 pt-0.5"
+                    : isC21Flat
+                      ? "pb-0.5 pt-1 md:pb-0.5"
+                      : "border-b border-white/[0.06] pb-0.5 pt-1 md:pb-0.5"
             }`}
           >
-            {useCcCompactLayout ? (
+            {useBoardHudRow ? (
               <>
-                <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-2 ${isOv2Board ? "min-h-[2rem] sm:min-h-[2.25rem]" : ""}`}>
                   <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
                     <Link href="/online-v2" className={OV2_HUD_CHROME_BTN}>
                       Hub
@@ -113,8 +133,14 @@ export default function OnlineV2GamePageShell({
                     <OnlineV2VaultStrip compact />
                   </div>
                   <div className="min-w-0 flex-1 px-1 text-center">
-                    <h1 className="truncate text-[11px] font-semibold leading-tight tracking-wide text-zinc-500 sm:text-xs">
-                      <span className="text-zinc-200">{title}</span>
+                    <h1
+                      className={`truncate font-semibold leading-tight tracking-wide ${
+                        isOv2Board
+                          ? "text-[12px] text-zinc-500 sm:text-[13px]"
+                          : "text-[11px] text-zinc-500 sm:text-xs"
+                      }`}
+                    >
+                      <span className={isOv2Board ? "text-zinc-50" : "text-zinc-200"}>{title}</span>
                       {shouldRenderSubtitle ? (
                         <span className="font-normal text-zinc-500"> · {subtitleText}</span>
                       ) : null}

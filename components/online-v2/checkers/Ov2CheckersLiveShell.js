@@ -354,7 +354,7 @@ export default function Ov2CheckersLiveShell() {
 
   if (!roomId) {
     return (
-      <OnlineV2GamePageShell title="Checkers" showSubtitle={false} infoPanel={null}>
+      <OnlineV2GamePageShell title="Checkers" showSubtitle={false} infoPanel={null} chromePreset="ov2_board">
         <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-sm text-zinc-400">
           {router.isReady ? "Opening rooms…" : "Loading…"}
         </div>
@@ -366,45 +366,57 @@ export default function Ov2CheckersLiveShell() {
     <OnlineV2GamePageShell
       title="Checkers"
       showSubtitle={false}
+      chromePreset="ov2_board"
       infoPanel={
         <>
-          <div className="space-y-2 text-[11px] leading-snug text-zinc-300">
-            <section>
-              <p className="font-semibold text-zinc-100">Rules</p>
-              <p className="mt-0.5">
+          <div className="space-y-0 text-[11px] leading-relaxed text-zinc-400">
+            <section className="border-b border-white/[0.05] py-2.5 first:pt-0 last:border-b-0 last:pb-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Rules</p>
+              <p className="mt-1.5 text-zinc-400/95">
                 8×8 on dark squares, forced captures, multi-jump chains on one turn, flying kings. First move branch locks the
                 chain until the turn completes. Server is authoritative.
               </p>
             </section>
-            <section>
-              <p className="font-semibold text-zinc-100">Turns</p>
-              <p className="mt-0.5">Tap your piece, then a legal destination. The move submits immediately — no undo.</p>
+            <section className="border-b border-white/[0.05] py-2.5 last:border-b-0 last:pb-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Turns</p>
+              <p className="mt-1.5 text-zinc-400/95">Tap your piece, then a legal destination. The move submits immediately — no undo.</p>
             </section>
-            <section>
-              <p className="font-semibold text-zinc-100">After the result</p>
-              <p className="mt-0.5">
+            <section className="py-2.5 last:pb-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">After the result</p>
+              <p className="mt-1.5 text-zinc-400/95">
                 Settlement runs automatically. Rematch, then host starts the next match and players re-commit stakes in the lobby.
               </p>
             </section>
           </div>
-          <p className="mt-2 text-[11px] text-zinc-500">
-            <Link href="/online-v2/rooms" className="text-sky-300 underline">
+          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-white/[0.06] pt-3 text-[11px] text-zinc-500">
+            <Link
+              href="/online-v2/rooms"
+              className="font-medium text-sky-300/90 underline decoration-sky-500/30 underline-offset-2 transition hover:text-sky-200"
+            >
               Lobby
             </Link>
-            {" · "}
-            <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
+            <span className="text-zinc-600" aria-hidden>
+              ·
+            </span>
+            <button
+              type="button"
+              className="font-medium text-sky-300/90 underline decoration-sky-500/30 underline-offset-2 transition hover:text-sky-200"
+              onClick={() => void reloadContext()}
+            >
               Refresh
             </button>
-            {" · "}
+            <span className="text-zinc-600" aria-hidden>
+              ·
+            </span>
             <button
               type="button"
               disabled={leaveBusy || !participantId}
-              className="text-sky-300 underline disabled:opacity-45"
+              className="font-medium text-sky-300/90 underline decoration-sky-500/30 underline-offset-2 transition hover:text-sky-200 disabled:opacity-45"
               onClick={() => void onLeaveTable()}
             >
               {leaveBusy ? "Leaving…" : "Leave table"}
             </button>
-            {leaveErr ? <span className="ml-1 text-red-300">{leaveErr}</span> : null}
+            {leaveErr ? <span className="w-full text-[10px] text-red-300/95">{leaveErr}</span> : null}
           </p>
         </>
       }
@@ -421,32 +433,32 @@ export default function Ov2CheckersLiveShell() {
       ) : (
         <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
           {showStakePhaseAfterRematchHint ? (
-            <div className="flex shrink-0 flex-col gap-1 border-b border-amber-500/25 bg-amber-950/20 px-2 py-1.5 sm:gap-1.5 sm:py-2">
-              <p className="text-[10px] leading-snug text-amber-100/95 sm:text-[11px]">
-                <strong className="font-semibold">Next round:</strong> commit entry again in the room lobby. When the room is
-                active, the host can open Checkers here.
+            <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1.5 border-b border-amber-500/20 bg-gradient-to-r from-amber-950/35 to-amber-950/10 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:min-h-[3.5rem] sm:py-2">
+              <p className="text-[10px] leading-snug text-amber-100/90 sm:text-[11px]">
+                <span className="font-semibold text-amber-200/95">Next round:</span> commit entry again in the room lobby. When
+                the room is active, the host can open Checkers here.
               </p>
               <Link
                 href="/online-v2/rooms"
-                className="inline-flex w-fit items-center rounded-md border border-amber-400/50 bg-amber-900/35 px-2.5 py-1 text-[10px] font-semibold text-amber-50 hover:bg-amber-900/50 sm:text-xs"
+                className="inline-flex w-fit items-center rounded-lg border border-amber-500/30 bg-gradient-to-b from-amber-900/40 to-amber-950/70 px-2.5 py-1 text-[10px] font-semibold text-amber-50/95 shadow-sm transition hover:from-amber-900/55 sm:text-xs"
               >
                 Open room lobby
               </Link>
             </div>
           ) : null}
           {canShellHostOpen ? (
-            <div className="flex shrink-0 flex-col gap-0.5 border-b border-white/[0.08] py-1">
+            <div className="flex min-h-[3rem] shrink-0 flex-col justify-center gap-1 border-b border-white/[0.06] py-1">
               <button
                 type="button"
                 disabled={openBusy || Boolean(shellOpenDisabledReason)}
                 title={shellOpenDisabledReason || undefined}
                 onClick={() => void onShellOpen()}
-                className="rounded-md border border-emerald-500/40 bg-emerald-950/40 py-1.5 text-[10px] font-bold text-emerald-100 disabled:opacity-40 sm:text-xs"
+                className="rounded-lg border border-emerald-500/20 bg-gradient-to-b from-emerald-950/75 to-emerald-950 py-1.5 text-[10px] font-semibold text-emerald-100/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-2px_4px_rgba(0,0,0,0.35)] transition active:scale-[0.98] disabled:opacity-40 sm:text-xs"
               >
                 {openBusy ? "Opening…" : "Open match (host)"}
               </button>
-              {shellOpenDisabledReason ? <p className="text-[10px] text-zinc-500">{shellOpenDisabledReason}</p> : null}
-              {openErr ? <p className="text-[10px] text-red-300">{openErr}</p> : null}
+              {shellOpenDisabledReason ? <p className="min-h-[1rem] text-[10px] text-zinc-500">{shellOpenDisabledReason}</p> : null}
+              {openErr ? <p className="text-[10px] text-red-300/95">{openErr}</p> : null}
             </div>
           ) : null}
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

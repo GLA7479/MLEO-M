@@ -16,6 +16,17 @@ import { useOv2CheckersSession } from "../../../hooks/useOv2CheckersSession";
 
 const finishDismissStorageKey = sid => `ov2_ck_finish_dismiss_${sid}`;
 
+const BTN_PRIMARY =
+  "rounded-lg border border-emerald-500/20 bg-gradient-to-b from-emerald-950/70 to-emerald-950 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-100/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-2px_5px_rgba(0,0,0,0.38)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+const BTN_SECONDARY =
+  "rounded-lg border border-zinc-500/20 bg-gradient-to-b from-zinc-800/55 to-zinc-950 px-2.5 py-1.5 text-[11px] font-medium text-zinc-200/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-2px_4px_rgba(0,0,0,0.35)] transition-[transform,opacity] active:scale-[0.98]";
+const BTN_ACCENT =
+  "rounded-lg border border-sky-500/20 bg-gradient-to-b from-sky-950/65 to-sky-950 px-2.5 py-1.5 text-[11px] font-semibold text-sky-100/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-2px_5px_rgba(0,0,0,0.35)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+const BTN_DANGER =
+  "w-full rounded-lg border border-rose-950/45 bg-gradient-to-b from-[#3a1519] to-[#160809] py-2 text-[11px] font-semibold text-rose-100/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-2px_6px_rgba(0,0,0,0.45)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+const BTN_GHOST =
+  "w-full rounded-lg border border-white/[0.1] bg-zinc-900/40 py-2 text-xs font-semibold text-zinc-100/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-2px_5px_rgba(0,0,0,0.35)] transition-[transform,opacity] active:scale-[0.98]";
+
 function pieceLabel(p) {
   if (p === 1) return "b";
   if (p === 2) return "BK";
@@ -254,28 +265,14 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
 
   const finishedActions = (
     <div className="flex flex-wrap gap-2">
-      <button
-        type="button"
-        disabled={rematchBusy}
-        onClick={() => void onRematch()}
-        className="rounded-md border border-emerald-500/40 bg-emerald-950/40 px-2 py-1.5 text-[11px] font-semibold text-emerald-100 disabled:opacity-45"
-      >
+      <button type="button" disabled={rematchBusy} onClick={() => void onRematch()} className={BTN_PRIMARY}>
         {rematchBusy ? "…" : "Rematch"}
       </button>
-      <button
-        type="button"
-        onClick={() => void cancelRematch()}
-        className="rounded-md border border-zinc-600 bg-zinc-800/50 px-2 py-1.5 text-[11px] text-zinc-200"
-      >
+      <button type="button" onClick={() => void cancelRematch()} className={BTN_SECONDARY}>
         Cancel rematch
       </button>
       {isHost ? (
-        <button
-          type="button"
-          disabled={startNextBusy}
-          onClick={() => void onStartNext()}
-          className="rounded-md border border-sky-500/40 bg-sky-950/40 px-2 py-1.5 text-[11px] font-semibold text-sky-100 disabled:opacity-45"
-        >
+        <button type="button" disabled={startNextBusy} onClick={() => void onStartNext()} className={BTN_ACCENT}>
           {startNextBusy ? "…" : "Start next (host)"}
         </button>
       ) : null}
@@ -283,112 +280,173 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
   );
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-1 pb-2 sm:gap-3 sm:px-2">
+    <div className="relative flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
       <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
-          <div className="tabular-nums">
-            {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
-              <span className={vm.turnSeat === vm.mySeat ? "text-amber-200" : "text-zinc-500"}>
-                Turn clock ~{vm.turnTimeLeftSec}s
+        <div className="rounded-lg border border-white/[0.07] bg-zinc-950/45 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:py-1.5">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[11px] sm:text-[12px]">
+            <div
+              className={`flex min-h-[1.625rem] items-center rounded-md border px-2.5 py-1 tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ${
+                vm.phase === "playing" && vm.turnSeat === vm.mySeat
+                  ? "border-amber-400/22 bg-amber-950/35 text-amber-50/95"
+                  : "border-white/[0.07] bg-zinc-900/50 text-zinc-400"
+              }`}
+            >
+              {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
+                <span className="tracking-wide">
+                  <span className="text-[10px] font-medium uppercase text-zinc-500 sm:text-[10px]">Turn</span>{" "}
+                  <span className="text-[12px] font-semibold text-zinc-100 sm:text-[13px]">~{vm.turnTimeLeftSec}s</span>
+                </span>
+              ) : (
+                <span className="text-zinc-500">—</span>
+              )}
+            </div>
+            {vaultClaimBusy ? (
+              <span className="rounded-md border border-sky-500/18 bg-sky-950/35 px-2 py-0.5 text-[10px] font-medium text-sky-100/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                Settlement…
               </span>
-            ) : (
-              <span>—</span>
-            )}
+            ) : null}
           </div>
-          {vaultClaimBusy ? <span className="text-sky-300">Settlement…</span> : null}
         </div>
         <div className="flex min-h-[2.5rem] flex-col justify-center text-[11px] leading-snug">
           {err ? (
-            <p className="text-red-300">
-              {err}
-              <button type="button" className="ml-2 underline decoration-red-400/80" onClick={() => setErr("")}>
-                Dismiss
-              </button>
-            </p>
-          ) : null}
+            <div className="rounded-md border border-red-500/20 bg-red-950/20 px-2 py-1.5 text-red-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <p className="pr-1">
+                {err}{" "}
+                <button
+                  type="button"
+                  className="ml-1 inline align-baseline text-[10px] font-medium text-red-300/90 underline decoration-red-400/40 underline-offset-2 transition hover:text-red-200"
+                  onClick={() => setErr("")}
+                >
+                  Dismiss
+                </button>
+              </p>
+            </div>
+          ) : (
+            <div className="min-h-[2.5rem]" aria-hidden="true" />
+          )}
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden py-0.5">
         <div
-          className="grid aspect-square w-full max-w-[min(100%,420px)] gap-0 rounded-md border border-[#2a1810] p-1 shadow-inner sm:max-w-[min(100%,520px)]"
+          className="w-full max-w-[min(100%,448px)] rounded-[11px] p-[2px] shadow-[0_20px_56px_rgba(0,0,0,0.58),0_0_0_1px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.05)] sm:max-w-[min(100%,548px)]"
           style={{
-            background: "linear-gradient(145deg,#1c1410,#0d0907)",
-            gridTemplateColumns: "repeat(8, 1fr)",
-            gridTemplateRows: "repeat(8, 1fr)",
+            background: "linear-gradient(155deg, #6b4530 0%, #3d2418 45%, #5a3828 100%)",
           }}
         >
-          {Array.from({ length: 64 }, (_, viewPos) => {
-            const r = Math.floor(viewPos / 8);
-            const c = viewPos % 8;
-            const dark = (r + c) % 2 === 1;
-            const serverIdx = mySeat != null ? ov2CheckersViewToServerIdx(viewPos, mySeat) : viewPos;
-            const p = cells[serverIdx] ?? 0;
-            const sel = selViewIdx === viewPos;
-            const leg = legalTosViewSet.has(viewPos);
-            const mustChain = chainAt != null && serverIdx === chainAt;
-            const forcedCapHint = !mustChain && forcedMenCaptureHintViewSet.has(viewPos);
-            const ringFocus =
-              mustChain
-                ? "z-[1] ring-2 ring-amber-400/90 ring-inset"
-                : forcedCapHint
-                  ? "z-[1] ring-2 ring-orange-400/90 ring-inset shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
-                  : sel
-                    ? "z-[1] ring-2 ring-sky-400 ring-inset"
-                    : leg
-                      ? "z-[1] ring-2 ring-emerald-500/80 ring-inset"
+          <div
+            className="relative overflow-hidden rounded-[9px] p-0.5 shadow-[inset_0_2px_14px_rgba(0,0,0,0.55),inset_0_0_0_1px_rgba(0,0,0,0.25)]"
+            style={{
+              background: "linear-gradient(168deg, #1a100c 0%, #0c0806 55%, #120b08 100%)",
+            }}
+          >
+            <div
+              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_28px_rgba(0,0,0,0.45),inset_0_0_48px_rgba(0,0,0,0.14)]"
+              style={{
+                gridTemplateColumns: "repeat(8, 1fr)",
+                gridTemplateRows: "repeat(8, 1fr)",
+              }}
+            >
+              {Array.from({ length: 64 }, (_, viewPos) => {
+                const r = Math.floor(viewPos / 8);
+                const c = viewPos % 8;
+                const dark = (r + c) % 2 === 1;
+                const serverIdx = mySeat != null ? ov2CheckersViewToServerIdx(viewPos, mySeat) : viewPos;
+                const p = cells[serverIdx] ?? 0;
+                const sel = selViewIdx === viewPos;
+                const leg = legalTosViewSet.has(viewPos);
+                const mustChain = chainAt != null && serverIdx === chainAt;
+                const forcedCapHint = !mustChain && forcedMenCaptureHintViewSet.has(viewPos);
+                const showLegalDot = leg && !sel && !mustChain && !forcedCapHint;
+                const hierarchyClass = mustChain
+                  ? "z-[2] shadow-[inset_0_0_0_2px_rgba(251,191,36,0.55),inset_0_0_12px_rgba(251,191,36,0.08)]"
+                  : forcedCapHint
+                    ? "z-[1] shadow-[inset_0_0_0_1px_rgba(234,179,8,0.4)]"
+                    : sel
+                      ? "z-[1] shadow-[inset_0_0_0_2px_rgba(125,211,252,0.38)]"
                       : "";
-            return (
-              <button
-                key={viewPos}
-                type="button"
-                disabled={vm.readOnly || busy}
-                onClick={() => void onCellClick(viewPos)}
-                className={`relative flex min-h-0 min-w-0 items-center justify-center outline-none transition-[box-shadow] disabled:opacity-50 ${
-                  dark
-                    ? "bg-gradient-to-br from-[#3d2918] to-[#1e120c]"
-                    : "bg-gradient-to-br from-[#c4a574] to-[#8a6a3e]"
-                } ${ringFocus}`}
-                style={{ WebkitTapHighlightColor: "transparent" }}
-              >
-                {p ? (
-                  <span
-                    className={`flex h-[55%] w-[55%] max-h-8 max-w-8 items-center justify-center rounded-full border border-black/40 text-[9px] font-bold shadow-md sm:h-[58%] sm:w-[58%] sm:text-[10px] ${
-                      p === 1 || p === 2
-                        ? "bg-gradient-to-b from-zinc-600 to-zinc-900 text-zinc-100"
-                        : "bg-gradient-to-b from-stone-100 to-stone-400 text-stone-900"
-                    }`}
+                const baseSq = dark
+                  ? "bg-[#1f0f08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-2px_0_rgba(0,0,0,0.4)]"
+                  : "bg-[#e2a968] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),inset_0_-1px_0_rgba(0,0,0,0.1)]";
+                const isDark = p === 1 || p === 2;
+                const isKing = p === 2 || p === 4;
+                return (
+                  <button
+                    key={viewPos}
+                    type="button"
+                    disabled={vm.readOnly || busy}
+                    onClick={() => void onCellClick(viewPos)}
+                    className={`relative flex min-h-0 min-w-0 items-center justify-center outline-none transition-[box-shadow,opacity] disabled:opacity-50 ${baseSq} ${hierarchyClass}`}
+                    style={{ WebkitTapHighlightColor: "transparent" }}
                   >
-                    {pieceLabel(p)}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
+                    {showLegalDot ? (
+                      <span
+                        className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-200/32 shadow-[0_1px_3px_rgba(0,0,0,0.35)] ring-1 ring-emerald-400/18"
+                        aria-hidden
+                      />
+                    ) : null}
+                    {p ? (
+                      <span
+                        className={`relative z-[1] flex h-[55%] w-[55%] max-h-8 max-w-8 items-center justify-center rounded-full text-[8px] font-bold tracking-tight sm:h-[58%] sm:w-[58%] sm:text-[9px] ${
+                          isKing ? "ring-1 ring-black/25" : "ring-1 ring-black/20"
+                        }`}
+                        style={{
+                          background: isDark
+                            ? "radial-gradient(circle at 32% 28%, #6a6a72 0%, #35353a 42%, #121214 88%)"
+                            : "radial-gradient(circle at 32% 28%, #fffdf7 0%, #e8dcc8 45%, #c4b29a 88%)",
+                          boxShadow:
+                            "0 2px 4px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -3px 6px rgba(0,0,0,0.25)",
+                          color: isDark ? "rgba(245,240,232,0.92)" : "rgba(28,24,20,0.9)",
+                          textShadow: isDark
+                            ? "0 1px 1px rgba(0,0,0,0.6)"
+                            : "0 1px 0 rgba(255,255,255,0.35)",
+                        }}
+                      >
+                        {isKing ? (
+                          <span
+                            className="text-[clamp(9px,2.5vw,11px)] font-normal leading-none"
+                            style={{ opacity: 0.88 }}
+                            aria-hidden
+                          >
+                            ♔
+                          </span>
+                        ) : (
+                          pieceLabel(p)
+                        )}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
       {showResultModal ? (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/55 p-3 backdrop-blur-[2px]">
-          <div className="w-full max-w-sm rounded-xl border border-white/20 bg-zinc-900/95 p-4 text-center shadow-2xl sm:max-w-md">
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 p-3 backdrop-blur-[3px]">
+          <div className="w-full max-w-sm rounded-2xl border border-white/[0.12] bg-gradient-to-b from-zinc-900/98 to-zinc-950/98 p-5 text-center shadow-[0_24px_64px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-10px_24px_rgba(0,0,0,0.28)] sm:max-w-md">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Match result</p>
             <p
-              className={`text-lg font-bold uppercase tracking-wide sm:text-xl ${
-                didIWin ? "text-emerald-300" : vm.mySeat != null ? "text-red-300" : "text-white"
+              className={`mt-1.5 text-lg font-semibold tracking-tight sm:text-xl ${
+                didIWin ? "text-emerald-200/92" : vm.mySeat != null ? "text-rose-300/90" : "text-zinc-50"
               }`}
             >
               {didIWin ? "You win" : vm.mySeat != null ? "You lose" : "Match over"}
             </p>
             {vm.winnerSeat != null ? (
-              <p className="mt-1 text-xs text-zinc-300">
-                Winner: <span className="font-semibold text-zinc-100">{winnerDisplayName}</span>
+              <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                Winner: <span className="font-semibold text-zinc-100/95">{winnerDisplayName}</span>
               </p>
             ) : (
-              <p className="mt-1 text-xs text-zinc-400">Match complete</p>
+              <p className="mt-2 text-xs text-zinc-500">Match complete</p>
             )}
-            <div className="mt-4 space-y-2 text-left text-[11px] text-zinc-200">{finishedActions}</div>
+            <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-white/[0.07] pt-3.5 text-left text-[11px] text-zinc-200">
+              {finishedActions}
+            </div>
             <button
               type="button"
-              className="mt-4 w-full rounded-md border border-white/20 bg-white/10 py-2 text-xs font-semibold text-zinc-100"
+              className={`${BTN_GHOST} mt-3.5`}
               onClick={() => {
                 try {
                   window.sessionStorage.setItem(finishDismissStorageKey(finishSessionId), "1");
@@ -405,27 +463,23 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
       ) : null}
 
       {finished && !showResultModal ? (
-        <div className="shrink-0 space-y-2 rounded-lg border border-white/10 bg-zinc-900/50 p-2 text-[11px] text-zinc-200">
-          <p className="font-semibold text-zinc-100">Match finished</p>
+        <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.11] bg-gradient-to-b from-zinc-900/75 to-zinc-950 p-3 text-[11px] text-zinc-200/95 shadow-[0_10px_28px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05),inset_0_-8px_20px_rgba(0,0,0,0.25)]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Result</p>
+          <p className="mt-0.5 text-sm font-semibold text-zinc-50/95">Match finished</p>
           {vm.winnerSeat != null && vm.mySeat != null ? (
-            <p className={didIWin ? "text-emerald-300/95" : "text-red-300/95"}>
+            <p className={`mt-1 ${didIWin ? "text-emerald-300/92" : "text-rose-300/88"}`}>
               {didIWin ? "You won." : "You lost."}
             </p>
           ) : null}
-          {finishedActions}
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">{finishedActions}</div>
         </div>
       ) : null}
 
       <div className="shrink-0">
-        <button
-          type="button"
-          disabled={exitBusy || !pk}
-          onClick={() => void onExitToLobby()}
-          className="w-full rounded-md border border-red-500/35 bg-red-950/25 py-2 text-[11px] font-semibold text-red-100 disabled:opacity-45"
-        >
+        <button type="button" disabled={exitBusy || !pk} onClick={() => void onExitToLobby()} className={BTN_DANGER}>
           {exitBusy ? "Leaving…" : "Leave table"}
         </button>
-        {exitErr ? <p className="mt-1 text-[10px] text-red-300">{exitErr}</p> : null}
+        {exitErr ? <p className="mt-1 min-h-[1rem] text-[10px] text-red-300/95">{exitErr}</p> : null}
       </div>
     </div>
   );
