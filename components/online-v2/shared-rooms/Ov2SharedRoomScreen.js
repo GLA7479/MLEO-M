@@ -14,6 +14,11 @@ import {
 import { openOv2BingoSession, OV2_BINGO_PRODUCT_GAME_ID } from "../../../lib/online-v2/bingo/ov2BingoSessionAdapter";
 import { openOv2Rummy51Session, OV2_RUMMY51_PRODUCT_GAME_ID } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
 import {
+  fetchOv2BackgammonSnapshot,
+  OV2_BACKGAMMON_PRODUCT_GAME_ID,
+  requestOv2BackgammonOpenSession,
+} from "../../../lib/online-v2/backgammon/ov2BackgammonSessionAdapter";
+import {
   commitOv2RoomStake,
   fetchOv2RoomById,
   fetchOv2RoomLedgerForViewer,
@@ -105,7 +110,8 @@ export default function Ov2SharedRoomScreen({
   const isLudoRoom = room?.product_game_id === "ov2_ludo";
   const isRummy51Room = String(room?.product_game_id || "").trim() === OV2_RUMMY51_PRODUCT_GAME_ID;
   const isBingoRoom = String(room?.product_game_id || "").trim() === OV2_BINGO_PRODUCT_GAME_ID;
-  const isStakeSharedRoom = isRummy51Room || isLudoRoom || isBingoRoom;
+  const isBackgammonRoom = String(room?.product_game_id || "").trim() === OV2_BACKGAMMON_PRODUCT_GAME_ID;
+  const isStakeSharedRoom = isRummy51Room || isLudoRoom || isBingoRoom || isBackgammonRoom;
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
 
   const ledgerByParticipant = useMemo(() => {
@@ -361,6 +367,17 @@ export default function Ov2SharedRoomScreen({
           didRouteToLiveRef.current = true;
           setLaunchingLive(true);
           await router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isBackgammonRoom) {
+          const open = await requestOv2BackgammonOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-backgammon?room=${encodeURIComponent(roomId)}`);
         }
       } catch {
         /* retry on next snapshot */
@@ -377,6 +394,7 @@ export default function Ov2SharedRoomScreen({
     isLudoRoom,
     isBingoRoom,
     isRummy51Room,
+    isBackgammonRoom,
     roomId,
     router,
     // Re-run on each shared snapshot poll so a transient open failure (e.g. first tick after IN_GAME) retries.
@@ -638,7 +656,7 @@ export default function Ov2SharedRoomScreen({
     setBusy(true);
     setMsg("");
     try {
-      if (isLudoRoom || isBingoRoom) {
+      if (isLudoRoom || isBingoRoom || isBackgammonRoom) {
         const prep = await prepareSharedHostPreStartStakes();
         if (!prep.ok) {
           setMsg(prep.error);
@@ -672,6 +690,19 @@ export default function Ov2SharedRoomScreen({
         didRouteToLiveRef.current = true;
         setLaunchingLive(true);
         await router.push(`/ov2-bingo?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isBackgammonRoom) {
+        const open = await requestOv2BackgammonOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Backgammon session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-backgammon?room=${encodeURIComponent(roomId)}`);
         return;
       }
       await reload();
@@ -771,10 +802,33 @@ export default function Ov2SharedRoomScreen({
         cancelled = true;
       };
     }
+    if (isBackgammonRoom) {
+      const bgSid = room?.active_session_id || null;
+      if (bgSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-backgammon?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledBg = false;
+      void fetchOv2BackgammonSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledBg || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-backgammon?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      return () => {
+        cancelledBg = true;
+      };
+    }
   }, [
     isLudoRoom,
     isRummy51Room,
     isBingoRoom,
+    isBackgammonRoom,
     room?.status,
     room?.active_session_id,
     liveRuntimeId,
@@ -978,7 +1032,7 @@ export default function Ov2SharedRoomScreen({
         ) : null}
 
         {runtimeHandoff && !isRummy51Room ? (
-          !isLudoRoom && !isBingoRoom ? (
+          !isLudoRoom && !isBingoRoom && !isBackgammonRoom ? (
             <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
               <div className="font-bold">Runtime handoff ready</div>
               <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
@@ -987,7 +1041,7 @@ export default function Ov2SharedRoomScreen({
             </div>
           ) : null
         ) : null}
-        {sharedStatusUpper === "IN_GAME" && (isRummy51Room || isBingoRoom) && !launchingLive ? (
+        {sharedStatusUpper === "IN_GAME" && (isRummy51Room || isBingoRoom || isBackgammonRoom) && !launchingLive ? (
           <div className="mt-3 rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
             <p className="font-semibold text-teal-50">Match starting</p>
             <p className="mt-1 text-teal-200/90">
@@ -1073,7 +1127,13 @@ export default function Ov2SharedRoomScreen({
         {loading ? <p className="text-[11px] text-zinc-500">Loading room...</p> : null}
         {launchingLive ? (
           <p className="text-[11px] text-sky-300">
-            {isRummy51Room ? "Opening live Rummy 51 game..." : isBingoRoom ? "Opening live Bingo..." : "Opening live Ludo game..."}
+            {isRummy51Room
+              ? "Opening live Rummy 51 game..."
+              : isBingoRoom
+                ? "Opening live Bingo..."
+                : isBackgammonRoom
+                  ? "Opening live Backgammon..."
+                  : "Opening live Ludo game..."}
           </p>
         ) : null}
         {error ? <p className="text-[11px] text-red-300">{error}</p> : null}

@@ -55,7 +55,8 @@ export default function OnlineV2Hub() {
                   <div className="mb-3 flex items-center justify-center text-5xl leading-none md:text-6xl lg:text-7xl">🚪</div>
                   <h2 className="text-center text-base font-extrabold text-white md:text-lg lg:text-xl xl:text-2xl">Rooms & lobby</h2>
                   <p className="mx-auto mt-2 max-w-md text-center text-[11px] text-zinc-300 md:text-sm lg:text-base">
-                    Create or join a room for Ludo or Rummy 51, claim a seat, commit stake, and start from the shared room.
+                    Create or join a room for Ludo, Rummy 51, Backgammon, or Bingo — claim a seat, commit entry, and start from the
+                    shared room.
                   </p>
                   <div className="mt-auto flex flex-col gap-2 pt-6 md:pt-8">
                     <Link
