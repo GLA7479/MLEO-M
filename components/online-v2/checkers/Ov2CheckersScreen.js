@@ -1,0 +1,316 @@
+"use client";
+
+import { useRouter } from "next/router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
+import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
+import {
+  normalizeOv2CheckersCells,
+  ov2CheckersLegalTosForFrom,
+  ov2CheckersServerToViewIdx,
+  ov2CheckersViewToServerIdx,
+} from "../../../lib/online-v2/checkers/ov2CheckersClientLegality";
+import { useOv2CheckersSession } from "../../../hooks/useOv2CheckersSession";
+
+function pieceLabel(p) {
+  if (p === 1) return "b";
+  if (p === 2) return "BK";
+  if (p === 3) return "w";
+  if (p === 4) return "WK";
+  return "";
+}
+
+/**
+ * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string }, onLeaveToLobby?: () => void|Promise<void>, leaveToLobbyBusy?: boolean } | null, onSessionRefresh?: (prev: string, rpcNew?: string, opts?: { expectClearedSession?: boolean }) => Promise<unknown> }} props
+ */
+export default function Ov2CheckersScreen({ contextInput = null, onSessionRefresh }) {
+  const router = useRouter();
+  const session = useOv2CheckersSession(contextInput ?? undefined);
+  const { snapshot, vm, busy, vaultClaimBusy, err, setErr, applyStep, requestRematch, cancelRematch, startNextMatch, isHost, roomMatchSeq } =
+    session;
+  const [selViewIdx, setSelViewIdx] = useState(/** @type {number|null} */ (null));
+  const [rematchBusy, setRematchBusy] = useState(false);
+  const [startNextBusy, setStartNextBusy] = useState(false);
+  const [exitBusy, setExitBusy] = useState(false);
+  const [exitErr, setExitErr] = useState("");
+
+  const room = contextInput?.room;
+  const roomId = room?.id != null ? String(room.id) : "";
+  const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
+
+  useEffect(() => {
+    setSelViewIdx(null);
+  }, [vm.sessionId, vm.revision]);
+
+  const cells = useMemo(() => normalizeOv2CheckersCells(vm.cells), [vm.cells]);
+  const chainAt = vm.jumpChainAt;
+  const turn = vm.turnSeat != null ? Number(vm.turnSeat) : null;
+  const mySeat = vm.mySeat;
+
+  const legalTosServer = useMemo(() => {
+    if (turn == null || mySeat == null) return [];
+    const fromServer =
+      chainAt != null ? chainAt : selViewIdx != null ? ov2CheckersViewToServerIdx(selViewIdx, mySeat) : null;
+    if (fromServer == null) return [];
+    return ov2CheckersLegalTosForFrom(cells, turn, chainAt, fromServer);
+  }, [cells, turn, chainAt, mySeat, selViewIdx]);
+
+  const legalTosViewSet = useMemo(() => {
+    const s = new Set();
+    if (mySeat == null) return s;
+    for (const t of legalTosServer) {
+      s.add(ov2CheckersServerToViewIdx(t, mySeat));
+    }
+    return s;
+  }, [legalTosServer, mySeat]);
+
+  const onCellClick = useCallback(
+    async viewIdx => {
+      if (vm.readOnly || !vm.canClientMove || busy || vaultClaimBusy) return;
+      if (turn == null || mySeat == null) return;
+      const serverIdx = ov2CheckersViewToServerIdx(viewIdx, mySeat);
+      const occupant = cells[serverIdx];
+      const owner = occupant === 1 || occupant === 2 ? 0 : occupant === 3 || occupant === 4 ? 1 : -1;
+
+      if (chainAt != null) {
+        const legalContinuation = ov2CheckersLegalTosForFrom(cells, turn, chainAt, chainAt);
+        if (legalContinuation.includes(serverIdx)) {
+          setErr("");
+          const r = await applyStep(chainAt, serverIdx);
+          setSelViewIdx(null);
+          if (!r.ok) {
+            /* err already set */
+          }
+          return;
+        }
+        if (serverIdx === chainAt) {
+          setSelViewIdx(viewIdx);
+          setErr("");
+          return;
+        }
+        if (owner === turn) {
+          setErr("Continue the jump chain with the marked piece.");
+          return;
+        }
+        setErr("Illegal move.");
+        return;
+      }
+
+      if (selViewIdx == null) {
+        if (owner !== turn) {
+          setErr("Select your piece.");
+          return;
+        }
+        setSelViewIdx(viewIdx);
+        setErr("");
+        return;
+      }
+
+      if (viewIdx === selViewIdx) {
+        setSelViewIdx(null);
+        setErr("");
+        return;
+      }
+
+      const fromServer = ov2CheckersViewToServerIdx(selViewIdx, mySeat);
+      const toServer = serverIdx;
+      const r = await applyStep(fromServer, toServer);
+      setSelViewIdx(null);
+      if (!r.ok) {
+        /* err already set */
+      }
+    },
+    [vm, busy, vaultClaimBusy, turn, mySeat, chainAt, cells, selViewIdx, applyStep, setErr]
+  );
+
+  const onRematch = useCallback(async () => {
+    if (!roomId || rematchBusy) return;
+    setRematchBusy(true);
+    setErr("");
+    try {
+      const r = await requestRematch();
+      if (!r.ok) setErr(r.error || "Rematch request failed");
+    } finally {
+      setRematchBusy(false);
+    }
+  }, [roomId, rematchBusy, requestRematch, setErr]);
+
+  const onStartNext = useCallback(async () => {
+    if (!roomId || !isHost || startNextBusy) return;
+    setStartNextBusy(true);
+    setErr("");
+    try {
+      const r = await startNextMatch(roomMatchSeq);
+      if (!r.ok) {
+        setErr(r.error || "Could not start next match");
+        return;
+      }
+      if (typeof window !== "undefined") {
+        try {
+          window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_SESSION_KEY, roomId);
+        } catch {
+          /* ignore */
+        }
+      }
+      if (typeof onSessionRefresh === "function") {
+        const prev = snapshot?.sessionId != null ? String(snapshot.sessionId) : "";
+        await onSessionRefresh(prev, "", { expectClearedSession: true });
+      }
+      await router.push(`/online-v2/rooms?room=${encodeURIComponent(roomId)}`);
+    } finally {
+      setStartNextBusy(false);
+    }
+  }, [
+    roomId,
+    isHost,
+    startNextBusy,
+    startNextMatch,
+    roomMatchSeq,
+    onSessionRefresh,
+    snapshot?.sessionId,
+    router,
+    setErr,
+  ]);
+
+  const onExitToLobby = useCallback(async () => {
+    if (!roomId || !pk || exitBusy) return;
+    setExitBusy(true);
+    setExitErr("");
+    try {
+      await leaveOv2RoomWithForfeitRetry({ room, room_id: roomId, participant_key: pk });
+      if (typeof window !== "undefined") {
+        try {
+          window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
+        } catch {
+          /* ignore */
+        }
+      }
+      await router.push("/online-v2/rooms");
+    } catch (e) {
+      setExitErr(e?.message || String(e) || "Could not leave.");
+    } finally {
+      setExitBusy(false);
+    }
+  }, [roomId, pk, exitBusy, room, router]);
+
+  const finished = vm.phase === "finished";
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-1 pb-2 sm:gap-3 sm:px-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
+        <div className="tabular-nums">
+          {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
+            <span className={vm.turnSeat === vm.mySeat ? "text-amber-200" : "text-zinc-500"}>
+              Turn clock ~{vm.turnTimeLeftSec}s
+            </span>
+          ) : (
+            <span>—</span>
+          )}
+        </div>
+        {vaultClaimBusy ? <span className="text-sky-300">Settlement…</span> : null}
+      </div>
+
+      {err ? <p className="shrink-0 text-[11px] text-red-300">{err}</p> : null}
+
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden">
+        <div
+          className="grid aspect-square w-full max-w-[min(100%,420px)] gap-0 rounded-md border border-[#2a1810] p-1 shadow-inner sm:max-w-[min(100%,520px)]"
+          style={{
+            background: "linear-gradient(145deg,#1c1410,#0d0907)",
+            gridTemplateColumns: "repeat(8, 1fr)",
+            gridTemplateRows: "repeat(8, 1fr)",
+          }}
+        >
+          {Array.from({ length: 64 }, (_, viewPos) => {
+            const r = Math.floor(viewPos / 8);
+            const c = viewPos % 8;
+            const dark = (r + c) % 2 === 1;
+            const serverIdx = mySeat != null ? ov2CheckersViewToServerIdx(viewPos, mySeat) : viewPos;
+            const p = cells[serverIdx] ?? 0;
+            const sel = selViewIdx === viewPos;
+            const leg = legalTosViewSet.has(viewPos);
+            const mustChain = chainAt != null && serverIdx === chainAt;
+            return (
+              <button
+                key={viewPos}
+                type="button"
+                disabled={vm.readOnly || busy}
+                onClick={() => void onCellClick(viewPos)}
+                className={`relative flex min-h-0 min-w-0 items-center justify-center outline-none transition-[box-shadow] disabled:opacity-50 ${
+                  dark
+                    ? "bg-gradient-to-br from-[#3d2918] to-[#1e120c]"
+                    : "bg-gradient-to-br from-[#c4a574] to-[#8a6a3e]"
+                } ${sel ? "z-[1] ring-2 ring-sky-400 ring-inset" : ""} ${
+                  leg ? "z-[1] ring-2 ring-emerald-500/80 ring-inset" : ""
+                } ${mustChain ? "z-[1] ring-2 ring-amber-400/90 ring-inset" : ""}`}
+                style={{ WebkitTapHighlightColor: "transparent" }}
+              >
+                {p ? (
+                  <span
+                    className={`flex h-[55%] w-[55%] max-h-8 max-w-8 items-center justify-center rounded-full border border-black/40 text-[9px] font-bold shadow-md sm:h-[58%] sm:w-[58%] sm:text-[10px] ${
+                      p === 1 || p === 2
+                        ? "bg-gradient-to-b from-zinc-600 to-zinc-900 text-zinc-100"
+                        : "bg-gradient-to-b from-stone-100 to-stone-400 text-stone-900"
+                    }`}
+                  >
+                    {pieceLabel(p)}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {finished ? (
+        <div className="shrink-0 space-y-2 rounded-lg border border-white/10 bg-zinc-900/50 p-2 text-[11px] text-zinc-200">
+          <p className="font-semibold text-zinc-100">Match finished</p>
+          {vm.winnerSeat != null && vm.mySeat != null ? (
+            <p className="text-zinc-300">
+              {vm.winnerSeat === vm.mySeat ? "You won." : "You lost."}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={rematchBusy}
+              onClick={() => void onRematch()}
+              className="rounded-md border border-emerald-500/40 bg-emerald-950/40 px-2 py-1.5 font-semibold text-emerald-100 disabled:opacity-45"
+            >
+              {rematchBusy ? "…" : "Rematch"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void cancelRematch()}
+              className="rounded-md border border-zinc-600 bg-zinc-800/50 px-2 py-1.5 text-zinc-200"
+            >
+              Cancel rematch
+            </button>
+            {isHost ? (
+              <button
+                type="button"
+                disabled={startNextBusy}
+                onClick={() => void onStartNext()}
+                className="rounded-md border border-sky-500/40 bg-sky-950/40 px-2 py-1.5 font-semibold text-sky-100 disabled:opacity-45"
+              >
+                {startNextBusy ? "…" : "Start next (host)"}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="shrink-0">
+        <button
+          type="button"
+          disabled={exitBusy || !pk}
+          onClick={() => void onExitToLobby()}
+          className="w-full rounded-md border border-red-500/35 bg-red-950/25 py-2 text-[11px] font-semibold text-red-100 disabled:opacity-45"
+        >
+          {exitBusy ? "Leaving…" : "Leave table"}
+        </button>
+        {exitErr ? <p className="mt-1 text-[10px] text-red-300">{exitErr}</p> : null}
+      </div>
+    </div>
+  );
+}

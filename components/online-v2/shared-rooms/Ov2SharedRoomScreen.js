@@ -19,6 +19,10 @@ import {
   requestOv2BackgammonOpenSession,
 } from "../../../lib/online-v2/backgammon/ov2BackgammonSessionAdapter";
 import {
+  OV2_CHECKERS_PRODUCT_GAME_ID,
+  requestOv2CheckersOpenSession,
+} from "../../../lib/online-v2/checkers/ov2CheckersSessionAdapter";
+import {
   commitOv2RoomStake,
   fetchOv2RoomById,
   fetchOv2RoomLedgerForViewer,
@@ -111,7 +115,8 @@ export default function Ov2SharedRoomScreen({
   const isRummy51Room = String(room?.product_game_id || "").trim() === OV2_RUMMY51_PRODUCT_GAME_ID;
   const isBingoRoom = String(room?.product_game_id || "").trim() === OV2_BINGO_PRODUCT_GAME_ID;
   const isBackgammonRoom = String(room?.product_game_id || "").trim() === OV2_BACKGAMMON_PRODUCT_GAME_ID;
-  const isStakeSharedRoom = isRummy51Room || isLudoRoom || isBingoRoom || isBackgammonRoom;
+  const isCheckersRoom = String(room?.product_game_id || "").trim() === OV2_CHECKERS_PRODUCT_GAME_ID;
+  const isStakeSharedRoom = isRummy51Room || isLudoRoom || isBingoRoom || isBackgammonRoom || isCheckersRoom;
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
 
   const ledgerByParticipant = useMemo(() => {
@@ -378,6 +383,17 @@ export default function Ov2SharedRoomScreen({
           didRouteToLiveRef.current = true;
           setLaunchingLive(true);
           await router.push(`/ov2-backgammon?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isCheckersRoom) {
+          const open = await requestOv2CheckersOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-checkers?room=${encodeURIComponent(roomId)}`);
         }
       } catch {
         /* retry on next snapshot */
@@ -395,6 +411,7 @@ export default function Ov2SharedRoomScreen({
     isBingoRoom,
     isRummy51Room,
     isBackgammonRoom,
+    isCheckersRoom,
     roomId,
     router,
     // Re-run on each shared snapshot poll so a transient open failure (e.g. first tick after IN_GAME) retries.
@@ -1032,7 +1049,7 @@ export default function Ov2SharedRoomScreen({
         ) : null}
 
         {runtimeHandoff && !isRummy51Room ? (
-          !isLudoRoom && !isBingoRoom && !isBackgammonRoom ? (
+          !isLudoRoom && !isBingoRoom && !isBackgammonRoom && !isCheckersRoom ? (
             <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
               <div className="font-bold">Runtime handoff ready</div>
               <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
@@ -1041,7 +1058,7 @@ export default function Ov2SharedRoomScreen({
             </div>
           ) : null
         ) : null}
-        {sharedStatusUpper === "IN_GAME" && (isRummy51Room || isBingoRoom || isBackgammonRoom) && !launchingLive ? (
+        {sharedStatusUpper === "IN_GAME" && (isRummy51Room || isBingoRoom || isBackgammonRoom || isCheckersRoom) && !launchingLive ? (
           <div className="mt-3 rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
             <p className="font-semibold text-teal-50">Match starting</p>
             <p className="mt-1 text-teal-200/90">
@@ -1133,7 +1150,9 @@ export default function Ov2SharedRoomScreen({
                 ? "Opening live Bingo..."
                 : isBackgammonRoom
                   ? "Opening live Backgammon..."
-                  : "Opening live Ludo game..."}
+                  : isCheckersRoom
+                    ? "Opening live Checkers..."
+                    : "Opening live Ludo game..."}
           </p>
         ) : null}
         {error ? <p className="text-[11px] text-red-300">{error}</p> : null}
