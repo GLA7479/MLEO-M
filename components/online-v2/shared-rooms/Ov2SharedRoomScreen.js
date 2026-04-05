@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import {
+  applyOv2SharedStakeRefundHintFromRpc,
   claimOv2Seat,
   hostStartOv2Room,
   joinOv2Room,
@@ -259,7 +260,8 @@ export default function Ov2SharedRoomScreen({
     if (sharedStatusUpper !== "OPEN") return undefined;
     const run = async () => {
       try {
-        const r = await ov2QuickMatchAutoStartDeadline({ room_id: roomId });
+        const r = await ov2QuickMatchAutoStartDeadline({ room_id: roomId, participant_key: participantId });
+        await applyOv2SharedStakeRefundHintFromRpc(r);
         const code = String(r?.code || "");
         if (code === "CANCELLED") {
           await reload();
@@ -281,7 +283,7 @@ export default function Ov2SharedRoomScreen({
     void run();
     const id = window.setInterval(() => void run(), 2000);
     return () => window.clearInterval(id);
-  }, [roomId, isQmRoom, sharedStatusUpper, reload, refreshSharedEconomySnapshot]);
+  }, [roomId, isQmRoom, sharedStatusUpper, participantId, reload, refreshSharedEconomySnapshot]);
 
   useEffect(() => {
     if (!roomId || !isQmRoom || !myPk) return;
