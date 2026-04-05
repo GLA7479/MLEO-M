@@ -422,7 +422,7 @@ export default function Ov2BackgammonLiveShell() {
       ) : (
         <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
           {showStakePhaseAfterRematchHint ? (
-            <div className="flex shrink-0 flex-col gap-1.5 border-b border-amber-500/25 bg-amber-950/20 px-2 py-2">
+            <div className="flex shrink-0 flex-col gap-1 border-b border-amber-500/25 bg-amber-950/20 px-2 py-1.5 sm:gap-1.5 sm:py-2">
               <p className="text-[10px] leading-snug text-amber-100/95 sm:text-[11px]">
                 <strong className="font-semibold">Next round:</strong> commit entry again in the room lobby. When the room is
                 active, the host can open Backgammon here.
@@ -436,7 +436,7 @@ export default function Ov2BackgammonLiveShell() {
             </div>
           ) : null}
           {canShellHostOpenBg ? (
-            <div className="flex shrink-0 flex-col gap-1 border-b border-white/[0.08] pb-1 pt-1">
+            <div className="flex shrink-0 flex-col gap-0.5 border-b border-white/[0.08] py-1">
               <button
                 type="button"
                 disabled={openBusy || Boolean(shellOpenDisabledReason)}
@@ -450,7 +450,7 @@ export default function Ov2BackgammonLiveShell() {
               {openErr ? <p className="text-[10px] text-red-300">{openErr}</p> : null}
             </div>
           ) : null}
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <Ov2BackgammonScreen
               key={room?.active_session_id ? String(room.active_session_id) : "ov2-bg-no-session"}
               contextInput={contextInput}
