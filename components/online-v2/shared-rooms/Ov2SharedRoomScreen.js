@@ -199,14 +199,14 @@ export default function Ov2SharedRoomScreen({
     return () => window.clearInterval(id);
   }, [isBingoRoom, sharedStatusUpper, launchingLive, roomId, bingoHandoffResetTick]);
 
-  const sharedPreStartStrict = useMemo(
-    () =>
-      isStakeSharedRoom &&
-      sharedStatusUpper === "OPEN" &&
-      canonicalStatusUpper === "OPEN" &&
-      Boolean(canonicalRoom),
-    [isStakeSharedRoom, sharedStatusUpper, canonicalStatusUpper, canonicalRoom]
-  );
+  const sharedPreStartStrict = useMemo(() => {
+    if (!isStakeSharedRoom || sharedStatusUpper !== "OPEN") return false;
+    // QM: shared snapshot is OPEN while canonical row can lag (ledger RPC / poll). Do not block pre-start UI on canonical alone.
+    if (isQmRoom) {
+      return canonicalRoom == null || canonicalStatusUpper === "OPEN" || canonicalStatusUpper === "";
+    }
+    return canonicalStatusUpper === "OPEN" && Boolean(canonicalRoom);
+  }, [isStakeSharedRoom, sharedStatusUpper, canonicalStatusUpper, canonicalRoom, isQmRoom]);
 
   const myPk = String(participantId || "").trim();
   const myWalletCommitted = useMemo(() => {
@@ -263,8 +263,18 @@ export default function Ov2SharedRoomScreen({
   }, [roomId, isQmRoom, sharedStatusUpper, canonicalStatusUpper, reload, refreshSharedEconomySnapshot]);
 
   useEffect(() => {
-    if (!roomId || !isQmRoom || !isHost || !myPk) return;
-    if (lifecyclePhase(canonicalRoom) !== "lobby") return;
+    if (!roomId || !isQmRoom || !myPk) return;
+    const canonHostPk = String(canonicalRoom?.host_participant_key || "").trim();
+    const createdByPk = String(room?.created_by_participant_key || "").trim();
+    const isQmIntentDriver =
+      isHost ||
+      (canonHostPk.length > 0 && canonHostPk === myPk) ||
+      (canonHostPk.length === 0 && createdByPk.length > 0 && createdByPk === myPk);
+    if (!isQmIntentDriver) return;
+    if (canonicalRoom != null) {
+      const phase = lifecyclePhase(canonicalRoom);
+      if (phase !== "lobby" && phase !== "") return;
+    }
     const minP = Math.max(2, Math.floor(Number(room?.min_players) || 2));
     const seatedN = members.filter(m => m.seat_index != null && m.seat_index !== "").length;
     if (seatedN < minP) return;
@@ -272,14 +282,27 @@ export default function Ov2SharedRoomScreen({
     qmHostIntentTriedRef.current = true;
     void (async () => {
       try {
-        await startOv2RoomIntent({ room_id: roomId, host_participant_key: myPk });
+        const hostPkForRpc =
+          canonHostPk.length > 0 ? canonHostPk : createdByPk.length > 0 ? createdByPk : myPk;
+        await startOv2RoomIntent({ room_id: roomId, host_participant_key: hostPkForRpc });
         await refreshSharedEconomySnapshot();
         await reload();
       } catch {
         qmHostIntentTriedRef.current = false;
       }
     })();
-  }, [roomId, isQmRoom, isHost, myPk, canonicalRoom, members, room?.min_players, reload, refreshSharedEconomySnapshot]);
+  }, [
+    roomId,
+    isQmRoom,
+    isHost,
+    myPk,
+    canonicalRoom,
+    room?.created_by_participant_key,
+    members,
+    room?.min_players,
+    reload,
+    refreshSharedEconomySnapshot,
+  ]);
 
   useEffect(() => {
     if (sharedStatusUpper !== "IN_GAME") {
