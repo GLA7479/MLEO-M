@@ -6,11 +6,15 @@ import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import {
   normalizeOv2CheckersCells,
+  ov2CheckersForcedMenCaptureFromIndices,
   ov2CheckersLegalTosForFrom,
   ov2CheckersServerToViewIdx,
+  ov2CheckersSideHasMenCapture,
   ov2CheckersViewToServerIdx,
 } from "../../../lib/online-v2/checkers/ov2CheckersClientLegality";
 import { useOv2CheckersSession } from "../../../hooks/useOv2CheckersSession";
+
+const finishDismissStorageKey = sid => `ov2_ck_finish_dismiss_${sid}`;
 
 function pieceLabel(p) {
   if (p === 1) return "b";
@@ -33,14 +37,20 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
   const [startNextBusy, setStartNextBusy] = useState(false);
   const [exitBusy, setExitBusy] = useState(false);
   const [exitErr, setExitErr] = useState("");
+  const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
 
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
+  const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
 
   useEffect(() => {
     setSelViewIdx(null);
   }, [vm.sessionId, vm.revision]);
+
+  useEffect(() => {
+    setFinishModalDismissedSessionId("");
+  }, [vm.sessionId]);
 
   const cells = useMemo(() => normalizeOv2CheckersCells(vm.cells), [vm.cells]);
   const chainAt = vm.jumpChainAt;
@@ -63,6 +73,22 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
     }
     return s;
   }, [legalTosServer, mySeat]);
+
+  const forcedMenCapture = useMemo(() => {
+    if (turn == null) return false;
+    return ov2CheckersSideHasMenCapture(cells, turn);
+  }, [cells, turn]);
+
+  const forcedMenCaptureHintViewSet = useMemo(() => {
+    const s = new Set();
+    if (mySeat == null || turn == null || chainAt != null) return s;
+    if (!vm.canClientMove || turn !== mySeat) return s;
+    if (!forcedMenCapture) return s;
+    for (const i of ov2CheckersForcedMenCaptureFromIndices(cells, turn)) {
+      s.add(ov2CheckersServerToViewIdx(i, mySeat));
+    }
+    return s;
+  }, [cells, turn, mySeat, chainAt, vm.canClientMove, forcedMenCapture]);
 
   const onCellClick = useCallback(
     async viewIdx => {
@@ -101,6 +127,11 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
           setErr("Select your piece.");
           return;
         }
+        const fromLegals = ov2CheckersLegalTosForFrom(cells, turn, chainAt, serverIdx);
+        if (fromLegals.length === 0) {
+          setErr("No legal moves from that piece.");
+          return;
+        }
         setSelViewIdx(viewIdx);
         setErr("");
         return;
@@ -114,6 +145,11 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
 
       const fromServer = ov2CheckersViewToServerIdx(selViewIdx, mySeat);
       const toServer = serverIdx;
+      const legals = ov2CheckersLegalTosForFrom(cells, turn, chainAt, fromServer);
+      if (!legals.includes(toServer)) {
+        setErr("Illegal move.");
+        return;
+      }
       const r = await applyStep(fromServer, toServer);
       setSelViewIdx(null);
       if (!r.ok) {
@@ -194,23 +230,84 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
   }, [roomId, pk, exitBusy, room, router]);
 
   const finished = vm.phase === "finished";
+  const finishSessionId = finished ? String(vm.sessionId || "").trim() : "";
+  const finishModalDismissed =
+    finishSessionId.length > 0 &&
+    (finishModalDismissedSessionId === finishSessionId ||
+      (typeof window !== "undefined" &&
+        (() => {
+          try {
+            return window.sessionStorage.getItem(finishDismissStorageKey(finishSessionId)) === "1";
+          } catch {
+            return false;
+          }
+        })()));
+  const showResultModal = finished && finishSessionId.length > 0 && !finishModalDismissed;
+  const didIWin = vm.mySeat != null && vm.winnerSeat != null && vm.winnerSeat === vm.mySeat;
+
+  const winnerDisplayName = useMemo(() => {
+    if (vm.winnerSeat == null) return "";
+    const m = members.find(x => Number(x?.seat_index) === Number(vm.winnerSeat));
+    const n = m && typeof m.display_name === "string" ? String(m.display_name).trim() : "";
+    return n || `Seat ${Number(vm.winnerSeat) + 1}`;
+  }, [members, vm.winnerSeat]);
+
+  const finishedActions = (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        disabled={rematchBusy}
+        onClick={() => void onRematch()}
+        className="rounded-md border border-emerald-500/40 bg-emerald-950/40 px-2 py-1.5 text-[11px] font-semibold text-emerald-100 disabled:opacity-45"
+      >
+        {rematchBusy ? "…" : "Rematch"}
+      </button>
+      <button
+        type="button"
+        onClick={() => void cancelRematch()}
+        className="rounded-md border border-zinc-600 bg-zinc-800/50 px-2 py-1.5 text-[11px] text-zinc-200"
+      >
+        Cancel rematch
+      </button>
+      {isHost ? (
+        <button
+          type="button"
+          disabled={startNextBusy}
+          onClick={() => void onStartNext()}
+          className="rounded-md border border-sky-500/40 bg-sky-950/40 px-2 py-1.5 text-[11px] font-semibold text-sky-100 disabled:opacity-45"
+        >
+          {startNextBusy ? "…" : "Start next (host)"}
+        </button>
+      ) : null}
+    </div>
+  );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-1 pb-2 sm:gap-3 sm:px-2">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
-        <div className="tabular-nums">
-          {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
-            <span className={vm.turnSeat === vm.mySeat ? "text-amber-200" : "text-zinc-500"}>
-              Turn clock ~{vm.turnTimeLeftSec}s
-            </span>
-          ) : (
-            <span>—</span>
-          )}
+    <div className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-1 pb-2 sm:gap-3 sm:px-2">
+      <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
+          <div className="tabular-nums">
+            {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
+              <span className={vm.turnSeat === vm.mySeat ? "text-amber-200" : "text-zinc-500"}>
+                Turn clock ~{vm.turnTimeLeftSec}s
+              </span>
+            ) : (
+              <span>—</span>
+            )}
+          </div>
+          {vaultClaimBusy ? <span className="text-sky-300">Settlement…</span> : null}
         </div>
-        {vaultClaimBusy ? <span className="text-sky-300">Settlement…</span> : null}
+        <div className="flex min-h-[2.5rem] flex-col justify-center text-[11px] leading-snug">
+          {err ? (
+            <p className="text-red-300">
+              {err}
+              <button type="button" className="ml-2 underline decoration-red-400/80" onClick={() => setErr("")}>
+                Dismiss
+              </button>
+            </p>
+          ) : null}
+        </div>
       </div>
-
-      {err ? <p className="shrink-0 text-[11px] text-red-300">{err}</p> : null}
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden">
         <div
@@ -230,6 +327,17 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
             const sel = selViewIdx === viewPos;
             const leg = legalTosViewSet.has(viewPos);
             const mustChain = chainAt != null && serverIdx === chainAt;
+            const forcedCapHint = !mustChain && forcedMenCaptureHintViewSet.has(viewPos);
+            const ringFocus =
+              mustChain
+                ? "z-[1] ring-2 ring-amber-400/90 ring-inset"
+                : forcedCapHint
+                  ? "z-[1] ring-2 ring-orange-400/90 ring-inset shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
+                  : sel
+                    ? "z-[1] ring-2 ring-sky-400 ring-inset"
+                    : leg
+                      ? "z-[1] ring-2 ring-emerald-500/80 ring-inset"
+                      : "";
             return (
               <button
                 key={viewPos}
@@ -240,9 +348,7 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
                   dark
                     ? "bg-gradient-to-br from-[#3d2918] to-[#1e120c]"
                     : "bg-gradient-to-br from-[#c4a574] to-[#8a6a3e]"
-                } ${sel ? "z-[1] ring-2 ring-sky-400 ring-inset" : ""} ${
-                  leg ? "z-[1] ring-2 ring-emerald-500/80 ring-inset" : ""
-                } ${mustChain ? "z-[1] ring-2 ring-amber-400/90 ring-inset" : ""}`}
+                } ${ringFocus}`}
                 style={{ WebkitTapHighlightColor: "transparent" }}
               >
                 {p ? (
@@ -262,41 +368,51 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
         </div>
       </div>
 
-      {finished ? (
+      {showResultModal ? (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/55 p-3 backdrop-blur-[2px]">
+          <div className="w-full max-w-sm rounded-xl border border-white/20 bg-zinc-900/95 p-4 text-center shadow-2xl sm:max-w-md">
+            <p
+              className={`text-lg font-bold uppercase tracking-wide sm:text-xl ${
+                didIWin ? "text-emerald-300" : vm.mySeat != null ? "text-red-300" : "text-white"
+              }`}
+            >
+              {didIWin ? "You win" : vm.mySeat != null ? "You lose" : "Match over"}
+            </p>
+            {vm.winnerSeat != null ? (
+              <p className="mt-1 text-xs text-zinc-300">
+                Winner: <span className="font-semibold text-zinc-100">{winnerDisplayName}</span>
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-zinc-400">Match complete</p>
+            )}
+            <div className="mt-4 space-y-2 text-left text-[11px] text-zinc-200">{finishedActions}</div>
+            <button
+              type="button"
+              className="mt-4 w-full rounded-md border border-white/20 bg-white/10 py-2 text-xs font-semibold text-zinc-100"
+              onClick={() => {
+                try {
+                  window.sessionStorage.setItem(finishDismissStorageKey(finishSessionId), "1");
+                } catch {
+                  /* ignore */
+                }
+                setFinishModalDismissedSessionId(finishSessionId);
+              }}
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {finished && !showResultModal ? (
         <div className="shrink-0 space-y-2 rounded-lg border border-white/10 bg-zinc-900/50 p-2 text-[11px] text-zinc-200">
           <p className="font-semibold text-zinc-100">Match finished</p>
           {vm.winnerSeat != null && vm.mySeat != null ? (
-            <p className="text-zinc-300">
-              {vm.winnerSeat === vm.mySeat ? "You won." : "You lost."}
+            <p className={didIWin ? "text-emerald-300/95" : "text-red-300/95"}>
+              {didIWin ? "You won." : "You lost."}
             </p>
           ) : null}
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={rematchBusy}
-              onClick={() => void onRematch()}
-              className="rounded-md border border-emerald-500/40 bg-emerald-950/40 px-2 py-1.5 font-semibold text-emerald-100 disabled:opacity-45"
-            >
-              {rematchBusy ? "…" : "Rematch"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void cancelRematch()}
-              className="rounded-md border border-zinc-600 bg-zinc-800/50 px-2 py-1.5 text-zinc-200"
-            >
-              Cancel rematch
-            </button>
-            {isHost ? (
-              <button
-                type="button"
-                disabled={startNextBusy}
-                onClick={() => void onStartNext()}
-                className="rounded-md border border-sky-500/40 bg-sky-950/40 px-2 py-1.5 font-semibold text-sky-100 disabled:opacity-45"
-              >
-                {startNextBusy ? "…" : "Start next (host)"}
-              </button>
-            ) : null}
-          </div>
+          {finishedActions}
         </div>
       ) : null}
 
