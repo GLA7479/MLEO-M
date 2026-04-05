@@ -335,8 +335,15 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         return;
       }
 
+      // 1) Legal destination from current selection — complete (including landing on own stack)
+      if (legalDest.has(idx)) {
+        await tryCompleteMove(from, idx);
+        return;
+      }
+
       const v = pts24[idx] || 0;
       const mine = vm.mySeat === 0 ? v > 0 : vm.mySeat === 1 ? v < 0 : false;
+      // 2) Else switch origin to another of my points that has legal moves from itself
       if (mine) {
         const dests = ov2BgClientLegalDestinationsForFrom(legalityBoard, idx);
         if (dests.size === 0) {
@@ -347,11 +354,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         return;
       }
 
-      if (!legalDest.has(idx)) {
-        flashInvalid(idx);
-        return;
-      }
-      await tryCompleteMove(from, idx);
+      flashInvalid(idx);
     },
     [
       vm,
