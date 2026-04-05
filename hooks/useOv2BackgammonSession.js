@@ -29,15 +29,19 @@ export function useOv2BackgammonSession(baseContext) {
   const [snap, setSnap] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [vaultClaimBusy, setVaultClaimBusy] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const vaultFinishedRef = useRef(/** @type {string|null} */ (null));
+  const vaultLinesAppliedForSessionRef = useRef(/** @type {Set<string>} */ (new Set()));
   const snapRef = useRef(/** @type {typeof snap} */ (null));
   const processedTurnTimeoutKeysRef = useRef(/** @type {Set<string>} */ (new Set()));
 
   useEffect(() => {
     setSnap(null);
     vaultFinishedRef.current = null;
+    vaultLinesAppliedForSessionRef.current.clear();
     processedTurnTimeoutKeysRef.current.clear();
+    setVaultClaimBusy(false);
   }, [roomId, activeSessionKey]);
 
   useEffect(() => {
@@ -77,18 +81,24 @@ export function useOv2BackgammonSession(baseContext) {
     const sid = String(snap.sessionId || "").trim();
     if (!sid || vaultFinishedRef.current === sid) return;
     vaultFinishedRef.current = sid;
+    setVaultClaimBusy(true);
     void (async () => {
       try {
         const claim = await requestOv2BackgammonClaimSettlement(roomId, selfKey);
         if (claim.ok && Array.isArray(claim.lines) && claim.lines.length > 0) {
-          await applyBoardPathSettlementClaimLinesToVault(claim.lines, OV2_BACKGAMMON_PRODUCT_GAME_ID);
+          if (!vaultLinesAppliedForSessionRef.current.has(sid)) {
+            await applyBoardPathSettlementClaimLinesToVault(claim.lines, OV2_BACKGAMMON_PRODUCT_GAME_ID);
+            vaultLinesAppliedForSessionRef.current.add(sid);
+          }
         } else if (!claim.ok) {
           vaultFinishedRef.current = null;
         }
       } catch {
         vaultFinishedRef.current = null;
+      } finally {
+        await readOnlineV2Vault({ fresh: true }).catch(() => {});
+        setVaultClaimBusy(false);
       }
-      await readOnlineV2Vault({ fresh: true }).catch(() => {});
     })();
   }, [snap, roomId, selfKey]);
 
@@ -113,9 +123,19 @@ export function useOv2BackgammonSession(baseContext) {
         const vturn = cur.turnSeat != null ? Number(cur.turnSeat) : NaN;
         const vkey = `${vsid}|${vdl}|${vturn}`;
         if (vkey !== turnKey || Date.now() < vdl) return;
+        const revBefore = cur.revision != null ? Number(cur.revision) : NaN;
         const r = await requestOv2BackgammonMarkTurnTimeout(roomId, selfKey, {});
         if (r.ok && r.snapshot) setSnap(r.snapshot);
-        if (r.ok) processedTurnTimeoutKeysRef.current.add(turnKey);
+        const sn = r.snapshot && typeof r.snapshot === "object" ? r.snapshot : null;
+        const revAfter = sn?.revision != null ? Number(sn.revision) : NaN;
+        const phaseAfter = sn ? String(sn.phase || "").toLowerCase() : "";
+        if (
+          r.ok &&
+          sn &&
+          (phaseAfter === "finished" || (Number.isFinite(revBefore) && Number.isFinite(revAfter) && revAfter !== revBefore))
+        ) {
+          processedTurnTimeoutKeysRef.current.add(turnKey);
+        }
       })();
     }, ms);
     return () => window.clearTimeout(t);
@@ -131,18 +151,22 @@ export function useOv2BackgammonSession(baseContext) {
   ]);
 
   const roll = useCallback(async () => {
-    if (!roomId || !selfKey || !snap) return;
+    if (!roomId || !selfKey || !snap) {
+      return { ok: false };
+    }
     setBusy(true);
     setErr("");
     try {
       const r = await requestOv2BackgammonRoll(roomId, selfKey, { revision: snap.revision });
       if (!r.ok) {
         setErr(r.error || "Roll failed");
-        return;
+        return { ok: false };
       }
       if (r.snapshot) setSnap(r.snapshot);
+      return { ok: true };
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
+      return { ok: false };
     } finally {
       setBusy(false);
     }
@@ -150,18 +174,20 @@ export function useOv2BackgammonSession(baseContext) {
 
   const move = useCallback(
     async (fromPt, toPt, die) => {
-      if (!roomId || !selfKey || !snap) return;
+      if (!roomId || !selfKey || !snap) return { ok: false };
       setBusy(true);
       setErr("");
       try {
         const r = await requestOv2BackgammonMove(roomId, selfKey, fromPt, toPt, die, { revision: snap.revision });
         if (!r.ok) {
           setErr(r.error || "Move failed");
-          return;
+          return { ok: false };
         }
         if (r.snapshot) setSnap(r.snapshot);
+        return { ok: true };
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
+        return { ok: false };
       } finally {
         setBusy(false);
       }
@@ -226,6 +252,7 @@ export function useOv2BackgammonSession(baseContext) {
     snapshot: snap,
     vm,
     busy,
+    vaultClaimBusy,
     err,
     setErr,
     roll,

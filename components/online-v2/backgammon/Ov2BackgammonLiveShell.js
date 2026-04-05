@@ -54,6 +54,7 @@ export default function Ov2BackgammonLiveShell() {
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveErr, setLeaveErr] = useState("");
   const loadedOnceForRoomRef = useRef(null);
+  const leaveInFlightRef = useRef(false);
   const selfDisplayName = useMemo(() => {
     const mine = members.find(m => String(m?.participant_key || "") === String(participantId || ""));
     return String(mine?.display_name || "").trim();
@@ -296,7 +297,8 @@ export default function Ov2BackgammonLiveShell() {
   }, [room, roomLifecycle, isRoomMember, isHost, seatedCount, seatedAllCommitted]);
 
   const onLeaveTable = useCallback(async () => {
-    if (!roomId || !participantId) return;
+    if (!roomId || !participantId || leaveInFlightRef.current) return;
+    leaveInFlightRef.current = true;
     setLeaveErr("");
     setLeaveBusy(true);
     try {
@@ -310,6 +312,7 @@ export default function Ov2BackgammonLiveShell() {
     } catch (e) {
       setLeaveErr(e?.message || String(e) || "Could not leave.");
     } finally {
+      leaveInFlightRef.current = false;
       setLeaveBusy(false);
     }
   }, [roomId, participantId, room, router]);

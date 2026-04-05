@@ -11,6 +11,7 @@ import {
 import { useOv2BackgammonSession } from "../../../hooks/useOv2BackgammonSession";
 
 const AUTO_ROLL_STORAGE_KEY = "ov2_bg_auto_roll";
+const finishDismissStorageKey = sid => `ov2_bg_finish_dismiss_${sid}`;
 
 /**
  * Visual column order must match real board geometry: top-left column j pairs index (12+j) above with (11−j) below
@@ -31,8 +32,8 @@ function CheckerStack({ count, maxVisible = 5, compact = false, stackFrom = "top
   }
   const isLight = count > 0;
   const dot = compact
-    ? "h-[15px] w-[15px] min-h-[15px] min-w-[15px] border border-black/50 shadow-[0_1px_2px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-black/20 sm:h-[18px] sm:w-[18px] sm:min-h-[18px] sm:min-w-[18px]"
-    : "h-[18px] w-[18px] min-h-[18px] min-w-[18px] border border-black/50 shadow-[0_1px_3px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.14)] ring-1 ring-black/25 sm:h-[1.35rem] sm:w-[1.35rem] sm:min-h-[1.35rem] sm:min-w-[1.35rem] md:h-[1.45rem] md:w-[1.45rem] md:min-h-[1.45rem] md:min-w-[1.45rem] lg:h-6 lg:w-6 lg:min-h-6 lg:min-w-6";
+    ? "h-[18px] w-[18px] min-h-[18px] min-w-[18px] border border-black/50 shadow-[0_1px_2px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-black/20 sm:h-5 sm:w-5 sm:min-h-5 sm:min-w-5"
+    : "h-5 w-5 min-h-5 min-w-5 border border-black/50 shadow-[0_1px_3px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.14)] ring-1 ring-black/25 sm:h-[1.4rem] sm:w-[1.4rem] sm:min-h-[1.4rem] sm:min-w-[1.4rem] md:h-6 md:w-6 md:min-h-6 md:min-w-6 lg:h-[1.65rem] lg:w-[1.65rem] lg:min-h-[1.65rem] lg:min-w-[1.65rem]";
   const disks = n > maxVisible ? maxVisible - 1 : n;
   const label =
     n > maxVisible ? (
@@ -50,7 +51,7 @@ function CheckerStack({ count, maxVisible = 5, compact = false, stackFrom = "top
       className={`shrink-0 rounded-full ${dot} ${isLight ? "bg-gradient-to-b from-amber-50 to-amber-200" : "bg-gradient-to-b from-zinc-500 to-zinc-900"}`}
     />
   ));
-  const stackGap = "gap-[3px] sm:gap-[3.5px]";
+  const stackGap = "gap-[3.5px] sm:gap-1";
   if (stackFrom === "bottom") {
     return (
       <div className={`inline-flex flex-col-reverse items-center ${stackGap} ${className}`}>
@@ -141,8 +142,20 @@ function BoardPoint({
 export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefresh }) {
   const router = useRouter();
   const session = useOv2BackgammonSession(contextInput ?? undefined);
-  const { vm, busy, err, setErr, roll, move, requestRematch, cancelRematch, startNextMatch, isHost, roomMatchSeq } =
-    session;
+  const {
+    vm,
+    busy,
+    vaultClaimBusy,
+    err,
+    setErr,
+    roll,
+    move,
+    requestRematch,
+    cancelRematch,
+    startNextMatch,
+    isHost,
+    roomMatchSeq,
+  } = session;
   const [selFrom, setSelFrom] = useState(/** @type {number|'bar'|null} */ (null));
   const [rematchBusy, setRematchBusy] = useState(false);
   const [startNextBusy, setStartNextBusy] = useState(false);
@@ -153,6 +166,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
   const [autoRoll, setAutoRoll] = useState(false);
   const autoRollBusyRef = useRef(false);
+  const autoRollEffectGenRef = useRef(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -246,8 +260,8 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         setErr("No legal die for that move.");
         return;
       }
-      await move(fromPt, toPt, die);
-      resetSelection();
+      const r = await move(fromPt, toPt, die);
+      if (r?.ok) resetSelection();
     },
     [legalityBoard, move, resetSelection, setErr]
   );
@@ -350,10 +364,22 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   }, [vm.readOnly, busy, vm.phase, vm.canClientMove, myBar, legalityBoard, flashInvalid]);
 
   useEffect(() => {
-    if (!autoRoll || !vm.canClientRoll || busy || vm.readOnly || String(vm.phase) !== "playing") return;
+    if (
+      !autoRoll ||
+      !vm.canClientRoll ||
+      busy ||
+      vm.readOnly ||
+      String(vm.phase) !== "playing" ||
+      vm.mySeat == null ||
+      vm.turnSeat == null ||
+      vm.mySeat !== vm.turnSeat
+    )
+      return;
     const sid = String(vm.sessionId || "").trim();
     if (!sid) return;
+    const gen = ++autoRollEffectGenRef.current;
     const t = window.setTimeout(() => {
+      if (gen !== autoRollEffectGenRef.current) return;
       if (autoRollBusyRef.current) return;
       autoRollBusyRef.current = true;
       void (async () => {
@@ -365,7 +391,19 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       })();
     }, 400);
     return () => window.clearTimeout(t);
-  }, [autoRoll, vm.canClientRoll, busy, vm.readOnly, vm.phase, vm.revision, vm.sessionId, vm.turnSeat, roll, err]);
+  }, [
+    autoRoll,
+    vm.canClientRoll,
+    busy,
+    vm.readOnly,
+    vm.phase,
+    vm.revision,
+    vm.sessionId,
+    vm.turnSeat,
+    vm.mySeat,
+    roll,
+    err,
+  ]);
 
   const eligibleRematch = useMemo(
     () => members.filter(m => m?.seat_index != null && m?.seat_index !== "" && m?.wallet_state === "committed").length,
@@ -393,8 +431,19 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     setFinishModalDismissedSessionId("");
   }, [room?.active_session_id]);
 
-  const showResultModal =
-    isFinished && finishSessionId.length > 0 && finishModalDismissedSessionId !== finishSessionId;
+  const finishModalDismissed =
+    finishSessionId.length > 0 &&
+    (finishModalDismissedSessionId === finishSessionId ||
+      (typeof window !== "undefined" &&
+        (() => {
+          try {
+            return window.sessionStorage.getItem(finishDismissStorageKey(finishSessionId)) === "1";
+          } catch {
+            return false;
+          }
+        })()));
+
+  const showResultModal = isFinished && finishSessionId.length > 0 && !finishModalDismissed;
 
   const boardDisabled = busy || vm.readOnly || String(vm.phase) !== "playing";
   const compactBoard = narrowViewport;
@@ -527,15 +576,22 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     vm.turnTimeLeftSec == null
       ? "border-white/15 bg-black/30 text-zinc-300"
       : vm.turnTimeLeftSec <= 5
-        ? "border-red-500/50 bg-red-950/40 text-red-100"
+        ? "animate-pulse border-red-500/55 bg-red-950/45 text-red-100"
         : vm.turnTimeLeftSec <= 10
-          ? "border-amber-500/45 bg-amber-950/35 text-amber-100"
+          ? "border-amber-500/50 bg-amber-950/40 text-amber-100"
           : "border-sky-500/40 bg-sky-950/30 text-sky-100";
 
   const myMiss =
     vm.mySeat === 0 ? vm.missedStreakBySeat[0] : vm.mySeat === 1 ? vm.missedStreakBySeat[1] : 0;
   const oppMiss =
     vm.mySeat === 0 ? vm.missedStreakBySeat[1] : vm.mySeat === 1 ? vm.missedStreakBySeat[0] : 0;
+
+  const winnerDisplayName = useMemo(() => {
+    if (vm.winnerSeat == null) return "";
+    const m = members.find(x => Number(x?.seat_index) === Number(vm.winnerSeat));
+    const n = m && typeof m.display_name === "string" ? String(m.display_name).trim() : "";
+    return n || `Seat ${vm.winnerSeat + 1}`;
+  }, [members, vm.winnerSeat]);
 
   const finishedPanel = (
     <div className="mt-3 flex w-full max-w-sm flex-col gap-2">
@@ -557,7 +613,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           }}
           className="w-full rounded-md border border-sky-500/40 bg-sky-950/35 py-2 text-xs font-semibold text-sky-100 disabled:opacity-45"
         >
-          {rematchBusy ? "…" : myRematchRequested ? "Cancel rematch" : "Rematch"}
+          {rematchBusy ? "…" : myRematchRequested ? "Cancel rematch" : "REMATCH"}
         </button>
       ) : null}
       {isHost ? (
@@ -578,115 +634,99 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
               setStartNextBusy(false);
             }
           }}
-          className="w-full rounded-md border border-emerald-500/40 bg-emerald-900/30 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-45"
+          className="w-full rounded-md border border-emerald-500/40 bg-emerald-900/30 py-2 text-xs font-bold uppercase tracking-wide text-emerald-100 disabled:opacity-45"
         >
-          {startNextBusy ? "Starting…" : "Start next match (host)"}
+          {startNextBusy ? "…" : "NEXT MATCH"}
         </button>
       ) : null}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          disabled={exitBusy}
-          onClick={() => void router.replace({ pathname: "/online-v2/rooms", query: { room: roomId } }, undefined, { shallow: true })}
-          className="rounded-md border border-white/25 bg-white/10 py-2 text-xs font-semibold"
-        >
-          Room lobby
-        </button>
-        <button
-          type="button"
-          disabled={exitBusy || !selfKey}
-          onClick={async () => {
-            setExitErr("");
-            setExitBusy(true);
+      <button
+        type="button"
+        disabled={exitBusy || !selfKey}
+        onClick={async () => {
+          setExitErr("");
+          setExitBusy(true);
+          try {
+            await leaveOv2RoomWithForfeitRetry({ room, room_id: roomId, participant_key: selfKey });
             try {
-              await leaveOv2RoomWithForfeitRetry({ room, room_id: roomId, participant_key: selfKey });
-              try {
-                window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
-              } catch {
-                /* ignore */
-              }
-              await router.replace("/online-v2/rooms");
-            } catch (e) {
-              setExitErr(e?.message || "Could not leave.");
-            } finally {
-              setExitBusy(false);
+              window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
+            } catch {
+              /* ignore */
             }
-          }}
-          className="rounded-md border border-red-500/45 bg-red-950/35 py-2 text-xs font-semibold text-red-100"
-        >
-          {exitBusy ? "…" : "Leave room"}
-        </button>
-      </div>
+            await router.replace("/online-v2/rooms");
+          } catch (e) {
+            setExitErr(e?.message || "Could not leave.");
+          } finally {
+            setExitBusy(false);
+          }
+        }}
+        className="w-full rounded-md border border-red-500/50 bg-red-950/40 py-2 text-xs font-bold uppercase tracking-wide text-red-100 disabled:opacity-45"
+      >
+        {exitBusy ? "…" : "LEAVE"}
+      </button>
+      <button
+        type="button"
+        disabled={exitBusy}
+        onClick={() => void router.replace({ pathname: "/online-v2/rooms", query: { room: roomId } }, undefined, { shallow: true })}
+        className="w-full rounded-md border border-white/20 bg-white/5 py-2 text-xs font-semibold text-zinc-300"
+      >
+        Room lobby
+      </button>
       {exitErr ? <p className="text-center text-[10px] text-red-300">{exitErr}</p> : null}
     </div>
   );
 
   return (
     <div className="relative flex h-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden px-1 pb-0.5 pt-0 text-white sm:gap-1 sm:px-2 sm:pb-1">
-      <div className="shrink-0 rounded-md border border-white/10 bg-black/35 px-1.5 py-0.5 sm:px-2 sm:py-1">
-        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[8px] leading-tight text-zinc-300 sm:text-[9px] md:text-[10px]">
-          <span className="min-w-0 font-medium">
-            You P{vm.mySeat != null ? vm.mySeat + 1 : "—"} · off{" "}
-            {vm.mySeat === 0 ? offS0 : vm.mySeat === 1 ? offS1 : "—"}/15
-            {myBar > 0 ? <span className="text-amber-200/95"> · bar {myBar}</span> : null}
-          </span>
-          <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+      <div className="shrink-0 rounded-md border border-white/10 bg-black/35 px-1.5 py-1 sm:px-2 sm:py-1.5">
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+          <div className="min-w-0 text-[8px] leading-snug text-zinc-300 sm:text-[9px] md:text-[10px]">
+            <span className="font-medium">
+              You P{vm.mySeat != null ? vm.mySeat + 1 : "—"} · off{" "}
+              {vm.mySeat === 0 ? offS0 : vm.mySeat === 1 ? offS1 : "—"}/15
+              {myBar > 0 ? <span className="text-amber-200/95"> · bar {myBar}</span> : null}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
             {String(vm.phase) === "playing" && vm.turnDeadline != null ? (
               <span
-                className={`shrink-0 rounded border px-1.5 py-0.5 font-semibold tabular-nums sm:px-2 sm:py-1 ${turnTimerTone}`}
+                className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold tabular-nums sm:px-2 sm:py-1 sm:text-[10px] ${turnTimerTone}`}
+                title="Turn time remaining"
               >
-                P{vm.turnSeat != null ? vm.turnSeat + 1 : "—"} · {vm.turnTimeLeftSec != null ? `${vm.turnTimeLeftSec}s` : "—"}
+                {vm.turnTimeLeftSec != null ? `${vm.turnTimeLeftSec}s` : "—"}
               </span>
-            ) : (
-              <span className="shrink-0 text-zinc-500">
+            ) : String(vm.phase) === "playing" ? (
+              <span className="shrink-0 text-[9px] text-zinc-500 sm:text-[10px]">
                 Turn P{vm.turnSeat != null ? vm.turnSeat + 1 : "—"}
               </span>
-            )}
+            ) : null}
             {String(vm.phase) === "playing" ? (
-              <span className="text-[7px] text-zinc-500 sm:text-[8px]">
-                Miss {myMiss}/3 · opp {oppMiss}/3
+              <span className="text-[8px] font-medium tabular-nums text-zinc-400 sm:text-[9px]">
+                Miss: {myMiss}/3
+                <span className="hidden sm:inline"> · opp {oppMiss}/3</span>
               </span>
             ) : null}
             {Array.isArray(vm.dice) ? (
-              <span className="font-mono text-zinc-500">· {JSON.stringify(vm.dice)}</span>
+              <span className="pointer-events-none select-none font-mono text-zinc-500" aria-hidden>
+                {JSON.stringify(vm.dice)}
+              </span>
+            ) : null}
+            {isLiveMatch && onLeaveToLobby ? (
+              <button
+                type="button"
+                disabled={leaveToLobbyBusy}
+                onClick={() => void onLeaveToLobby()}
+                className="shrink-0 rounded-md border border-red-500/55 bg-red-950/45 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-red-100 shadow-sm shadow-black/20 disabled:pointer-events-none disabled:opacity-45 sm:px-3 sm:py-1.5 sm:text-[11px]"
+              >
+                {leaveToLobbyBusy ? "…" : "LEAVE"}
+              </button>
             ) : null}
           </div>
         </div>
       </div>
 
-      {isLiveMatch && onLeaveToLobby ? (
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-0.5">
-          <label className="flex cursor-pointer items-center gap-1.5 text-[9px] text-zinc-400 sm:text-[10px]">
-            <input
-              type="checkbox"
-              className="h-3.5 w-3.5 rounded border-white/25 bg-black/40 text-violet-400 focus:ring-violet-500/40"
-              checked={autoRoll}
-              onChange={e => persistAutoRoll(e.target.checked)}
-            />
-            Auto-roll
-          </label>
-          <button
-            type="button"
-            disabled={leaveToLobbyBusy}
-            onClick={() => void onLeaveToLobby()}
-            className="text-[10px] font-semibold text-red-200/95 underline decoration-red-400/50 disabled:opacity-45"
-          >
-            {leaveToLobbyBusy ? "Leaving…" : "Leave table"}
-          </button>
-        </div>
-      ) : (
-        <div className="flex shrink-0 px-0.5">
-          <label className="flex cursor-pointer items-center gap-1.5 text-[9px] text-zinc-400 sm:text-[10px]">
-            <input
-              type="checkbox"
-              className="h-3.5 w-3.5 rounded border-white/25 bg-black/40 text-violet-400 focus:ring-violet-500/40"
-              checked={autoRoll}
-              onChange={e => persistAutoRoll(e.target.checked)}
-            />
-            Auto-roll (applies when it is your roll)
-          </label>
-        </div>
-      )}
+      {vaultClaimBusy ? (
+        <p className="shrink-0 text-center text-[9px] text-zinc-400 sm:text-[10px]">Updating balance…</p>
+      ) : null}
 
       {err ? (
         <div className="shrink-0 rounded border border-amber-500/35 bg-amber-950/30 px-1.5 py-0.5 text-[8px] text-amber-100 sm:px-2 sm:py-1 sm:text-[9px]">
@@ -697,13 +737,26 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         </div>
       ) : null}
 
-      <div className="flex shrink-0 flex-wrap items-center gap-0.5 sm:gap-1">
+      <div className="flex shrink-0 flex-wrap items-center gap-1 sm:gap-1.5">
+        {String(vm.phase) === "playing" ? (
+          <button
+            type="button"
+            onClick={() => persistAutoRoll(!autoRoll)}
+            className={`rounded-md border px-2 py-1 text-[9px] font-bold uppercase tracking-wide sm:py-1.5 sm:text-[10px] ${
+              autoRoll
+                ? "border-amber-400/60 bg-amber-950/50 text-amber-100 shadow-sm shadow-amber-950/25"
+                : "border-white/20 bg-white/5 text-zinc-500"
+            }`}
+          >
+            Auto
+          </button>
+        ) : null}
         {vm.canClientRoll ? (
           <button
             type="button"
             disabled={busy}
             onClick={() => void roll()}
-            className="rounded-md border border-violet-500/45 bg-violet-950/40 px-2 py-0.5 text-[9px] font-bold text-violet-100 disabled:opacity-45 sm:px-2.5 sm:py-1 sm:text-[10px] md:text-xs"
+            className="rounded-md border border-violet-500/45 bg-violet-950/40 px-2 py-1 text-[9px] font-bold text-violet-100 disabled:opacity-45 sm:px-2.5 sm:py-1.5 sm:text-[10px] md:text-xs"
           >
             {busy ? "Rolling…" : "Roll"}
           </button>
@@ -755,14 +808,20 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 p-3 backdrop-blur-[2px]">
             <div className="w-full max-w-sm rounded-xl border border-white/20 bg-zinc-900/95 p-4 text-center shadow-2xl sm:max-w-md">
               <p
-                className={`text-lg font-semibold sm:text-xl ${
+                className={`text-lg font-bold uppercase tracking-wide sm:text-xl ${
                   didIWin ? "text-emerald-200" : vm.mySeat != null ? "text-red-300" : "text-white"
                 }`}
               >
-                {didIWin ? "You won" : vm.mySeat != null ? "You lost" : "Match finished"}
+                {didIWin ? "YOU WIN" : vm.mySeat != null ? "YOU LOSE" : "MATCH OVER"}
               </p>
               <p className="mt-1 text-xs text-zinc-300">
-                {vm.winnerSeat != null ? `Winner: seat ${vm.winnerSeat + 1}` : "Match complete"}
+                {vm.winnerSeat != null ? (
+                  <>
+                    Winner: <span className="font-semibold text-zinc-100">{winnerDisplayName}</span>
+                  </>
+                ) : (
+                  "Match complete"
+                )}
               </p>
               {stakePerSeat != null ? (
                 <p className="mt-2 text-[11px] text-zinc-400">
@@ -781,7 +840,14 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
               <button
                 type="button"
                 className="mt-3 w-full rounded-md border border-white/20 bg-white/10 py-2 text-xs font-semibold text-zinc-100"
-                onClick={() => setFinishModalDismissedSessionId(finishSessionId)}
+                onClick={() => {
+                  try {
+                    window.sessionStorage.setItem(finishDismissStorageKey(finishSessionId), "1");
+                  } catch {
+                    /* ignore */
+                  }
+                  setFinishModalDismissedSessionId(finishSessionId);
+                }}
               >
                 Continue
               </button>
