@@ -31,6 +31,8 @@ import {
   seatedPlayersNotStakeCommitted,
 } from "../../../lib/online-v2/shared-rooms/ov2SharedRoomStakeFromLedger";
 import { useOv2SharedRoom } from "../../../hooks/useOv2SharedRoom";
+import { ov2QuickMatchAutoStartDeadline } from "../../../lib/online-v2/room-api/ov2QuickMatchApi";
+import { isOv2QuickMatchRoom, parseOv2QuickMatchLobbyDeadlineIso } from "../../../lib/online-v2/shared-rooms/ov2QuickMatchUi";
 import Ov2SharedSeatGrid from "./Ov2SharedSeatGrid";
 
 function ov2StakeDebitLocalKey(roomId, matchSeq, participantKey) {
@@ -72,6 +74,9 @@ export default function Ov2SharedRoomScreen({
   const [bingoHandoffResetTick, setBingoHandoffResetTick] = useState(0);
   const [bingoHandoffTimedOut, setBingoHandoffTimedOut] = useState(false);
   const bingoHandoffWaitStartRef = useRef(null);
+  const qmHostIntentTriedRef = useRef(false);
+  const qmLiveOpenDoneRef = useRef(false);
+  const [qmNowMs, setQmNowMs] = useState(() => Date.now());
 
   const refreshSharedEconomySnapshot = useCallback(async () => {
     if (!roomId) return { ledger: [], canon: null };
@@ -89,6 +94,8 @@ export default function Ov2SharedRoomScreen({
   }, [roomId]);
 
   const joinedCount = useMemo(() => members.length, [members]);
+  const isQmRoom = useMemo(() => isOv2QuickMatchRoom(room), [room]);
+  const qmLobbyDeadlineIso = useMemo(() => parseOv2QuickMatchLobbyDeadlineIso(room), [room]);
   const isLudoRoom = room?.product_game_id === "ov2_ludo";
   const isRummy51Room = String(room?.product_game_id || "").trim() === OV2_RUMMY51_PRODUCT_GAME_ID;
   const isBingoRoom = String(room?.product_game_id || "").trim() === OV2_BINGO_PRODUCT_GAME_ID;
@@ -119,6 +126,11 @@ export default function Ov2SharedRoomScreen({
 
   useEffect(() => {
     autoJoinPublicAttemptedRef.current = false;
+  }, [roomId]);
+
+  useEffect(() => {
+    qmHostIntentTriedRef.current = false;
+    qmLiveOpenDoneRef.current = false;
   }, [roomId]);
 
   useEffect(() => {
@@ -201,6 +213,127 @@ export default function Ov2SharedRoomScreen({
     const p = lifecyclePhase(canonicalRoom);
     return p === "pending_start" || p === "pending_stakes";
   }, [canonicalRoom]);
+
+  useEffect(() => {
+    if (!qmLobbyDeadlineIso || sharedStatusUpper !== "OPEN" || !isQmRoom) return undefined;
+    const id = window.setInterval(() => setQmNowMs(Date.now()), 500);
+    return () => window.clearInterval(id);
+  }, [qmLobbyDeadlineIso, sharedStatusUpper, isQmRoom]);
+
+  const qmSecondsLeft = useMemo(() => {
+    if (!qmLobbyDeadlineIso) return null;
+    const t = Date.parse(qmLobbyDeadlineIso);
+    if (!Number.isFinite(t)) return null;
+    return Math.max(0, Math.ceil((t - qmNowMs) / 1000));
+  }, [qmLobbyDeadlineIso, qmNowMs]);
+
+  useEffect(() => {
+    if (!roomId || !isQmRoom) return undefined;
+    if (sharedStatusUpper !== "OPEN") return undefined;
+    const run = async () => {
+      try {
+        const r = await ov2QuickMatchAutoStartDeadline({ room_id: roomId });
+        const code = String(r?.code || "");
+        if (code === "CANCELLED") {
+          await reload();
+          setMsg("Quick match ended — not enough eligible players when the timer finished.");
+          return;
+        }
+        if (r?.ok === true && code === "STARTED") {
+          await reload();
+          await refreshSharedEconomySnapshot();
+        }
+        if (code === "HOST_START_FAILED" || code === "START_INTENT_FAILED") {
+          await reload();
+          setMsg(String(r?.message || "Quick match could not start."));
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    void run();
+    const id = window.setInterval(() => void run(), 2000);
+    return () => window.clearInterval(id);
+  }, [roomId, isQmRoom, sharedStatusUpper, reload, refreshSharedEconomySnapshot]);
+
+  useEffect(() => {
+    if (!roomId || !isQmRoom || !isHost || !myPk) return;
+    if (lifecyclePhase(canonicalRoom) !== "lobby") return;
+    const minP = Math.max(2, Math.floor(Number(room?.min_players) || 2));
+    const seatedN = members.filter(m => m.seat_index != null && m.seat_index !== "").length;
+    if (seatedN < minP) return;
+    if (qmHostIntentTriedRef.current) return;
+    qmHostIntentTriedRef.current = true;
+    void (async () => {
+      try {
+        await startOv2RoomIntent({ room_id: roomId, host_participant_key: myPk });
+        await refreshSharedEconomySnapshot();
+        await reload();
+      } catch {
+        qmHostIntentTriedRef.current = false;
+      }
+    })();
+  }, [roomId, isQmRoom, isHost, myPk, canonicalRoom, members, room?.min_players, reload, refreshSharedEconomySnapshot]);
+
+  useEffect(() => {
+    if (sharedStatusUpper !== "IN_GAME") {
+      qmLiveOpenDoneRef.current = false;
+    }
+  }, [sharedStatusUpper]);
+
+  useEffect(() => {
+    if (!isQmRoom || !isHost || sharedStatusUpper !== "IN_GAME") return undefined;
+    if (didRouteToLiveRef.current || qmLiveOpenDoneRef.current) return undefined;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        if (isLudoRoom) {
+          const open = await requestOv2LudoOpenSession(roomId, participantId, {
+            presenceLeaderKey: participantId,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isBingoRoom) {
+          const open = await openOv2BingoSession(roomId, participantId);
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-bingo?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isRummy51Room) {
+          const open = await openOv2Rummy51Session(roomId, participantId);
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-rummy51?room=${encodeURIComponent(roomId)}`);
+        }
+      } catch {
+        /* retry on next snapshot */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isQmRoom,
+    isHost,
+    sharedStatusUpper,
+    isLudoRoom,
+    isBingoRoom,
+    isRummy51Room,
+    roomId,
+    participantId,
+    router,
+  ]);
 
   useEffect(() => {
     if (sharedStatusUpper !== "IN_GAME") return;
@@ -329,7 +462,7 @@ export default function Ov2SharedRoomScreen({
   }
 
   async function onNonHostJoinMatchStake() {
-    if (!roomId || !myPk || isHost) return;
+    if (!roomId || !myPk || (isHost && !isQmRoom)) return;
     setBusy(true);
     setMsg("");
     try {
@@ -614,7 +747,7 @@ export default function Ov2SharedRoomScreen({
   const showNonHostJoinBtn =
     isStakeSharedRoom &&
     sharedPreStartStrict &&
-    !isHost &&
+    (!isHost || isQmRoom) &&
     sharedSeated &&
     !myWalletCommitted &&
     phaseOpen &&
@@ -624,7 +757,7 @@ export default function Ov2SharedRoomScreen({
   const showNonHostWaitingLobby =
     isStakeSharedRoom &&
     sharedPreStartStrict &&
-    !isHost &&
+    (!isHost || isQmRoom) &&
     sharedSeated &&
     !myWalletCommitted &&
     !phaseOpen &&
@@ -636,7 +769,8 @@ export default function Ov2SharedRoomScreen({
     isHost &&
     sharedSeated &&
     sharedLedgerSynced &&
-    !ledgerErr;
+    !ledgerErr &&
+    !isQmRoom;
 
   const sharedSecondFooterSlot =
     isStakeSharedRoom && sharedStatusUpper === "OPEN" ? (
@@ -669,7 +803,7 @@ export default function Ov2SharedRoomScreen({
         </div>
       ) : showNonHostWaitingLobby ? (
         <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 px-2 py-2 text-center text-[10px] font-medium text-zinc-400">
-          Waiting for host to start match
+          {isQmRoom ? "Waiting for automatic game start…" : "Waiting for host to start match"}
         </div>
       ) : !sharedLedgerSynced || ledgerErr ? (
         <div
@@ -714,7 +848,16 @@ export default function Ov2SharedRoomScreen({
           {room?.min_players}-{room?.max_players} players • status {room?.status}
           {room?.requires_password ? " • password" : ""}
         </div>
-        {room?.join_code ? <div className="mt-1 text-[11px] text-zinc-300">Code: {room.join_code}</div> : null}
+        {room?.join_code && !isQmRoom ? (
+          <div className="mt-1 text-[11px] text-zinc-300">Code: {room.join_code}</div>
+        ) : null}
+        {isQmRoom && sharedStatusUpper === "OPEN" ? (
+          <div className="mt-2 rounded-lg border border-amber-500/35 bg-amber-950/25 px-2 py-1.5 text-[11px] text-amber-100/95">
+            Quick Match — the game starts automatically
+            {qmSecondsLeft != null ? ` in ~${qmSecondsLeft}s` : ""}. Claim a seat and commit your stake before the timer
+            ends.
+          </div>
+        ) : null}
       </div>
 
       <div

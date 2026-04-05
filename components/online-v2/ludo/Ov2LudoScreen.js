@@ -127,18 +127,18 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
   const isAwaitingMyDouble = isLiveMatch && mySeat != null && doubleAwaitingSeat === mySeat;
   const turnTimerTone =
     !isTurnTimerActive || turnTimeLeftSec == null
-      ? "border-white/15 bg-white/5 text-zinc-300"
+      ? "border-sky-400/35 bg-sky-950/30 text-sky-100 shadow-sm shadow-sky-950/40"
       : turnTimeLeftSec <= 5
-        ? "border-red-400/50 bg-red-950/35 text-red-100"
+        ? "border-red-400/55 bg-red-950/40 text-red-100 shadow-sm shadow-red-950/45"
         : turnTimeLeftSec <= 10
-          ? "border-amber-400/50 bg-amber-950/35 text-amber-100"
-          : "border-sky-400/40 bg-sky-950/30 text-sky-100";
+          ? "border-amber-400/50 bg-amber-950/38 text-amber-100 shadow-sm shadow-amber-950/40"
+          : "border-sky-400/45 bg-sky-950/35 text-sky-100 shadow-sm shadow-sky-950/35";
   const doubleTimerTone =
     !isDoublePending
-      ? "border-white/15 bg-white/5 text-zinc-300"
+      ? "border-violet-400/35 bg-violet-950/30 text-violet-100 shadow-sm shadow-violet-950/40"
       : isDoubleTimerActive && doubleTimeLeftSec != null && doubleTimeLeftSec <= 8
-        ? "border-red-400/50 bg-red-950/35 text-red-100"
-        : "border-fuchsia-400/40 bg-fuchsia-950/30 text-fuchsia-100";
+        ? "border-red-400/55 bg-red-950/40 text-red-100 shadow-sm shadow-red-950/45"
+        : "border-fuchsia-400/45 bg-fuchsia-950/38 text-fuchsia-100 shadow-sm shadow-fuchsia-950/35";
   const pendingSeatsLabel = doublePendingSeats.length > 0 ? doublePendingSeats.map(s => `Seat ${Number(s) + 1}`).join(", ") : "None";
   const responderLabel = doubleAwaitingSeat != null ? `Seat ${Number(doubleAwaitingSeat) + 1}` : "—";
   const proposerLabel = doubleProposedBySeat != null ? `Seat ${Number(doubleProposedBySeat) + 1}` : "—";
@@ -272,12 +272,12 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
     </div>
   ) : null;
   const mobileStateRow = isLiveMatch ? (
-    <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/15 bg-gradient-to-r from-zinc-900/70 via-zinc-900/55 to-zinc-800/60 px-2.5 py-1.5 text-sm leading-tight shadow-sm shadow-black/25 backdrop-blur-[2px]">
       <button
         type="button"
         disabled={!canOfferDouble}
         onClick={() => void offerDouble()}
-        className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white disabled:opacity-40"
+        className="rounded-md border border-amber-400/35 bg-amber-950/35 px-3 py-1.5 text-sm font-semibold text-amber-100 shadow-sm shadow-amber-950/30 transition-colors enabled:hover:border-amber-400/50 enabled:hover:bg-amber-950/45 disabled:border-zinc-600/25 disabled:bg-zinc-800/40 disabled:text-zinc-500 disabled:shadow-none"
       >
         Offer
       </button>
@@ -286,31 +286,37 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
           <button
             type="button"
             onClick={() => void respondDouble("accept")}
-            className="rounded-md border border-emerald-500/40 bg-emerald-900/30 px-2 py-1 text-[10px] font-semibold text-emerald-100"
+            className="rounded-md border border-emerald-400/45 bg-emerald-950/40 px-3 py-1.5 text-sm font-semibold text-emerald-100 shadow-sm shadow-emerald-950/25"
           >
             Accept
           </button>
           <button
             type="button"
             onClick={() => void respondDouble("decline")}
-            className="rounded-md border border-red-500/40 bg-red-900/30 px-2 py-1 text-[10px] font-semibold text-red-100"
+            className="rounded-md border border-rose-400/40 bg-rose-950/35 px-3 py-1.5 text-sm font-semibold text-rose-100 shadow-sm shadow-rose-950/25"
           >
             Decline
           </button>
         </>
       ) : null}
       {authoritativeTurnKey != null ? (
-        <span className={`rounded border px-2 py-1 font-semibold ${turnTimerTone}`}>{turnToken} {turnTimeToken}</span>
+        <span className={`rounded-md border px-3 py-1.5 text-sm font-semibold ${turnTimerTone}`}>{turnToken} {turnTimeToken}</span>
       ) : null}
-      <span className={`rounded border px-2 py-1 font-semibold ${doubleTimerTone}`}>{doubleToken} {doubleTimeToken}</span>
+      <span className={`rounded-md border px-3 py-1.5 text-sm font-semibold ${doubleTimerTone}`}>{doubleToken} {doubleTimeToken}</span>
       {pendingToken ? (
-        <span className="rounded border border-fuchsia-400/30 bg-fuchsia-950/20 px-2 py-1 font-semibold text-fuchsia-100">{pendingToken}</span>
+        <span className="rounded-md border border-fuchsia-400/40 bg-fuchsia-950/35 px-3 py-1.5 text-sm font-semibold text-fuchsia-100 shadow-sm shadow-fuchsia-950/20">
+          {pendingToken}
+        </span>
       ) : null}
       {statusShort ? (
-        <span className="rounded border border-amber-500/35 bg-amber-950/25 px-2 py-1 font-semibold text-amber-100">{statusShort}</span>
+        <span className="rounded-md border border-amber-400/40 bg-amber-950/35 px-3 py-1.5 text-sm font-semibold text-amber-100 shadow-sm shadow-amber-950/20">
+          {statusShort}
+        </span>
       ) : null}
       {strikeToken ? (
-        <span className="rounded border border-zinc-500/35 bg-zinc-900/35 px-2 py-1 font-semibold text-zinc-200">{strikeToken}</span>
+        <span className="rounded-md border border-slate-400/35 bg-slate-800/50 px-3 py-1.5 text-sm font-semibold text-slate-100 shadow-sm shadow-slate-950/30">
+          {strikeToken}
+        </span>
       ) : null}
     </div>
   ) : null;

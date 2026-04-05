@@ -11,6 +11,7 @@ import {
 } from "../../../lib/online-v2/onlineV2GameRegistry";
 import Ov2SharedCreateRoomModal from "./Ov2SharedCreateRoomModal";
 import Ov2SharedJoinByCodeModal from "./Ov2SharedJoinByCodeModal";
+import Ov2SharedQuickMatchBar from "./Ov2SharedQuickMatchBar";
 import Ov2SharedRoomDirectory from "./Ov2SharedRoomDirectory";
 
 export default function Ov2SharedLobbyScreen({
@@ -189,6 +190,17 @@ export default function Ov2SharedLobbyScreen({
           Join by code
         </button>
       </div>
+
+      <Ov2SharedQuickMatchBar
+        games={games}
+        selectedGameId={selectedGameId}
+        participantId={participantId}
+        displayName={displayName}
+        busy={busy}
+        setBusy={setBusy}
+        setMsg={setMsg}
+        onEnterRoom={onEnterRoom}
+      />
 
       <div
         className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain rounded-xl border border-white/10 bg-black/20 p-2"
