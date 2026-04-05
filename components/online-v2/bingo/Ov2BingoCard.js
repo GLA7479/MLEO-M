@@ -48,7 +48,7 @@ export default function Ov2BingoCard({ card, called, marks, onToggleMark = null,
               }}
               disabled={!canInteract || isFree || !canClickCell || (isMarked && !isFree)}
               className={[
-                "grid min-h-[1.85rem] place-items-center rounded-lg border text-xs font-semibold transition sm:min-h-[2.25rem] sm:text-sm",
+                "grid min-h-[1.85rem] place-items-center rounded-lg border transition sm:min-h-[2.25rem]",
                 isFree
                   ? "border-cyan-400/80 bg-gradient-to-br from-cyan-700/50 to-sky-900/40 text-cyan-50 shadow-inner shadow-cyan-900/40"
                   : "",
@@ -58,7 +58,18 @@ export default function Ov2BingoCard({ card, called, marks, onToggleMark = null,
                 !isFree && !isMarked ? "border-white/15 bg-white/5 text-zinc-100" : "",
               ].join(" ")}
             >
-              <span className={isMarked && !isFree ? "font-bold text-white" : ""}>{isFree ? "FREE" : n}</span>
+              <span
+                className={[
+                  isFree
+                    ? "text-[10px] font-bold leading-tight sm:text-[11px]"
+                    : "text-base font-semibold leading-none tabular-nums sm:text-xl",
+                  isMarked && !isFree ? "font-bold text-white" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {isFree ? "FREE" : n}
+              </span>
             </button>
           );
         })}

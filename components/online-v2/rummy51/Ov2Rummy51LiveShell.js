@@ -8,11 +8,13 @@ import {
   isOv2RoomIdQueryParam,
   ONLINE_V2_GAME_IDS,
 } from "../../../lib/online-v2/onlineV2GameRegistry";
+import { useOv2DebouncedReload } from "../../../hooks/useOv2DebouncedReload";
 import { useOv2LiveShellFatalRoomRedirect } from "../../../hooks/useOv2LiveShellFatalRoomRedirect";
 import { openOv2Rummy51Session } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
 import {
   fetchOv2RoomLedgerForViewer,
   leaveOv2RoomWithForfeitRetry,
+  Ov2RoomRpcError,
 } from "../../../lib/online-v2/ov2RoomsApi";
 import {
   formatSeatedStakeBlockers,
@@ -95,12 +97,20 @@ export default function Ov2Rummy51LiveShell() {
       loadedOnceForRoomRef.current = roomId;
     } catch (e) {
       setLoadError(e?.message || String(e));
-      setRoom(null);
-      setMembers([]);
+      const softLedger =
+        e instanceof Ov2RoomRpcError && e.code === "room_not_found_or_invalid_credentials";
+      if (!softLedger) {
+        setRoom(null);
+        setMembers([]);
+      }
     } finally {
       if (firstForRoom) setLoading(false);
     }
   }, [roomId, participantId]);
+
+  const debouncedReloadContext = useOv2DebouncedReload(() => {
+    void reloadContext();
+  }, 400);
 
   useEffect(() => {
     loadedOnceForRoomRef.current = null;
@@ -127,21 +137,21 @@ export default function Ov2Rummy51LiveShell() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "ov2_rooms", filter: `id=eq.${roomId}` },
         () => {
-          void reloadContext();
+          debouncedReloadContext();
         }
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "ov2_room_members", filter: `room_id=eq.${roomId}` },
         () => {
-          void reloadContext();
+          debouncedReloadContext();
         }
       )
       .subscribe();
     return () => {
       void ch.unsubscribe();
     };
-  }, [roomId, reloadContext]);
+  }, [roomId, debouncedReloadContext]);
 
   const isRoomMember = useMemo(
     () => Boolean(participantId && members.some(m => m.participant_key === participantId)),

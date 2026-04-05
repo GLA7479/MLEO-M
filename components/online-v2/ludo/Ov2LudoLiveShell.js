@@ -8,11 +8,13 @@ import {
   isOv2RoomIdQueryParam,
   ONLINE_V2_GAME_IDS,
 } from "../../../lib/online-v2/onlineV2GameRegistry";
+import { useOv2DebouncedReload } from "../../../hooks/useOv2DebouncedReload";
 import { useOv2LiveShellFatalRoomRedirect } from "../../../hooks/useOv2LiveShellFatalRoomRedirect";
 import { requestOv2LudoOpenSession } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import {
   fetchOv2RoomLedgerForViewer,
   leaveOv2RoomWithForfeitRetry,
+  Ov2RoomRpcError,
 } from "../../../lib/online-v2/ov2RoomsApi";
 import { getOv2ParticipantId } from "../../../lib/online-v2/ov2ParticipantId";
 import { supabaseMP } from "../../../lib/supabaseClients";
@@ -90,8 +92,12 @@ export default function Ov2LudoLiveShell() {
       loadedOnceForRoomRef.current = roomId;
     } catch (e) {
       setLoadError(e?.message || String(e));
-      setRoom(null);
-      setMembers([]);
+      const softLedger =
+        e instanceof Ov2RoomRpcError && e.code === "room_not_found_or_invalid_credentials";
+      if (!softLedger) {
+        setRoom(null);
+        setMembers([]);
+      }
     } finally {
       if (firstForRoom) setLoading(false);
     }
@@ -149,13 +155,21 @@ export default function Ov2LudoLiveShell() {
       } catch (e) {
         const msg = e?.message || String(e);
         setLoadError(msg);
-        setRoom(null);
-        setMembers([]);
+        const softLedger =
+          e instanceof Ov2RoomRpcError && e.code === "room_not_found_or_invalid_credentials";
+        if (!softLedger) {
+          setRoom(null);
+          setMembers([]);
+        }
         return { ok: false, error: msg };
       }
     },
     [roomId, participantId]
   );
+
+  const debouncedReloadContext = useOv2DebouncedReload(() => {
+    void reloadContext();
+  }, 400);
 
   useEffect(() => {
     loadedOnceForRoomRef.current = null;
@@ -182,21 +196,21 @@ export default function Ov2LudoLiveShell() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "ov2_rooms", filter: `id=eq.${roomId}` },
         () => {
-          void reloadContext();
+          debouncedReloadContext();
         }
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "ov2_room_members", filter: `room_id=eq.${roomId}` },
         () => {
-          void reloadContext();
+          debouncedReloadContext();
         }
       )
       .subscribe();
     return () => {
       void ch.unsubscribe();
     };
-  }, [roomId, reloadContext]);
+  }, [roomId, debouncedReloadContext]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !roomId || !participantId) return undefined;

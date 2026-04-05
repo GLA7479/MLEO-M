@@ -218,8 +218,21 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
     !rematchIntentBusy;
   const canHostStartNextMatch =
     isFinished && isHost && eligibleRematch >= 2 && readyRematch >= eligibleRematch && !startNextBusy;
-  const prizeTotal = result?.prize != null && Number.isFinite(Number(result.prize)) ? Math.floor(Number(result.prize)) : null;
-  const lossPerSeat = result?.lossPerSeat != null && Number.isFinite(Number(result.lossPerSeat)) ? Math.floor(Number(result.lossPerSeat)) : null;
+  const lossPerSeat =
+    result?.lossPerSeat != null && Number.isFinite(Number(result.lossPerSeat)) ? Math.floor(Number(result.lossPerSeat)) : null;
+  let prizeTotal =
+    result?.prize != null && Number.isFinite(Number(result.prize)) ? Math.floor(Number(result.prize)) : null;
+  // Strike walkover path (023) can emit __result__.prize = one stake while lossPerSeat = per-player stake; full pot = loss * seated count.
+  if (
+    prizeTotal != null &&
+    lossPerSeat != null &&
+    prizeTotal > 0 &&
+    lossPerSeat > 0 &&
+    prizeTotal <= lossPerSeat &&
+    seatedCount >= 2
+  ) {
+    prizeTotal = lossPerSeat * seatedCount;
+  }
   const winnerNet =
     prizeTotal != null && lossPerSeat != null ? Math.max(0, Math.floor(prizeTotal - lossPerSeat)) : null;
   const desktopStateSurface = isLiveMatch ? (

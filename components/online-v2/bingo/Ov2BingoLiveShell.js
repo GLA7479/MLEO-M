@@ -13,10 +13,12 @@ import {
   openOv2BingoSession,
 } from "../../../lib/online-v2/bingo/ov2BingoSessionAdapter";
 import { isOv2QuickMatchRoom } from "../../../lib/online-v2/shared-rooms/ov2QuickMatchUi";
+import { useOv2DebouncedReload } from "../../../hooks/useOv2DebouncedReload";
 import { useOv2LiveShellFatalRoomRedirect } from "../../../hooks/useOv2LiveShellFatalRoomRedirect";
 import {
   fetchOv2RoomLedgerForViewer,
   leaveOv2RoomWithForfeitRetry,
+  Ov2RoomRpcError,
 } from "../../../lib/online-v2/ov2RoomsApi";
 import { getOv2ParticipantId } from "../../../lib/online-v2/ov2ParticipantId";
 import { supabaseMP } from "../../../lib/supabaseClients";
@@ -98,12 +100,20 @@ export default function Ov2BingoLiveShell() {
       loadedOnceForRoomRef.current = roomId;
     } catch (e) {
       setLoadError(e?.message || String(e));
-      setRoom(null);
-      setMembers([]);
+      const softLedger =
+        e instanceof Ov2RoomRpcError && e.code === "room_not_found_or_invalid_credentials";
+      if (!softLedger) {
+        setRoom(null);
+        setMembers([]);
+      }
     } finally {
       if (firstForRoom) setLoading(false);
     }
   }, [roomId, participantId]);
+
+  const debouncedReloadContext = useOv2DebouncedReload(() => {
+    void reloadContext();
+  }, 400);
 
   useEffect(() => {
     loadedOnceForRoomRef.current = null;
@@ -177,21 +187,21 @@ export default function Ov2BingoLiveShell() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "ov2_rooms", filter: `id=eq.${roomId}` },
         () => {
-          void reloadContext();
+          debouncedReloadContext();
         }
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "ov2_room_members", filter: `room_id=eq.${roomId}` },
         () => {
-          void reloadContext();
+          debouncedReloadContext();
         }
       )
       .subscribe();
     return () => {
       void ch.unsubscribe();
     };
-  }, [roomId, reloadContext]);
+  }, [roomId, debouncedReloadContext]);
 
   const onLeaveTable = useCallback(async () => {
     if (!roomId || !participantId || leaveBusy) return;
