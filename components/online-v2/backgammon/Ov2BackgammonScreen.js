@@ -6,7 +6,7 @@ import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import {
   ov2BgClientLegalDestinationsForFrom,
-  ov2BgClientPickDieForMove,
+  ov2BgClientLegalDiceForFromTo,
 } from "../../../lib/online-v2/backgammon/ov2BackgammonClientLegality";
 import { useOv2BackgammonSession } from "../../../hooks/useOv2BackgammonSession";
 
@@ -167,6 +167,10 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   const [autoRoll, setAutoRoll] = useState(false);
   const autoRollBusyRef = useRef(false);
   const autoRollEffectGenRef = useRef(0);
+  /** When the same (from,to) is legal with more than one die value, player picks here. */
+  const [pendingDieChoice, setPendingDieChoice] = useState(
+    /** @type {{ fromPt: number, toPt: number, dice: number[] } | null} */ (null)
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -243,7 +247,12 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
 
   const resetSelection = useCallback(() => {
     setSelFrom(null);
+    setPendingDieChoice(null);
   }, []);
+
+  useEffect(() => {
+    setPendingDieChoice(null);
+  }, [vm.revision]);
 
   useEffect(() => {
     resetSelection();
@@ -253,17 +262,32 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     setInvalidFlashIdx(idx);
   }, []);
 
-  const executeMove = useCallback(
+  const tryCompleteMove = useCallback(
     async (fromPt, toPt) => {
-      const die = ov2BgClientPickDieForMove(legalityBoard, fromPt, toPt);
-      if (die == null) {
+      const opts = ov2BgClientLegalDiceForFromTo(legalityBoard, fromPt, toPt);
+      if (opts.length === 0) {
         setErr("No legal die for that move.");
         return;
       }
-      const r = await move(fromPt, toPt, die);
+      if (opts.length > 1) {
+        setPendingDieChoice({ fromPt, toPt, dice: opts });
+        return;
+      }
+      const r = await move(fromPt, toPt, opts[0]);
       if (r?.ok) resetSelection();
     },
     [legalityBoard, move, resetSelection, setErr]
+  );
+
+  const confirmDieChoice = useCallback(
+    async die => {
+      if (!pendingDieChoice) return;
+      const { fromPt, toPt } = pendingDieChoice;
+      setPendingDieChoice(null);
+      const r = await move(fromPt, toPt, die);
+      if (r?.ok) resetSelection();
+    },
+    [pendingDieChoice, move, resetSelection]
   );
 
   const onPointClick = useCallback(
@@ -301,13 +325,13 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           flashInvalid(idx);
           return;
         }
-        await executeMove(-1, idx);
+        await tryCompleteMove(-1, idx);
         return;
       }
 
       const from = selFrom;
       if (typeof from === "number" && from === idx) {
-        setSelFrom(null);
+        resetSelection();
         return;
       }
 
@@ -327,7 +351,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         flashInvalid(idx);
         return;
       }
-      await executeMove(from, idx);
+      await tryCompleteMove(from, idx);
     },
     [
       vm,
@@ -337,9 +361,10 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       pts24,
       legalDest,
       legalityBoard,
-      executeMove,
+      tryCompleteMove,
       flashInvalid,
       setErr,
+      resetSelection,
     ]
   );
 
@@ -349,8 +374,8 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       flashInvalid(-1);
       return;
     }
-    await executeMove(selFrom, -1);
-  }, [vm.readOnly, busy, selFrom, legalDest, executeMove, flashInvalid]);
+    await tryCompleteMove(selFrom, -1);
+  }, [vm.readOnly, busy, selFrom, legalDest, tryCompleteMove, flashInvalid]);
 
   const onBarClick = useCallback(() => {
     if (vm.readOnly || busy || String(vm.phase) !== "playing" || !vm.canClientMove) return;
@@ -767,6 +792,36 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           </button>
         ) : null}
       </div>
+
+      {pendingDieChoice && vm.canClientMove && String(vm.phase) === "playing" ? (
+        <div
+          className="flex shrink-0 flex-wrap items-center gap-1.5 rounded-md border border-sky-500/40 bg-sky-950/35 px-2 py-1.5 sm:gap-2"
+          role="dialog"
+          aria-label="Choose die for this move"
+        >
+          <span className="text-[9px] font-semibold text-sky-100 sm:text-[10px]">Which die?</span>
+          <div className="flex flex-wrap gap-1">
+            {pendingDieChoice.dice.map(d => (
+              <button
+                key={d}
+                type="button"
+                disabled={busy}
+                onClick={() => void confirmDieChoice(d)}
+                className="min-w-[2rem] rounded border border-sky-400/60 bg-sky-900/50 px-2 py-0.5 text-xs font-bold tabular-nums text-sky-50 disabled:opacity-45 sm:px-2.5 sm:py-1"
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="text-[8px] text-zinc-400 underline sm:text-[9px]"
+            onClick={() => setPendingDieChoice(null)}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden">
         <div className="flex w-full max-w-full flex-col overflow-hidden rounded-lg border border-amber-900/70 bg-gradient-to-b from-[#2e1c12] via-[#1a0f08] to-[#0f0805] p-px shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] max-md:h-[min(39svh,78vw)] max-md:max-h-[40svh] max-md:flex-none sm:rounded-xl sm:border-amber-900/80 sm:p-0.5 md:h-[min(56vh,520px)] md:max-w-4xl md:p-1 lg:max-w-[52rem] lg:p-1.5 xl:max-w-[56rem]">
