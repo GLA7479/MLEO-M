@@ -117,9 +117,9 @@ function BoardPoint({
       onClick={() => onPointClick(pointIndex)}
       className={`relative isolate flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch overflow-visible rounded-sm border border-black/25 outline-none transition-[box-shadow,transform] ${
         highlightDestination
-          ? "z-[2] ring-2 ring-emerald-400/90 ring-offset-1 ring-offset-[#1a0f08] shadow-[0_0_14px_rgba(52,211,153,0.35)]"
+          ? "z-[2] ring-2 ring-emerald-400/90 ring-offset-1 ring-offset-[#24160f] shadow-[0_0_14px_rgba(52,211,153,0.35)]"
           : ""
-      } ${selectedFrom ? "z-[2] ring-2 ring-sky-400 ring-offset-2 ring-offset-[#1a0f08]" : ""} ${
+      } ${selectedFrom ? "z-[2] ring-2 ring-sky-400 ring-offset-2 ring-offset-[#24160f]" : ""} ${
         invalidFlash ? "animate-pulse ring-2 ring-rose-500/70" : ""
       } ${mine ? "ring-1 ring-emerald-500/40" : ""} ${isHome ? "ring-1 ring-amber-300/35" : ""} disabled:cursor-not-allowed disabled:opacity-50`}
       style={{ WebkitTapHighlightColor: "transparent" }}
@@ -635,7 +635,11 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   const barInvalidBot = invalidFlashIdx === -2 && vm.mySeat === 0;
 
   const barCol = (
-    <div className="flex w-9 shrink-0 flex-col border-x border-amber-900/90 bg-gradient-to-b from-zinc-900 to-black sm:w-11 md:w-14">
+    <div
+      className={`flex w-9 shrink-0 flex-col border-x border-amber-800/80 bg-gradient-to-b from-zinc-800/95 to-zinc-950 sm:w-11 md:w-14 ${
+        swapBoardHalvesForViewer ? "flex-col-reverse" : ""
+      }`}
+    >
       <button
         type="button"
         disabled={boardDisabled || vm.mySeat !== 1 || displayBar[1] <= 0 || !vm.canClientMove}
@@ -681,7 +685,11 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   );
 
   const offColumn = (
-    <div className="flex w-10 shrink-0 flex-col border-l border-amber-900/50 bg-black/40 sm:w-12 md:w-[3.25rem]">
+    <div
+      className={`flex w-10 shrink-0 flex-col border-l border-amber-800/55 bg-zinc-950/55 sm:w-12 md:w-[3.25rem] ${
+        swapBoardHalvesForViewer ? "flex-col-reverse" : ""
+      }`}
+    >
       <button
         type="button"
         disabled={!bearHighlight || vm.mySeat !== 1}
@@ -823,8 +831,8 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   );
 
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden px-1 pb-0.5 pt-0 text-white sm:gap-1 sm:px-2 sm:pb-1">
-      <div className="shrink-0 rounded-md border border-white/10 bg-black/35 px-1.5 py-1 sm:px-2 sm:py-1.5">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden bg-gradient-to-b from-[#16120f] to-[#080605] px-1 pb-0.5 pt-0 text-white sm:gap-1 sm:px-2 sm:pb-1">
+      <div className="shrink-0 rounded-md border border-white/[0.14] bg-zinc-950/55 px-1.5 py-1 shadow-sm shadow-black/20 sm:px-2 sm:py-1.5">
         <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
           <div className="min-w-0 text-[8px] leading-snug text-zinc-300 sm:text-[9px] md:text-[10px]">
             <span className="font-medium">
@@ -876,110 +884,22 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         </div>
       </div>
 
-      {vaultClaimBusy ? (
-        <p className="shrink-0 text-center text-[9px] text-zinc-400 sm:text-[10px]">Updating balance…</p>
-      ) : null}
-
-      {err ? (
-        <div className="shrink-0 rounded border border-amber-500/35 bg-amber-950/30 px-1.5 py-0.5 text-[8px] text-amber-100 sm:px-2 sm:py-1 sm:text-[9px]">
-          {err}
-          <button type="button" className="ml-1.5 underline" onClick={() => setErr("")}>
-            Dismiss
-          </button>
-        </div>
-      ) : null}
-
-      <div className="flex shrink-0 flex-wrap items-center gap-1 sm:gap-1.5">
-        {String(vm.phase) === "playing" ? (
-          <button
-            type="button"
-            onClick={() => persistAutoRoll(!autoRoll)}
-            className={`rounded-md border px-2 py-1 text-[9px] font-bold uppercase tracking-wide sm:py-1.5 sm:text-[10px] ${
-              autoRoll
-                ? "border-amber-400/60 bg-amber-950/50 text-amber-100 shadow-sm shadow-amber-950/25"
-                : "border-white/20 bg-white/5 text-zinc-500"
-            }`}
-          >
-            Auto
-          </button>
+      <div className="flex min-h-[3rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.25rem]">
+        {vaultClaimBusy ? (
+          <p className="text-center text-[9px] text-zinc-400 sm:text-[10px]">Updating balance…</p>
         ) : null}
-        {vm.canClientRoll ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void roll()}
-            className="rounded-md border border-violet-500/45 bg-violet-950/40 px-2 py-1 text-[9px] font-bold text-violet-100 disabled:opacity-45 sm:px-2.5 sm:py-1.5 sm:text-[10px] md:text-xs"
-          >
-            {busy ? "Rolling…" : "Roll"}
-          </button>
-        ) : null}
-        {vm.canClientMove && selFrom != null ? (
-          <button type="button" className="text-[8px] text-zinc-500 underline sm:text-[9px]" onClick={resetSelection}>
-            Clear selection
-          </button>
-        ) : null}
-        {draftBase ? (
-          <>
-            <button
-              type="button"
-              disabled={busy || draftSteps.length === 0}
-              onClick={() => undoDraft()}
-              className="rounded-md border border-zinc-500/40 bg-zinc-900/50 px-2 py-1 text-[9px] font-semibold text-zinc-200 disabled:opacity-40 sm:text-[10px]"
-            >
-              Undo
+        {err ? (
+          <div className="rounded border border-amber-500/40 bg-amber-950/40 px-1.5 py-0.5 text-[8px] text-amber-100 sm:px-2 sm:py-1 sm:text-[9px]">
+            {err}
+            <button type="button" className="ml-1.5 underline" onClick={() => setErr("")}>
+              Dismiss
             </button>
-            <button
-              type="button"
-              disabled={busy || draftSteps.length === 0}
-              onClick={() => resetDraft()}
-              className="rounded-md border border-zinc-500/40 bg-zinc-900/50 px-2 py-1 text-[9px] font-semibold text-zinc-200 disabled:opacity-40 sm:text-[10px]"
-            >
-              Reset
-            </button>
-            <button
-              type="button"
-              disabled={busy || !submitValidation.ok}
-              onClick={() => void confirmTurn()}
-              className="rounded-md border border-emerald-500/55 bg-emerald-950/40 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-emerald-100 disabled:opacity-40 sm:text-[10px]"
-            >
-              {busy ? "…" : "Confirm turn"}
-            </button>
-          </>
+          </div>
         ) : null}
       </div>
 
-      {pendingDieChoice && vm.canClientMove && String(vm.phase) === "playing" ? (
-        <div
-          className="flex shrink-0 flex-wrap items-center gap-1.5 rounded-md border border-sky-500/40 bg-sky-950/35 px-2 py-1.5 sm:gap-2"
-          role="dialog"
-          aria-label="Choose die for this move"
-        >
-          <span className="text-[9px] font-semibold text-sky-100 sm:text-[10px]">Which die?</span>
-          <div className="flex flex-wrap gap-1">
-            {pendingDieChoice.dice.map(d => (
-              <button
-                key={d}
-                type="button"
-                disabled={busy}
-                onClick={() => void confirmDieChoice(d)}
-                className="min-w-[2rem] rounded border border-sky-400/60 bg-sky-900/50 px-2 py-0.5 text-xs font-bold tabular-nums text-sky-50 disabled:opacity-45 sm:px-2.5 sm:py-1"
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="text-[8px] text-zinc-400 underline sm:text-[9px]"
-            onClick={() => setPendingDieChoice(null)}
-          >
-            Cancel
-          </button>
-        </div>
-      ) : null}
-
       <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden">
-        <div className="flex w-full max-w-full flex-col overflow-hidden rounded-lg border border-amber-900/70 bg-gradient-to-b from-[#2e1c12] via-[#1a0f08] to-[#0f0805] p-px shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] max-md:h-[min(39svh,78vw)] max-md:max-h-[40svh] max-md:flex-none sm:rounded-xl sm:border-amber-900/80 sm:p-0.5 md:h-[min(56vh,520px)] md:max-w-4xl md:p-1 lg:max-w-[52rem] lg:p-1.5 xl:max-w-[56rem]">
+        <div className="flex w-full max-w-full flex-col overflow-hidden rounded-lg border border-amber-800/75 bg-gradient-to-b from-[#3a2618] via-[#221409] to-[#120a06] p-px shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_8px_28px_rgba(0,0,0,0.45)] max-md:h-[min(43svh,86vw)] max-md:max-h-[44svh] max-md:flex-none sm:rounded-xl sm:border-amber-800/85 sm:p-0.5 md:h-[min(62vh,572px)] md:max-w-4xl md:p-1 lg:max-w-[52rem] lg:p-1.5 xl:max-w-[56rem]">
           <div className="pointer-events-none flex shrink-0 items-end justify-between gap-1 px-0.5 pb-px sm:px-1 sm:pb-0.5">
             <span className="text-[7px] font-bold uppercase tracking-wide text-zinc-500 sm:text-[8px] md:text-[9px]">Outer</span>
             <span className="w-9 shrink-0 text-center text-[7px] font-bold uppercase tracking-[0.16em] text-amber-200/80 sm:w-11 sm:text-[8px] md:w-14 md:text-[9px]">
@@ -1007,6 +927,97 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
             {offColumn}
           </div>
         </div>
+      </div>
+
+      <div className="mt-1 flex min-h-[3.25rem] shrink-0 flex-col justify-center sm:min-h-[3.5rem]">
+        {pendingDieChoice && vm.canClientMove && String(vm.phase) === "playing" ? (
+          <div
+            className="flex flex-wrap items-center gap-1.5 rounded-md border border-sky-500/45 bg-sky-950/45 px-2 py-1.5 shadow-sm shadow-black/25 sm:gap-2"
+            role="dialog"
+            aria-label="Choose die for this move"
+          >
+            <span className="text-[9px] font-semibold text-sky-100 sm:text-[10px]">Which die?</span>
+            <div className="flex flex-wrap gap-1">
+              {pendingDieChoice.dice.map(d => (
+                <button
+                  key={d}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void confirmDieChoice(d)}
+                  className="min-w-[2rem] rounded border border-sky-400/60 bg-sky-900/50 px-2 py-0.5 text-xs font-bold tabular-nums text-sky-50 disabled:opacity-45 sm:px-2.5 sm:py-1"
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="text-[8px] text-zinc-400 underline sm:text-[9px]"
+              onClick={() => setPendingDieChoice(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex min-h-[2.75rem] shrink-0 flex-wrap items-center gap-1 sm:gap-1.5">
+        {String(vm.phase) === "playing" ? (
+          <button
+            type="button"
+            onClick={() => persistAutoRoll(!autoRoll)}
+            className={`rounded-md border px-2 py-1 text-[9px] font-bold uppercase tracking-wide sm:py-1.5 sm:text-[10px] ${
+              autoRoll
+                ? "border-amber-400/60 bg-amber-950/50 text-amber-100 shadow-sm shadow-amber-950/25"
+                : "border-white/25 bg-white/[0.07] text-zinc-400"
+            }`}
+          >
+            Auto
+          </button>
+        ) : null}
+        {vm.canClientRoll ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void roll()}
+            className="rounded-md border border-violet-500/45 bg-violet-950/40 px-2 py-1 text-[9px] font-bold text-violet-100 disabled:opacity-45 sm:px-2.5 sm:py-1.5 sm:text-[10px] md:text-xs"
+          >
+            {busy ? "Rolling…" : "Roll"}
+          </button>
+        ) : null}
+        {vm.canClientMove && selFrom != null ? (
+          <button type="button" className="text-[8px] text-zinc-500 underline sm:text-[9px]" onClick={resetSelection}>
+            Clear selection
+          </button>
+        ) : null}
+        {draftBase ? (
+          <>
+            <button
+              type="button"
+              disabled={busy || draftSteps.length === 0}
+              onClick={() => undoDraft()}
+              className="rounded-md border border-zinc-500/45 bg-zinc-900/55 px-2 py-1 text-[9px] font-semibold text-zinc-200 disabled:opacity-40 sm:text-[10px]"
+            >
+              Undo
+            </button>
+            <button
+              type="button"
+              disabled={busy || draftSteps.length === 0}
+              onClick={() => resetDraft()}
+              className="rounded-md border border-zinc-500/45 bg-zinc-900/55 px-2 py-1 text-[9px] font-semibold text-zinc-200 disabled:opacity-40 sm:text-[10px]"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              disabled={busy || !submitValidation.ok}
+              onClick={() => void confirmTurn()}
+              className="rounded-md border border-emerald-500/55 bg-emerald-950/45 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-emerald-100 disabled:opacity-40 sm:text-[10px]"
+            >
+              {busy ? "…" : "Confirm turn"}
+            </button>
+          </>
+        ) : null}
       </div>
 
       <span className="sr-only">
