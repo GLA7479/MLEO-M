@@ -6,8 +6,11 @@ import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { useOv2BackgammonSession } from "../../../hooks/useOv2BackgammonSession";
 
-/** Board order: top row L→R outer then opponent home; bottom row L→R outer then your home (seat 0). Matches engine geometry. */
-const TOP_OUTER = [17, 16, 15, 14, 13, 12];
+/**
+ * Visual column order must match real board geometry: top-left column j pairs index (12+j) above with (11−j) below
+ * (standard 13–18 over 12–7). Bottom outer is already [11..6] L→R; top outer must be [12..17] L→R — not reversed.
+ */
+const TOP_OUTER = [12, 13, 14, 15, 16, 17];
 const TOP_HOME_S1 = [18, 19, 20, 21, 22, 23];
 const BOT_OUTER = [11, 10, 9, 8, 7, 6];
 const BOT_HOME_S0 = [5, 4, 3, 2, 1, 0];
@@ -22,29 +25,36 @@ function CheckerStack({ count, maxVisible = 5, compact = false, stackFrom = "top
   }
   const isLight = count > 0;
   const dot = compact
-    ? "h-3.5 w-3.5 min-h-[14px] min-w-[14px] border border-black/40 shadow-sm sm:h-4 sm:w-4 sm:min-h-4 sm:min-w-4"
-    : "h-4 w-4 min-h-4 min-w-4 border border-black/45 shadow-sm sm:h-[1.1rem] sm:w-[1.1rem] sm:min-h-[1.1rem] sm:min-w-[1.1rem] md:h-5 md:w-5 md:min-h-5 md:min-w-5";
+    ? "h-3.5 w-3.5 min-h-[14px] min-w-[14px] border border-black/50 shadow-[0_1px_2px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-black/20 sm:h-4 sm:w-4 sm:min-h-4 sm:min-w-4"
+    : "h-4 w-4 min-h-4 min-w-4 border border-black/50 shadow-[0_1px_3px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.14)] ring-1 ring-black/25 sm:h-[1.1rem] sm:w-[1.1rem] sm:min-h-[1.1rem] sm:min-w-[1.1rem] md:h-5 md:w-5 md:min-h-5 md:min-w-5";
   const disks = n > maxVisible ? maxVisible - 1 : n;
   const label =
     n > maxVisible ? (
-      <span className="shrink-0 text-[8px] font-bold tabular-nums leading-none text-white sm:text-[9px] md:text-[10px]">{n}</span>
+      <span
+        className={`shrink-0 text-[8px] font-bold tabular-nums leading-none text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.85)] sm:text-[9px] md:text-[10px] ${
+          stackFrom === "top" ? "mb-px sm:mb-0.5" : "mt-px sm:mt-0.5"
+        }`}
+      >
+        {n}
+      </span>
     ) : null;
   const diskEls = Array.from({ length: disks }, (_, i) => (
     <div
       key={i}
-      className={`shrink-0 rounded-full ${dot} ${isLight ? "bg-gradient-to-b from-amber-100 to-amber-200" : "bg-gradient-to-b from-zinc-600 to-zinc-800"}`}
+      className={`shrink-0 rounded-full ${dot} ${isLight ? "bg-gradient-to-b from-amber-50 to-amber-200" : "bg-gradient-to-b from-zinc-500 to-zinc-900"}`}
     />
   ));
+  const stackGap = "gap-[2.5px]";
   if (stackFrom === "bottom") {
     return (
-      <div className={`flex flex-col-reverse items-center justify-start gap-px ${className}`}>
+      <div className={`inline-flex flex-col-reverse items-center ${stackGap} ${className}`}>
         {diskEls}
         {label}
       </div>
     );
   }
   return (
-    <div className={`flex flex-col items-center justify-start gap-px ${className}`}>
+    <div className={`inline-flex flex-col items-center ${stackGap} ${className}`}>
       {label}
       {diskEls}
     </div>
@@ -88,7 +98,7 @@ function BoardPoint({
       type="button"
       disabled={disabled}
       onClick={() => onPointClick(pointIndex)}
-      className={`relative flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch overflow-visible rounded-sm border border-black/25 outline-none transition-[box-shadow,transform] ${
+      className={`relative isolate flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch overflow-visible rounded-sm border border-black/25 outline-none transition-[box-shadow,transform] ${
         selected ? "z-[1] ring-2 ring-sky-400 ring-offset-2 ring-offset-[#1a0f08]" : ""
       } ${mine ? "ring-1 ring-emerald-500/40" : ""} ${isHome ? "ring-1 ring-amber-300/35" : ""} disabled:cursor-not-allowed disabled:opacity-50`}
       style={{ WebkitTapHighlightColor: "transparent" }}
@@ -99,11 +109,11 @@ function BoardPoint({
         style={{ clipPath: clip }}
       />
       {direction === "down" ? (
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center px-0.5 pt-0.5">
+        <div className="pointer-events-none absolute left-[7%] right-[7%] top-0 z-[1] flex flex-col items-center justify-start pt-0.5 sm:left-[6%] sm:right-[6%] sm:pt-1">
           <CheckerStack count={value} compact={compact} stackFrom="top" />
         </div>
       ) : (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-0.5 pb-0.5">
+        <div className="pointer-events-none absolute bottom-0 left-[7%] right-[7%] top-auto z-[1] flex flex-col items-center justify-end pb-0.5 sm:left-[6%] sm:right-[6%] sm:pb-1">
           <CheckerStack count={value} compact={compact} stackFrom="bottom" />
         </div>
       )}
