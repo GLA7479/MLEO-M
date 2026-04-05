@@ -12,6 +12,10 @@ import {
 import { requestOv2CheckersClaimSettlement } from "../lib/online-v2/checkers/ov2CheckersSettlement";
 import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
+import {
+  normalizeOv2CheckersCells,
+  ov2CheckersLegalTosForFrom,
+} from "../lib/online-v2/checkers/ov2CheckersClientLegality";
 
 /** @param {null|undefined|{ room?: object, members?: unknown[], self?: { participant_key?: string } }} baseContext */
 export function useOv2CheckersSession(baseContext) {
@@ -196,9 +200,7 @@ export function useOv2CheckersSession(baseContext) {
     const phase = snap ? String(snap.phase || "").toLowerCase() : "";
     const board = snap?.board && typeof snap.board === "object" ? snap.board : {};
     const cellsRaw = board.cells;
-    const cells = Array.isArray(cellsRaw) ? cellsRaw.map(x => Math.floor(Number(x)) || 0) : new Array(64).fill(0);
-    while (cells.length < 64) cells.push(0);
-    if (cells.length > 64) cells.length = 64;
+    const cells = normalizeOv2CheckersCells(Array.isArray(cellsRaw) ? cellsRaw : []);
     const missed = snap?.missedTurns && typeof snap.missedTurns === "object" ? snap.missedTurns : {};
     const m0 = Math.max(0, Math.min(3, Number(missed["0"] ?? missed[0] ?? 0) || 0));
     const m1 = Math.max(0, Math.min(3, Number(missed["1"] ?? missed[1] ?? 0) || 0));
@@ -206,20 +208,34 @@ export function useOv2CheckersSession(baseContext) {
     const turnTimeLeftMs =
       phase === "playing" && turnDeadline != null ? Math.max(0, turnDeadline - nowMs) : null;
     const turnTimeLeftSec = turnTimeLeftMs != null ? Math.ceil(turnTimeLeftMs / 1000) : null;
+    const turnSeat = snap?.turnSeat ?? null;
+    const mySeatVm = snap?.mySeat ?? null;
+    const jumpChainAtVm =
+      snap?.jumpChainAt != null && Number.isFinite(Number(snap.jumpChainAt)) ? Number(snap.jumpChainAt) : null;
+    const chainLegals =
+      phase === "playing" && jumpChainAtVm != null && turnSeat != null
+        ? ov2CheckersLegalTosForFrom(cells, turnSeat, jumpChainAtVm, jumpChainAtVm)
+        : [];
+    const chainUnblocks =
+      jumpChainAtVm != null &&
+      chainLegals.length > 0 &&
+      mySeatVm != null &&
+      turnSeat != null &&
+      Number(mySeatVm) === Number(turnSeat);
     return {
       phase,
       cells,
-      turnSeat: snap?.turnSeat ?? null,
-      mySeat: snap?.mySeat ?? null,
+      turnSeat,
+      mySeat: mySeatVm,
       winnerSeat: snap?.winnerSeat ?? null,
-      canClientMove: snap?.canClientMove === true,
-      readOnly: snap?.boardViewReadOnly === true,
+      canClientMove: snap?.canClientMove === true || chainUnblocks,
+      readOnly: snap?.boardViewReadOnly === true && !chainUnblocks,
       revision: snap?.revision ?? 0,
       sessionId: snap?.sessionId != null ? String(snap.sessionId) : "",
       turnDeadline,
       turnTimeLeftSec,
       missedStreakBySeat: { 0: m0, 1: m1 },
-      jumpChainAt: snap?.jumpChainAt != null && Number.isFinite(Number(snap.jumpChainAt)) ? Number(snap.jumpChainAt) : null,
+      jumpChainAt: jumpChainAtVm,
     };
   }, [snap, nowMs]);
 
