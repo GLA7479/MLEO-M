@@ -306,7 +306,16 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     return ov2BgClientValidateSubmitSteps({ ...draftBase, turnSeat: vm.turnSeat }, draftSteps);
   }, [draftBase, vm.turnSeat, draftSteps]);
 
-  const boardColDir = vm.mySeat === 1 ? "flex-col-reverse" : "flex-col";
+  /** Seat 1 sees the same shell as seat 0 but swaps outer/home vertical halves + triangle dirs (engine indices unchanged). */
+  const swapBoardHalvesForViewer = vm.mySeat === 1;
+  const leftTopIndices = swapBoardHalvesForViewer ? BOT_OUTER : TOP_OUTER;
+  const leftTopDir = swapBoardHalvesForViewer ? "down" : "down";
+  const leftBotIndices = swapBoardHalvesForViewer ? TOP_OUTER : BOT_OUTER;
+  const leftBotDir = swapBoardHalvesForViewer ? "up" : "up";
+  const rightTopIndices = swapBoardHalvesForViewer ? BOT_HOME_S0 : TOP_HOME_S1;
+  const rightTopDir = swapBoardHalvesForViewer ? "down" : "down";
+  const rightBotIndices = swapBoardHalvesForViewer ? TOP_HOME_S1 : BOT_HOME_S0;
+  const rightBotDir = swapBoardHalvesForViewer ? "up" : "up";
 
   const legalDest = useMemo(() => {
     if (selFrom == null || !vm.canClientMove || vm.readOnly) return new Set();
@@ -977,23 +986,23 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
               Bar
             </span>
             <span className="min-w-0 flex-1 text-center text-[7px] font-bold uppercase tracking-wide text-amber-100/85 sm:text-[8px] md:text-[9px]">
-              P2 home
+              Opp home · yours
             </span>
             <span className="w-10 shrink-0 text-center text-[7px] font-bold uppercase tracking-[0.14em] text-amber-200/80 sm:w-12 sm:text-[8px] md:w-[3.25rem] md:text-[9px]">
               Off
             </span>
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 flex-row gap-px overflow-hidden sm:gap-1">
-            <div className={`flex h-full min-h-0 min-w-0 flex-1 ${boardColDir}`}>
-              <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(TOP_OUTER, "down")}</div>
+            <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+              <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(leftTopIndices, leftTopDir)}</div>
               <div className="h-px shrink-0 bg-black/50" aria-hidden />
-              <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(BOT_OUTER, "up")}</div>
+              <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(leftBotIndices, leftBotDir)}</div>
             </div>
             {barCol}
-            <div className={`flex h-full min-h-0 min-w-0 flex-1 ${boardColDir}`}>
-              <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(TOP_HOME_S1, "down")}</div>
+            <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+              <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(rightTopIndices, rightTopDir)}</div>
               <div className="h-px shrink-0 bg-black/50" aria-hidden />
-              <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(BOT_HOME_S0, "up")}</div>
+              <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(rightBotIndices, rightBotDir)}</div>
             </div>
             {offColumn}
           </div>
@@ -1001,7 +1010,8 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       </div>
 
       <span className="sr-only">
-        Backgammon table: your home is shown toward the bottom; bar between halves. Confirm turn to commit moves.
+        Backgammon table: your home is in the lower half of the home column; opponent home above it; bar between board
+        halves. Confirm turn to commit moves.
       </span>
 
       {isFinished ? (

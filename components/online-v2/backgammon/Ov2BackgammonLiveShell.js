@@ -192,14 +192,14 @@ export default function Ov2BackgammonLiveShell() {
       .channel(`ov2_bg_shell_room:${roomId}`)
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "ov2_rooms", filter: `id=eq.${roomId}` },
+        { event: "*", schema: "public", table: "ov2_rooms", filter: `id=eq.${roomId}` },
         () => {
           debouncedReloadContext();
         }
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "ov2_room_members", filter: `room_id=eq.${roomId}` },
+        { event: "*", schema: "public", table: "ov2_room_members", filter: `room_id=eq.${roomId}` },
         () => {
           debouncedReloadContext();
         }
