@@ -1,10 +1,16 @@
 "use client";
 
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
+import {
+  ov2BgClientLegalDestinationsForFrom,
+  ov2BgClientPickDieForMove,
+} from "../../../lib/online-v2/backgammon/ov2BackgammonClientLegality";
 import { useOv2BackgammonSession } from "../../../hooks/useOv2BackgammonSession";
+
+const AUTO_ROLL_STORAGE_KEY = "ov2_bg_auto_roll";
 
 /**
  * Visual column order must match real board geometry: top-left column j pairs index (12+j) above with (11−j) below
@@ -25,8 +31,8 @@ function CheckerStack({ count, maxVisible = 5, compact = false, stackFrom = "top
   }
   const isLight = count > 0;
   const dot = compact
-    ? "h-3.5 w-3.5 min-h-[14px] min-w-[14px] border border-black/50 shadow-[0_1px_2px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-black/20 sm:h-4 sm:w-4 sm:min-h-4 sm:min-w-4"
-    : "h-4 w-4 min-h-4 min-w-4 border border-black/50 shadow-[0_1px_3px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.14)] ring-1 ring-black/25 sm:h-[1.1rem] sm:w-[1.1rem] sm:min-h-[1.1rem] sm:min-w-[1.1rem] md:h-5 md:w-5 md:min-h-5 md:min-w-5";
+    ? "h-[15px] w-[15px] min-h-[15px] min-w-[15px] border border-black/50 shadow-[0_1px_2px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-black/20 sm:h-[18px] sm:w-[18px] sm:min-h-[18px] sm:min-w-[18px]"
+    : "h-[18px] w-[18px] min-h-[18px] min-w-[18px] border border-black/50 shadow-[0_1px_3px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.14)] ring-1 ring-black/25 sm:h-[1.35rem] sm:w-[1.35rem] sm:min-h-[1.35rem] sm:min-w-[1.35rem] md:h-[1.45rem] md:w-[1.45rem] md:min-h-[1.45rem] md:min-w-[1.45rem] lg:h-6 lg:w-6 lg:min-h-6 lg:min-w-6";
   const disks = n > maxVisible ? maxVisible - 1 : n;
   const label =
     n > maxVisible ? (
@@ -44,7 +50,7 @@ function CheckerStack({ count, maxVisible = 5, compact = false, stackFrom = "top
       className={`shrink-0 rounded-full ${dot} ${isLight ? "bg-gradient-to-b from-amber-50 to-amber-200" : "bg-gradient-to-b from-zinc-500 to-zinc-900"}`}
     />
   ));
-  const stackGap = "gap-[2.5px]";
+  const stackGap = "gap-[3px] sm:gap-[3.5px]";
   if (stackFrom === "bottom") {
     return (
       <div className={`inline-flex flex-col-reverse items-center ${stackGap} ${className}`}>
@@ -66,7 +72,9 @@ function CheckerStack({ count, maxVisible = 5, compact = false, stackFrom = "top
  *   pointIndex: number,
  *   value: number,
  *   mySeat: number|null,
- *   selected: boolean,
+ *   selectedFrom: boolean,
+ *   highlightDestination: boolean,
+ *   invalidFlash: boolean,
  *   disabled: boolean,
  *   direction: 'down' | 'up',
  *   tone: 'a' | 'b',
@@ -79,7 +87,9 @@ function BoardPoint({
   pointIndex,
   value,
   mySeat,
-  selected,
+  selectedFrom,
+  highlightDestination,
+  invalidFlash,
   disabled,
   direction,
   tone,
@@ -99,7 +109,11 @@ function BoardPoint({
       disabled={disabled}
       onClick={() => onPointClick(pointIndex)}
       className={`relative isolate flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch overflow-visible rounded-sm border border-black/25 outline-none transition-[box-shadow,transform] ${
-        selected ? "z-[1] ring-2 ring-sky-400 ring-offset-2 ring-offset-[#1a0f08]" : ""
+        highlightDestination
+          ? "z-[2] ring-2 ring-emerald-400/90 ring-offset-1 ring-offset-[#1a0f08] shadow-[0_0_14px_rgba(52,211,153,0.35)]"
+          : ""
+      } ${selectedFrom ? "z-[2] ring-2 ring-sky-400 ring-offset-2 ring-offset-[#1a0f08]" : ""} ${
+        invalidFlash ? "animate-pulse ring-2 ring-rose-500/70" : ""
       } ${mine ? "ring-1 ring-emerald-500/40" : ""} ${isHome ? "ring-1 ring-amber-300/35" : ""} disabled:cursor-not-allowed disabled:opacity-50`}
       style={{ WebkitTapHighlightColor: "transparent" }}
       aria-label={`Point ${pointIndex + 1}`}
@@ -122,19 +136,41 @@ function BoardPoint({
 }
 
 /**
- * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string } } | null, onSessionRefresh?: (prev: string, rpcNew?: string, opts?: { expectClearedSession?: boolean }) => Promise<unknown> }} props
+ * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string }, onLeaveToLobby?: () => void|Promise<void>, leaveToLobbyBusy?: boolean } | null, onSessionRefresh?: (prev: string, rpcNew?: string, opts?: { expectClearedSession?: boolean }) => Promise<unknown> }} props
  */
 export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefresh }) {
   const router = useRouter();
   const session = useOv2BackgammonSession(contextInput ?? undefined);
-  const { vm, busy, err, setErr, roll, move, requestRematch, cancelRematch, startNextMatch, isHost, roomMatchSeq } = session;
-  const [selDie, setSelDie] = useState(/** @type {number|null} */ (null));
+  const { vm, busy, err, setErr, roll, move, requestRematch, cancelRematch, startNextMatch, isHost, roomMatchSeq } =
+    session;
   const [selFrom, setSelFrom] = useState(/** @type {number|'bar'|null} */ (null));
   const [rematchBusy, setRematchBusy] = useState(false);
   const [startNextBusy, setStartNextBusy] = useState(false);
   const [exitBusy, setExitBusy] = useState(false);
   const [exitErr, setExitErr] = useState("");
   const [narrowViewport, setNarrowViewport] = useState(true);
+  const [invalidFlashIdx, setInvalidFlashIdx] = useState(/** @type {number|null} */ (null));
+  const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
+  const [autoRoll, setAutoRoll] = useState(false);
+  const autoRollBusyRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      setAutoRoll(window.localStorage.getItem(AUTO_ROLL_STORAGE_KEY) === "1");
+    } catch {
+      setAutoRoll(false);
+    }
+  }, []);
+
+  const persistAutoRoll = useCallback(next => {
+    setAutoRoll(next);
+    try {
+      window.localStorage.setItem(AUTO_ROLL_STORAGE_KEY, next ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -145,10 +181,26 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     return () => mq.removeEventListener("change", apply);
   }, []);
 
+  useEffect(() => {
+    if (invalidFlashIdx == null) return undefined;
+    const t = window.setTimeout(() => setInvalidFlashIdx(null), 420);
+    return () => window.clearTimeout(t);
+  }, [invalidFlashIdx]);
+
   const room = contextInput?.room && typeof contextInput.room === "object" ? contextInput.room : null;
   const roomId = room?.id != null ? String(room.id) : "";
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
   const selfKey = contextInput?.self?.participant_key?.trim() || "";
+  const onLeaveToLobby =
+    contextInput && typeof contextInput === "object" && typeof contextInput.onLeaveToLobby === "function"
+      ? contextInput.onLeaveToLobby
+      : null;
+  const leaveToLobbyBusy = Boolean(
+    contextInput && typeof contextInput === "object" && contextInput.leaveToLobbyBusy === true
+  );
+
+  const stakePerSeat =
+    room?.stake_per_seat != null && Number.isFinite(Number(room.stake_per_seat)) ? Number(room.stake_per_seat) : null;
 
   const myBar = vm.mySeat === 0 ? vm.bar[0] : vm.mySeat === 1 ? vm.bar[1] : 0;
 
@@ -158,21 +210,47 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     return p.slice(0, 24);
   }, [vm.pts]);
 
-  const uniqueDice = useMemo(() => {
-    const seen = new Set();
-    const out = [];
-    for (const d of vm.diceAvail) {
-      if (!Number.isFinite(d) || seen.has(d)) continue;
-      seen.add(d);
-      out.push(d);
-    }
-    return out.sort((a, b) => b - a);
-  }, [vm.diceAvail]);
+  const legalityBoard = useMemo(
+    () => ({
+      pts: pts24,
+      bar: vm.bar,
+      off: vm.off,
+      turnSeat: vm.turnSeat,
+      diceAvail: vm.diceAvail,
+    }),
+    [pts24, vm.bar, vm.off, vm.turnSeat, vm.diceAvail]
+  );
+
+  const legalDest = useMemo(() => {
+    if (selFrom == null || !vm.canClientMove || vm.readOnly) return new Set();
+    const fromPt = selFrom === "bar" ? -1 : selFrom;
+    return ov2BgClientLegalDestinationsForFrom(legalityBoard, fromPt);
+  }, [selFrom, vm.canClientMove, vm.readOnly, legalityBoard]);
 
   const resetSelection = useCallback(() => {
-    setSelDie(null);
     setSelFrom(null);
   }, []);
+
+  useEffect(() => {
+    resetSelection();
+  }, [vm.phase, vm.turnSeat, resetSelection]);
+
+  const flashInvalid = useCallback(idx => {
+    setInvalidFlashIdx(idx);
+  }, []);
+
+  const executeMove = useCallback(
+    async (fromPt, toPt) => {
+      const die = ov2BgClientPickDieForMove(legalityBoard, fromPt, toPt);
+      if (die == null) {
+        setErr("No legal die for that move.");
+        return;
+      }
+      await move(fromPt, toPt, die);
+      resetSelection();
+    },
+    [legalityBoard, move, resetSelection, setErr]
+  );
 
   const onPointClick = useCallback(
     async idx => {
@@ -181,20 +259,23 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       if (!vm.canClientMove && !vm.canClientRoll) return;
       if (vm.canClientRoll) return;
 
-      if (selDie == null) {
-        setErr("Pick a die value first.");
+      if (myBar > 0 && selFrom !== "bar") {
+        setErr("You must move from the bar first.");
+        flashInvalid(idx);
         return;
       }
 
       if (selFrom == null) {
-        if (myBar > 0) {
-          setErr("You must move from the bar first.");
-          return;
-        }
+        if (myBar > 0) return;
         const v = pts24[idx] || 0;
         const mine = vm.mySeat === 0 ? v > 0 : vm.mySeat === 1 ? v < 0 : false;
         if (!mine) {
-          setErr("Choose one of your points.");
+          flashInvalid(idx);
+          return;
+        }
+        const dests = ov2BgClientLegalDestinationsForFrom(legalityBoard, idx);
+        if (dests.size === 0) {
+          flashInvalid(idx);
           return;
         }
         setSelFrom(idx);
@@ -202,35 +283,89 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       }
 
       if (selFrom === "bar") {
-        const to = idx;
-        await move(-1, to, selDie);
-        resetSelection();
+        if (!legalDest.has(idx)) {
+          flashInvalid(idx);
+          return;
+        }
+        await executeMove(-1, idx);
         return;
       }
 
       const from = selFrom;
-      const to = idx;
-      await move(from, to, selDie);
-      resetSelection();
+      if (typeof from === "number" && from === idx) {
+        setSelFrom(null);
+        return;
+      }
+
+      const v = pts24[idx] || 0;
+      const mine = vm.mySeat === 0 ? v > 0 : vm.mySeat === 1 ? v < 0 : false;
+      if (mine) {
+        const dests = ov2BgClientLegalDestinationsForFrom(legalityBoard, idx);
+        if (dests.size === 0) {
+          flashInvalid(idx);
+          return;
+        }
+        setSelFrom(idx);
+        return;
+      }
+
+      if (!legalDest.has(idx)) {
+        flashInvalid(idx);
+        return;
+      }
+      await executeMove(from, idx);
     },
-    [vm, busy, selDie, selFrom, myBar, move, resetSelection, setErr, pts24]
+    [
+      vm,
+      busy,
+      myBar,
+      selFrom,
+      pts24,
+      legalDest,
+      legalityBoard,
+      executeMove,
+      flashInvalid,
+      setErr,
+    ]
   );
 
   const onBearOffClick = useCallback(async () => {
-    if (vm.readOnly || busy || selDie == null || selFrom == null || selFrom === "bar") return;
-    await move(selFrom, -1, selDie);
-    resetSelection();
-  }, [vm.readOnly, busy, selDie, selFrom, move, resetSelection]);
+    if (vm.readOnly || busy || selFrom == null || selFrom === "bar") return;
+    if (!legalDest.has(-1)) {
+      flashInvalid(-1);
+      return;
+    }
+    await executeMove(selFrom, -1);
+  }, [vm.readOnly, busy, selFrom, legalDest, executeMove, flashInvalid]);
 
   const onBarClick = useCallback(() => {
     if (vm.readOnly || busy || String(vm.phase) !== "playing" || !vm.canClientMove) return;
-    if (selDie == null) {
-      setErr("Pick a die value first.");
+    if (myBar <= 0) return;
+    const dests = ov2BgClientLegalDestinationsForFrom(legalityBoard, -1);
+    if (dests.size === 0) {
+      flashInvalid(-2);
       return;
     }
-    if (myBar <= 0) return;
     setSelFrom(s => (s === "bar" ? null : "bar"));
-  }, [vm.readOnly, busy, vm.phase, vm.canClientMove, selDie, myBar, setErr]);
+  }, [vm.readOnly, busy, vm.phase, vm.canClientMove, myBar, legalityBoard, flashInvalid]);
+
+  useEffect(() => {
+    if (!autoRoll || !vm.canClientRoll || busy || vm.readOnly || String(vm.phase) !== "playing") return;
+    const sid = String(vm.sessionId || "").trim();
+    if (!sid) return;
+    const t = window.setTimeout(() => {
+      if (autoRollBusyRef.current) return;
+      autoRollBusyRef.current = true;
+      void (async () => {
+        try {
+          await roll();
+        } finally {
+          autoRollBusyRef.current = false;
+        }
+      })();
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [autoRoll, vm.canClientRoll, busy, vm.readOnly, vm.phase, vm.revision, vm.sessionId, vm.turnSeat, roll, err]);
 
   const eligibleRematch = useMemo(
     () => members.filter(m => m?.seat_index != null && m?.seat_index !== "" && m?.wallet_state === "committed").length,
@@ -248,8 +383,18 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   const myRow = useMemo(() => members.find(m => m?.participant_key === selfKey), [members, selfKey]);
   const myRematchRequested = Boolean(myRow?.meta?.bg?.rematch_requested);
   const isFinished = String(vm.phase).toLowerCase() === "finished";
+  const isLiveMatch = Boolean(room?.active_session_id) && String(vm.phase).toLowerCase() === "playing";
   const didIWin = vm.mySeat != null && vm.winnerSeat != null && vm.winnerSeat === vm.mySeat;
   const canHostStartNext = isHost && isFinished && eligibleRematch >= 2 && readyRematch >= eligibleRematch;
+
+  const finishSessionId = isFinished ? String(vm.sessionId || "").trim() : "";
+
+  useEffect(() => {
+    setFinishModalDismissedSessionId("");
+  }, [room?.active_session_id]);
+
+  const showResultModal =
+    isFinished && finishSessionId.length > 0 && finishModalDismissedSessionId !== finishSessionId;
 
   const boardDisabled = busy || vm.readOnly || String(vm.phase) !== "playing";
   const compactBoard = narrowViewport;
@@ -273,7 +418,9 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           pointIndex={i}
           value={pts24[i] ?? 0}
           mySeat={vm.mySeat}
-          selected={selFrom === i}
+          selectedFrom={typeof selFrom === "number" && selFrom === i}
+          highlightDestination={selFrom != null && legalDest.has(i)}
+          invalidFlash={invalidFlashIdx === i}
           disabled={boardDisabled}
           direction={direction}
           tone={toneAt(i)}
@@ -287,8 +434,9 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
 
   const offS1 = vm.off[1] ?? 0;
   const offS0 = vm.off[0] ?? 0;
-  const bearOffActive =
-    !boardDisabled && vm.canClientMove && selDie != null && selFrom != null && selFrom !== "bar" && myBar <= 0;
+  const bearHighlight = selFrom != null && typeof selFrom === "number" && legalDest.has(-1);
+  const barInvalidTop = invalidFlashIdx === -2 && vm.mySeat === 1;
+  const barInvalidBot = invalidFlashIdx === -2 && vm.mySeat === 0;
 
   const barCol = (
     <div className="flex w-9 shrink-0 flex-col border-x border-amber-900/90 bg-gradient-to-b from-zinc-900 to-black sm:w-11 md:w-14">
@@ -300,8 +448,10 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           void onBarClick();
         }}
         className={`flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 py-1 sm:py-1.5 ${
-          vm.mySeat === 1 && myBar > 0 && selFrom === "bar" ? "bg-sky-900/55 text-sky-50" : ""
-        } disabled:opacity-40`}
+          vm.mySeat === 1 && myBar > 0 && selFrom === "bar"
+            ? "bg-sky-900/55 text-sky-50 ring-2 ring-sky-400/80 ring-inset"
+            : ""
+        } ${barInvalidTop ? "animate-pulse ring-2 ring-rose-500/60 ring-inset" : ""} disabled:opacity-40`}
         aria-label="Bar, seat two"
       >
         <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-amber-100/95 sm:text-[9px] md:text-[10px] md:tracking-[0.24em]">
@@ -319,8 +469,10 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           void onBarClick();
         }}
         className={`flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 py-1 sm:py-1.5 ${
-          vm.mySeat === 0 && myBar > 0 && selFrom === "bar" ? "bg-sky-900/55 text-sky-50" : ""
-        } disabled:opacity-40`}
+          vm.mySeat === 0 && myBar > 0 && selFrom === "bar"
+            ? "bg-sky-900/55 text-sky-50 ring-2 ring-sky-400/80 ring-inset"
+            : ""
+        } ${barInvalidBot ? "animate-pulse ring-2 ring-rose-500/60 ring-inset" : ""} disabled:opacity-40`}
         aria-label="Bar, seat one"
       >
         <CheckerStack count={Math.max(0, vm.bar[0])} maxVisible={5} compact={compactBoard} />
@@ -336,13 +488,15 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     <div className="flex w-10 shrink-0 flex-col border-l border-amber-900/50 bg-black/40 sm:w-12 md:w-[3.25rem]">
       <button
         type="button"
-        disabled={!bearOffActive || vm.mySeat !== 1}
+        disabled={!bearHighlight || vm.mySeat !== 1}
         onClick={() => {
           if (vm.mySeat === 1) void onBearOffClick();
         }}
         className={`flex min-h-0 flex-1 flex-col items-center justify-start gap-1 border-b border-black/30 py-1 sm:py-1.5 ${
-          bearOffActive && vm.mySeat === 1 ? "bg-amber-900/25 ring-1 ring-inset ring-amber-400/40" : ""
-        } disabled:cursor-default disabled:opacity-60`}
+          bearHighlight && vm.mySeat === 1
+            ? "bg-emerald-950/35 ring-2 ring-inset ring-emerald-400/55 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+            : ""
+        } ${invalidFlashIdx === -1 ? "animate-pulse ring-rose-500/50" : ""} disabled:cursor-default disabled:opacity-60`}
         aria-label="Borne off, seat two"
       >
         <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-amber-100/90 sm:text-[9px] md:text-[10px]">Off</span>
@@ -351,12 +505,14 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       </button>
       <button
         type="button"
-        disabled={!bearOffActive || vm.mySeat !== 0}
+        disabled={!bearHighlight || vm.mySeat !== 0}
         onClick={() => {
           if (vm.mySeat === 0) void onBearOffClick();
         }}
         className={`flex min-h-0 flex-1 flex-col items-center justify-end gap-1 py-1 sm:py-1.5 ${
-          bearOffActive && vm.mySeat === 0 ? "bg-amber-900/25 ring-1 ring-inset ring-amber-400/40" : ""
+          bearHighlight && vm.mySeat === 0
+            ? "bg-emerald-950/35 ring-2 ring-inset ring-emerald-400/55 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+            : ""
         } disabled:cursor-default disabled:opacity-60`}
         aria-label="Borne off, seat one"
       >
@@ -367,23 +523,170 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     </div>
   );
 
+  const turnTimerTone =
+    vm.turnTimeLeftSec == null
+      ? "border-white/15 bg-black/30 text-zinc-300"
+      : vm.turnTimeLeftSec <= 5
+        ? "border-red-500/50 bg-red-950/40 text-red-100"
+        : vm.turnTimeLeftSec <= 10
+          ? "border-amber-500/45 bg-amber-950/35 text-amber-100"
+          : "border-sky-500/40 bg-sky-950/30 text-sky-100";
+
+  const myMiss =
+    vm.mySeat === 0 ? vm.missedStreakBySeat[0] : vm.mySeat === 1 ? vm.missedStreakBySeat[1] : 0;
+  const oppMiss =
+    vm.mySeat === 0 ? vm.missedStreakBySeat[1] : vm.mySeat === 1 ? vm.missedStreakBySeat[0] : 0;
+
+  const finishedPanel = (
+    <div className="mt-3 flex w-full max-w-sm flex-col gap-2">
+      {eligibleRematch >= 2 ? (
+        <p className="text-center text-[10px] text-zinc-400">Rematch: {readyRematch}/{eligibleRematch} ready</p>
+      ) : null}
+      {vm.mySeat != null ? (
+        <button
+          type="button"
+          disabled={rematchBusy}
+          onClick={async () => {
+            setRematchBusy(true);
+            try {
+              const r = myRematchRequested ? await cancelRematch() : await requestRematch();
+              if (!r?.ok && r?.error) setErr(r.error);
+            } finally {
+              setRematchBusy(false);
+            }
+          }}
+          className="w-full rounded-md border border-sky-500/40 bg-sky-950/35 py-2 text-xs font-semibold text-sky-100 disabled:opacity-45"
+        >
+          {rematchBusy ? "…" : myRematchRequested ? "Cancel rematch" : "Rematch"}
+        </button>
+      ) : null}
+      {isHost ? (
+        <button
+          type="button"
+          disabled={!canHostStartNext || startNextBusy}
+          onClick={async () => {
+            const prev = room?.active_session_id != null ? String(room.active_session_id) : "";
+            setStartNextBusy(true);
+            try {
+              const r = await startNextMatch(roomMatchSeq);
+              if (r?.ok && onSessionRefresh) {
+                await onSessionRefresh(prev, undefined, { expectClearedSession: true });
+              } else if (!r?.ok && r?.error) {
+                setErr(r.error);
+              }
+            } finally {
+              setStartNextBusy(false);
+            }
+          }}
+          className="w-full rounded-md border border-emerald-500/40 bg-emerald-900/30 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-45"
+        >
+          {startNextBusy ? "Starting…" : "Start next match (host)"}
+        </button>
+      ) : null}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          disabled={exitBusy}
+          onClick={() => void router.replace({ pathname: "/online-v2/rooms", query: { room: roomId } }, undefined, { shallow: true })}
+          className="rounded-md border border-white/25 bg-white/10 py-2 text-xs font-semibold"
+        >
+          Room lobby
+        </button>
+        <button
+          type="button"
+          disabled={exitBusy || !selfKey}
+          onClick={async () => {
+            setExitErr("");
+            setExitBusy(true);
+            try {
+              await leaveOv2RoomWithForfeitRetry({ room, room_id: roomId, participant_key: selfKey });
+              try {
+                window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
+              } catch {
+                /* ignore */
+              }
+              await router.replace("/online-v2/rooms");
+            } catch (e) {
+              setExitErr(e?.message || "Could not leave.");
+            } finally {
+              setExitBusy(false);
+            }
+          }}
+          className="rounded-md border border-red-500/45 bg-red-950/35 py-2 text-xs font-semibold text-red-100"
+        >
+          {exitBusy ? "…" : "Leave room"}
+        </button>
+      </div>
+      {exitErr ? <p className="text-center text-[10px] text-red-300">{exitErr}</p> : null}
+    </div>
+  );
+
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden px-1 pb-0.5 pt-0 text-white sm:gap-1 sm:px-2 sm:pb-1">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden px-1 pb-0.5 pt-0 text-white sm:gap-1 sm:px-2 sm:pb-1">
       <div className="shrink-0 rounded-md border border-white/10 bg-black/35 px-1.5 py-0.5 sm:px-2 sm:py-1">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 text-[8px] leading-tight text-zinc-300 sm:text-[9px] md:flex-nowrap md:text-[10px]">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[8px] leading-tight text-zinc-300 sm:text-[9px] md:text-[10px]">
           <span className="min-w-0 font-medium">
             You P{vm.mySeat != null ? vm.mySeat + 1 : "—"} · off{" "}
             {vm.mySeat === 0 ? offS0 : vm.mySeat === 1 ? offS1 : "—"}/15
             {myBar > 0 ? <span className="text-amber-200/95"> · bar {myBar}</span> : null}
           </span>
-          <span className="shrink-0 text-zinc-500">
-            Turn P{vm.turnSeat != null ? vm.turnSeat + 1 : "—"}
-            {Array.isArray(vm.dice) ? (
-              <span className="ml-1 font-mono text-zinc-500">· {JSON.stringify(vm.dice)}</span>
+          <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+            {String(vm.phase) === "playing" && vm.turnDeadline != null ? (
+              <span
+                className={`shrink-0 rounded border px-1.5 py-0.5 font-semibold tabular-nums sm:px-2 sm:py-1 ${turnTimerTone}`}
+              >
+                P{vm.turnSeat != null ? vm.turnSeat + 1 : "—"} · {vm.turnTimeLeftSec != null ? `${vm.turnTimeLeftSec}s` : "—"}
+              </span>
+            ) : (
+              <span className="shrink-0 text-zinc-500">
+                Turn P{vm.turnSeat != null ? vm.turnSeat + 1 : "—"}
+              </span>
+            )}
+            {String(vm.phase) === "playing" ? (
+              <span className="text-[7px] text-zinc-500 sm:text-[8px]">
+                Miss {myMiss}/3 · opp {oppMiss}/3
+              </span>
             ) : null}
-          </span>
+            {Array.isArray(vm.dice) ? (
+              <span className="font-mono text-zinc-500">· {JSON.stringify(vm.dice)}</span>
+            ) : null}
+          </div>
         </div>
       </div>
+
+      {isLiveMatch && onLeaveToLobby ? (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-0.5">
+          <label className="flex cursor-pointer items-center gap-1.5 text-[9px] text-zinc-400 sm:text-[10px]">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 rounded border-white/25 bg-black/40 text-violet-400 focus:ring-violet-500/40"
+              checked={autoRoll}
+              onChange={e => persistAutoRoll(e.target.checked)}
+            />
+            Auto-roll
+          </label>
+          <button
+            type="button"
+            disabled={leaveToLobbyBusy}
+            onClick={() => void onLeaveToLobby()}
+            className="text-[10px] font-semibold text-red-200/95 underline decoration-red-400/50 disabled:opacity-45"
+          >
+            {leaveToLobbyBusy ? "Leaving…" : "Leave table"}
+          </button>
+        </div>
+      ) : (
+        <div className="flex shrink-0 px-0.5">
+          <label className="flex cursor-pointer items-center gap-1.5 text-[9px] text-zinc-400 sm:text-[10px]">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 rounded border-white/25 bg-black/40 text-violet-400 focus:ring-violet-500/40"
+              checked={autoRoll}
+              onChange={e => persistAutoRoll(e.target.checked)}
+            />
+            Auto-roll (applies when it is your roll)
+          </label>
+        </div>
+      )}
 
       {err ? (
         <div className="shrink-0 rounded border border-amber-500/35 bg-amber-950/30 px-1.5 py-0.5 text-[8px] text-amber-100 sm:px-2 sm:py-1 sm:text-[9px]">
@@ -405,52 +708,9 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
             {busy ? "Rolling…" : "Roll"}
           </button>
         ) : null}
-        {vm.canClientMove && uniqueDice.length ? (
-          <div className="flex flex-wrap items-center gap-0.5 sm:gap-1">
-            <span className="text-[8px] text-zinc-500 sm:text-[9px]">Die</span>
-            {uniqueDice.map(d => (
-              <button
-                key={d}
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  setSelDie(d);
-                  setSelFrom(null);
-                }}
-                className={`min-h-7 min-w-7 rounded border px-1 text-[10px] font-bold sm:min-h-8 sm:min-w-8 sm:text-xs md:min-h-9 md:min-w-9 ${
-                  selDie === d ? "border-emerald-400 bg-emerald-900/50" : "border-white/20 bg-white/10"
-                }`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {vm.canClientMove && myBar > 0 && selDie != null ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setSelFrom(s => (s === "bar" ? null : "bar"))}
-            className={`rounded border px-1 py-0.5 text-[8px] font-semibold sm:px-1.5 sm:text-[9px] ${
-              selFrom === "bar" ? "border-sky-400 bg-sky-900/40" : "border-white/20 bg-white/10"
-            }`}
-          >
-            Bar {myBar}
-          </button>
-        ) : null}
-        {selDie != null && selFrom != null && selFrom !== "bar" ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void onBearOffClick()}
-            className="rounded border border-amber-500/40 bg-amber-950/30 px-1 py-0.5 text-[8px] font-semibold text-amber-100 sm:px-1.5 sm:text-[9px]"
-          >
-            Off
-          </button>
-        ) : null}
-        {selDie != null ? (
+        {vm.canClientMove && selFrom != null ? (
           <button type="button" className="text-[8px] text-zinc-500 underline sm:text-[9px]" onClick={resetSelection}>
-            Clear
+            Clear selection
           </button>
         ) : null}
       </div>
@@ -491,97 +751,45 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       </span>
 
       {isFinished ? (
-        <div className="shrink-0 rounded-xl border border-white/15 bg-black/40 p-3">
-          <p className={`text-center text-sm font-semibold ${didIWin ? "text-emerald-200" : vm.mySeat != null ? "text-rose-200" : "text-white"}`}>
-            {didIWin ? "You won" : vm.mySeat != null ? "You lost" : "Match finished"}
-          </p>
-          {vm.winnerSeat != null ? (
-            <p className="mt-1 text-center text-[11px] text-zinc-400">Winner: seat {vm.winnerSeat + 1}</p>
-          ) : null}
-          <div className="mt-2 flex flex-col gap-2">
-            {eligibleRematch >= 2 ? (
-              <p className="text-center text-[10px] text-zinc-500">
-                Rematch: {readyRematch}/{eligibleRematch} ready
+        showResultModal ? (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 p-3 backdrop-blur-[2px]">
+            <div className="w-full max-w-sm rounded-xl border border-white/20 bg-zinc-900/95 p-4 text-center shadow-2xl sm:max-w-md">
+              <p
+                className={`text-lg font-semibold sm:text-xl ${
+                  didIWin ? "text-emerald-200" : vm.mySeat != null ? "text-red-300" : "text-white"
+                }`}
+              >
+                {didIWin ? "You won" : vm.mySeat != null ? "You lost" : "Match finished"}
               </p>
-            ) : null}
-            {vm.mySeat != null ? (
+              <p className="mt-1 text-xs text-zinc-300">
+                {vm.winnerSeat != null ? `Winner: seat ${vm.winnerSeat + 1}` : "Match complete"}
+              </p>
+              {stakePerSeat != null ? (
+                <p className="mt-2 text-[11px] text-zinc-400">
+                  Entry {stakePerSeat.toLocaleString()} · pot {(stakePerSeat * 2).toLocaleString()}
+                </p>
+              ) : null}
+              {didIWin && stakePerSeat != null ? (
+                <p className="mt-1 text-sm font-semibold text-emerald-300/95">
+                  You take the pot ({(stakePerSeat * 2).toLocaleString()})
+                </p>
+              ) : null}
+              {!didIWin && vm.mySeat != null && stakePerSeat != null ? (
+                <p className="mt-1 text-sm font-semibold text-red-400/95">Entry settled ({stakePerSeat.toLocaleString()})</p>
+              ) : null}
+              {finishedPanel}
               <button
                 type="button"
-                disabled={rematchBusy}
-                onClick={async () => {
-                  setRematchBusy(true);
-                  try {
-                    const r = myRematchRequested ? await cancelRematch() : await requestRematch();
-                    if (!r?.ok && r?.error) setErr(r.error);
-                  } finally {
-                    setRematchBusy(false);
-                  }
-                }}
-                className="w-full rounded-md border border-sky-500/40 bg-sky-950/35 py-2 text-xs font-semibold text-sky-100 disabled:opacity-45"
+                className="mt-3 w-full rounded-md border border-white/20 bg-white/10 py-2 text-xs font-semibold text-zinc-100"
+                onClick={() => setFinishModalDismissedSessionId(finishSessionId)}
               >
-                {rematchBusy ? "…" : myRematchRequested ? "Cancel rematch" : "Rematch"}
-              </button>
-            ) : null}
-            {isHost ? (
-              <button
-                type="button"
-                disabled={!canHostStartNext || startNextBusy}
-                onClick={async () => {
-                  const prev = room?.active_session_id != null ? String(room.active_session_id) : "";
-                  setStartNextBusy(true);
-                  try {
-                    const r = await startNextMatch(roomMatchSeq);
-                    if (r?.ok && onSessionRefresh) {
-                      await onSessionRefresh(prev, undefined, { expectClearedSession: true });
-                    } else if (!r?.ok && r?.error) {
-                      setErr(r.error);
-                    }
-                  } finally {
-                    setStartNextBusy(false);
-                  }
-                }}
-                className="w-full rounded-md border border-emerald-500/40 bg-emerald-900/30 py-2 text-xs font-semibold text-emerald-100 disabled:opacity-45"
-              >
-                {startNextBusy ? "Starting…" : "Start next match (host)"}
-              </button>
-            ) : null}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={exitBusy}
-                onClick={() => void router.replace({ pathname: "/online-v2/rooms", query: { room: roomId } }, undefined, { shallow: true })}
-                className="rounded-md border border-white/25 bg-white/10 py-2 text-xs font-semibold"
-              >
-                Room lobby
-              </button>
-              <button
-                type="button"
-                disabled={exitBusy || !selfKey}
-                onClick={async () => {
-                  setExitErr("");
-                  setExitBusy(true);
-                  try {
-                    await leaveOv2RoomWithForfeitRetry({ room, room_id: roomId, participant_key: selfKey });
-                    try {
-                      window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
-                    } catch {
-                      /* ignore */
-                    }
-                    await router.replace("/online-v2/rooms");
-                  } catch (e) {
-                    setExitErr(e?.message || "Could not leave.");
-                  } finally {
-                    setExitBusy(false);
-                  }
-                }}
-                className="rounded-md border border-red-500/45 bg-red-950/35 py-2 text-xs font-semibold text-red-100"
-              >
-                {exitBusy ? "…" : "Leave room"}
+                Continue
               </button>
             </div>
-            {exitErr ? <p className="text-center text-[10px] text-red-300">{exitErr}</p> : null}
           </div>
-        </div>
+        ) : (
+          <div className="shrink-0 rounded-xl border border-white/15 bg-black/40 p-3">{finishedPanel}</div>
+        )
       ) : null}
     </div>
   );

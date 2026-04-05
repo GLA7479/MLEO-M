@@ -3,6 +3,7 @@ import {
   fetchOv2BackgammonSnapshot,
   OV2_BACKGAMMON_PRODUCT_GAME_ID,
   requestOv2BackgammonCancelRematch,
+  requestOv2BackgammonMarkTurnTimeout,
   requestOv2BackgammonMove,
   requestOv2BackgammonRequestRematch,
   requestOv2BackgammonRoll,
@@ -28,12 +29,26 @@ export function useOv2BackgammonSession(baseContext) {
   const [snap, setSnap] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const vaultFinishedRef = useRef(/** @type {string|null} */ (null));
+  const snapRef = useRef(/** @type {typeof snap} */ (null));
+  const processedTurnTimeoutKeysRef = useRef(/** @type {Set<string>} */ (new Set()));
 
   useEffect(() => {
     setSnap(null);
     vaultFinishedRef.current = null;
+    processedTurnTimeoutKeysRef.current.clear();
   }, [roomId, activeSessionKey]);
+
+  useEffect(() => {
+    snapRef.current = snap;
+  }, [snap]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const id = window.setInterval(() => setNowMs(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!roomId || roomProductId !== OV2_BACKGAMMON_PRODUCT_GAME_ID) {
@@ -76,6 +91,44 @@ export function useOv2BackgammonSession(baseContext) {
       await readOnlineV2Vault({ fresh: true }).catch(() => {});
     })();
   }, [snap, roomId, selfKey]);
+
+  useEffect(() => {
+    if (!roomId || !selfKey || roomProductId !== OV2_BACKGAMMON_PRODUCT_GAME_ID) return undefined;
+    const s = snap;
+    if (!s || String(s.phase || "").toLowerCase() !== "playing") return undefined;
+    const dl = s.turnDeadline != null ? Number(s.turnDeadline) : NaN;
+    const sid = String(s.sessionId || "").trim();
+    const turn = s.turnSeat != null ? Number(s.turnSeat) : NaN;
+    if (!sid || !Number.isFinite(dl) || !Number.isInteger(turn) || (turn !== 0 && turn !== 1)) return undefined;
+    const turnKey = `${sid}|${dl}|${turn}`;
+    if (processedTurnTimeoutKeysRef.current.has(turnKey)) return undefined;
+    const ms = Math.max(0, dl - Date.now());
+    const t = window.setTimeout(() => {
+      void (async () => {
+        if (processedTurnTimeoutKeysRef.current.has(turnKey)) return;
+        const cur = snapRef.current;
+        if (!cur || String(cur.phase || "").toLowerCase() !== "playing") return;
+        const vdl = cur.turnDeadline != null ? Number(cur.turnDeadline) : NaN;
+        const vsid = String(cur.sessionId || "").trim();
+        const vturn = cur.turnSeat != null ? Number(cur.turnSeat) : NaN;
+        const vkey = `${vsid}|${vdl}|${vturn}`;
+        if (vkey !== turnKey || Date.now() < vdl) return;
+        const r = await requestOv2BackgammonMarkTurnTimeout(roomId, selfKey, {});
+        if (r.ok && r.snapshot) setSnap(r.snapshot);
+        if (r.ok) processedTurnTimeoutKeysRef.current.add(turnKey);
+      })();
+    }, ms);
+    return () => window.clearTimeout(t);
+  }, [
+    roomId,
+    selfKey,
+    roomProductId,
+    snap?.sessionId,
+    snap?.turnDeadline,
+    snap?.turnSeat,
+    snap?.phase,
+    snap?.revision,
+  ]);
 
   const roll = useCallback(async () => {
     if (!roomId || !selfKey || !snap) return;
@@ -141,6 +194,13 @@ export function useOv2BackgammonSession(baseContext) {
     const bar = Array.isArray(board.bar) ? board.bar.map(x => Number(x)) : [0, 0];
     const off = Array.isArray(board.off) ? board.off.map(x => Number(x)) : [0, 0];
     const diceAvail = Array.isArray(board.diceAvail) ? board.diceAvail.map(x => Number(x)) : [];
+    const missed = snap?.missedTurns && typeof snap.missedTurns === "object" ? snap.missedTurns : {};
+    const m0 = Math.max(0, Math.min(3, Number(missed["0"] ?? missed[0] ?? 0) || 0));
+    const m1 = Math.max(0, Math.min(3, Number(missed["1"] ?? missed[1] ?? 0) || 0));
+    const turnDeadline = snap?.turnDeadline != null && Number.isFinite(Number(snap.turnDeadline)) ? Number(snap.turnDeadline) : null;
+    const turnTimeLeftMs =
+      phase === "playing" && turnDeadline != null ? Math.max(0, turnDeadline - nowMs) : null;
+    const turnTimeLeftSec = turnTimeLeftMs != null ? Math.ceil(turnTimeLeftMs / 1000) : null;
     return {
       phase,
       pts,
@@ -155,8 +215,12 @@ export function useOv2BackgammonSession(baseContext) {
       canClientMove: snap?.canClientMove === true,
       readOnly: snap?.boardViewReadOnly === true,
       revision: snap?.revision ?? 0,
+      sessionId: snap?.sessionId != null ? String(snap.sessionId) : "",
+      turnDeadline,
+      turnTimeLeftSec,
+      missedStreakBySeat: { 0: m0, 1: m1 },
     };
-  }, [snap]);
+  }, [snap, nowMs]);
 
   return {
     snapshot: snap,
