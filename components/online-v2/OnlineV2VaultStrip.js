@@ -30,7 +30,7 @@ export default function OnlineV2VaultStrip({ compact = false }) {
           ? "inline-flex h-9 items-center rounded-full border border-emerald-500/35 bg-emerald-950/35 px-2.5 text-[12px] font-semibold leading-none tabular-nums text-emerald-100 sm:h-9 sm:px-3 sm:text-[12px] lg:h-8 lg:min-h-[32px] lg:px-3 lg:text-[12px]"
           : "rounded-lg border border-emerald-500/30 bg-emerald-950/40 px-2 py-1 text-[12px] font-semibold leading-none tabular-nums text-emerald-100 lg:text-[11px]"
       }
-      title="Product vault via OV2 bridge"
+      title={`Product vault · exact ${balance.toLocaleString()}`}
     >
       {compact ? (
         <>
@@ -38,7 +38,7 @@ export default function OnlineV2VaultStrip({ compact = false }) {
           <span className="ml-1">{formatCompactNumber(balance)}</span>
         </>
       ) : (
-        <>Vault: {balance.toLocaleString()}</>
+        <>Vault: {formatCompactNumber(balance)}</>
       )}
     </div>
   );

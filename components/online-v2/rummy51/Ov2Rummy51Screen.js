@@ -15,6 +15,7 @@ import { OV2_RUMMY51_PRODUCT_GAME_ID } from "../../../lib/online-v2/rummy51/ov2R
 import Ov2SeatStrip from "../shared/Ov2SeatStrip";
 import Ov2Rummy51Hand from "./Ov2Rummy51Hand";
 import Ov2Rummy51TableMelds from "./Ov2Rummy51TableMelds";
+import { formatCompactNumber } from "../../../lib/solo-v2/formatCompactNumber";
 
 /**
  * @typedef {import("../../../lib/online-v2/rummy51/ov2Rummy51Engine").Rummy51Card} Rummy51Card
@@ -285,6 +286,29 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     const total = Math.floor(stake * seats);
     return `${total} (pool: ${stake} × ${seats} seats)`;
   }, [snapshot]);
+
+  const finishedPotTotalUnits = useMemo(() => {
+    if (!snapshot || String(snapshot.phase) !== "finished") return null;
+    const m = snapshot.matchMeta && typeof snapshot.matchMeta === "object" ? snapshot.matchMeta : null;
+    if (!m) return null;
+    const stake = m.stakePerSeat != null ? Number(m.stakePerSeat) : 0;
+    const seats = m.seatCount != null ? Number(m.seatCount) : 0;
+    if (!Number.isFinite(stake) || !Number.isFinite(seats) || stake <= 0 || seats <= 0) return null;
+    return Math.floor(stake * seats);
+  }, [snapshot]);
+
+  /** Win / loss / neutral when match.phase === finished (English-only floating banner above table). */
+  const r51FinishOutcome = useMemo(() => {
+    if (!isFinished || !snapshot || String(snapshot.phase) !== "finished") {
+      return { win: false, loss: false, neutral: true };
+    }
+    const w = snapshot.winnerParticipantKey != null ? String(snapshot.winnerParticipantKey).trim() : "";
+    const me = selfKey != null ? String(selfKey).trim() : "";
+    if (!w) return { win: false, loss: false, neutral: true };
+    if (me && w === me) return { win: true, loss: false, neutral: false };
+    if (me) return { win: false, loss: true, neutral: false };
+    return { win: false, loss: false, neutral: true };
+  }, [isFinished, snapshot, selfKey]);
 
   const myHandRaw = useMemo(() => {
     if (!snapshot?.hands || !selfKey) return [];
@@ -995,6 +1019,66 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
             onSelectTargetMeld={setTargetMeldId}
             disabled={busy || !isMyTurn || !isPlaying}
           />
+          {isFinished ? (
+            <div
+              lang="en"
+              dir="ltr"
+              className="pointer-events-none absolute inset-0 z-[28] flex items-start justify-center pt-2 sm:pt-3"
+              aria-live="polite"
+              role="status"
+              aria-label={
+                r51FinishOutcome.win
+                  ? "Match over. You won."
+                  : r51FinishOutcome.loss
+                    ? "Match over. You lost."
+                    : "Match over."
+              }
+            >
+              <div
+                className={`mx-2 w-full max-w-sm rounded-2xl border px-3 py-2.5 text-center shadow-[0_12px_40px_rgba(0,0,0,0.55)] ring-1 ring-black/40 backdrop-blur-md sm:px-4 sm:py-3 ${
+                  r51FinishOutcome.win
+                    ? "border-emerald-400/55 bg-emerald-950/92"
+                    : r51FinishOutcome.loss
+                      ? "border-red-500/50 bg-red-950/90"
+                      : "border-zinc-500/45 bg-zinc-900/92"
+                }`}
+              >
+                <p
+                  className={`text-base font-extrabold leading-tight sm:text-lg ${
+                    r51FinishOutcome.win
+                      ? "text-emerald-200"
+                      : r51FinishOutcome.loss
+                        ? "text-red-200"
+                        : "text-zinc-100"
+                  }`}
+                >
+                  {r51FinishOutcome.win ? "You won" : r51FinishOutcome.loss ? "You lost" : "Finished match"}
+                </p>
+                <p
+                  className={`mt-1 text-[10px] font-semibold leading-snug sm:text-[11px] ${
+                    r51FinishOutcome.win
+                      ? "text-emerald-100/90"
+                      : r51FinishOutcome.loss
+                        ? "text-red-100/88"
+                        : "text-zinc-300"
+                  }`}
+                >
+                  Winner:{" "}
+                  {snapshot.winnerName || snapshot.winnerParticipantKey?.slice(0, 12) || "—"}
+                </p>
+                {r51FinishOutcome.win && finishedPotTotalUnits != null ? (
+                  <p className="mt-1 text-[10px] font-bold text-emerald-300/95 sm:text-[11px]">
+                    Pot {formatCompactNumber(finishedPotTotalUnits)}
+                  </p>
+                ) : null}
+                {r51FinishOutcome.loss && finishedPotLabel ? (
+                  <p className="mt-1 text-[10px] text-red-200/85 sm:text-[11px]">
+                    Table pool: {finishedPotLabel}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           <div className="pointer-events-none absolute bottom-1 right-1 z-20 flex flex-row items-end gap-1 sm:bottom-1.5 sm:right-1.5 sm:gap-1.5">
             {pendingDraw === "discard" && isMyTurn && isPlaying ? (
               <DiscardUndoIconButton disabled={busy} onClick={() => void onUndoDiscardDraw()} />
@@ -1021,16 +1105,13 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
         ) : null}
 
         {isFinished ? (
-          <div className="shrink-0 rounded-md border border-amber-500/35 bg-amber-950/25 p-1.5 text-[9px] text-amber-50">
-            <p className="font-bold text-amber-200">Match finished</p>
-            <p className="mt-0.5 text-[8px] text-amber-100/85">
-              Winner: {snapshot.winnerName || snapshot.winnerParticipantKey?.slice(0, 10) || "—"}
-            </p>
-            {finishedPotLabel ? (
-              <p className="mt-0.5 text-[8px] text-amber-100/80">Winner payout: {finishedPotLabel}</p>
-            ) : null}
-            <p className="mt-1 text-[7px] leading-snug text-zinc-400">
-              Official result is recorded. The winner&apos;s share is applied to the vault when this result loads (forfeit or normal end).
+          <div
+            lang="en"
+            dir="ltr"
+            className="shrink-0 rounded-md border border-zinc-600/40 bg-zinc-950/80 p-1.5 text-[8px] text-zinc-300"
+          >
+            <p className="text-center text-[7px] leading-snug text-zinc-500">
+              Result recorded · vault updates when settlement loads
             </p>
             {onLeaveToLobby ? (
               <button
