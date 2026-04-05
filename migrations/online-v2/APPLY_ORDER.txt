@@ -83,3 +83,4 @@ ludo/071_ov2_ludo_full_pot_settlement_parity.sql
 072_ov2_quick_match.sql
 073_ov2_quick_match_fill_pending_room.sql
 074_ov2_shared_rls_canonical_ledger_rpc_host_start_stakes.sql
+075_ov2_quick_match_deadline_prune_uncommitted_seats.sql

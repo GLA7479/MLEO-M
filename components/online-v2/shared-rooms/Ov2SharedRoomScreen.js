@@ -209,6 +209,28 @@ export default function Ov2SharedRoomScreen({
   }, [isStakeSharedRoom, sharedStatusUpper, canonicalStatusUpper, canonicalRoom, isQmRoom]);
 
   const myPk = String(participantId || "").trim();
+  const canonHostPkForQm = useMemo(
+    () => String(canonicalRoom?.host_participant_key || "").trim(),
+    [canonicalRoom?.host_participant_key]
+  );
+  const createdByPkForQm = useMemo(
+    () => String(room?.created_by_participant_key || "").trim(),
+    [room?.created_by_participant_key]
+  );
+  const isQmHostSideDriver = useMemo(() => {
+    if (!myPk) return false;
+    return (
+      isHost ||
+      (canonHostPkForQm.length > 0 && canonHostPkForQm === myPk) ||
+      (canonHostPkForQm.length === 0 && createdByPkForQm.length > 0 && createdByPkForQm === myPk)
+    );
+  }, [isHost, myPk, canonHostPkForQm, createdByPkForQm]);
+  const qmAuthorityHostPk = useMemo(() => {
+    if (canonHostPkForQm.length > 0) return canonHostPkForQm;
+    if (createdByPkForQm.length > 0) return createdByPkForQm;
+    return myPk;
+  }, [canonHostPkForQm, createdByPkForQm, myPk]);
+
   const myWalletCommitted = useMemo(() => {
     const row = myPk ? ledgerByParticipant.get(myPk) : null;
     return String(row?.wallet_state || "").trim() === "committed";
@@ -235,7 +257,6 @@ export default function Ov2SharedRoomScreen({
   useEffect(() => {
     if (!roomId || !isQmRoom) return undefined;
     if (sharedStatusUpper !== "OPEN") return undefined;
-    if (canonicalStatusUpper === "IN_GAME") return undefined;
     const run = async () => {
       try {
         const r = await ov2QuickMatchAutoStartDeadline({ room_id: roomId });
@@ -260,17 +281,11 @@ export default function Ov2SharedRoomScreen({
     void run();
     const id = window.setInterval(() => void run(), 2000);
     return () => window.clearInterval(id);
-  }, [roomId, isQmRoom, sharedStatusUpper, canonicalStatusUpper, reload, refreshSharedEconomySnapshot]);
+  }, [roomId, isQmRoom, sharedStatusUpper, reload, refreshSharedEconomySnapshot]);
 
   useEffect(() => {
     if (!roomId || !isQmRoom || !myPk) return;
-    const canonHostPk = String(canonicalRoom?.host_participant_key || "").trim();
-    const createdByPk = String(room?.created_by_participant_key || "").trim();
-    const isQmIntentDriver =
-      isHost ||
-      (canonHostPk.length > 0 && canonHostPk === myPk) ||
-      (canonHostPk.length === 0 && createdByPk.length > 0 && createdByPk === myPk);
-    if (!isQmIntentDriver) return;
+    if (!isQmHostSideDriver) return;
     if (canonicalRoom != null) {
       const phase = lifecyclePhase(canonicalRoom);
       if (phase !== "lobby" && phase !== "") return;
@@ -282,9 +297,7 @@ export default function Ov2SharedRoomScreen({
     qmHostIntentTriedRef.current = true;
     void (async () => {
       try {
-        const hostPkForRpc =
-          canonHostPk.length > 0 ? canonHostPk : createdByPk.length > 0 ? createdByPk : myPk;
-        await startOv2RoomIntent({ room_id: roomId, host_participant_key: hostPkForRpc });
+        await startOv2RoomIntent({ room_id: roomId, host_participant_key: qmAuthorityHostPk });
         await refreshSharedEconomySnapshot();
         await reload();
       } catch {
@@ -294,10 +307,10 @@ export default function Ov2SharedRoomScreen({
   }, [
     roomId,
     isQmRoom,
-    isHost,
     myPk,
+    isQmHostSideDriver,
+    qmAuthorityHostPk,
     canonicalRoom,
-    room?.created_by_participant_key,
     members,
     room?.min_players,
     reload,
@@ -311,15 +324,17 @@ export default function Ov2SharedRoomScreen({
   }, [sharedStatusUpper]);
 
   useEffect(() => {
-    if (!isQmRoom || !isHost || sharedStatusUpper !== "IN_GAME") return undefined;
+    if (!isQmRoom || !isQmHostSideDriver || !qmAuthorityHostPk || sharedStatusUpper !== "IN_GAME") {
+      return undefined;
+    }
     if (didRouteToLiveRef.current || qmLiveOpenDoneRef.current) return undefined;
 
     let cancelled = false;
     void (async () => {
       try {
         if (isLudoRoom) {
-          const open = await requestOv2LudoOpenSession(roomId, participantId, {
-            presenceLeaderKey: participantId,
+          const open = await requestOv2LudoOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
           });
           if (cancelled || !open?.ok) return;
           qmLiveOpenDoneRef.current = true;
@@ -329,7 +344,7 @@ export default function Ov2SharedRoomScreen({
           return;
         }
         if (isBingoRoom) {
-          const open = await openOv2BingoSession(roomId, participantId);
+          const open = await openOv2BingoSession(roomId, qmAuthorityHostPk);
           if (cancelled || !open?.ok) return;
           qmLiveOpenDoneRef.current = true;
           didRouteToLiveRef.current = true;
@@ -338,7 +353,7 @@ export default function Ov2SharedRoomScreen({
           return;
         }
         if (isRummy51Room) {
-          const open = await openOv2Rummy51Session(roomId, participantId);
+          const open = await openOv2Rummy51Session(roomId, qmAuthorityHostPk);
           if (cancelled || !open?.ok) return;
           qmLiveOpenDoneRef.current = true;
           didRouteToLiveRef.current = true;
@@ -354,13 +369,13 @@ export default function Ov2SharedRoomScreen({
     };
   }, [
     isQmRoom,
-    isHost,
+    isQmHostSideDriver,
+    qmAuthorityHostPk,
     sharedStatusUpper,
     isLudoRoom,
     isBingoRoom,
     isRummy51Room,
     roomId,
-    participantId,
     router,
     // Re-run on each shared snapshot poll so a transient open failure (e.g. first tick after IN_GAME) retries.
     lastLoadedAt,
