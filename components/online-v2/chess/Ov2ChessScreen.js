@@ -21,7 +21,7 @@ const BTN_SECONDARY =
 const BTN_ACCENT =
   "rounded-lg border border-sky-500/28 bg-gradient-to-b from-sky-950/65 to-sky-950 px-3 py-2 text-[11px] font-semibold text-sky-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_4px_14px_rgba(0,0,0,0.3)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_DANGER =
-  "w-full rounded-lg border border-[#4a3035]/80 bg-gradient-to-b from-[#2e2226] to-[#10090b] py-2 px-3 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.38)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+  "w-full rounded-lg border border-white/[0.12] bg-gradient-to-b from-[#2a2228] via-[#1c161a] to-[#121014] py-2 px-3 text-[11px] font-semibold text-rose-100/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_4px_18px_rgba(0,0,0,0.42),0_0_0_1px_rgba(0,0,0,0.35)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
 /** Local cburnett SVG set under `public/assets/chess/cburnett/`. */
 const CBURNETT_BASE = "/assets/chess/cburnett";
@@ -223,21 +223,21 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
       : "";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden bg-gradient-to-b from-[#101522] via-[#0c0f18] to-[#090c12] px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
       <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
-        <div className="rounded-lg border border-white/[0.08] bg-zinc-950/50 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:px-2 sm:py-2">
+        <div className="rounded-lg border border-white/[0.12] bg-gradient-to-b from-slate-900/55 to-zinc-950/75 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_6px_24px_rgba(0,0,0,0.28),0_0_0_1px_rgba(0,0,0,0.2)] backdrop-blur-[6px] sm:px-2 sm:py-2">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[11px] sm:text-[12px]">
             <div
-              className={`flex min-h-[1.625rem] items-center rounded-md border px-2.5 py-1 tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_2px_rgba(0,0,0,0.35)] ${
+              className={`flex min-h-[1.625rem] items-center rounded-md border px-2.5 py-1 tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-1px_2px_rgba(0,0,0,0.3)] ${
                 vm.phase === "playing" && vm.turnSeat === vm.mySeat
-                  ? "border-amber-400/38 bg-amber-950/50 text-amber-50/92"
-                  : "border-white/[0.12] bg-zinc-950/65 text-zinc-400"
+                  ? "border-amber-400/45 bg-gradient-to-b from-amber-950/55 to-amber-950/40 text-amber-50/95"
+                  : "border-white/[0.14] bg-zinc-900/50 text-zinc-300/90"
               }`}
             >
               {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
                 <span className="tracking-wide">
                   <span className="text-[10px] font-medium uppercase text-zinc-500 sm:text-[10px]">Turn</span>{" "}
-                  <span className="text-[12px] font-semibold text-zinc-100 sm:text-[13px]">~{vm.turnTimeLeftSec}s</span>
+                  <span className="text-[12px] font-semibold text-zinc-50 sm:text-[13px]">~{vm.turnTimeLeftSec}s</span>
                 </span>
               ) : (
                 <span className="text-zinc-500">—</span>
@@ -270,17 +270,21 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
         </div>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_72%_58%_at_50%_50%,transparent_40%,rgba(0,0,0,0.2)_100%)]">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_88%_72%_at_50%_38%,#1a2334_0%,#121826_38%,#0c1018_72%,#080a10_100%)] before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_68%_54%_at_50%_50%,transparent_32%,rgba(6,10,22,0.38)_100%)]">
         <div
-          className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(0,0,0,0.55),0_8px_22px_rgba(0,0,0,0.35)] sm:max-w-[min(100%,548px)]"
-          style={{ background: "#1F1A16" }}
+          className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_0_0_1px_rgba(0,0,0,0.55),0_10px_36px_rgba(0,0,0,0.5),0_0_64px_rgba(18,26,42,0.35),inset_0_1px_0_rgba(255,255,255,0.16),inset_0_-2px_5px_rgba(0,0,0,0.32)] sm:max-w-[min(100%,548px)]"
+          style={{
+            background: "linear-gradient(152deg, #8c5f45 0%, #5a3524 38%, #3a2218 65%, #5c3a28 100%)",
+          }}
         >
           <div
-            className="relative overflow-hidden rounded-[8px] p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),inset_0_0_0_1px_rgba(0,0,0,0.35)]"
-            style={{ background: "#141210" }}
+            className="relative overflow-hidden rounded-[8px] p-0.5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.07),inset_0_-3px_8px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(0,0,0,0.28)]"
+            style={{
+              background: "linear-gradient(172deg, #2a201c 0%, #181210 48%, #1f1612 100%)",
+            }}
           >
             <div
-              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08),inset_0_0_52px_rgba(0,0,0,0.035),inset_0_0_60px_rgba(0,0,0,0.06),inset_0_0_120px_rgba(0,0,0,0.04)]"
+              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_28px_rgba(0,0,0,0.36),inset_0_0_52px_rgba(0,0,0,0.1)]"
               style={{
                 gridTemplateColumns: "repeat(8, 1fr)",
                 gridTemplateRows: "repeat(8, 1fr)",
@@ -302,15 +306,15 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                     ? "z-[1] shadow-[inset_0_0_0_1px_rgba(217,119,6,0.45)]"
                     : "";
                 const baseSq = light
-                  ? "bg-[#E6DCC8] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
-                  : "bg-[#3d3025] shadow-[inset_0_2px_4px_rgba(0,0,0,0.18)]";
+                  ? "bg-[#e0b078] shadow-[inset_0_1px_0_rgba(255,250,240,0.32),inset_0_-1px_0_rgba(0,0,0,0.09)]"
+                  : "bg-[#4a3020] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-2px_0_rgba(0,0,0,0.28)]";
                 return (
                   <button
                     key={viewPos}
                     type="button"
                     disabled={vm.readOnly || busy}
                     onClick={() => void onCellClick(viewPos)}
-                    className={`relative flex min-h-0 min-w-0 items-center justify-center outline-none transition-[box-shadow,background-color,opacity] disabled:opacity-50 ${baseSq} ${
+                    className={`relative flex min-h-0 min-w-0 items-center justify-center outline-none transition-[box-shadow,opacity] disabled:opacity-50 ${baseSq} ${
                       kingThreat
                         ? "z-[1] before:pointer-events-none before:absolute before:inset-0 before:z-0 before:bg-rose-950/30 before:content-['']"
                         : ""
@@ -319,15 +323,15 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                     aria-label={kingThreat ? "King in check" : undefined}
                   >
                     {pieceSrc ? (
-                      <div className="relative z-[1] aspect-square w-[88%] max-w-full shrink-0">
+                      <div className="relative z-[1] aspect-square w-[85%] max-w-full shrink-0">
                         <img
                           src={pieceSrc}
                           alt=""
                           draggable={false}
                           className={`h-full w-full select-none object-contain ${
                             p === p.toUpperCase() && p !== "."
-                              ? "[filter:drop-shadow(0px_1.5px_1.5px_rgba(0,0,0,0.18))_drop-shadow(0px_3px_4px_rgba(0,0,0,0.12))_brightness(1.08)_contrast(1.06)]"
-                              : "[filter:drop-shadow(0px_2px_2px_rgba(0,0,0,0.22))_drop-shadow(0px_4px_6px_rgba(0,0,0,0.16))_brightness(1.05)_contrast(1.08)]"
+                              ? "[filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.09))_drop-shadow(0_2px_2.5px_rgba(0,0,0,0.05))_brightness(0.99)_contrast(1.03)_saturate(1.02)]"
+                              : "[filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.14))_drop-shadow(0_2px_3px_rgba(0,0,0,0.065))_brightness(1.03)_contrast(1.03)]"
                           }`}
                         />
                       </div>
@@ -355,15 +359,15 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                         className="flex h-12 w-12 min-h-12 min-w-12 items-center justify-center rounded-lg border border-zinc-600/28 bg-gradient-to-b from-zinc-800/75 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_6px_rgba(0,0,0,0.3)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45 sm:h-14 sm:w-14"
                         aria-label={`Promote to ${({ q: "queen", Q: "queen", r: "rook", R: "rook", b: "bishop", B: "bishop", n: "knight", N: "knight" }[l] || "piece")}`}
                       >
-                        <div className="relative aspect-square w-[88%] max-w-full shrink-0">
+                        <div className="relative aspect-square w-[85%] max-w-full shrink-0">
                           <img
                             src={pieceImageSrc(l) || ""}
                             alt=""
                             draggable={false}
                             className={`h-full w-full select-none object-contain ${
                               String(l) === String(l).toUpperCase()
-                                ? "[filter:drop-shadow(0px_1.5px_1.5px_rgba(0,0,0,0.18))_drop-shadow(0px_3px_4px_rgba(0,0,0,0.12))_brightness(1.08)_contrast(1.06)]"
-                                : "[filter:drop-shadow(0px_2px_2px_rgba(0,0,0,0.22))_drop-shadow(0px_4px_6px_rgba(0,0,0,0.16))_brightness(1.05)_contrast(1.08)]"
+                                ? "[filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.09))_drop-shadow(0_2px_2.5px_rgba(0,0,0,0.05))_brightness(0.99)_contrast(1.03)_saturate(1.02)]"
+                                : "[filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.14))_drop-shadow(0_2px_3px_rgba(0,0,0,0.065))_brightness(1.03)_contrast(1.03)]"
                             }`}
                           />
                         </div>
@@ -402,7 +406,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
         </div>
       ) : null}
 
-      <div className="shrink-0">
+      <div className="shrink-0 rounded-lg border border-white/[0.09] bg-gradient-to-b from-slate-900/35 to-zinc-950/50 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_20px_rgba(0,0,0,0.22)]">
         <button type="button" disabled={exitBusy || !pk} onClick={() => void onExitToLobby()} className={BTN_DANGER}>
           {exitBusy ? "Leaving…" : "Leave table"}
         </button>
