@@ -167,12 +167,10 @@ DECLARE
   v_opp int := CASE WHEN p_turn = 0 THEN 1 ELSE 0 END;
   v_fwd int := CASE WHEN p_turn = 0 THEN 1 ELSE -1 END;
 BEGIN
-  FOR v_dr, v_dc IN
-    SELECT x, y FROM (VALUES (-1, -1), (-1, 1), (1, -1), (1, 1)) AS t(x, y)
+  /* Only the two forward diagonals (same geometry as ov2_ck_try_man_capture). */
+  v_dr := v_fwd;
+  FOREACH v_dc IN ARRAY ARRAY[-1, 1]
   LOOP
-    IF v_dr IS DISTINCT FROM v_fwd THEN
-      CONTINUE;
-    END IF;
     v_rm := p_r + v_dr;
     v_cm := p_c + v_dc;
     v_r2 := p_r + 2 * v_dr;
@@ -660,6 +658,7 @@ DECLARE
   v_winner int;
   v_more_cap boolean;
   v_opp int;
+  v_did_capture boolean;
 BEGIN
   IF p_board IS NULL OR jsonb_typeof(p_board) <> 'object' THEN
     RETURN jsonb_build_object('ok', false, 'code', 'BAD_BOARD');
@@ -731,11 +730,15 @@ BEGIN
       END IF;
     END IF;
   END IF;
+  /* Do not rely on (jsonb->>'capture')::boolean alone: some stacks expose booleans as t/f/text. */
+  v_did_capture :=
+    COALESCE((v_mv -> 'capture') = to_jsonb(true), false)
+    OR (lower(trim(COALESCE(v_mv ->> 'capture', ''))) = ANY (ARRAY['true', 't', '1']));
   IF NOT coalesce((v_mv ->> 'ok')::boolean, false) THEN
     RETURN jsonb_build_object('ok', false, 'code', COALESCE(v_mv ->> 'code', 'ILLEGAL'));
   END IF;
   v_new_cells := public.ov2_ck_cell_set(v_cells, p_from, 0);
-  IF coalesce((v_mv ->> 'capture')::boolean, false) THEN
+  IF v_did_capture THEN
     v_new_cells := public.ov2_ck_cell_set(v_new_cells, (v_mv ->> 'mid_idx')::int, 0);
   END IF;
   v_promo := v_p;
@@ -750,7 +753,7 @@ BEGIN
   IF public.ov2_ck_count_side(v_new_cells, v_opp) = 0 THEN
     v_winner := v_turn;
   END IF;
-  IF coalesce((v_mv ->> 'capture')::boolean, false) AND v_winner IS NULL THEN
+  IF v_did_capture AND v_winner IS NULL THEN
     v_more_cap := public.ov2_ck_cell_has_capture(v_new_cells, p_to, v_turn);
     IF v_more_cap THEN
       RETURN jsonb_build_object(
@@ -787,6 +790,40 @@ BEGIN
   );
 END;
 $$;
+
+/* Regression: man double-jump must set jumpChain; backward man capture must be rejected. */
+DO $ov2_ck_reg$
+DECLARE
+  cells jsonb;
+  b jsonb;
+  r jsonb;
+BEGIN
+  cells := (SELECT jsonb_agg(x) FROM (SELECT 0::int AS x FROM generate_series(1, 64)) s);
+  cells := jsonb_set(cells, '{19}', to_jsonb(1), true);
+  cells := jsonb_set(cells, '{28}', to_jsonb(3), true);
+  cells := jsonb_set(cells, '{46}', to_jsonb(3), true);
+  b := jsonb_build_object('cells', cells, 'turnSeat', 0);
+  r := public.ov2_ck_apply_move(b, 19, 37);
+  IF NOT COALESCE((r ->> 'ok')::boolean, false) THEN
+    RAISE EXCEPTION 'ov2_ck_reg: first jump not ok: %', r;
+  END IF;
+  IF (r -> 'turn_complete') IS DISTINCT FROM to_jsonb(false) THEN
+    RAISE EXCEPTION 'ov2_ck_reg: expected turn_complete json false, got %', r -> 'turn_complete';
+  END IF;
+  IF COALESCE((r -> 'board' -> 'jumpChain' ->> 'at')::int, -1) <> 37 THEN
+    RAISE EXCEPTION 'ov2_ck_reg: expected jumpChain.at=37, board=%', r -> 'board';
+  END IF;
+
+  cells := (SELECT jsonb_agg(x) FROM (SELECT 0::int AS x FROM generate_series(1, 64)) s);
+  cells := jsonb_set(cells, '{35}', to_jsonb(1), true);
+  cells := jsonb_set(cells, '{26}', to_jsonb(3), true);
+  b := jsonb_build_object('cells', cells, 'turnSeat', 0);
+  r := public.ov2_ck_apply_move(b, 35, 17);
+  IF COALESCE((r ->> 'ok')::boolean, false) THEN
+    RAISE EXCEPTION 'ov2_ck_reg: backward man capture should be illegal, got %', r;
+  END IF;
+END;
+$ov2_ck_reg$;
 
 REVOKE ALL ON FUNCTION public.ov2_ck_cell_get(jsonb, integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.ov2_ck_cell_get(jsonb, integer) TO anon, authenticated, service_role;

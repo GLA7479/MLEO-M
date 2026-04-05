@@ -23,24 +23,29 @@ const BTN_ACCENT =
 const BTN_DANGER =
   "w-full rounded-lg border border-[#4a3035]/80 bg-gradient-to-b from-[#2e2226] to-[#10090b] py-2 px-3 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.38)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
-const PIECE_SYM = {
-  K: "♔",
-  Q: "♕",
-  R: "♖",
-  B: "♗",
-  N: "♘",
-  P: "♙",
-  k: "♚",
-  q: "♛",
-  r: "♜",
-  b: "♝",
-  n: "♞",
-  p: "♟",
+/** Local cburnett SVG set under `public/assets/chess/cburnett/`. */
+const CBURNETT_BASE = "/assets/chess/cburnett";
+
+const PIECE_SVG = {
+  P: "wP",
+  R: "wR",
+  N: "wN",
+  B: "wB",
+  Q: "wQ",
+  K: "wK",
+  p: "bP",
+  r: "bR",
+  n: "bN",
+  b: "bB",
+  q: "bQ",
+  k: "bK",
 };
 
-function pieceGlyph(ch) {
+function pieceImageSrc(ch) {
   const c = String(ch || ".").trim().slice(0, 1);
-  return PIECE_SYM[c] || (c === "." ? "" : c);
+  const id = PIECE_SVG[c];
+  if (!id) return null;
+  return `${CBURNETT_BASE}/${id}.svg`;
 }
 
 /**
@@ -265,21 +270,17 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
         </div>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_72%_58%_at_50%_48%,transparent_20%,rgba(0,0,0,0.34)_100%)]">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_72%_58%_at_50%_50%,transparent_40%,rgba(0,0,0,0.2)_100%)]">
         <div
-          className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(0,0,0,0.45),0_0_52px_rgba(0,0,0,0.22),0_22px_56px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.14),inset_0_-2px_4px_rgba(0,0,0,0.35)] sm:max-w-[min(100%,548px)]"
-          style={{
-            background: "linear-gradient(158deg, #a89878 0%, #7d6c52 38%, #4f4230 72%, #6b5d44 100%)",
-          }}
+          className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(0,0,0,0.55),0_8px_22px_rgba(0,0,0,0.35)] sm:max-w-[min(100%,548px)]"
+          style={{ background: "#1F1A16" }}
         >
           <div
-            className="relative overflow-hidden rounded-[8px] p-0.5 shadow-[inset_0_2px_3px_rgba(255,255,255,0.06),inset_0_-3px_8px_rgba(0,0,0,0.55),inset_0_0_0_1px_rgba(0,0,0,0.32)]"
-            style={{
-              background: "linear-gradient(172deg, #161614 0%, #0b0b0a 52%, #121210 100%)",
-            }}
+            className="relative overflow-hidden rounded-[8px] p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),inset_0_0_0_1px_rgba(0,0,0,0.35)]"
+            style={{ background: "#141210" }}
           >
             <div
-              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_30px_rgba(0,0,0,0.48),inset_0_0_52px_rgba(0,0,0,0.14)]"
+              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12)]"
               style={{
                 gridTemplateColumns: "repeat(8, 1fr)",
                 gridTemplateRows: "repeat(8, 1fr)",
@@ -292,7 +293,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                 const serverIdx = mySeat != null ? ov2ChessViewToServerIdx(viewPos, mySeat) : viewPos;
                 const p = squares[serverIdx] ?? ".";
                 const sel = selServerIdx === serverIdx;
-                const g = pieceGlyph(p);
+                const pieceSrc = pieceImageSrc(p);
                 const kingThreat = checkHighlight.inCheck && checkHighlight.kingServerIdx === serverIdx;
                 const attackingKing = attackerServerSet.has(serverIdx);
                 const ringClass = sel
@@ -301,8 +302,8 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                     ? "z-[1] shadow-[inset_0_0_0_1px_rgba(217,119,6,0.45)]"
                     : "";
                 const baseSq = light
-                  ? "bg-[#ebe4d4] shadow-[inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-1px_0_rgba(0,0,0,0.06)]"
-                  : "bg-[#3d4534] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-2px_0_rgba(0,0,0,0.2)]";
+                  ? "bg-[#E6DCC8] shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+                  : "bg-[#4A3A2C] shadow-[inset_0_-1px_0_rgba(0,0,0,0.15)]";
                 return (
                   <button
                     key={viewPos}
@@ -317,16 +318,15 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                     style={{ WebkitTapHighlightColor: "transparent" }}
                     aria-label={kingThreat ? "King in check" : undefined}
                   >
-                    {g ? (
-                      <span
-                        className={`relative z-[1] select-none text-[clamp(14px,11vw,28px)] leading-none ${
-                          p === p.toUpperCase() && p !== "."
-                            ? "text-[#1c1f26] [text-shadow:0_1px_0_rgba(255,255,255,0.22),0_2px_4px_rgba(0,0,0,0.35)]"
-                            : "text-[#f2ebe0] [text-shadow:0_1px_2px_rgba(0,0,0,0.55),0_-1px_0_rgba(0,0,0,0.2)]"
-                        }`}
-                      >
-                        {g}
-                      </span>
+                    {pieceSrc ? (
+                      <div className="relative z-[1] aspect-square w-[clamp(14px,11vw,28px)] shrink-0 sm:w-[clamp(15px,10.5vw,30px)]">
+                        <img
+                          src={pieceSrc}
+                          alt=""
+                          draggable={false}
+                          className="h-full w-full select-none object-contain [filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.22))]"
+                        />
+                      </div>
                     ) : null}
                   </button>
                 );
@@ -334,11 +334,11 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
 
               {promoOpen ? (
                 <div
-                  className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 border-t border-[#a89868]/35 bg-[#0c0c0b]/95 px-2 py-2.5 shadow-[0_-12px_32px_rgba(0,0,0,0.65)] backdrop-blur-sm sm:py-3"
+                  className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 border-t border-white/[0.08] bg-[#0a0a09]/96 px-2 py-2.5 shadow-[0_-10px_28px_rgba(0,0,0,0.6)] backdrop-blur-sm sm:py-3"
                   role="dialog"
                   aria-label="Choose promotion piece"
                 >
-                  <p className="text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c9b896]/95 sm:text-[11px]">
+                  <p className="text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500 sm:text-[11px]">
                     Promote pawn
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
@@ -348,10 +348,17 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                         type="button"
                         disabled={busy}
                         onClick={() => void onPickPromo(l)}
-                        className="flex h-12 w-12 min-h-12 min-w-12 items-center justify-center rounded-lg border border-[#8a7a58]/45 bg-gradient-to-b from-zinc-700/75 to-zinc-950 text-[26px] leading-none text-[#f2ebe0] shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-2px_5px_rgba(0,0,0,0.45)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45 sm:h-14 sm:w-14 sm:text-[30px]"
+                        className="flex h-12 w-12 min-h-12 min-w-12 items-center justify-center rounded-lg border border-zinc-600/28 bg-gradient-to-b from-zinc-800/75 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_6px_rgba(0,0,0,0.3)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45 sm:h-14 sm:w-14"
                         aria-label={`Promote to ${({ q: "queen", Q: "queen", r: "rook", R: "rook", b: "bishop", B: "bishop", n: "knight", N: "knight" }[l] || "piece")}`}
                       >
-                        <span className="select-none [text-shadow:0_2px_4px_rgba(0,0,0,0.5)]">{pieceGlyph(l)}</span>
+                        <div className="h-8 w-8 shrink-0 sm:h-9 sm:w-9">
+                          <img
+                            src={pieceImageSrc(l) || ""}
+                            alt=""
+                            draggable={false}
+                            className="h-full w-full select-none object-contain [filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.28))]"
+                          />
+                        </div>
                       </button>
                     ))}
                   </div>

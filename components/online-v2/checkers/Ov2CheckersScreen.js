@@ -387,7 +387,7 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
                     ) : null}
                     {p ? (
                       <span
-                        className={`relative z-[1] flex h-[55%] w-[55%] max-h-8 max-w-8 items-center justify-center rounded-full text-[8px] font-bold tracking-tight sm:h-[58%] sm:w-[58%] sm:text-[9px] ${
+                        className={`relative z-[1] flex h-[55%] w-[55%] max-h-8 max-w-8 items-center justify-center rounded-full text-[8px] font-bold tracking-tight sm:h-[61%] sm:w-[61%] sm:max-h-9 sm:max-w-9 sm:text-[9px] md:h-[63%] md:w-[63%] md:max-h-[2.375rem] md:max-w-[2.375rem] md:text-[10px] ${
                           isKing ? "ring-1 ring-black/25" : "ring-1 ring-black/20"
                         }`}
                         style={{
@@ -404,7 +404,7 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
                       >
                         {isKing ? (
                           <span
-                            className="text-[clamp(9px,2.5vw,11px)] font-normal leading-none"
+                            className="text-[clamp(9px,2.5vw,11px)] font-normal leading-none sm:text-[clamp(10px,2.6vw,12px)] md:text-[clamp(10px,2.4vw,12px)]"
                             style={{ opacity: 0.88 }}
                             aria-hidden
                           >

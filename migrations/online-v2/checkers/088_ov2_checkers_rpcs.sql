@@ -313,6 +313,7 @@ DECLARE
   v_ps jsonb;
   v_new_board jsonb;
   v_snap jsonb;
+  v_partial boolean;
 BEGIN
   IF p_room_id IS NULL OR p_from IS NULL OR p_to IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'Invalid arguments');
@@ -414,7 +415,13 @@ BEGIN
     RETURN jsonb_build_object('ok', true, 'snapshot', v_snap);
   END IF;
 
-  IF coalesce((v_ap ->> 'turn_complete')::boolean, true) THEN
+  /* Partial turn: prefer board.jumpChain; do not trust (jsonb->>'turn_complete')::boolean alone. */
+  v_partial :=
+    (public.ov2_checkers_jump_chain_at(v_new_board) IS NOT NULL)
+    OR COALESCE((v_ap -> 'turn_complete') = to_jsonb(false), false)
+    OR (lower(trim(COALESCE(v_ap ->> 'turn_complete', ''))) = ANY (ARRAY['false', 'f', '0', 'no', 'n']));
+
+  IF NOT v_partial THEN
     v_ps := public.ov2_checkers_parity_bump_timer(
       v_sess.parity_state,
       (v_new_board ->> 'turnSeat')::int,
