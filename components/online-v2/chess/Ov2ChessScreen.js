@@ -6,6 +6,7 @@ import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import {
   normalizeOv2ChessSquares,
+  ov2ChessKingCheckHighlights,
   ov2ChessMoveNeedsPromotion,
   ov2ChessPieceOwnedBySeat,
   ov2ChessViewToServerIdx,
@@ -60,6 +61,17 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
   const turn = vm.turnSeat != null ? Number(vm.turnSeat) : null;
   const mySeat = vm.mySeat;
 
+  const checkHighlight = useMemo(() => {
+    if (String(vm.phase) !== "playing" || turn == null) {
+      return { inCheck: false, kingServerIdx: -1, attackerServerIdxs: [] };
+    }
+    return ov2ChessKingCheckHighlights(squares, turn);
+  }, [squares, turn, vm.phase]);
+
+  const attackerServerSet = useMemo(() => new Set(checkHighlight.attackerServerIdxs), [checkHighlight.attackerServerIdxs]);
+
+  const promoLetters = mySeat === 0 ? (["Q", "R", "B", "N"]) : mySeat === 1 ? (["q", "r", "b", "n"]) : (["Q", "R", "B", "N"]);
+
   const onCellClick = useCallback(
     async viewIdx => {
       if (vm.readOnly || !vm.canClientMove || busy || vaultClaimBusy) return;
@@ -110,7 +122,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
       if (!promoOpen) return;
       const { from, to } = promoOpen;
       setPromoOpen(null);
-      const r = await applyMove(from, to, letter);
+      const r = await applyMove(from, to, String(letter || "Q").toUpperCase().slice(0, 1));
       setSelServerIdx(null);
       if (!r.ok) {
         /* */
@@ -197,43 +209,34 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-1 pb-2 sm:gap-3 sm:px-2">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
-        <div className="tabular-nums">
-          {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
-            <span className={vm.turnSeat === vm.mySeat ? "text-amber-200" : "text-zinc-500"}>
-              Turn clock ~{vm.turnTimeLeftSec}s
-            </span>
-          ) : (
-            <span>—</span>
-          )}
-        </div>
-        {vaultClaimBusy ? <span className="text-sky-300">Settlement…</span> : null}
-      </div>
-
-      {err ? <p className="shrink-0 text-[11px] text-red-300">{err}</p> : null}
-
-      {promoOpen ? (
-        <div className="shrink-0 rounded-md border border-amber-500/40 bg-amber-950/30 p-2 text-[11px] text-amber-100">
-          <p className="font-semibold">Promotion</p>
-          <div className="mt-2 flex flex-wrap gap-1">
-            {(["Q", "R", "B", "N"]).map(l => (
-              <button
-                key={l}
-                type="button"
-                disabled={busy}
-                onClick={() => void onPickPromo(l)}
-                className="rounded border border-amber-400/50 px-2 py-1 font-bold disabled:opacity-45"
-              >
-                {l}
-              </button>
-            ))}
+      <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
+          <div className="tabular-nums">
+            {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
+              <span className={vm.turnSeat === vm.mySeat ? "text-amber-200" : "text-zinc-500"}>
+                Turn clock ~{vm.turnTimeLeftSec}s
+              </span>
+            ) : (
+              <span>—</span>
+            )}
           </div>
+          {vaultClaimBusy ? <span className="text-sky-300">Settlement…</span> : null}
         </div>
-      ) : null}
+        <div className="flex min-h-[2.5rem] flex-col justify-center text-[11px] leading-snug">
+          {err ? (
+            <p className="text-red-300">
+              {err}
+              <button type="button" className="ml-2 underline decoration-red-400/80" onClick={() => setErr("")}>
+                Dismiss
+              </button>
+            </p>
+          ) : null}
+        </div>
+      </div>
 
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden">
         <div
-          className="grid aspect-square w-full max-w-[min(100%,420px)] gap-0 rounded-md border border-[#2a2a22] p-1 shadow-inner sm:max-w-[min(100%,520px)]"
+          className="relative grid aspect-square w-full max-w-[min(100%,420px)] gap-0 rounded-md border border-[#2a2a22] p-1 shadow-inner sm:max-w-[min(100%,520px)]"
           style={{
             background: "linear-gradient(145deg,#1a1a14,#0c0c0a)",
             gridTemplateColumns: "repeat(8, 1fr)",
@@ -248,20 +251,28 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
             const p = squares[serverIdx] ?? ".";
             const sel = selServerIdx === serverIdx;
             const g = pieceGlyph(p);
+            const kingThreat = checkHighlight.inCheck && checkHighlight.kingServerIdx === serverIdx;
+            const attackingKing = attackerServerSet.has(serverIdx);
+            const ringClass = sel
+              ? "z-[2] ring-2 ring-sky-500 ring-inset"
+              : attackingKing
+                ? "z-[1] ring-2 ring-orange-500/90 ring-inset"
+                : "";
             return (
               <button
                 key={viewPos}
                 type="button"
                 disabled={vm.readOnly || busy}
                 onClick={() => void onCellClick(viewPos)}
-                className={`relative flex min-h-0 min-w-0 items-center justify-center outline-none transition-[box-shadow] disabled:opacity-50 ${
+                className={`relative flex min-h-0 min-w-0 items-center justify-center outline-none transition-[box-shadow,background-color] disabled:opacity-50 ${
                   light ? "bg-[#c9b88a]" : "bg-[#4a5c3a]"
-                } ${sel ? "z-[1] ring-2 ring-sky-500 ring-inset" : ""}`}
+                } ${kingThreat ? "z-[1] bg-rose-500/[0.22]" : ""} ${ringClass}`}
                 style={{ WebkitTapHighlightColor: "transparent" }}
+                aria-label={kingThreat ? "King in check" : undefined}
               >
                 {g ? (
                   <span
-                    className={`text-[clamp(14px,11vw,28px)] leading-none ${
+                    className={`relative z-[1] text-[clamp(14px,11vw,28px)] leading-none ${
                       p === p.toUpperCase() && p !== "." ? "text-zinc-900 drop-shadow-sm" : "text-zinc-100 drop-shadow"
                     }`}
                   >
@@ -271,6 +282,32 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
               </button>
             );
           })}
+
+          {promoOpen ? (
+            <div
+              className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 border-t border-amber-500/35 bg-zinc-950/92 px-2 py-2.5 shadow-[0_-8px_24px_rgba(0,0,0,0.55)] backdrop-blur-sm sm:py-3"
+              role="dialog"
+              aria-label="Choose promotion piece"
+            >
+              <p className="text-center text-[10px] font-semibold uppercase tracking-wide text-amber-100/90 sm:text-[11px]">
+                Promote pawn
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+                {promoLetters.map(l => (
+                  <button
+                    key={l}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void onPickPromo(l)}
+                    className="flex h-12 w-12 min-h-12 min-w-12 items-center justify-center rounded-lg border border-amber-400/45 bg-gradient-to-b from-zinc-700/80 to-zinc-900/95 text-[26px] leading-none shadow-md transition-[transform,box-shadow] active:scale-95 disabled:opacity-45 sm:h-14 sm:w-14 sm:text-[30px]"
+                    aria-label={`Promote to ${({ q: "queen", Q: "queen", r: "rook", R: "rook", b: "bishop", B: "bishop", n: "knight", N: "knight" }[l] || "piece")}`}
+                  >
+                    <span className="select-none">{pieceGlyph(l)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 

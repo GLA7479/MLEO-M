@@ -163,7 +163,10 @@ export function useOv2ChessSession(baseContext) {
           promo: promo || "Q",
         });
         if (!r.ok) {
-          setErr(r.error || "Move failed");
+          const code = /** @type {{ code?: string }} */ (r).code;
+          const msg = String(r.error || "").toLowerCase();
+          const checkHandledOnBoard = code === "IN_CHECK" || msg.includes("king in check");
+          if (!checkHandledOnBoard) setErr(r.error || "Move failed");
           return { ok: false };
         }
         if (r.snapshot) setSnap(r.snapshot);
