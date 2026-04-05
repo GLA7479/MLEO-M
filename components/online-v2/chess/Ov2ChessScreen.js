@@ -15,13 +15,13 @@ import { useOv2ChessSession } from "../../../hooks/useOv2ChessSession";
 
 /** Shared premium button language (Chess + Checkers product family). */
 const BTN_PRIMARY =
-  "rounded-lg border border-emerald-500/20 bg-gradient-to-b from-emerald-950/70 to-emerald-950 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-100/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-2px_5px_rgba(0,0,0,0.38)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+  "rounded-lg border border-emerald-500/28 bg-gradient-to-b from-emerald-950/70 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_4px_14px_rgba(0,0,0,0.32)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_SECONDARY =
-  "rounded-lg border border-zinc-500/20 bg-gradient-to-b from-zinc-800/55 to-zinc-950 px-2.5 py-1.5 text-[11px] font-medium text-zinc-200/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-2px_4px_rgba(0,0,0,0.35)] transition-[transform,opacity] active:scale-[0.98]";
+  "rounded-lg border border-zinc-500/28 bg-gradient-to-b from-zinc-800/55 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_12px_rgba(0,0,0,0.28)] transition-[transform,opacity] active:scale-[0.98]";
 const BTN_ACCENT =
-  "rounded-lg border border-sky-500/20 bg-gradient-to-b from-sky-950/65 to-sky-950 px-2.5 py-1.5 text-[11px] font-semibold text-sky-100/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-2px_5px_rgba(0,0,0,0.35)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+  "rounded-lg border border-sky-500/28 bg-gradient-to-b from-sky-950/65 to-sky-950 px-3 py-2 text-[11px] font-semibold text-sky-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_4px_14px_rgba(0,0,0,0.3)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_DANGER =
-  "w-full rounded-lg border border-rose-950/45 bg-gradient-to-b from-[#3a1519] to-[#160809] py-2 text-[11px] font-semibold text-rose-100/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-2px_6px_rgba(0,0,0,0.45)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+  "w-full rounded-lg border border-[#4a3035]/80 bg-gradient-to-b from-[#2e2226] to-[#10090b] py-2 px-3 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.38)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
 const PIECE_SYM = {
   K: "♔",
@@ -220,13 +220,13 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
       <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
-        <div className="rounded-lg border border-white/[0.07] bg-zinc-950/45 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:py-1.5">
+        <div className="rounded-lg border border-white/[0.08] bg-zinc-950/50 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:px-2 sm:py-2">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[11px] sm:text-[12px]">
             <div
-              className={`flex min-h-[1.625rem] items-center rounded-md border px-2.5 py-1 tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] ${
+              className={`flex min-h-[1.625rem] items-center rounded-md border px-2.5 py-1 tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_2px_rgba(0,0,0,0.35)] ${
                 vm.phase === "playing" && vm.turnSeat === vm.mySeat
-                  ? "border-amber-400/22 bg-amber-950/35 text-amber-50/95"
-                  : "border-white/[0.07] bg-zinc-900/50 text-zinc-400"
+                  ? "border-amber-400/38 bg-amber-950/50 text-amber-50/92"
+                  : "border-white/[0.12] bg-zinc-950/65 text-zinc-400"
               }`}
             >
               {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
@@ -265,21 +265,21 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden py-0.5">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_72%_58%_at_50%_48%,transparent_20%,rgba(0,0,0,0.34)_100%)]">
         <div
-          className="w-full max-w-[min(100%,448px)] rounded-[11px] p-[2px] shadow-[0_20px_56px_rgba(0,0,0,0.58),0_0_0_1px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] sm:max-w-[min(100%,548px)]"
+          className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(0,0,0,0.45),0_0_52px_rgba(0,0,0,0.22),0_22px_56px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.14),inset_0_-2px_4px_rgba(0,0,0,0.35)] sm:max-w-[min(100%,548px)]"
           style={{
-            background: "linear-gradient(145deg, #9a8a6a 0%, #5c4d36 42%, #7d6e4e 100%)",
+            background: "linear-gradient(158deg, #a89878 0%, #7d6c52 38%, #4f4230 72%, #6b5d44 100%)",
           }}
         >
           <div
-            className="relative overflow-hidden rounded-[9px] p-0.5 shadow-[inset_0_2px_14px_rgba(0,0,0,0.65),inset_0_0_0_1px_rgba(0,0,0,0.25)]"
+            className="relative overflow-hidden rounded-[8px] p-0.5 shadow-[inset_0_2px_3px_rgba(255,255,255,0.06),inset_0_-3px_8px_rgba(0,0,0,0.55),inset_0_0_0_1px_rgba(0,0,0,0.32)]"
             style={{
-              background: "linear-gradient(168deg, #141412 0%, #0a0a09 55%, #10100e 100%)",
+              background: "linear-gradient(172deg, #161614 0%, #0b0b0a 52%, #121210 100%)",
             }}
           >
             <div
-              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_28px_rgba(0,0,0,0.42),inset_0_0_48px_rgba(0,0,0,0.12)]"
+              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_30px_rgba(0,0,0,0.48),inset_0_0_52px_rgba(0,0,0,0.14)]"
               style={{
                 gridTemplateColumns: "repeat(8, 1fr)",
                 gridTemplateRows: "repeat(8, 1fr)",
@@ -363,15 +363,15 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
       </div>
 
       {finished ? (
-        <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.11] bg-gradient-to-b from-zinc-900/75 to-zinc-950 p-3 text-[11px] text-zinc-200/95 shadow-[0_10px_28px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05),inset_0_-8px_20px_rgba(0,0,0,0.25)]">
+        <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.14] bg-gradient-to-b from-zinc-900/82 to-zinc-950 p-3 text-[11px] text-zinc-200/92 shadow-[0_16px_44px_rgba(0,0,0,0.5),0_0_0_1px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-10px_24px_rgba(0,0,0,0.3)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Result</p>
-          <p className="mt-0.5 text-sm font-semibold text-zinc-50/95">Match finished</p>
+          <p className="mt-1 text-sm font-semibold text-zinc-50">Match finished</p>
           {rk === "stalemate" ? (
-            <p className="mt-1 text-zinc-400/95">Draw by stalemate.</p>
+            <p className="mt-1 text-zinc-400/90">Draw by stalemate.</p>
           ) : vm.winnerSeat != null && vm.mySeat != null ? (
-            <p className="mt-1 text-zinc-300/95">{vm.winnerSeat === vm.mySeat ? "You won." : "You lost."}</p>
+            <p className="mt-1 text-zinc-400/90">{vm.winnerSeat === vm.mySeat ? "You won." : "You lost."}</p>
           ) : null}
-          <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2.5">
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.1] pt-3">
             <button type="button" disabled={rematchBusy} onClick={() => void onRematch()} className={BTN_PRIMARY}>
               {rematchBusy ? "…" : "Rematch"}
             </button>

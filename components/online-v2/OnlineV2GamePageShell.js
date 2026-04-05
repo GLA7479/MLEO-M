@@ -13,10 +13,10 @@ import OnlineV2VaultStrip from "./OnlineV2VaultStrip";
  *
  * `chromePreset="ov2_board"` — Chess / Checkers: single-row system HUD, tighter vertical rhythm, default zinc shell.
  *
- * Design note (Backgammon — not implemented here): same HUD + button + spacing rules as ov2_board; board identity =
- * rich walnut/mahogany, lacquered points with soft gradients, felt-like center; reuse Checkers-style premium discs;
- * dice clean/glossy minimal; doubling cube sharp with subtle shadow; bar/bear-off integrated into board plane; palette
- * warmer than Checkers, “elite table” without neon.
+ * Design note (Backgammon — not implemented): ov2_board HUD + buttons + spacing; board = deeper triangle contrast,
+ * subtle grain via CSS noise/overlay (no bitmap); middle bar = darker integrated strip (not a separate panel); pieces =
+ * Checkers disc system 1:1; dice = matte ivory faces + engraved (inset) pips; doubling cube minimal, sharp, soft shadow;
+ * tone = private club / high-end table (not flashy casino).
  */
 export default function OnlineV2GamePageShell({
   title,
@@ -86,7 +86,9 @@ export default function OnlineV2GamePageShell({
               : "bg-gradient-to-b from-[#030506] via-[#06090c] to-[#030506]"
             : isC21Flat
               ? "bg-[#030506]"
-              : "bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950"
+              : isOv2Board
+                ? "bg-gradient-to-b from-[#070708] via-[#0c0c0e] to-[#060607]"
+                : "bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950"
         }`}
         style={{
           paddingTop: useCcCompactLayout
@@ -113,7 +115,7 @@ export default function OnlineV2GamePageShell({
           <header
             className={`relative shrink-0 ${
               isOv2Board
-                ? "border-b border-white/[0.09] bg-zinc-950/35 pb-1.5 pt-1 shadow-[0_1px_0_rgba(0,0,0,0.35)] sm:pb-2 sm:pt-1.5"
+                ? "border-b border-white/[0.14] bg-zinc-950/60 pb-2 pt-1 shadow-[0_1px_0_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.04)] sm:pb-2 sm:pt-1.5"
                 : isCcLiveTable
                   ? "border-b border-white/[0.04] pb-1 pt-0.5"
                   : isCcFlat
@@ -134,13 +136,13 @@ export default function OnlineV2GamePageShell({
                   </div>
                   <div className="min-w-0 flex-1 px-1 text-center">
                     <h1
-                      className={`truncate font-semibold leading-tight tracking-wide ${
+                      className={`truncate leading-tight ${
                         isOv2Board
-                          ? "text-[12px] text-zinc-500 sm:text-[13px]"
-                          : "text-[11px] text-zinc-500 sm:text-xs"
+                          ? "text-[12px] font-bold tracking-tight text-zinc-500 sm:text-[13px]"
+                          : "text-[11px] font-semibold tracking-wide text-zinc-500 sm:text-xs"
                       }`}
                     >
-                      <span className={isOv2Board ? "text-zinc-50" : "text-zinc-200"}>{title}</span>
+                      <span className={isOv2Board ? "text-zinc-100" : "text-zinc-200"}>{title}</span>
                       {shouldRenderSubtitle ? (
                         <span className="font-normal text-zinc-500"> · {subtitleText}</span>
                       ) : null}
