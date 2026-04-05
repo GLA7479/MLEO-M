@@ -280,7 +280,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
             style={{ background: "#141210" }}
           >
             <div
-              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12)]"
+              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08),inset_0_0_52px_rgba(0,0,0,0.035),inset_0_0_60px_rgba(0,0,0,0.06),inset_0_0_120px_rgba(0,0,0,0.04)]"
               style={{
                 gridTemplateColumns: "repeat(8, 1fr)",
                 gridTemplateRows: "repeat(8, 1fr)",
@@ -302,8 +302,8 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                     ? "z-[1] shadow-[inset_0_0_0_1px_rgba(217,119,6,0.45)]"
                     : "";
                 const baseSq = light
-                  ? "bg-[#E6DCC8] shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
-                  : "bg-[#4A3A2C] shadow-[inset_0_-1px_0_rgba(0,0,0,0.15)]";
+                  ? "bg-[#E6DCC8] shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]"
+                  : "bg-[#3d3025] shadow-[inset_0_2px_4px_rgba(0,0,0,0.18)]";
                 return (
                   <button
                     key={viewPos}
@@ -319,12 +319,16 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                     aria-label={kingThreat ? "King in check" : undefined}
                   >
                     {pieceSrc ? (
-                      <div className="relative z-[1] aspect-square w-[clamp(14px,11vw,28px)] shrink-0 sm:w-[clamp(15px,10.5vw,30px)]">
+                      <div className="relative z-[1] aspect-square w-[88%] max-w-full shrink-0">
                         <img
                           src={pieceSrc}
                           alt=""
                           draggable={false}
-                          className="h-full w-full select-none object-contain [filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.22))]"
+                          className={`h-full w-full select-none object-contain ${
+                            p === p.toUpperCase() && p !== "."
+                              ? "[filter:drop-shadow(0px_1.5px_1.5px_rgba(0,0,0,0.18))_drop-shadow(0px_3px_4px_rgba(0,0,0,0.12))_brightness(1.08)_contrast(1.06)]"
+                              : "[filter:drop-shadow(0px_2px_2px_rgba(0,0,0,0.22))_drop-shadow(0px_4px_6px_rgba(0,0,0,0.16))_brightness(1.05)_contrast(1.08)]"
+                          }`}
                         />
                       </div>
                     ) : null}
@@ -351,12 +355,16 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                         className="flex h-12 w-12 min-h-12 min-w-12 items-center justify-center rounded-lg border border-zinc-600/28 bg-gradient-to-b from-zinc-800/75 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_6px_rgba(0,0,0,0.3)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45 sm:h-14 sm:w-14"
                         aria-label={`Promote to ${({ q: "queen", Q: "queen", r: "rook", R: "rook", b: "bishop", B: "bishop", n: "knight", N: "knight" }[l] || "piece")}`}
                       >
-                        <div className="h-8 w-8 shrink-0 sm:h-9 sm:w-9">
+                        <div className="relative aspect-square w-[88%] max-w-full shrink-0">
                           <img
                             src={pieceImageSrc(l) || ""}
                             alt=""
                             draggable={false}
-                            className="h-full w-full select-none object-contain [filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.28))]"
+                            className={`h-full w-full select-none object-contain ${
+                              String(l) === String(l).toUpperCase()
+                                ? "[filter:drop-shadow(0px_1.5px_1.5px_rgba(0,0,0,0.18))_drop-shadow(0px_3px_4px_rgba(0,0,0,0.12))_brightness(1.08)_contrast(1.06)]"
+                                : "[filter:drop-shadow(0px_2px_2px_rgba(0,0,0,0.22))_drop-shadow(0px_4px_6px_rgba(0,0,0,0.16))_brightness(1.05)_contrast(1.08)]"
+                            }`}
                           />
                         </div>
                       </button>

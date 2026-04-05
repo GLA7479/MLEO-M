@@ -1,5 +1,6 @@
--- OV2 Checkers: authoritative rules (8x8 dark squares, men-only forced capture, multi-jump chain, flying kings).
--- Men: forward move and forward capture only. Kings: any direction; not globally forced to capture.
+-- OV2 Checkers: authoritative rules (8x8 dark squares, men-only forced opening capture, multi-jump chain, flying kings).
+-- Men: forward slide; opening man capture forward only; same man in jumpChain may continue forward or backward.
+-- Kings: any direction / flying; not globally forced to capture.
 -- Apply after 086_ov2_checkers_schema.sql.
 
 BEGIN;
@@ -148,7 +149,8 @@ CREATE OR REPLACE FUNCTION public.ov2_ck_man_has_capture(
   p_cells jsonb,
   p_r int,
   p_c int,
-  p_turn int
+  p_turn int,
+  p_forward_only boolean DEFAULT true
 )
 RETURNS boolean
 LANGUAGE plpgsql
@@ -167,10 +169,12 @@ DECLARE
   v_opp int := CASE WHEN p_turn = 0 THEN 1 ELSE 0 END;
   v_fwd int := CASE WHEN p_turn = 0 THEN 1 ELSE -1 END;
 BEGIN
-  /* Only the two forward diagonals (same geometry as ov2_ck_try_man_capture). */
-  v_dr := v_fwd;
-  FOREACH v_dc IN ARRAY ARRAY[-1, 1]
+  FOR v_dr, v_dc IN
+    SELECT x, y FROM (VALUES (-1, -1), (-1, 1), (1, -1), (1, 1)) AS t(x, y)
   LOOP
+    IF p_forward_only AND v_dr IS DISTINCT FROM v_fwd THEN
+      CONTINUE;
+    END IF;
     v_rm := p_r + v_dr;
     v_cm := p_c + v_dc;
     v_r2 := p_r + 2 * v_dr;
@@ -298,7 +302,8 @@ $$;
 CREATE OR REPLACE FUNCTION public.ov2_ck_cell_has_capture(
   p_cells jsonb,
   p_idx int,
-  p_turn int
+  p_turn int,
+  p_man_forward_only boolean DEFAULT true
 )
 RETURNS boolean
 LANGUAGE plpgsql
@@ -319,7 +324,7 @@ BEGIN
   IF public.ov2_ck_is_king(v_p) THEN
     RETURN public.ov2_ck_king_has_capture(p_cells, v_r, v_c, p_turn);
   END IF;
-  RETURN public.ov2_ck_man_has_capture(p_cells, v_r, v_c, p_turn);
+  RETURN public.ov2_ck_man_has_capture(p_cells, v_r, v_c, p_turn, p_man_forward_only);
 END;
 $$;
 
@@ -437,7 +442,8 @@ CREATE OR REPLACE FUNCTION public.ov2_ck_try_man_capture(
   p_fc int,
   p_tr int,
   p_tc int,
-  p_turn int
+  p_turn int,
+  p_chain_continuation boolean DEFAULT false
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -468,10 +474,12 @@ BEGIN
   IF abs(v_dr) <> 2 OR abs(v_dc) <> 2 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'CAP_DISTANCE');
   END IF;
-  v_fwd := CASE WHEN p_turn = 0 THEN 1 ELSE -1 END;
-  v_step_r := CASE WHEN v_dr > 0 THEN 1 WHEN v_dr < 0 THEN -1 ELSE 0 END;
-  IF v_step_r IS DISTINCT FROM v_fwd THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'MAN_FORWARD_CAP');
+  IF NOT p_chain_continuation THEN
+    v_fwd := CASE WHEN p_turn = 0 THEN 1 ELSE -1 END;
+    v_step_r := CASE WHEN v_dr > 0 THEN 1 WHEN v_dr < 0 THEN -1 ELSE 0 END;
+    IF v_step_r IS DISTINCT FROM v_fwd THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'MAN_FORWARD_CAP');
+    END IF;
   END IF;
   v_dr := CASE WHEN v_dr > 0 THEN 1 WHEN v_dr < 0 THEN -1 ELSE 0 END;
   v_dc := CASE WHEN v_dc > 0 THEN 1 WHEN v_dc < 0 THEN -1 ELSE 0 END;
@@ -600,7 +608,7 @@ BEGIN
         IF public.ov2_ck_is_king(v_p) THEN
           v_mv := public.ov2_ck_try_king_capture(v_cells, v_fr, v_fc, v_tr, v_tc, p_turn);
         ELSE
-          v_mv := public.ov2_ck_try_man_capture(v_cells, v_fr, v_fc, v_tr, v_tc, p_turn);
+          v_mv := public.ov2_ck_try_man_capture(v_cells, v_fr, v_fc, v_tr, v_tc, p_turn, true);
         END IF;
       ELSIF v_glob_men_cap THEN
         IF public.ov2_ck_is_king(v_p) THEN
@@ -709,7 +717,7 @@ BEGIN
     IF public.ov2_ck_is_king(v_p) THEN
       v_mv := public.ov2_ck_try_king_capture(v_cells, v_fr, v_fc, v_tr, v_tc, v_turn);
     ELSE
-      v_mv := public.ov2_ck_try_man_capture(v_cells, v_fr, v_fc, v_tr, v_tc, v_turn);
+      v_mv := public.ov2_ck_try_man_capture(v_cells, v_fr, v_fc, v_tr, v_tc, v_turn, true);
     END IF;
   ELSIF public.ov2_ck_is_king(v_p) THEN
     IF v_glob_men_cap THEN
@@ -754,7 +762,7 @@ BEGIN
     v_winner := v_turn;
   END IF;
   IF v_did_capture AND v_winner IS NULL THEN
-    v_more_cap := public.ov2_ck_cell_has_capture(v_new_cells, p_to, v_turn);
+    v_more_cap := public.ov2_ck_cell_has_capture(v_new_cells, p_to, v_turn, false);
     IF v_more_cap THEN
       RETURN jsonb_build_object(
         'ok', true,
@@ -791,12 +799,15 @@ BEGIN
 END;
 $$;
 
-/* Regression: man double-jump must set jumpChain; backward man capture must be rejected. */
+/* Regression: man jumpChain; opening backward illegal; man backward continuation in chain; king two-hop chain. */
 DO $ov2_ck_reg$
 DECLARE
   cells jsonb;
   b jsonb;
   r jsonb;
+  rbc jsonb;
+  rk jsonb;
+  rk2 jsonb;
 BEGIN
   cells := (SELECT jsonb_agg(x) FROM (SELECT 0::int AS x FROM generate_series(1, 64)) s);
   cells := jsonb_set(cells, '{19}', to_jsonb(1), true);
@@ -820,7 +831,65 @@ BEGIN
   b := jsonb_build_object('cells', cells, 'turnSeat', 0);
   r := public.ov2_ck_apply_move(b, 35, 17);
   IF COALESCE((r ->> 'ok')::boolean, false) THEN
-    RAISE EXCEPTION 'ov2_ck_reg: backward man capture should be illegal, got %', r;
+    RAISE EXCEPTION 'ov2_ck_reg: opening backward man capture should be illegal, got %', r;
+  END IF;
+
+  /* Same first jump as above, then remove forward-only continuation and allow backward chain jump 37->19. */
+  cells := (SELECT jsonb_agg(x) FROM (SELECT 0::int AS x FROM generate_series(1, 64)) s);
+  cells := jsonb_set(cells, '{19}', to_jsonb(1), true);
+  cells := jsonb_set(cells, '{28}', to_jsonb(3), true);
+  cells := jsonb_set(cells, '{46}', to_jsonb(3), true);
+  b := jsonb_build_object('cells', cells, 'turnSeat', 0);
+  r := public.ov2_ck_apply_move(b, 19, 37);
+  IF NOT COALESCE((r ->> 'ok')::boolean, false) THEN
+    RAISE EXCEPTION 'ov2_ck_reg (chain): first jump not ok: %', r;
+  END IF;
+  cells := r -> 'board' -> 'cells';
+  cells := jsonb_set(cells, '{46}', to_jsonb(0), true);
+  cells := jsonb_set(cells, '{28}', to_jsonb(3), true);
+  cells := jsonb_set(cells, '{19}', to_jsonb(0), true);
+  b := jsonb_set(r -> 'board', '{cells}', cells, true);
+  rbc := public.ov2_ck_apply_move(b, 37, 19);
+  IF NOT COALESCE((rbc ->> 'ok')::boolean, false) THEN
+    RAISE EXCEPTION 'ov2_ck_reg: backward continuation in man chain should be legal, got %', rbc;
+  END IF;
+  IF public.ov2_ck_cell_get(rbc -> 'board' -> 'cells', 28) <> 0 THEN
+    RAISE EXCEPTION 'ov2_ck_reg: captured mid at 28 should be empty';
+  END IF;
+  IF public.ov2_ck_cell_get(rbc -> 'board' -> 'cells', 19) <> 1 THEN
+    RAISE EXCEPTION 'ov2_ck_reg: landing square 19 should be seat0 man';
+  END IF;
+  IF (rbc -> 'turn_complete') IS DISTINCT FROM to_jsonb(true) THEN
+    RAISE EXCEPTION 'ov2_ck_reg: expected turn_complete true after chain end, got %', rbc -> 'turn_complete';
+  END IF;
+
+  cells := (SELECT jsonb_agg(x) FROM (SELECT 0::int AS x FROM generate_series(1, 64)) s);
+  cells := jsonb_set(cells, '{17}', to_jsonb(2), true);
+  cells := jsonb_set(cells, '{26}', to_jsonb(3), true);
+  b := jsonb_build_object('cells', cells, 'turnSeat', 0);
+  rk := public.ov2_ck_apply_move(b, 17, 35);
+  IF NOT COALESCE((rk ->> 'ok')::boolean, false) THEN
+    RAISE EXCEPTION 'ov2_ck_reg: king first hop not ok: %', rk;
+  END IF;
+  IF COALESCE((rk -> 'board' -> 'jumpChain' ->> 'at')::int, -1) <> 35 THEN
+    RAISE EXCEPTION 'ov2_ck_reg: king jumpChain.at expected 35, got %', rk -> 'board';
+  END IF;
+  cells := rk -> 'board' -> 'cells';
+  cells := jsonb_set(cells, '{44}', to_jsonb(3), true);
+  cells := jsonb_set(cells, '{53}', to_jsonb(0), true);
+  b := jsonb_set(rk -> 'board', '{cells}', cells, true);
+  rk2 := public.ov2_ck_apply_move(b, 35, 53);
+  IF NOT COALESCE((rk2 ->> 'ok')::boolean, false) THEN
+    RAISE EXCEPTION 'ov2_ck_reg: king second hop not ok: %', rk2;
+  END IF;
+  IF public.ov2_ck_cell_get(rk2 -> 'board' -> 'cells', 44) <> 0 THEN
+    RAISE EXCEPTION 'ov2_ck_reg: king should clear captured mid at 44';
+  END IF;
+  IF public.ov2_ck_cell_get(rk2 -> 'board' -> 'cells', 53) <> 2 THEN
+    RAISE EXCEPTION 'ov2_ck_reg: king should land as king at 53';
+  END IF;
+  IF (rk2 -> 'turn_complete') IS DISTINCT FROM to_jsonb(true) THEN
+    RAISE EXCEPTION 'ov2_ck_reg: king chain end turn_complete expected true, got %', rk2 -> 'turn_complete';
   END IF;
 END;
 $ov2_ck_reg$;
