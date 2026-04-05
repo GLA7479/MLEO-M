@@ -334,6 +334,8 @@ export default function Ov2SharedRoomScreen({
     roomId,
     participantId,
     router,
+    // Re-run on each shared snapshot poll so a transient open failure (e.g. first tick after IN_GAME) retries.
+    lastLoadedAt,
   ]);
 
   useEffect(() => {
