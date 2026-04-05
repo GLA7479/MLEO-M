@@ -5,6 +5,7 @@ import {
   requestOv2BackgammonCancelRematch,
   requestOv2BackgammonMarkTurnTimeout,
   requestOv2BackgammonMove,
+  requestOv2BackgammonSubmitTurn,
   requestOv2BackgammonRequestRematch,
   requestOv2BackgammonRoll,
   requestOv2BackgammonStartNextMatch,
@@ -195,6 +196,29 @@ export function useOv2BackgammonSession(baseContext) {
     [roomId, selfKey, snap]
   );
 
+  const submitTurn = useCallback(
+    async steps => {
+      if (!roomId || !selfKey || !snap) return { ok: false };
+      setBusy(true);
+      setErr("");
+      try {
+        const r = await requestOv2BackgammonSubmitTurn(roomId, selfKey, steps, { revision: snap.revision });
+        if (!r.ok) {
+          setErr(r.error || "Submit turn failed");
+          return { ok: false };
+        }
+        if (r.snapshot) setSnap(r.snapshot);
+        return { ok: true };
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+        return { ok: false };
+      } finally {
+        setBusy(false);
+      }
+    },
+    [roomId, selfKey, snap]
+  );
+
   const requestRematch = useCallback(async () => {
     if (!roomId || !selfKey) return { ok: false };
     return requestOv2BackgammonRequestRematch(roomId, selfKey);
@@ -257,6 +281,7 @@ export function useOv2BackgammonSession(baseContext) {
     setErr,
     roll,
     move,
+    submitTurn,
     requestRematch,
     cancelRematch,
     startNextMatch,

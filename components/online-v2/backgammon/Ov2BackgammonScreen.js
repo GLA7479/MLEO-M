@@ -7,7 +7,13 @@ import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi
 import {
   ov2BgClientLegalDestinationsForFrom,
   ov2BgClientLegalDiceForFromTo,
+  ov2BgClientValidateSubmitSteps,
 } from "../../../lib/online-v2/backgammon/ov2BackgammonClientLegality";
+import {
+  ov2BgAutoChainForcedMoves,
+  ov2BgDraftBaseFromServerBoard,
+  ov2BgReplayDraftSteps,
+} from "../../../lib/online-v2/backgammon/ov2BackgammonDraftTurn";
 import { useOv2BackgammonSession } from "../../../hooks/useOv2BackgammonSession";
 
 const AUTO_ROLL_STORAGE_KEY = "ov2_bg_auto_roll";
@@ -143,13 +149,14 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   const router = useRouter();
   const session = useOv2BackgammonSession(contextInput ?? undefined);
   const {
+    snapshot,
     vm,
     busy,
     vaultClaimBusy,
     err,
     setErr,
     roll,
-    move,
+    submitTurn,
     requestRematch,
     cancelRematch,
     startNextMatch,
@@ -171,6 +178,9 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   const [pendingDieChoice, setPendingDieChoice] = useState(
     /** @type {{ fromPt: number, toPt: number, dice: number[] } | null} */ (null)
   );
+  /** Local draft; committed only via `submitTurn` (server RPC). */
+  const [draftSteps, setDraftSteps] = useState(/** @type {{ from: number, to: number, die: number }[]} */ ([]));
+  const draftEpochRef = useRef("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -220,24 +230,83 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   const stakePerSeat =
     room?.stake_per_seat != null && Number.isFinite(Number(room.stake_per_seat)) ? Number(room.stake_per_seat) : null;
 
-  const myBar = vm.mySeat === 0 ? vm.bar[0] : vm.mySeat === 1 ? vm.bar[1] : 0;
+  const draftBase = useMemo(() => {
+    if (!snapshot?.board || String(vm.phase) !== "playing" || !vm.canClientMove || vm.readOnly) return null;
+    if (vm.turnSeat == null || vm.mySeat == null || Number(vm.turnSeat) !== Number(vm.mySeat)) return null;
+    return ov2BgDraftBaseFromServerBoard(snapshot.board, vm.turnSeat);
+  }, [snapshot, vm.phase, vm.canClientMove, vm.readOnly, vm.turnSeat, vm.mySeat]);
 
-  const pts24 = useMemo(() => {
-    const p = Array.isArray(vm.pts) ? vm.pts.map(x => Number(x)) : [];
+  const draftEpoch = useMemo(() => {
+    if (!draftBase) return "";
+    return `${vm.sessionId}|${vm.revision}|${draftBase.diceAvail.join(",")}`;
+  }, [draftBase, vm.sessionId, vm.revision]);
+
+  useEffect(() => {
+    if (!draftEpoch) {
+      draftEpochRef.current = "";
+      return;
+    }
+    if (draftEpochRef.current === draftEpoch) return;
+    draftEpochRef.current = draftEpoch;
+    setPendingDieChoice(null);
+    setSelFrom(null);
+    if (draftBase && vm.turnSeat != null) {
+      setDraftSteps(ov2BgAutoChainForcedMoves(draftBase, vm.turnSeat, []));
+    } else {
+      setDraftSteps([]);
+    }
+  }, [draftEpoch, draftBase, vm.turnSeat]);
+
+  useEffect(() => {
+    if (!draftBase) setDraftSteps([]);
+  }, [draftBase]);
+
+  const draftReplay = useMemo(() => {
+    if (!draftBase || vm.turnSeat == null) return { ok: false, board: null };
+    return ov2BgReplayDraftSteps(draftBase, vm.turnSeat, draftSteps);
+  }, [draftBase, vm.turnSeat, draftSteps]);
+
+  const displayPts = useMemo(() => {
+    const p =
+      draftReplay.ok && Array.isArray(draftReplay.board?.pts)
+        ? draftReplay.board.pts.map(x => Number(x))
+        : Array.isArray(vm.pts)
+          ? vm.pts.map(x => Number(x))
+          : [];
     while (p.length < 24) p.push(0);
     return p.slice(0, 24);
-  }, [vm.pts]);
+  }, [draftReplay, vm.pts]);
+
+  const displayBar =
+    draftReplay.ok && draftReplay.board && Array.isArray(draftReplay.board.bar) ? draftReplay.board.bar : vm.bar;
+  const displayOff =
+    draftReplay.ok && draftReplay.board && Array.isArray(draftReplay.board.off) ? draftReplay.board.off : vm.off;
+  const displayDiceAvail =
+    draftReplay.ok && draftReplay.board && Array.isArray(draftReplay.board.diceAvail)
+      ? draftReplay.board.diceAvail
+      : vm.diceAvail;
+
+  const myBar = vm.mySeat === 0 ? displayBar[0] : vm.mySeat === 1 ? displayBar[1] : 0;
 
   const legalityBoard = useMemo(
     () => ({
-      pts: pts24,
-      bar: vm.bar,
-      off: vm.off,
+      pts: displayPts,
+      bar: displayBar,
+      off: displayOff,
       turnSeat: vm.turnSeat,
-      diceAvail: vm.diceAvail,
+      diceAvail: displayDiceAvail,
     }),
-    [pts24, vm.bar, vm.off, vm.turnSeat, vm.diceAvail]
+    [displayPts, displayBar, displayOff, vm.turnSeat, displayDiceAvail]
   );
+
+  const submitValidation = useMemo(() => {
+    if (!draftBase || vm.turnSeat == null) {
+      return { ok: false, code: "NO_DRAFT", message: "Not in draft mode" };
+    }
+    return ov2BgClientValidateSubmitSteps({ ...draftBase, turnSeat: vm.turnSeat }, draftSteps);
+  }, [draftBase, vm.turnSeat, draftSteps]);
+
+  const boardColDir = vm.mySeat === 1 ? "flex-col-reverse" : "flex-col";
 
   const legalDest = useMemo(() => {
     if (selFrom == null || !vm.canClientMove || vm.readOnly) return new Set();
@@ -262,6 +331,23 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     setInvalidFlashIdx(idx);
   }, []);
 
+  const appendDraftStep = useCallback(
+    (fromPt, toPt, die) => {
+      if (!draftBase || vm.turnSeat == null) return;
+      const turn = vm.turnSeat;
+      const tentative = [...draftSteps, { from: fromPt, to: toPt, die }];
+      const rep = ov2BgReplayDraftSteps(draftBase, turn, tentative);
+      if (!rep.ok) {
+        setErr(typeof rep.code === "string" ? rep.code : "Illegal move");
+        return;
+      }
+      setErr("");
+      setDraftSteps(ov2BgAutoChainForcedMoves(draftBase, turn, tentative));
+      resetSelection();
+    },
+    [draftBase, vm.turnSeat, draftSteps, resetSelection, setErr]
+  );
+
   const tryCompleteMove = useCallback(
     async (fromPt, toPt) => {
       const opts = ov2BgClientLegalDiceForFromTo(legalityBoard, fromPt, toPt);
@@ -273,10 +359,9 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         setPendingDieChoice({ fromPt, toPt, dice: opts });
         return;
       }
-      const r = await move(fromPt, toPt, opts[0]);
-      if (r?.ok) resetSelection();
+      appendDraftStep(fromPt, toPt, opts[0]);
     },
-    [legalityBoard, move, resetSelection, setErr]
+    [legalityBoard, appendDraftStep, setErr]
   );
 
   const confirmDieChoice = useCallback(
@@ -284,11 +369,36 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       if (!pendingDieChoice) return;
       const { fromPt, toPt } = pendingDieChoice;
       setPendingDieChoice(null);
-      const r = await move(fromPt, toPt, die);
-      if (r?.ok) resetSelection();
+      appendDraftStep(fromPt, toPt, die);
     },
-    [pendingDieChoice, move, resetSelection]
+    [pendingDieChoice, appendDraftStep]
   );
+
+  const undoDraft = useCallback(() => {
+    setDraftSteps(s => s.slice(0, -1));
+    resetSelection();
+  }, [resetSelection]);
+
+  const resetDraft = useCallback(() => {
+    resetSelection();
+    if (draftBase && vm.turnSeat != null) {
+      setDraftSteps(ov2BgAutoChainForcedMoves(draftBase, vm.turnSeat, []));
+    } else {
+      setDraftSteps([]);
+    }
+  }, [draftBase, vm.turnSeat, resetSelection]);
+
+  const confirmTurn = useCallback(async () => {
+    if (!submitValidation.ok) {
+      setErr(submitValidation.message || "Cannot confirm this turn.");
+      return;
+    }
+    const r = await submitTurn(draftSteps);
+    if (r?.ok) {
+      setDraftSteps([]);
+      resetSelection();
+    }
+  }, [submitTurn, draftSteps, submitValidation, resetSelection, setErr]);
 
   const onPointClick = useCallback(
     async idx => {
@@ -305,7 +415,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
 
       if (selFrom == null) {
         if (myBar > 0) return;
-        const v = pts24[idx] || 0;
+        const v = displayPts[idx] || 0;
         const mine = vm.mySeat === 0 ? v > 0 : vm.mySeat === 1 ? v < 0 : false;
         if (!mine) {
           flashInvalid(idx);
@@ -341,7 +451,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         return;
       }
 
-      const v = pts24[idx] || 0;
+      const v = displayPts[idx] || 0;
       const mine = vm.mySeat === 0 ? v > 0 : vm.mySeat === 1 ? v < 0 : false;
       // 2) Else switch origin to another of my points that has legal moves from itself
       if (mine) {
@@ -361,7 +471,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       busy,
       myBar,
       selFrom,
-      pts24,
+      displayPts,
       legalDest,
       legalityBoard,
       tryCompleteMove,
@@ -493,7 +603,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         <BoardPoint
           key={i}
           pointIndex={i}
-          value={pts24[i] ?? 0}
+          value={displayPts[i] ?? 0}
           mySeat={vm.mySeat}
           selectedFrom={typeof selFrom === "number" && selFrom === i}
           highlightDestination={selFrom != null && legalDest.has(i)}
@@ -509,8 +619,8 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     </div>
   );
 
-  const offS1 = vm.off[1] ?? 0;
-  const offS0 = vm.off[0] ?? 0;
+  const offS1 = displayOff[1] ?? 0;
+  const offS0 = displayOff[0] ?? 0;
   const bearHighlight = selFrom != null && typeof selFrom === "number" && legalDest.has(-1);
   const barInvalidTop = invalidFlashIdx === -2 && vm.mySeat === 1;
   const barInvalidBot = invalidFlashIdx === -2 && vm.mySeat === 0;
@@ -519,7 +629,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     <div className="flex w-9 shrink-0 flex-col border-x border-amber-900/90 bg-gradient-to-b from-zinc-900 to-black sm:w-11 md:w-14">
       <button
         type="button"
-        disabled={boardDisabled || vm.mySeat !== 1 || vm.bar[1] <= 0 || !vm.canClientMove}
+        disabled={boardDisabled || vm.mySeat !== 1 || displayBar[1] <= 0 || !vm.canClientMove}
         onClick={() => {
           if (vm.mySeat !== 1) return;
           void onBarClick();
@@ -535,12 +645,12 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           Bar
         </span>
         <span className="text-[7px] font-semibold text-zinc-500 sm:text-[8px]">P2</span>
-        <CheckerStack count={-Math.max(0, vm.bar[1])} maxVisible={5} compact={compactBoard} />
+        <CheckerStack count={-Math.max(0, displayBar[1])} maxVisible={5} compact={compactBoard} />
       </button>
       <div className="h-px shrink-0 bg-black/60" aria-hidden />
       <button
         type="button"
-        disabled={boardDisabled || vm.mySeat !== 0 || vm.bar[0] <= 0 || !vm.canClientMove}
+        disabled={boardDisabled || vm.mySeat !== 0 || displayBar[0] <= 0 || !vm.canClientMove}
         onClick={() => {
           if (vm.mySeat !== 0) return;
           void onBarClick();
@@ -552,7 +662,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         } ${barInvalidBot ? "animate-pulse ring-2 ring-rose-500/60 ring-inset" : ""} disabled:opacity-40`}
         aria-label="Bar, seat one"
       >
-        <CheckerStack count={Math.max(0, vm.bar[0])} maxVisible={5} compact={compactBoard} />
+        <CheckerStack count={Math.max(0, displayBar[0])} maxVisible={5} compact={compactBoard} />
         <span className="text-[7px] font-semibold text-zinc-500 sm:text-[8px]">P1</span>
         <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-amber-100/95 sm:text-[9px] md:text-[10px] md:tracking-[0.24em]">
           Bar
@@ -736,6 +846,11 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
             {Array.isArray(vm.dice) ? (
               <span className="pointer-events-none select-none font-mono text-zinc-500" aria-hidden>
                 {JSON.stringify(vm.dice)}
+                {draftBase ? (
+                  <span className="ml-1 text-emerald-400/90" title="Dice remaining (draft)">
+                    →{JSON.stringify(displayDiceAvail)}
+                  </span>
+                ) : null}
               </span>
             ) : null}
             {isLiveMatch && onLeaveToLobby ? (
@@ -794,6 +909,34 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
             Clear selection
           </button>
         ) : null}
+        {draftBase ? (
+          <>
+            <button
+              type="button"
+              disabled={busy || draftSteps.length === 0}
+              onClick={() => undoDraft()}
+              className="rounded-md border border-zinc-500/40 bg-zinc-900/50 px-2 py-1 text-[9px] font-semibold text-zinc-200 disabled:opacity-40 sm:text-[10px]"
+            >
+              Undo
+            </button>
+            <button
+              type="button"
+              disabled={busy || draftSteps.length === 0}
+              onClick={() => resetDraft()}
+              className="rounded-md border border-zinc-500/40 bg-zinc-900/50 px-2 py-1 text-[9px] font-semibold text-zinc-200 disabled:opacity-40 sm:text-[10px]"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              disabled={busy || !submitValidation.ok}
+              onClick={() => void confirmTurn()}
+              className="rounded-md border border-emerald-500/55 bg-emerald-950/40 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-emerald-100 disabled:opacity-40 sm:text-[10px]"
+            >
+              {busy ? "…" : "Confirm turn"}
+            </button>
+          </>
+        ) : null}
       </div>
 
       {pendingDieChoice && vm.canClientMove && String(vm.phase) === "playing" ? (
@@ -841,13 +984,13 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
             </span>
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 flex-row gap-px overflow-hidden sm:gap-1">
-            <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+            <div className={`flex h-full min-h-0 min-w-0 flex-1 ${boardColDir}`}>
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(TOP_OUTER, "down")}</div>
               <div className="h-px shrink-0 bg-black/50" aria-hidden />
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(BOT_OUTER, "up")}</div>
             </div>
             {barCol}
-            <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+            <div className={`flex h-full min-h-0 min-w-0 flex-1 ${boardColDir}`}>
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(TOP_HOME_S1, "down")}</div>
               <div className="h-px shrink-0 bg-black/50" aria-hidden />
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(BOT_HOME_S0, "up")}</div>
@@ -858,7 +1001,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       </div>
 
       <span className="sr-only">
-        Backgammon table: player one bears off bottom right, player two top right, bar between halves.
+        Backgammon table: your home is shown toward the bottom; bar between halves. Confirm turn to commit moves.
       </span>
 
       {isFinished ? (
