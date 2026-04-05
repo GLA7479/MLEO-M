@@ -22,6 +22,7 @@ import {
   OV2_CHECKERS_PRODUCT_GAME_ID,
   requestOv2CheckersOpenSession,
 } from "../../../lib/online-v2/checkers/ov2CheckersSessionAdapter";
+import { OV2_CHESS_PRODUCT_GAME_ID, requestOv2ChessOpenSession } from "../../../lib/online-v2/chess/ov2ChessSessionAdapter";
 import {
   commitOv2RoomStake,
   fetchOv2RoomById,
@@ -116,7 +117,9 @@ export default function Ov2SharedRoomScreen({
   const isBingoRoom = String(room?.product_game_id || "").trim() === OV2_BINGO_PRODUCT_GAME_ID;
   const isBackgammonRoom = String(room?.product_game_id || "").trim() === OV2_BACKGAMMON_PRODUCT_GAME_ID;
   const isCheckersRoom = String(room?.product_game_id || "").trim() === OV2_CHECKERS_PRODUCT_GAME_ID;
-  const isStakeSharedRoom = isRummy51Room || isLudoRoom || isBingoRoom || isBackgammonRoom || isCheckersRoom;
+  const isChessRoom = String(room?.product_game_id || "").trim() === OV2_CHESS_PRODUCT_GAME_ID;
+  const isStakeSharedRoom =
+    isRummy51Room || isLudoRoom || isBingoRoom || isBackgammonRoom || isCheckersRoom || isChessRoom;
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
 
   const ledgerByParticipant = useMemo(() => {
@@ -394,6 +397,18 @@ export default function Ov2SharedRoomScreen({
           didRouteToLiveRef.current = true;
           setLaunchingLive(true);
           await router.push(`/ov2-checkers?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isChessRoom) {
+          const open = await requestOv2ChessOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-chess?room=${encodeURIComponent(roomId)}`);
+          return;
         }
       } catch {
         /* retry on next snapshot */
@@ -412,6 +427,7 @@ export default function Ov2SharedRoomScreen({
     isRummy51Room,
     isBackgammonRoom,
     isCheckersRoom,
+    isChessRoom,
     roomId,
     router,
     // Re-run on each shared snapshot poll so a transient open failure (e.g. first tick after IN_GAME) retries.
@@ -722,6 +738,32 @@ export default function Ov2SharedRoomScreen({
         await router.push(`/ov2-backgammon?room=${encodeURIComponent(roomId)}`);
         return;
       }
+      if (isCheckersRoom) {
+        const open = await requestOv2CheckersOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Checkers session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-checkers?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isChessRoom) {
+        const open = await requestOv2ChessOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Chess session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-chess?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
       await reload();
     } catch (e) {
       setMsg(e?.message || String(e));
@@ -796,6 +838,70 @@ export default function Ov2SharedRoomScreen({
       };
     }
 
+    if (isCheckersRoom) {
+      const ckSid = room?.active_session_id || null;
+      if (ckSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-checkers?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledCk = false;
+      let intervalCk = null;
+      const tickCk = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledCk || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalCk) clearInterval(intervalCk);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-checkers?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickCk();
+      intervalCk = setInterval(() => void tickCk(), 2500);
+      return () => {
+        cancelledCk = true;
+        if (intervalCk) clearInterval(intervalCk);
+      };
+    }
+
+    if (isChessRoom) {
+      const chSid = room?.active_session_id || null;
+      if (chSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-chess?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledCh = false;
+      let intervalCh = null;
+      const tickCh = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledCh || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalCh) clearInterval(intervalCh);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-chess?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickCh();
+      intervalCh = setInterval(() => void tickCh(), 2500);
+      return () => {
+        cancelledCh = true;
+        if (intervalCh) clearInterval(intervalCh);
+      };
+    }
+
     if (!liveRuntimeId) return;
     if (isLudoRoom) {
       const ludoSid = room?.active_session_id || null;
@@ -846,6 +952,8 @@ export default function Ov2SharedRoomScreen({
     isRummy51Room,
     isBingoRoom,
     isBackgammonRoom,
+    isCheckersRoom,
+    isChessRoom,
     room?.status,
     room?.active_session_id,
     liveRuntimeId,
@@ -1049,7 +1157,7 @@ export default function Ov2SharedRoomScreen({
         ) : null}
 
         {runtimeHandoff && !isRummy51Room ? (
-          !isLudoRoom && !isBingoRoom && !isBackgammonRoom && !isCheckersRoom ? (
+          !isLudoRoom && !isBingoRoom && !isBackgammonRoom && !isCheckersRoom && !isChessRoom ? (
             <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
               <div className="font-bold">Runtime handoff ready</div>
               <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
@@ -1058,7 +1166,9 @@ export default function Ov2SharedRoomScreen({
             </div>
           ) : null
         ) : null}
-        {sharedStatusUpper === "IN_GAME" && (isRummy51Room || isBingoRoom || isBackgammonRoom || isCheckersRoom) && !launchingLive ? (
+        {sharedStatusUpper === "IN_GAME" &&
+        (isRummy51Room || isBingoRoom || isBackgammonRoom || isCheckersRoom || isChessRoom) &&
+        !launchingLive ? (
           <div className="mt-3 rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
             <p className="font-semibold text-teal-50">Match starting</p>
             <p className="mt-1 text-teal-200/90">
@@ -1152,7 +1262,9 @@ export default function Ov2SharedRoomScreen({
                   ? "Opening live Backgammon..."
                   : isCheckersRoom
                     ? "Opening live Checkers..."
-                    : "Opening live Ludo game..."}
+                    : isChessRoom
+                      ? "Opening live Chess..."
+                      : "Opening live Ludo game..."}
           </p>
         ) : null}
         {error ? <p className="text-[11px] text-red-300">{error}</p> : null}

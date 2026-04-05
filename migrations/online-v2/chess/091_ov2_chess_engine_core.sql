@@ -48,7 +48,7 @@ LANGUAGE sql
 IMMUTABLE
 SET search_path = public
 AS $$
-  SELECT upper(trim(COALESCE(p_ch, ''))) IN ('P','N','B','R','Q','K');
+  SELECT left(trim(COALESCE(p_ch, '')), 1) IN ('P','N','B','R','Q','K');
 $$;
 
 CREATE OR REPLACE FUNCTION public.ov2_ch_is_black_sq(p_ch text)
@@ -57,7 +57,7 @@ LANGUAGE sql
 IMMUTABLE
 SET search_path = public
 AS $$
-  SELECT lower(trim(COALESCE(p_ch, ''))) IN ('p','n','b','r','q','k');
+  SELECT left(trim(COALESCE(p_ch, '')), 1) IN ('p','n','b','r','q','k');
 $$;
 
 CREATE OR REPLACE FUNCTION public.ov2_ch_initial_board_json()

@@ -452,7 +452,6 @@ BEGIN
       ELSE
         v_ns := public.ov2_ch_set_sq(v_ns, p_to, 'P');
       END IF;
-      v_cas := jsonb_set(jsonb_set(v_cas, '{wK}', 'false'::jsonb, true), '{wQ}', 'false'::jsonb, true);
       v_half := 0;
       RETURN jsonb_build_object(
         'squares', v_ns, 'castling', v_cas, 'ep', 'null'::jsonb,
@@ -501,7 +500,6 @@ BEGIN
       ELSE
         v_ns := public.ov2_ch_set_sq(v_ns, p_to, 'p');
       END IF;
-      v_cas := jsonb_set(jsonb_set(v_cas, '{bK}', 'false'::jsonb, true), '{bQ}', 'false'::jsonb, true);
       v_half := 0;
       RETURN jsonb_build_object(
         'squares', v_ns, 'castling', v_cas, 'ep', 'null'::jsonb,
