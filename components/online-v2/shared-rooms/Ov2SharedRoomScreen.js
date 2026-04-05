@@ -778,6 +778,23 @@ export default function Ov2SharedRoomScreen({
         <div className="flex flex-1 items-center justify-center rounded-lg border border-zinc-600/50 bg-zinc-900/40 py-2 text-[10px] font-medium text-zinc-500">
           Pick a seat
         </div>
+      ) : showNonHostJoinBtn ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void onNonHostJoinMatchStake()}
+          className="flex-1 rounded-lg border border-violet-500/45 bg-violet-900/40 py-2 text-xs font-bold text-violet-100 disabled:opacity-45"
+        >
+          {busy ? "Working…" : isHost && isQmRoom ? "Commit stake" : "Join match (stake)"}
+        </button>
+      ) : isStakeSharedRoom &&
+        sharedPreStartStrict &&
+        sharedSeated &&
+        myWalletCommitted &&
+        (!isHost || isQmRoom) ? (
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-950/25 py-2 text-[10px] font-medium text-emerald-200/90">
+          Stake committed — waiting
+        </div>
       ) : isHost ? (
         <button
           type="button"
@@ -787,15 +804,6 @@ export default function Ov2SharedRoomScreen({
           className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-900/40 py-2 text-xs font-bold text-emerald-100 disabled:opacity-45"
         >
           {busy ? "Working…" : "Start match"}
-        </button>
-      ) : showNonHostJoinBtn ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void onNonHostJoinMatchStake()}
-          className="flex-1 rounded-lg border border-violet-500/45 bg-violet-900/40 py-2 text-xs font-bold text-violet-100 disabled:opacity-45"
-        >
-          {busy ? "Working…" : "Join match (stake)"}
         </button>
       ) : myWalletCommitted ? (
         <div className="flex flex-1 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-950/25 py-2 text-[10px] font-medium text-emerald-200/90">

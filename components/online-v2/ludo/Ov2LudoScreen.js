@@ -272,7 +272,7 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
     </div>
   ) : null;
   const mobileStateRow = isLiveMatch ? (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/15 bg-gradient-to-r from-zinc-900/70 via-zinc-900/55 to-zinc-800/60 px-2.5 py-1.5 text-sm leading-tight shadow-sm shadow-black/25 backdrop-blur-[2px]">
+    <div className="flex flex-wrap items-center justify-center gap-2 py-0.5 text-sm leading-tight">
       <button
         type="button"
         disabled={!canOfferDouble}

@@ -62,8 +62,9 @@ export default function Ov2SharedQuickMatchBar({
     async out => {
       const pk = String(participantId || "").trim();
       const ph = String(out?.phase || "idle");
-      if (typeof out?.stake_per_seat === "number" && Number.isFinite(out.stake_per_seat)) {
-        setFlowStakeUnits(Math.floor(out.stake_per_seat));
+      if (out?.stake_per_seat != null && out.stake_per_seat !== "") {
+        const n = Number(out.stake_per_seat);
+        if (Number.isFinite(n)) setFlowStakeUnits(Math.floor(n));
       }
       setPhase(ph);
       if (ph === "confirm") {
