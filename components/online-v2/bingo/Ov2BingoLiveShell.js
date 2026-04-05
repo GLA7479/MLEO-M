@@ -8,6 +8,11 @@ import {
   isOv2RoomIdQueryParam,
   ONLINE_V2_GAME_IDS,
 } from "../../../lib/online-v2/onlineV2GameRegistry";
+import {
+  fetchOv2BingoLiveRoundSnapshot,
+  openOv2BingoSession,
+} from "../../../lib/online-v2/bingo/ov2BingoSessionAdapter";
+import { isOv2QuickMatchRoom } from "../../../lib/online-v2/shared-rooms/ov2QuickMatchUi";
 import { useOv2LiveShellFatalRoomRedirect } from "../../../hooks/useOv2LiveShellFatalRoomRedirect";
 import { fetchOv2RoomById, fetchOv2RoomMembers, leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { getOv2ParticipantId } from "../../../lib/online-v2/ov2ParticipantId";
@@ -50,6 +55,9 @@ export default function Ov2BingoLiveShell() {
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveErr, setLeaveErr] = useState("");
   const loadedOnceForRoomRef = useRef(null);
+  const qmBingoAutoOpenDoneRef = useRef(false);
+  const qmBingoAutoOpenFlightRef = useRef(false);
+  const qmBingoAutoOpenFailuresRef = useRef(0);
   const selfDisplayName = useMemo(() => {
     const mine = members.find(m => String(m?.participant_key || "") === String(participantId || ""));
     return String(mine?.display_name || "").trim();
@@ -96,9 +104,56 @@ export default function Ov2BingoLiveShell() {
   }, [roomId]);
 
   useEffect(() => {
+    qmBingoAutoOpenDoneRef.current = false;
+    qmBingoAutoOpenFlightRef.current = false;
+    qmBingoAutoOpenFailuresRef.current = 0;
+  }, [roomId]);
+
+  useEffect(() => {
     if (!roomId) return;
     void reloadContext();
   }, [roomId, reloadContext]);
+
+  useEffect(() => {
+    if (!roomId || !room || !participantId) return undefined;
+    if (!isOv2QuickMatchRoom(room)) return undefined;
+    if (String(room.product_game_id || "").trim() !== ONLINE_V2_GAME_IDS.BINGO) return undefined;
+    if (String(room.status || "").toUpperCase() !== "IN_GAME") return undefined;
+    if (String(room.lifecycle_phase || "").trim() !== "active") return undefined;
+    const hostPk = String(room.host_participant_key || "").trim();
+    const myPk = String(participantId || "").trim();
+    if (!hostPk || !myPk || hostPk !== myPk) return undefined;
+    if (qmBingoAutoOpenDoneRef.current || qmBingoAutoOpenFlightRef.current) return undefined;
+    if (qmBingoAutoOpenFailuresRef.current >= 8) return undefined;
+
+    let cancelled = false;
+    void (async () => {
+      qmBingoAutoOpenFlightRef.current = true;
+      try {
+        const snap = await fetchOv2BingoLiveRoundSnapshot(roomId, { viewerParticipantKey: myPk });
+        if (cancelled) return;
+        if (snap?.sessionId) {
+          qmBingoAutoOpenDoneRef.current = true;
+          return;
+        }
+        const open = await openOv2BingoSession(roomId, myPk);
+        if (cancelled) return;
+        if (open?.ok) {
+          qmBingoAutoOpenDoneRef.current = true;
+          qmBingoAutoOpenFailuresRef.current = 0;
+          await reloadContext();
+        } else {
+          qmBingoAutoOpenFailuresRef.current += 1;
+        }
+      } finally {
+        if (!cancelled) qmBingoAutoOpenFlightRef.current = false;
+      }
+    })();
+    return () => {
+      cancelled = true;
+      qmBingoAutoOpenFlightRef.current = false;
+    };
+  }, [roomId, room, participantId, reloadContext]);
 
   useEffect(() => {
     if (!router.isReady) return;

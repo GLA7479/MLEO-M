@@ -14,6 +14,7 @@ import {
 import {
   callOv2BingoNext,
   claimOv2BingoPrize,
+  coalesceOv2BingoLiveSnapshots,
   fetchOv2BingoLiveRoundSnapshot,
   normalizeOv2BingoAuthoritativeSnapshot,
   normalizeMemberRow,
@@ -104,13 +105,16 @@ export function useOv2BingoSession(baseContext) {
     let cancelled = false;
     void (async () => {
       const snap = await fetchOv2BingoLiveRoundSnapshot(roomId, { viewerParticipantKey: selfKey ?? "" });
-      if (!cancelled) setLiveSnapshot(snap ?? null);
+      if (!cancelled) {
+        if (!snap) setLiveSnapshot(null);
+        else setLiveSnapshot(prev => coalesceOv2BingoLiveSnapshots(prev, snap, selfKey ?? ""));
+      }
     })();
 
     const unsub = subscribeOv2BingoAuthoritativeSnapshot(roomId, {
       viewerParticipantKey: selfKey ?? "",
       onSnapshot: s => {
-        if (!cancelled) setLiveSnapshot(s);
+        if (!cancelled) setLiveSnapshot(prev => coalesceOv2BingoLiveSnapshots(prev, s, selfKey ?? ""));
       },
     });
 
@@ -119,7 +123,9 @@ export function useOv2BingoSession(baseContext) {
         ? window.setInterval(() => {
             void (async () => {
               const snap = await fetchOv2BingoLiveRoundSnapshot(roomId, { viewerParticipantKey: selfKey ?? "" });
-              if (!cancelled && snap) setLiveSnapshot(snap);
+              if (!cancelled && snap) {
+                setLiveSnapshot(prev => coalesceOv2BingoLiveSnapshots(prev, snap, selfKey ?? ""));
+              }
             })();
           }, OV2_BINGO_POLL_MS)
         : 0;
@@ -236,7 +242,7 @@ export function useOv2BingoSession(baseContext) {
       try {
         const r = await callOv2BingoNext(roomId, selfKey, liveSnapshot.revision);
         if (r.ok && "snapshot" in r && r.snapshot) {
-          setLiveSnapshot(r.snapshot);
+          setLiveSnapshot(prev => coalesceOv2BingoLiveSnapshots(prev, r.snapshot, selfKey));
         } else {
           lastAutoCallKeyRef.current = null;
         }
@@ -292,13 +298,17 @@ export function useOv2BingoSession(baseContext) {
   const refreshLiveSnapshot = useCallback(async () => {
     if (!roomId) return;
     const snap = await fetchOv2BingoLiveRoundSnapshot(roomId, { viewerParticipantKey: selfKey ?? "" });
-    if (snap) setLiveSnapshot(snap);
+    if (snap) {
+      setLiveSnapshot(prev => coalesceOv2BingoLiveSnapshots(prev, snap, selfKey ?? ""));
+    }
   }, [roomId, selfKey]);
 
   const openSession = useCallback(async () => {
     if (!roomId || !selfKey) return { ok: false, error: "Not ready" };
     const r = await openOv2BingoSession(roomId, selfKey);
-    if (r.ok && r.snapshot) setLiveSnapshot(r.snapshot);
+    if (r.ok && r.snapshot) {
+      setLiveSnapshot(prev => coalesceOv2BingoLiveSnapshots(prev, r.snapshot, selfKey));
+    }
     await refreshLiveSnapshot();
     if (typeof reloadRoomContext === "function") void Promise.resolve(reloadRoomContext());
     return r;
@@ -307,7 +317,9 @@ export function useOv2BingoSession(baseContext) {
   const callNextManual = useCallback(async () => {
     if (!roomId || !selfKey || !liveSnapshot) return { ok: false, error: "Not ready" };
     const r = await callOv2BingoNext(roomId, selfKey, liveSnapshot.revision);
-    if (r.ok && "snapshot" in r && r.snapshot) setLiveSnapshot(r.snapshot);
+    if (r.ok && "snapshot" in r && r.snapshot) {
+      setLiveSnapshot(prev => coalesceOv2BingoLiveSnapshots(prev, r.snapshot, selfKey));
+    }
     return r;
   }, [roomId, selfKey, liveSnapshot]);
 
@@ -317,7 +329,7 @@ export function useOv2BingoSession(baseContext) {
       const pk = String(prizeKey ?? "").trim();
       const r = await claimOv2BingoPrize(roomId, pk, selfKey, liveSnapshot.revision);
       if (r.ok && "snapshot" in r && r.snapshot) {
-        setLiveSnapshot(r.snapshot);
+        setLiveSnapshot(prev => coalesceOv2BingoLiveSnapshots(prev, r.snapshot, selfKey));
         const snap = r.snapshot;
         const claims = Array.isArray(snap.claims) ? snap.claims : [];
         const just = claims.filter(c => c.claimedByParticipantKey === selfKey && c.prizeKey === pk).pop();
@@ -338,7 +350,7 @@ export function useOv2BingoSession(baseContext) {
   const rebindSnapshotFromServerPayload = useCallback(
     raw => {
       const s = normalizeOv2BingoAuthoritativeSnapshot(raw, { viewerParticipantKey: selfKey ?? "" });
-      if (s) setLiveSnapshot(s);
+      if (s) setLiveSnapshot(prev => coalesceOv2BingoLiveSnapshots(prev, s, selfKey ?? ""));
     },
     [selfKey]
   );
@@ -351,6 +363,9 @@ export function useOv2BingoSession(baseContext) {
   const vm = useMemo(() => {
     if (playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET) {
       const life = room?.lifecycle_phase != null ? String(room.lifecycle_phase) : "";
+      const ctxHostPk = room?.host_participant_key != null ? String(room.host_participant_key).trim() : "";
+      const ctxIsHost = Boolean(selfKey && ctxHostPk && selfKey === ctxHostPk);
+      const allowHostOpenOverride = ctxIsHost && life === "active";
       let phaseLine = "Waiting for the host to open a Bingo match.";
       if (life === "lobby") phaseLine = "Waiting for players — the host must start the match from the lobby.";
       else if (life === "pending_start" || life === "pending_stakes") phaseLine = "Waiting for stake commits from all players.";
@@ -402,7 +417,11 @@ export function useOv2BingoSession(baseContext) {
         canStartNextMatch: false,
         cardIsAuthoritative: false,
         disabledReasons: {
-          openSession: !selfKey ? "No participant id" : liveSnapshot && !liveSnapshot.canOpenSession ? "Cannot open now" : null,
+          openSession: !selfKey
+            ? "No participant id"
+            : liveSnapshot && !liveSnapshot.canOpenSession && !allowHostOpenOverride
+              ? "Cannot open now"
+              : null,
           callNext: "Calls start after the host opens the round.",
           claim: "No live match",
           rematch: "No finished match",

@@ -147,14 +147,18 @@ export default function Ov2BingoScreen({ contextInput = null }) {
   const phaseHeader = useMemo(() => {
     const life = vm.roomLifecyclePhase || "";
     const sp = vm.sessionPhase || "";
+    const snapSid =
+      vm.authoritativeSnapshot && vm.authoritativeSnapshot.sessionId != null
+        ? String(vm.authoritativeSnapshot.sessionId).trim()
+        : "";
     if (isLiveMatch && sp === "playing") return "Playing";
     if (isLiveMatch && sp === "finished") return "Finished";
     if (life === "lobby") return "Waiting for players";
     if (life === "pending_start" || life === "pending_stakes") return "Waiting for stake commits";
-    if (life === "active" && !vm.roomActiveSessionId) return "Waiting for host to open Bingo";
-    if (life === "active" && vm.roomActiveSessionId) return "Match";
+    if (life === "active" && !vm.roomActiveSessionId && !snapSid) return "Waiting for host to open Bingo";
+    if (life === "active" && (vm.roomActiveSessionId || snapSid)) return "Match";
     return sp || life || "—";
-  }, [isLiveMatch, vm.roomLifecyclePhase, vm.sessionPhase, vm.roomActiveSessionId]);
+  }, [isLiveMatch, vm.roomLifecyclePhase, vm.sessionPhase, vm.roomActiveSessionId, vm.authoritativeSnapshot]);
 
   const playingLive = Boolean(vm.isLive && isLiveMatch && vm.sessionPhase === "playing");
   const isFinishedLive = Boolean(vm.isLive && isLiveMatch && vm.sessionPhase === "finished");

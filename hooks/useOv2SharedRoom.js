@@ -20,10 +20,12 @@ export function useOv2SharedRoom({ roomId, participantKey, pollMs = 3000 }) {
     [members, participantKey]
   );
 
-  const isHost = useMemo(
-    () => Boolean(room && me && room.host_member_id && room.host_member_id === me.id),
-    [room, me]
-  );
+  const isHost = useMemo(() => {
+    if (!room || !me) return false;
+    const role = String(me.role || "").toLowerCase();
+    if (role === "host") return true;
+    return Boolean(room.host_member_id && room.host_member_id === me.id);
+  }, [room, me]);
 
   const loadSnapshot = useCallback(
     async (opts = { silent: false }) => {

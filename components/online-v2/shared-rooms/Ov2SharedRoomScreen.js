@@ -230,6 +230,7 @@ export default function Ov2SharedRoomScreen({
   useEffect(() => {
     if (!roomId || !isQmRoom) return undefined;
     if (sharedStatusUpper !== "OPEN") return undefined;
+    if (canonicalStatusUpper === "IN_GAME") return undefined;
     const run = async () => {
       try {
         const r = await ov2QuickMatchAutoStartDeadline({ room_id: roomId });
@@ -254,7 +255,7 @@ export default function Ov2SharedRoomScreen({
     void run();
     const id = window.setInterval(() => void run(), 2000);
     return () => window.clearInterval(id);
-  }, [roomId, isQmRoom, sharedStatusUpper, reload, refreshSharedEconomySnapshot]);
+  }, [roomId, isQmRoom, sharedStatusUpper, canonicalStatusUpper, reload, refreshSharedEconomySnapshot]);
 
   useEffect(() => {
     if (!roomId || !isQmRoom || !isHost || !myPk) return;

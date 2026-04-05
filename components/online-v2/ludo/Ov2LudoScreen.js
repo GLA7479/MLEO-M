@@ -323,16 +323,6 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-0.5 overflow-hidden px-0.5 sm:gap-1 sm:px-1">
-      {isReadOnlyRoom ? (
-        <div
-          className="shrink-0 rounded-md border border-amber-500/40 bg-amber-950/30 px-2 py-1 text-center text-[9px] font-semibold text-amber-100 sm:text-[10px]"
-          role="status"
-        >
-          {roomProductId === OV2_LUDO_PRODUCT_GAME_ID
-            ? "Read-only — no live Ludo session yet. The room host can open the match when 2–4 players are seated."
-            : "Read-only — no authoritative match snapshot yet."}
-        </div>
-      ) : null}
       {playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL ? (
         <div className="flex shrink-0 flex-wrap items-center gap-1">
           <button
