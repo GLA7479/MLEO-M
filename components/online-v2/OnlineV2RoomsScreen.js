@@ -141,6 +141,10 @@ export default function OnlineV2RoomsScreen() {
     sessionResumeTriedRef.current = true;
     void getOv2RoomSnapshot({ room_id: last, viewer_participant_key: participantId })
       .then(snap => {
+        if (!snap?.room) {
+          clearOv2SharedLastRoomSessionKey();
+          return;
+        }
         const productId = snap?.room?.product_game_id;
         if (!isOv2ActiveSharedProductId(productId)) {
           clearOv2SharedLastRoomSessionKey();
@@ -155,9 +159,13 @@ export default function OnlineV2RoomsScreen() {
           lastExitedRoomIdRef.current = null;
           setSelectedRoomId(last);
           router.replace({ pathname: "/online-v2/rooms", query: { room: last } }, undefined, { shallow: true });
+        } else {
+          clearOv2SharedLastRoomSessionKey();
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        clearOv2SharedLastRoomSessionKey();
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `router` identity can churn and retrigger this effect; we only react to query/participant/selection.
   }, [router.isReady, router.query.room, participantId, selectedRoomId]);
 

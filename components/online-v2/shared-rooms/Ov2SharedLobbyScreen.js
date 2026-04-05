@@ -60,6 +60,15 @@ export default function Ov2SharedLobbyScreen({
     void loadRooms({ silent: true });
   }, [loadRooms]);
 
+  useEffect(() => {
+    const onVis = () => {
+      if (typeof document === "undefined" || document.visibilityState !== "visible") return;
+      void loadRooms({ silent: true });
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [loadRooms]);
+
   async function handleCreate(payload) {
     if (!displayName.trim()) {
       setMsg("Set a display name first.");

@@ -15,6 +15,20 @@ import {
 
 const POLL_MS = 2000;
 
+function qmCoerceUuid(v) {
+  if (v == null || v === "") return null;
+  const s = String(v).trim();
+  return s.length ? s : null;
+}
+
+function qmCoerceIso(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "string") return v;
+  if (v instanceof Date && Number.isFinite(v.getTime())) return v.toISOString();
+  const s = String(v).trim();
+  return s.length ? s : null;
+}
+
 /**
  * @param {{
  *   games: { id: string, title: string }[],
@@ -61,34 +75,39 @@ export default function Ov2SharedQuickMatchBar({
   const applyTickPayload = useCallback(
     async out => {
       const pk = String(participantId || "").trim();
-      const ph = String(out?.phase || "idle");
+      const ph = String(out?.phase || "idle").trim() || "idle";
       if (out?.stake_per_seat != null && out.stake_per_seat !== "") {
         const n = Number(out.stake_per_seat);
         if (Number.isFinite(n)) setFlowStakeUnits(Math.floor(n));
       }
       setPhase(ph);
       if (ph === "confirm") {
-        setOfferId(typeof out.offer_id === "string" ? out.offer_id : null);
-        setConfirmDeadline(typeof out.confirm_deadline_at === "string" ? out.confirm_deadline_at : null);
+        setOfferId(qmCoerceUuid(out.offer_id));
+        setConfirmDeadline(qmCoerceIso(out.confirm_deadline_at));
         setPeers(Array.isArray(out.peers) ? out.peers : []);
       } else {
         setOfferId(null);
         setConfirmDeadline(null);
         setPeers([]);
       }
+      if (ph === "idle" || ph === "") {
+        pollActiveRef.current = false;
+        setOpen(false);
+        setFlowStakeUnits(null);
+      }
       if (ph === "join_room" && out.room_id && !joiningRef.current) {
         joiningRef.current = true;
         setBusy(true);
         try {
           await ov2QuickMatchJoinInvitedRoom({
-            room_id: String(out.room_id),
+            room_id: qmCoerceUuid(out.room_id) || String(out.room_id),
             participant_key: pk,
             display_name: displayName.trim() || "Player",
           });
           setOpen(false);
           pollActiveRef.current = false;
           setFlowStakeUnits(null);
-          onEnterRoom(String(out.room_id));
+          onEnterRoom(qmCoerceUuid(out.room_id) || String(out.room_id));
         } catch (e) {
           setMsg(e?.message || String(e));
         } finally {
@@ -172,8 +191,11 @@ export default function Ov2SharedQuickMatchBar({
       await ov2QuickMatchLeaveQueue({ participant_key: participantId });
       setPhase("idle");
       setOfferId(null);
+      setConfirmDeadline(null);
+      setPeers([]);
       setFlowStakeUnits(null);
       setOpen(false);
+      await refreshTick();
     } catch (e) {
       setMsg(e?.message || String(e));
     } finally {
@@ -182,11 +204,16 @@ export default function Ov2SharedQuickMatchBar({
   }
 
   async function onConfirmMatch() {
-    if (!offerId) return;
+    const oid = qmCoerceUuid(offerId);
+    if (!oid) {
+      setMsg("Missing match offer id — tap Refresh on the lobby or cancel and search again.");
+      await refreshTick();
+      return;
+    }
     setBusy(true);
     setMsg("");
     try {
-      await ov2QuickMatchConfirm({ offer_id: offerId, participant_key: participantId });
+      await ov2QuickMatchConfirm({ offer_id: oid, participant_key: participantId });
       await refreshTick();
     } catch (e) {
       setMsg(e?.message || String(e));
@@ -196,11 +223,16 @@ export default function Ov2SharedQuickMatchBar({
   }
 
   async function onDeclineMatch() {
-    if (!offerId) return;
+    const oid = qmCoerceUuid(offerId);
+    if (!oid) {
+      setMsg("Missing match offer id — cancelling queue state.");
+      await cancelFlow();
+      return;
+    }
     setBusy(true);
     setMsg("");
     try {
-      await ov2QuickMatchDecline({ offer_id: offerId, participant_key: participantId });
+      await ov2QuickMatchDecline({ offer_id: oid, participant_key: participantId });
       setPhase("idle");
       setOfferId(null);
       await refreshTick();
@@ -277,6 +309,11 @@ export default function Ov2SharedQuickMatchBar({
             Confirm to join the table
             {confirmSecondsLeft != null ? ` • ${confirmSecondsLeft}s` : ""}
           </p>
+          {!offerId ? (
+            <p className="text-[10px] text-amber-200/90">
+              Offer id missing from server response — use Cancel match below or lobby Refresh, then try again.
+            </p>
+          ) : null}
           <ul className="max-h-24 overflow-y-auto text-[11px] text-zinc-300">
             {peers.map((p, i) => (
               <li key={i}>
@@ -304,6 +341,14 @@ export default function Ov2SharedQuickMatchBar({
               Decline
             </button>
           </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void cancelFlow()}
+            className="w-full rounded-lg border border-red-500/35 bg-red-950/25 py-2 text-[11px] font-semibold text-red-100/95 disabled:opacity-50"
+          >
+            Cancel match (leave queue &amp; clear offer)
+          </button>
         </div>
       ) : phase === "join_room" ? (
         <p className="text-[11px] text-amber-100/90">
