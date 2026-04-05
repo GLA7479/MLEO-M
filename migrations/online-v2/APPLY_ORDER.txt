@@ -1,5 +1,12 @@
-# OV2 migrations — apply in this exact order (global sequence by numeric prefix).
-# Do not rely on filesystem sort across subfolders; use this list or sort by basename only.
+# OV2 migrations — apply in this exact order (full repo list).
+#
+# Ordering rule:
+# 1) Primary key = leading numeric prefix on the FILE BASENAME (e.g. 028 in `ludo/028_...sql`).
+# 2) Duplicate prefixes across folders: sort by (numeric prefix ASC, full relative path ASC).
+#    Example: `028_ov2_room_stale_cleanup_hardened.sql` before `ludo/028_ov2_ludo_open_session_require_active_committed_stakes.sql`.
+# 3) Same prefix + same folder: path sort is stable by filename.
+#
+# Do not rely on filesystem sort across subfolders; follow this list.
 
 001_ov2_core.sql
 board-path/002_ov2_board_path.sql
@@ -27,7 +34,9 @@ ludo/023_ov2_ludo_turn_deadline_missed_turn_guard_and_rematch.sql
 ludo/025_ov2_ludo_no_legal_move_force_pass.sql
 026_ov2_room_stale_cleanup_purge_ambiguous_room_id_fix.sql
 027_ov2_room_stale_cleanup_schedule.sql
+028_ov2_room_stale_cleanup_hardened.sql
 ludo/028_ov2_ludo_open_session_require_active_committed_stakes.sql
+029_ov2_room_stale_cleanup_schedule_30m.sql
 ludo/029_ov2_ludo_double_cycle_economy_snapshot.sql
 ludo/030_ov2_ludo_double_decline_loss_per_seat_fix.sql
 ludo/031_ov2_ludo_rematch_match_seq_settlement_claim.sql
@@ -38,12 +47,18 @@ bingo/035_ov2_bingo_rpcs.sql
 bingo/036_ov2_bingo_realtime.sql
 038_ov2_unified_room_seat_claim.sql
 bingo/039_ov2_bingo_hotfix.sql
+bingo/040_ov2_bingo_prize_model.sql
 rummy51/040_ov2_rummy51_schema.sql
 rummy51/041_ov2_rummy51_rpcs.sql
 rummy51/042_ov2_rummy51_realtime.sql
 rummy51/043_ov2_rummy51_open_session_hotfix.sql
 rummy51/044_ov2_r51_joker_extend_run.sql
 rummy51/045_ov2_r51_undo_discard_draw.sql
+046_ov2_shared_rooms_schema.sql
+047_ov2_shared_rooms_rpcs.sql
+048_ov2_shared_rooms_realtime.sql
+ludo/049_ov2_ludo_shared_room_start_bridge.sql
+ludo/050_ov2_shared_create_room_stake_compat_bridge.sql
 051_ov2_shared_create_room_entry_per_seat.sql
 052_ov2_shared_pgcrypto_gen_salt_fix.sql
 053_ov2_shared_pgcrypto_extensions_schema_fix.sql
@@ -52,11 +67,19 @@ rummy51/054_ov2_rummy51_shared_room_start_bridge.sql
 056_ov2_rummy51_full_pot_settlement.sql
 057_ov2_shared_leave_keep_empty_open_room.sql
 058_ov2_shared_hidden_join_by_code.sql
+bingo/059_ov2_bingo_last_player_walkover.sql
+bingo/060_ov2_bingo_no_auto_finish_on_deck_exhaust.sql
 c21/061_ov2_c21_persistent_live_tables.sql
+c21/062_ov2_c21_participant_device_binding.sql
 community_cards/063_ov2_community_cards_persistent_live_tables.sql
 community_cards/064_ov2_cc_economy_entry_policy_explicit.sql
 color_wheel/065_ov2_color_wheel_persistent_live_tables.sql
 color_wheel/066_ov2_color_wheel_stake_1_10_rooms.sql
+c21/067_ov2_c21_public_tables_expand_10_per_tier.sql
+color_wheel/068_ov2_color_wheel_public_tables_expand_10_per_tier.sql
+community_cards/069_ov2_community_cards_public_tables_expand_10_per_category.sql
+wave/070_ov2_wave_fixed_active_seat_and_password_utils.sql
 ludo/071_ov2_ludo_full_pot_settlement_parity.sql
 072_ov2_quick_match.sql
 073_ov2_quick_match_fill_pending_room.sql
+074_ov2_shared_rls_canonical_ledger_rpc_host_start_stakes.sql

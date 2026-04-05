@@ -10,7 +10,10 @@ import {
 } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { useOv2LiveShellFatalRoomRedirect } from "../../../hooks/useOv2LiveShellFatalRoomRedirect";
 import { requestOv2LudoOpenSession } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
-import { fetchOv2RoomById, fetchOv2RoomMembers, leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
+import {
+  fetchOv2RoomLedgerForViewer,
+  leaveOv2RoomWithForfeitRetry,
+} from "../../../lib/online-v2/ov2RoomsApi";
 import { getOv2ParticipantId } from "../../../lib/online-v2/ov2ParticipantId";
 import { supabaseMP } from "../../../lib/supabaseClients";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
@@ -39,7 +42,9 @@ export default function Ov2LudoLiveShell() {
   const rawRoomId = router.isReady ? routerRoomId : bootRoomId;
   const roomId = rawRoomId && isOv2RoomIdQueryParam(rawRoomId) ? String(rawRoomId).trim() : null;
 
-  const [participantId, setParticipantId] = useState("");
+  const [participantId, setParticipantId] = useState(() =>
+    typeof window !== "undefined" ? getOv2ParticipantId() : ""
+  );
   const [room, setRoom] = useState(null);
   const [members, setMembers] = useState([]);
   const [loadError, setLoadError] = useState("");
@@ -61,11 +66,13 @@ export default function Ov2LudoLiveShell() {
 
   const reloadContext = useCallback(async () => {
     if (!roomId) return;
+    const pk = String(participantId || "").trim();
+    if (!pk) return;
     setLoadError("");
     const firstForRoom = loadedOnceForRoomRef.current !== roomId;
     if (firstForRoom) setLoading(true);
     try {
-      const r = await fetchOv2RoomById(roomId);
+      const { room: r, members: m } = await fetchOv2RoomLedgerForViewer(roomId, { viewer_participant_key: pk });
       if (!r) {
         setRoom(null);
         setMembers([]);
@@ -79,7 +86,6 @@ export default function Ov2LudoLiveShell() {
         return;
       }
       setRoom(r);
-      const m = await fetchOv2RoomMembers(roomId);
       setMembers(m);
       loadedOnceForRoomRef.current = roomId;
     } catch (e) {
@@ -89,11 +95,13 @@ export default function Ov2LudoLiveShell() {
     } finally {
       if (firstForRoom) setLoading(false);
     }
-  }, [roomId]);
+  }, [roomId, participantId]);
 
   const reloadContextUntilSessionChanges = useCallback(
     async (previousSessionId, rpcNewSessionId, timeoutMs = 20000, options = {}) => {
       if (!roomId) return { ok: false, error: "no room" };
+      const pk = String(participantId || "").trim();
+      if (!pk) return { ok: false, error: "no participant" };
       const expectClearedSession = options?.expectClearedSession === true;
       const prev =
         previousSessionId != null && String(previousSessionId).trim() !== "" ? String(previousSessionId).trim() : "";
@@ -106,7 +114,7 @@ export default function Ov2LudoLiveShell() {
           setRoom(row => (row && typeof row === "object" ? { ...row, active_session_id: rpcSid } : row));
         }
         while (Date.now() - start < timeoutMs) {
-          const r = await fetchOv2RoomById(roomId);
+          const { room: r, members: m } = await fetchOv2RoomLedgerForViewer(roomId, { viewer_participant_key: pk });
           if (!r) {
             setRoom(null);
             setMembers([]);
@@ -122,7 +130,6 @@ export default function Ov2LudoLiveShell() {
           const nextId = r.active_session_id != null ? String(r.active_session_id).trim() : "";
           const life = r.lifecycle_phase != null ? String(r.lifecycle_phase).trim() : "";
           setRoom(r);
-          const m = await fetchOv2RoomMembers(roomId);
           setMembers(m);
           loadedOnceForRoomRef.current = roomId;
           if (expectClearedSession) {
@@ -147,7 +154,7 @@ export default function Ov2LudoLiveShell() {
         return { ok: false, error: msg };
       }
     },
-    [roomId]
+    [roomId, participantId]
   );
 
   useEffect(() => {

@@ -10,7 +10,10 @@ import {
 } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { useOv2LiveShellFatalRoomRedirect } from "../../../hooks/useOv2LiveShellFatalRoomRedirect";
 import { openOv2Rummy51Session } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
-import { fetchOv2RoomById, fetchOv2RoomMembers, leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
+import {
+  fetchOv2RoomLedgerForViewer,
+  leaveOv2RoomWithForfeitRetry,
+} from "../../../lib/online-v2/ov2RoomsApi";
 import {
   formatSeatedStakeBlockers,
   seatedPlayersNotStakeCommitted,
@@ -44,7 +47,9 @@ export default function Ov2Rummy51LiveShell() {
   const rawRoomId = router.isReady ? routerRoomId : bootRoomId;
   const roomId = rawRoomId && isOv2RoomIdQueryParam(rawRoomId) ? String(rawRoomId).trim() : null;
 
-  const [participantId, setParticipantId] = useState("");
+  const [participantId, setParticipantId] = useState(() =>
+    typeof window !== "undefined" ? getOv2ParticipantId() : ""
+  );
   const [room, setRoom] = useState(null);
   const [members, setMembers] = useState([]);
   const [loadError, setLoadError] = useState("");
@@ -66,11 +71,13 @@ export default function Ov2Rummy51LiveShell() {
 
   const reloadContext = useCallback(async () => {
     if (!roomId) return;
+    const pk = String(participantId || "").trim();
+    if (!pk) return;
     setLoadError("");
     const firstForRoom = loadedOnceForRoomRef.current !== roomId;
     if (firstForRoom) setLoading(true);
     try {
-      const r = await fetchOv2RoomById(roomId);
+      const { room: r, members: m } = await fetchOv2RoomLedgerForViewer(roomId, { viewer_participant_key: pk });
       if (!r) {
         setRoom(null);
         setMembers([]);
@@ -84,7 +91,6 @@ export default function Ov2Rummy51LiveShell() {
         return;
       }
       setRoom(r);
-      const m = await fetchOv2RoomMembers(roomId);
       setMembers(m);
       loadedOnceForRoomRef.current = roomId;
     } catch (e) {
@@ -94,7 +100,7 @@ export default function Ov2Rummy51LiveShell() {
     } finally {
       if (firstForRoom) setLoading(false);
     }
-  }, [roomId]);
+  }, [roomId, participantId]);
 
   useEffect(() => {
     loadedOnceForRoomRef.current = null;
@@ -235,7 +241,9 @@ export default function Ov2Rummy51LiveShell() {
     setOpenErr("");
     try {
       await reloadContext();
-      const freshMembers = await fetchOv2RoomMembers(roomId);
+      const { members: freshMembers } = await fetchOv2RoomLedgerForViewer(roomId, {
+        viewer_participant_key: participantId,
+      });
       setMembers(freshMembers);
       const blockers = seatedPlayersNotStakeCommitted(freshMembers);
       if (blockers.length) {

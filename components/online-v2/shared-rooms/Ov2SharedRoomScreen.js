@@ -15,7 +15,7 @@ import { openOv2Rummy51Session, OV2_RUMMY51_PRODUCT_GAME_ID } from "../../../lib
 import {
   commitOv2RoomStake,
   fetchOv2RoomById,
-  fetchOv2RoomMembers,
+  fetchOv2RoomLedgerForViewer,
   leaveOv2RoomWithForfeitRetry,
   setOv2MemberReady,
   startOv2RoomIntent,
@@ -82,7 +82,12 @@ export default function Ov2SharedRoomScreen({
     if (!roomId) return { ledger: [], canon: null };
     try {
       setLedgerErr("");
-      const [ledger, canon] = await Promise.all([fetchOv2RoomMembers(roomId), fetchOv2RoomById(roomId)]);
+      const pk = String(participantId || "").trim();
+      if (!pk) {
+        setLedgerErr("Missing participant id.");
+        return { ledger: [], canon: null };
+      }
+      const { room: canon, members: ledger } = await fetchOv2RoomLedgerForViewer(roomId, { viewer_participant_key: pk });
       const rows = ledger || [];
       setLedgerMembers(rows);
       setCanonicalRoom(canon);
@@ -91,7 +96,7 @@ export default function Ov2SharedRoomScreen({
       setLedgerErr(e?.message || String(e));
       return { ledger: [], canon: null };
     }
-  }, [roomId]);
+  }, [roomId, participantId]);
 
   const joinedCount = useMemo(() => members.length, [members]);
   const isQmRoom = useMemo(() => isOv2QuickMatchRoom(room), [room]);
@@ -571,7 +576,9 @@ export default function Ov2SharedRoomScreen({
     setBusy(true);
     setMsg("");
     try {
-      const canon = canonicalRoom || (await fetchOv2RoomById(roomId).catch(() => null));
+      const canon =
+        canonicalRoom ||
+        (await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId }).catch(() => null));
       await leaveOv2RoomWithForfeitRetry({
         room: canon || room,
         room_id: roomId,
@@ -656,7 +663,7 @@ export default function Ov2SharedRoomScreen({
       let intervalId = null;
       const tick = async () => {
         try {
-          const canon = await fetchOv2RoomById(roomId);
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
           if (cancelled || didRouteToLiveRef.current) return;
           if (canon?.active_session_id) {
             if (intervalId) clearInterval(intervalId);
@@ -681,7 +688,7 @@ export default function Ov2SharedRoomScreen({
       let intervalId = null;
       const tick = async () => {
         try {
-          const canon = await fetchOv2RoomById(roomId);
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
           if (cancelled || didRouteToLiveRef.current) return;
           if (canon?.active_session_id) {
             if (intervalId) clearInterval(intervalId);

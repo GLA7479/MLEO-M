@@ -14,7 +14,10 @@ import {
 } from "../../../lib/online-v2/bingo/ov2BingoSessionAdapter";
 import { isOv2QuickMatchRoom } from "../../../lib/online-v2/shared-rooms/ov2QuickMatchUi";
 import { useOv2LiveShellFatalRoomRedirect } from "../../../hooks/useOv2LiveShellFatalRoomRedirect";
-import { fetchOv2RoomById, fetchOv2RoomMembers, leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
+import {
+  fetchOv2RoomLedgerForViewer,
+  leaveOv2RoomWithForfeitRetry,
+} from "../../../lib/online-v2/ov2RoomsApi";
 import { getOv2ParticipantId } from "../../../lib/online-v2/ov2ParticipantId";
 import { supabaseMP } from "../../../lib/supabaseClients";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
@@ -47,7 +50,9 @@ export default function Ov2BingoLiveShell() {
   const rawRoomId = router.isReady ? routerRoomId : bootRoomId;
   const roomId = rawRoomId && isOv2RoomIdQueryParam(rawRoomId) ? String(rawRoomId).trim() : null;
 
-  const [participantId, setParticipantId] = useState("");
+  const [participantId, setParticipantId] = useState(() =>
+    typeof window !== "undefined" ? getOv2ParticipantId() : ""
+  );
   const [room, setRoom] = useState(null);
   const [members, setMembers] = useState([]);
   const [loadError, setLoadError] = useState("");
@@ -69,11 +74,13 @@ export default function Ov2BingoLiveShell() {
 
   const reloadContext = useCallback(async () => {
     if (!roomId) return;
+    const pk = String(participantId || "").trim();
+    if (!pk) return;
     setLoadError("");
     const firstForRoom = loadedOnceForRoomRef.current !== roomId;
     if (firstForRoom) setLoading(true);
     try {
-      const r = await fetchOv2RoomById(roomId);
+      const { room: r, members: m } = await fetchOv2RoomLedgerForViewer(roomId, { viewer_participant_key: pk });
       if (!r) {
         setRoom(null);
         setMembers([]);
@@ -87,7 +94,6 @@ export default function Ov2BingoLiveShell() {
         return;
       }
       setRoom(r);
-      const m = await fetchOv2RoomMembers(roomId);
       setMembers(m);
       loadedOnceForRoomRef.current = roomId;
     } catch (e) {
@@ -97,7 +103,7 @@ export default function Ov2BingoLiveShell() {
     } finally {
       if (firstForRoom) setLoading(false);
     }
-  }, [roomId]);
+  }, [roomId, participantId]);
 
   useEffect(() => {
     loadedOnceForRoomRef.current = null;
