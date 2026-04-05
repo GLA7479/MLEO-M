@@ -59,3 +59,4 @@ color_wheel/065_ov2_color_wheel_persistent_live_tables.sql
 color_wheel/066_ov2_color_wheel_stake_1_10_rooms.sql
 ludo/071_ov2_ludo_full_pot_settlement_parity.sql
 072_ov2_quick_match.sql
+073_ov2_quick_match_fill_pending_room.sql
