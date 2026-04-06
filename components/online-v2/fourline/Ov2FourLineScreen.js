@@ -29,8 +29,8 @@ function CellDisc({ seat }) {
   }
   const cls =
     seat === 0
-      ? "bg-gradient-to-b from-rose-400/90 to-rose-700/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]"
-      : "bg-gradient-to-b from-amber-300/90 to-amber-700/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]";
+      ? "bg-gradient-to-b from-sky-300/95 to-blue-700/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.22)]"
+      : "bg-gradient-to-b from-amber-200/95 to-yellow-600/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]";
   return <div className={`aspect-square w-full max-w-[3rem] rounded-full border border-black/20 ${cls} sm:max-w-none`} />;
 }
 
@@ -66,8 +66,6 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
-  const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
-
   const cells = useMemo(() => parseFourLineCells(vm.cells), [vm.cells]);
 
   useEffect(() => {
@@ -176,15 +174,8 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
   const didIWin = vm.mySeat != null && vm.winnerSeat != null && vm.winnerSeat === vm.mySeat;
   const isDraw = finished && vm.winnerSeat == null;
 
-  const winnerDisplayName = useMemo(() => {
-    if (vm.winnerSeat == null) return "";
-    const m = members.find(x => Number(x?.seat_index) === Number(vm.winnerSeat));
-    const n = m && typeof m.display_name === "string" ? String(m.display_name).trim() : "";
-    return n || `Seat ${Number(vm.winnerSeat) + 1}`;
-  }, [members, vm.winnerSeat]);
-
-  const myColorLabel = vm.mySeat === 0 ? "Rose" : vm.mySeat === 1 ? "Amber" : "—";
-  const oppColorLabel = vm.mySeat === 0 ? "Amber" : vm.mySeat === 1 ? "Rose" : "—";
+  const myColorLabel = vm.mySeat === 0 ? "Blue" : vm.mySeat === 1 ? "Gold" : "—";
+  const oppColorLabel = vm.mySeat === 0 ? "Gold" : vm.mySeat === 1 ? "Blue" : "—";
 
   const canPickColumn =
     vm.phase === "playing" &&
@@ -194,7 +185,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
     !vaultClaimBusy;
 
   const finishedActions = (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap justify-center gap-1.5">
       <button type="button" disabled={rematchBusy} onClick={() => void onRematch()} className={BTN_PRIMARY}>
         {rematchBusy ? "…" : "Rematch"}
       </button>
@@ -208,6 +199,24 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
       ) : null}
     </div>
   );
+
+  const finishReasonLine = useMemo(() => {
+    if (!finished) return "";
+    if (isDraw) return "Board full — stakes refunded";
+    if (didIWin) return "Four in a row";
+    return "Opponent connected four";
+  }, [finished, isDraw, didIWin]);
+
+  const finishAmountLine = useMemo(() => {
+    if (!finished) return { text: "", className: "text-zinc-500" };
+    if (vaultClaimBusy) return { text: "…", className: "text-zinc-400" };
+    const at = vm.chipsPerSeatAtStake;
+    const pot = vm.chipsPrizeTotal;
+    if (at == null || pot == null) return { text: "—", className: "text-zinc-500" };
+    if (isDraw) return { text: `+${at} chips`, className: "font-semibold tabular-nums text-emerald-300/95" };
+    if (didIWin) return { text: `+${pot} chips`, className: "font-semibold tabular-nums text-amber-200/95" };
+    return { text: `−${at} chips`, className: "font-semibold tabular-nums text-rose-300/95" };
+  }, [finished, vaultClaimBusy, vm.chipsPerSeatAtStake, vm.chipsPrizeTotal, isDraw, didIWin]);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-1 sm:px-2 sm:pb-2">
@@ -279,7 +288,10 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
         ) : null}
 
         <div className="mx-auto w-full max-w-md rounded-xl border border-white/[0.08] bg-zinc-900/50 p-2 sm:max-w-lg sm:p-3 md:max-w-xl">
-          <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Board</p>
+          <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+            Board{" "}
+            <span className="font-normal normal-case text-zinc-500/85">· drop to connect four</span>
+          </p>
           <div className="grid grid-cols-7 gap-1 sm:gap-1.5 md:gap-2">
             {Array.from({ length: OV2_FOURLINE_COLS }, (_, c) => {
               const playable = canPickColumn && fourLineColumnPlayable(c, cells);
@@ -347,20 +359,23 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
       {showResultModal ? (
         <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/55 p-2 sm:items-center">
           <div
-            className="w-full max-w-sm rounded-xl border border-white/[0.1] bg-zinc-950/95 p-4 shadow-2xl backdrop-blur-sm"
+            className="w-full max-w-[min(100%,17.5rem)] rounded-xl border border-white/[0.08] bg-zinc-950/96 p-3 shadow-2xl backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
           >
-            <p className="text-center text-sm font-semibold text-zinc-100">
-              {isDraw ? "Draw" : didIWin ? "You won" : `${winnerDisplayName} won`}
+            <p className="text-center text-base font-bold tracking-tight text-zinc-50">
+              {isDraw ? "Draw" : didIWin ? "You won" : "You lost"}
             </p>
-            <p className="mt-2 text-center text-[11px] text-zinc-400">
-              {vaultClaimBusy ? "Sending results to your balance…" : "Round complete. Rematch, then host starts the next match."}
+            <p className="mt-1 text-center text-[10px] font-medium text-zinc-500">Table ×{vm.stakeMultiplier}</p>
+            <p className={`mt-2 text-center text-lg ${finishAmountLine.className}`}>{finishAmountLine.text}</p>
+            <p className="mt-1 text-center text-[10px] leading-snug text-zinc-400">{finishReasonLine}</p>
+            <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
+              {vaultClaimBusy ? "Sending results to your balance…" : "Round complete — rematch, then host starts next."}
             </p>
-            <div className="mt-4">{finishedActions}</div>
+            <div className="mt-3">{finishedActions}</div>
             <button
               type="button"
-              className="mt-3 w-full rounded-lg border border-white/10 py-2 text-[11px] text-zinc-300"
+              className="mt-2 w-full rounded-lg border border-white/10 py-1.5 text-[11px] text-zinc-300"
               onClick={() => {
                 setFinishModalDismissedSessionId(finishSessionId);
                 try {

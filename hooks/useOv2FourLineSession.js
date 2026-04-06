@@ -254,6 +254,12 @@ export function useOv2FourLineSession(baseContext) {
     const turnTimeLeftMs =
       phase === "playing" && turnDeadline != null ? Math.max(0, turnDeadline - nowMs) : null;
     const turnTimeLeftSec = turnTimeLeftMs != null ? Math.ceil(turnTimeLeftMs / 1000) : null;
+    const stakeMult =
+      snap?.stakeMultiplier != null ? Math.max(1, Math.min(16, Math.floor(Number(snap.stakeMultiplier)))) : 1;
+    const baseStake = room?.stake_per_seat != null ? Number(room.stake_per_seat) : null;
+    const perSeatAtStake =
+      baseStake != null && Number.isFinite(baseStake) && baseStake >= 0 ? Math.round(baseStake * stakeMult) : null;
+    const prizeTotalChips = perSeatAtStake != null ? perSeatAtStake * 2 : null;
     return {
       phase,
       turnSeat: snap?.turnSeat ?? null,
@@ -266,13 +272,19 @@ export function useOv2FourLineSession(baseContext) {
       missedStreakBySeat: { 0: m0, 1: m1 },
       cells: Array.isArray(snap?.cells) ? snap.cells : [],
       lastMove: snap?.lastMove ?? null,
-      stakeMultiplier: snap?.stakeMultiplier ?? 1,
+      stakeMultiplier: stakeMult,
       doublesAccepted: snap?.doublesAccepted ?? 0,
       pendingDouble: snap?.pendingDouble ?? null,
       canOfferDouble: snap?.canOfferDouble === true,
       mustRespondDouble: snap?.mustRespondDouble === true,
+      /** Base table stake per seat (room); matches server __entry__ when equal to stake_per_seat. */
+      baseStakePerSeat: baseStake != null && Number.isFinite(baseStake) ? baseStake : null,
+      /** Per-seat stake at current table multiplier (aligned with server lossPerSeat = entry × mult). */
+      chipsPerSeatAtStake: perSeatAtStake,
+      /** Full pot to winner (aligned with server prize = 2 × entry × mult). */
+      chipsPrizeTotal: prizeTotalChips,
     };
-  }, [snap, nowMs]);
+  }, [snap, nowMs, room]);
 
   return {
     snapshot: snap,
