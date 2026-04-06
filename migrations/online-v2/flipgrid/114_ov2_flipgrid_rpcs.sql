@@ -286,7 +286,7 @@ BEGIN
         jsonb_build_object(
           'draw', true,
           'discDraw', true,
-          'refundPerSeat', v_entry,
+          'refundPerSeat', v_entry * v_mult,
           'stakeMultiplier', v_mult,
           'discCounts', jsonb_build_object(
             '0', public.ov2_fg_disc_count(v_fin_board -> 'cells', 0),
@@ -514,7 +514,7 @@ BEGIN
         jsonb_build_object(
           'draw', true,
           'discDraw', true,
-          'refundPerSeat', v_entry,
+          'refundPerSeat', v_entry * v_mult,
           'stakeMultiplier', v_mult,
           'discCounts', jsonb_build_object(
             '0', public.ov2_fg_disc_count(v_fin_board -> 'cells', 0),

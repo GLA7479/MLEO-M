@@ -404,7 +404,7 @@ BEGIN
         jsonb_build_object(
           'draw', true,
           'discDraw', true,
-          'refundPerSeat', v_entry,
+          'refundPerSeat', v_entry * v_mult,
           'stakeMultiplier', v_mult,
           'discCounts', jsonb_build_object(
             '0', public.ov2_fg_disc_count(v_fin_board -> 'cells', 0),
@@ -558,6 +558,8 @@ DECLARE
   v_prize bigint;
   v_loss bigint;
   v_entry bigint;
+  v_mult int;
+  v_refund bigint;
   r record;
   v_idem text;
   v_room_id uuid := NEW.room_id;
@@ -571,6 +573,8 @@ BEGIN
 
   IF coalesce((v_res ->> 'draw')::boolean, false) THEN
     v_entry := COALESCE((NEW.parity_state ->> '__entry__')::bigint, 0);
+    v_mult := public.ov2_fg_parity_stake_mult(NEW.parity_state);
+    v_refund := v_entry * v_mult;
     FOR r IN
       SELECT trim(participant_key) AS pk
       FROM public.ov2_flipgrid_seats
@@ -587,14 +591,15 @@ BEGIN
         v_match_seq,
         r.pk,
         'fg_draw_refund',
-        v_entry,
+        v_refund,
         v_idem,
         v_sess_id,
         jsonb_build_object(
           'gameId', 'ov2_flipgrid',
           'sessionId', v_sess_id,
           'discDraw', coalesce((v_res ->> 'discDraw')::boolean, false),
-          'refundPerSeat', v_entry,
+          'refundPerSeat', v_refund,
+          'stakeMultiplier', v_mult,
           'lossAlreadyCommitted', true
         )
       )
