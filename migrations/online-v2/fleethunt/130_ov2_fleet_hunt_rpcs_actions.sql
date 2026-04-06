@@ -39,6 +39,9 @@ DECLARE
   v_pm int;
   v_lk0 boolean;
   v_lk1 boolean;
+  v_m0 int;
+  v_m1 int;
+  v_terminal int;
 BEGIN
   IF p_room_id IS NULL OR length(v_pk) = 0 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'room_id and participant_key required');
@@ -114,6 +117,7 @@ BEGIN
     v_pl_m := coalesce(v_ps -> 'placement_missed', jsonb_build_object('0', 0, '1', 0));
     v_lk0 := coalesce((v_pub ->> 'lock0')::boolean, false);
     v_lk1 := coalesce((v_pub ->> 'lock1')::boolean, false);
+    -- Apply all overdue placement strikes for this tick first; do not pick a winner inside the loop.
     FOR v_s IN 0..1 LOOP
       IF (v_s = 0 AND v_lk0) OR (v_s = 1 AND v_lk1) THEN
         CONTINUE;
@@ -134,38 +138,68 @@ BEGIN
       v_pm := coalesce((v_pl_m ->> v_s::text)::int, 0) + 1;
       v_pl_m := jsonb_set(v_pl_m, ARRAY[v_s::text], to_jsonb(v_pm), true);
       v_pl_dl := jsonb_set(v_pl_dl, ARRAY[v_s::text], to_jsonb(v_now + 30000), true);
-      IF v_pm >= 3 THEN
-        v_other := CASE WHEN v_s = 0 THEN 1 ELSE 0 END;
-        v_mult := public.ov2_fh_parity_stake_mult(v_ps);
-        v_entry := coalesce((v_ps ->> '__entry__')::bigint, 0);
-        v_ps := jsonb_set(
-          jsonb_set(v_ps, '{placement_missed}', v_pl_m, true),
-          '{__result__}',
-          jsonb_build_object(
-            'winner', v_other,
-            'prize', v_entry * 2 * v_mult,
-            'lossPerSeat', v_entry * v_mult,
-            'stakeMultiplier', v_mult,
-            'placement_timeout', true,
-            'timeout_loser_seat', v_s,
-            'timestamp', v_now
-          ),
-          true
-        );
-        v_ps := jsonb_set(v_ps, '{placement_dl}', v_pl_dl, true);
-        UPDATE public.ov2_fleet_hunt_sessions
-        SET
-          phase = 'finished',
-          winner_seat = v_other,
-          parity_state = v_ps,
-          revision = v_sess.revision + 1,
-          updated_at = now()
-        WHERE id = v_sess.id
-        RETURNING * INTO v_sess;
-        RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_fleet_hunt_build_client_snapshot(v_sess, v_pk));
-      END IF;
     END LOOP;
+
+    v_m0 := coalesce((v_pl_m ->> '0')::int, 0);
+    v_m1 := coalesce((v_pl_m ->> '1')::int, 0);
+    v_terminal := public.ov2_fh_classify_placement_terminal(v_m0, v_m1);
     v_ps := jsonb_set(jsonb_set(v_ps, '{placement_dl}', v_pl_dl, true), '{placement_missed}', v_pl_m, true);
+
+    IF v_terminal = -2 THEN
+      v_mult := public.ov2_fh_parity_stake_mult(v_ps);
+      v_entry := coalesce((v_ps ->> '__entry__')::bigint, 0);
+      v_ps := jsonb_set(
+        v_ps,
+        '{__result__}',
+        jsonb_build_object(
+          'draw', true,
+          'placementMutualTimeout', true,
+          'refundPerSeat', v_entry * v_mult,
+          'stakeMultiplier', v_mult,
+          'timestamp', v_now
+        ),
+        true
+      );
+      UPDATE public.ov2_fleet_hunt_sessions
+      SET
+        phase = 'finished',
+        winner_seat = NULL,
+        parity_state = v_ps,
+        revision = v_sess.revision + 1,
+        updated_at = now()
+      WHERE id = v_sess.id
+      RETURNING * INTO v_sess;
+      RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_fleet_hunt_build_client_snapshot(v_sess, v_pk));
+    ELSIF v_terminal IS NOT NULL THEN
+      v_other := v_terminal;
+      v_mult := public.ov2_fh_parity_stake_mult(v_ps);
+      v_entry := coalesce((v_ps ->> '__entry__')::bigint, 0);
+      v_ps := jsonb_set(
+        v_ps,
+        '{__result__}',
+        jsonb_build_object(
+          'winner', v_other,
+          'prize', v_entry * 2 * v_mult,
+          'lossPerSeat', v_entry * v_mult,
+          'stakeMultiplier', v_mult,
+          'placement_timeout', true,
+          'timeout_loser_seat', CASE WHEN v_other = 1 THEN 0 ELSE 1 END,
+          'timestamp', v_now
+        ),
+        true
+      );
+      UPDATE public.ov2_fleet_hunt_sessions
+      SET
+        phase = 'finished',
+        winner_seat = v_other,
+        parity_state = v_ps,
+        revision = v_sess.revision + 1,
+        updated_at = now()
+      WHERE id = v_sess.id
+      RETURNING * INTO v_sess;
+      RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_fleet_hunt_build_client_snapshot(v_sess, v_pk));
+    END IF;
+
     UPDATE public.ov2_fleet_hunt_sessions
     SET parity_state = v_ps, revision = v_sess.revision + 1, updated_at = now()
     WHERE id = v_sess.id
@@ -324,6 +358,8 @@ DECLARE
   v_prize bigint;
   v_loss bigint;
   v_entry bigint;
+  v_mult int;
+  v_refund bigint;
   r record;
   v_idem text;
   v_room_id uuid := NEW.room_id;
@@ -332,6 +368,45 @@ DECLARE
 BEGIN
   v_res := coalesce(NEW.parity_state, '{}'::jsonb) -> '__result__';
   IF v_res IS NULL OR jsonb_typeof(v_res) = 'null' THEN
+    RETURN NULL;
+  END IF;
+  -- Mutual placement timeout: refund both seats (no winner); symmetric with __result__ from mark_turn_timeout.
+  IF coalesce((v_res ->> 'draw')::boolean, false)
+     AND coalesce((v_res ->> 'placementMutualTimeout')::boolean, false) THEN
+    v_entry := coalesce((NEW.parity_state ->> '__entry__')::bigint, 0);
+    v_mult := public.ov2_fh_parity_stake_mult(NEW.parity_state);
+    v_refund := v_entry * v_mult;
+    FOR r IN
+      SELECT trim(participant_key) AS pk
+      FROM public.ov2_fleet_hunt_seats
+      WHERE session_id = v_sess_id
+    LOOP
+      IF r.pk IS NULL OR length(r.pk) = 0 THEN
+        CONTINUE;
+      END IF;
+      v_idem := 'ov2:settle:' || v_room_id::text || ':' || v_sess_id::text || ':' || r.pk || ':fh_placement_mutual_refund:';
+      INSERT INTO public.ov2_settlement_lines (
+        room_id, match_seq, recipient_participant_key, line_kind, amount, idempotency_key, game_session_id, meta
+      ) VALUES (
+        v_room_id,
+        v_match_seq,
+        r.pk,
+        'fh_placement_mutual_refund',
+        v_refund,
+        v_idem,
+        v_sess_id,
+        jsonb_build_object(
+          'gameId', 'ov2_fleet_hunt',
+          'sessionId', v_sess_id,
+          'refundPerSeat', v_refund,
+          'stakeMultiplier', v_mult,
+          'placementMutualTimeout', true,
+          'lossAlreadyCommitted', true
+        )
+      )
+      ON CONFLICT (idempotency_key) DO NOTHING;
+    END LOOP;
+    UPDATE public.ov2_fleet_hunt_sessions SET status = 'closed', updated_at = now() WHERE id = v_sess_id AND status IS DISTINCT FROM 'closed';
     RETURN NULL;
   END IF;
   IF NOT (v_res ? 'winner') THEN
@@ -646,12 +721,12 @@ BEGIN
   SELECT EXISTS (
     SELECT 1 FROM public.ov2_settlement_lines sl
     WHERE sl.room_id = p_room_id AND trim(sl.recipient_participant_key) = v_pk
-      AND coalesce(sl.line_kind, '') IN ('fh_win', 'fh_loss')
+      AND coalesce(sl.line_kind, '') IN ('fh_win', 'fh_loss', 'fh_placement_mutual_refund')
   ) INTO v_has_any;
   SELECT EXISTS (
     SELECT 1 FROM public.ov2_settlement_lines sl
     WHERE sl.room_id = p_room_id AND trim(sl.recipient_participant_key) = v_pk
-      AND coalesce(sl.line_kind, '') IN ('fh_win', 'fh_loss')
+      AND coalesce(sl.line_kind, '') IN ('fh_win', 'fh_loss', 'fh_placement_mutual_refund')
       AND sl.vault_delivered_at IS NULL
   ) INTO v_has_undelivered;
   IF NOT v_has_undelivered THEN
@@ -670,7 +745,7 @@ BEGIN
     SET vault_delivered_at = now()
     WHERE sl.room_id = p_room_id
       AND trim(sl.recipient_participant_key) = v_pk
-      AND coalesce(sl.line_kind, '') IN ('fh_win', 'fh_loss')
+      AND coalesce(sl.line_kind, '') IN ('fh_win', 'fh_loss', 'fh_placement_mutual_refund')
       AND sl.vault_delivered_at IS NULL
     RETURNING sl.id, sl.amount, sl.line_kind, sl.idempotency_key, sl.match_seq
   )

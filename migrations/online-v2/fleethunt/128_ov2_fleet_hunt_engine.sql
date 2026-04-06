@@ -451,4 +451,20 @@ BEGIN
 END;
 $$;
 
+-- Classify placement strike counts after a timeout tick (both seats evaluated; no seat-order bias).
+-- Returns: NULL = not terminal; -2 = both >=3 (mutual cancel / draw refund); 0/1 = winning seat.
+CREATE OR REPLACE FUNCTION public.ov2_fh_classify_placement_terminal(p_m0 int, p_m1 int)
+RETURNS int
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public
+AS $$
+  SELECT CASE
+    WHEN p_m0 >= 3 AND p_m1 >= 3 THEN -2
+    WHEN p_m0 >= 3 THEN 1
+    WHEN p_m1 >= 3 THEN 0
+    ELSE NULL
+  END;
+$$;
+
 COMMIT;

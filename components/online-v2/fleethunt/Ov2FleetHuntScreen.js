@@ -73,6 +73,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
   const [orientationH, setOrientationH] = useState(true);
   const [pickLen, setPickLen] = useState(/** @type {number|null} */ (null));
   const [draftShips, setDraftShips] = useState(/** @type {{ cells: { r: number, c: number }[] }[]} */ ([]));
+  const [mobileBattleTab, setMobileBattleTab] = useState(/** @type {"offense" | "defense"} */ ("offense"));
 
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
@@ -84,6 +85,10 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
     setDraftShips([]);
     setPickLen(null);
   }, [vm.sessionId]);
+
+  useEffect(() => {
+    if (vm.phase === "battle") setMobileBattleTab("offense");
+  }, [vm.phase, vm.sessionId]);
 
   useEffect(() => {
     if (vm.phase !== "placement") return;
@@ -250,7 +255,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
     vm.doublesAccepted < 4 &&
     vm.stakeMultiplier < 16;
 
-  const renderGrid = (mode, { onCell, shipsCells, outgoing, incoming, dim }) => {
+  const renderGrid = (mode, { onCell, shipsCells, outgoing, incoming, dim, gridClassName = "" }) => {
     const shipSet = new Set();
     if (Array.isArray(shipsCells)) {
       for (const cells of shipsCells) {
@@ -261,7 +266,13 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
     }
     return (
       <div
-        className="grid aspect-square w-full max-w-[min(100%,22rem)] gap-0.5 sm:max-w-[min(100%,28rem)]"
+        className={[
+          "grid aspect-square w-full max-w-[min(100%,22rem)] gap-0.5 sm:max-w-[min(100%,28rem)]",
+          "max-sm:mx-auto max-sm:w-[min(92vw,min(40dvh,300px))] max-sm:max-w-none",
+          gridClassName,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         style={{ gridTemplateColumns: `repeat(${FH_GRID_SIZE}, minmax(0, 1fr))` }}
       >
         {Array.from({ length: FH_GRID_SIZE * FH_GRID_SIZE }, (_, i) => {
@@ -315,23 +326,24 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
   const lockDisabled = busy || vm.phase !== "placement" || myLocked;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden px-1.5 pb-3 pt-1 sm:gap-3 sm:px-2">
+    <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden px-1.5 pt-1 max-sm:min-h-0 max-sm:flex-1 max-sm:pb-0 sm:gap-2 sm:overflow-y-auto sm:pb-3 sm:pt-1 md:gap-3 md:px-2">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden sm:gap-2 sm:overflow-visible md:gap-3">
       {err ? <div className="rounded-lg border border-red-500/30 bg-red-950/35 px-2 py-1.5 text-[11px] text-red-100">{err}</div> : null}
       {vaultClaimBusy ? (
         <div className="rounded-lg border border-sky-500/25 bg-sky-950/25 px-2 py-1 text-[10px] text-sky-100/90">Updating vault…</div>
       ) : null}
 
       {vm.phase === "placement" && mySeat != null ? (
-        <div className="space-y-2 rounded-xl border border-white/[0.06] bg-zinc-950/50 p-2 sm:p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-300">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col space-y-1.5 overflow-hidden rounded-xl border border-white/[0.06] bg-zinc-950/50 p-1.5 max-sm:py-1.5 sm:space-y-2 sm:p-3">
+          <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[10px] text-zinc-300 sm:text-[11px]">
             <span>
               Placement — {myLocked ? "Locked" : "Arrange your fleet"}
               {vm.placementTimeLeftSec != null && !myLocked ? (
-                <span className="ml-2 text-amber-200/90">⏱ {vm.placementTimeLeftSec}s</span>
+                <span className="ml-1.5 text-amber-200/90 sm:ml-2">⏱ {vm.placementTimeLeftSec}s</span>
               ) : null}
             </span>
             <span className="text-zinc-500">
-              Opponent: {oppLocked ? "locked" : "arranging…"} (strikes {vm.placementMissStreakBySeat[oppSeat ?? 0] ?? 0}/3)
+              Opp: {oppLocked ? "locked" : "…"} · {vm.placementMissStreakBySeat[oppSeat ?? 0] ?? 0}/3
             </span>
           </div>
           {!myLocked ? (
@@ -376,7 +388,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               </div>
             </>
           ) : null}
-          <div className="mx-auto w-full max-w-[min(100%,22rem)] sm:max-w-[min(100%,28rem)]">
+          <div className="mx-auto flex min-h-0 min-w-0 flex-1 items-center justify-center py-0.5 sm:py-0">
             {renderGrid("defense", {
               onCell: !myLocked ? onPlacementCell : null,
               shipsCells: draftShips.map(s => s.cells),
@@ -386,7 +398,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
             })}
           </div>
           {!myLocked ? (
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <div className="flex flex-shrink-0 flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:gap-2">
               <button
                 type="button"
                 className={BTN_SECONDARY}
@@ -425,18 +437,18 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
       ) : null}
 
       {vm.phase === "battle" && mySeat != null ? (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-300">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden sm:gap-3">
+          <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[10px] text-zinc-300 sm:text-[11px]">
             <span>
               Battle — {vm.turnSeat === mySeat ? "Your turn" : "Opponent turn"}
-              {vm.turnTimeLeftSec != null ? <span className="ml-2 text-amber-200/90">⏱ {vm.turnTimeLeftSec}s</span> : null}
+              {vm.turnTimeLeftSec != null ? <span className="ml-1.5 text-amber-200/90 sm:ml-2">⏱ {vm.turnTimeLeftSec}s</span> : null}
             </span>
             <span className="text-zinc-400">
-              ×{vm.stakeMultiplier} · doubles {vm.doublesAccepted}/4
+              ×{vm.stakeMultiplier} · dbl {vm.doublesAccepted}/4
             </span>
           </div>
           {pd ? (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-950/25 p-2 text-[11px] text-amber-100/95">
+            <div className="flex-shrink-0 rounded-xl border border-amber-500/30 bg-amber-950/25 p-1.5 text-[10px] text-amber-100/95 sm:p-2 sm:text-[11px]">
               {responderSeat === mySeat ? (
                 <>
                   <p className="font-semibold">Double offered → ×{proposedMult ?? "?"}</p>
@@ -454,36 +466,77 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               )}
             </div>
           ) : canOfferDouble ? (
-            <button type="button" className={BTN_SECONDARY + " w-full sm:w-auto"} disabled={busy} onClick={() => void offerDouble()}>
+            <button type="button" className={BTN_SECONDARY + " w-full shrink-0 sm:w-auto"} disabled={busy} onClick={() => void offerDouble()}>
               Offer double
             </button>
           ) : null}
 
-          <section className="space-y-1">
-            <h3 className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Your shots</h3>
-            <div className="mx-auto w-full">
-              {renderGrid("offense", {
-                onCell: onTargetCell,
-                shipsCells: [],
-                outgoing: myOutgoing,
-                incoming: [],
-                dim: vm.turnSeat !== mySeat || Boolean(pd),
-              })}
-            </div>
-          </section>
+          <div className="mb-1 flex gap-1 sm:hidden">
+            <button
+              type="button"
+              onClick={() => setMobileBattleTab("offense")}
+              className={[
+                "min-h-[36px] flex-1 rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition",
+                mobileBattleTab === "offense"
+                  ? "border-sky-500/45 bg-sky-950/40 text-sky-100"
+                  : "border-zinc-600/40 bg-zinc-900/50 text-zinc-400",
+              ].join(" ")}
+            >
+              Your shots
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileBattleTab("defense")}
+              className={[
+                "min-h-[36px] flex-1 rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition",
+                mobileBattleTab === "defense"
+                  ? "border-sky-500/45 bg-sky-950/40 text-sky-100"
+                  : "border-zinc-600/40 bg-zinc-900/50 text-zinc-400",
+              ].join(" ")}
+            >
+              Your fleet
+            </button>
+          </div>
 
-          <section className="space-y-1">
-            <h3 className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Your fleet</h3>
-            <div className="mx-auto w-full">
-              {renderGrid("defense", {
-                onCell: null,
-                shipsCells: vm.myShips.map(s => s.cells || []),
-                outgoing: [],
-                incoming: incomingOnMe,
-                dim: false,
-              })}
-            </div>
-          </section>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden sm:gap-3">
+            <section
+              className={
+                "min-h-0 flex-col space-y-0.5 overflow-hidden sm:space-y-1 " +
+                (mobileBattleTab === "offense" ? "flex flex-1" : "hidden") +
+                " sm:flex sm:flex-none"
+              }
+            >
+              <h3 className="flex-shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">Your shots</h3>
+              <div className="mx-auto flex min-h-0 w-full flex-1 items-center justify-center sm:flex-none">
+                {renderGrid("offense", {
+                  onCell: onTargetCell,
+                  shipsCells: [],
+                  outgoing: myOutgoing,
+                  incoming: [],
+                  dim: vm.turnSeat !== mySeat || Boolean(pd),
+                })}
+              </div>
+            </section>
+
+            <section
+              className={
+                "min-h-0 flex-col space-y-0.5 overflow-hidden sm:space-y-1 " +
+                (mobileBattleTab === "defense" ? "flex flex-1" : "hidden") +
+                " sm:flex sm:flex-none"
+              }
+            >
+              <h3 className="flex-shrink-0 text-[9px] font-semibold uppercase tracking-wide text-zinc-500 sm:text-[10px]">Your fleet</h3>
+              <div className="mx-auto flex min-h-0 w-full flex-1 items-center justify-center sm:flex-none">
+                {renderGrid("defense", {
+                  onCell: null,
+                  shipsCells: vm.myShips.map(s => s.cells || []),
+                  outgoing: [],
+                  incoming: incomingOnMe,
+                  dim: false,
+                })}
+              </div>
+            </section>
+          </div>
         </div>
       ) : null}
 
@@ -542,6 +595,17 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
           <p className="mt-1">Result dismissed — you can rematch from the lobby or use buttons below if still available.</p>
         </div>
       ) : null}
+      </div>
+
+      {/* Mobile: reserved space for future banner ad — included in flex budget so game area sizes above it */}
+      <div
+        className="flex h-12 shrink-0 flex-col border-t border-white/[0.06] bg-zinc-950/30 sm:hidden"
+        aria-hidden
+      >
+        <div className="flex flex-1 items-center justify-center px-2 text-[9px] font-medium uppercase tracking-[0.14em] text-zinc-600">
+          Ad slot
+        </div>
+      </div>
     </div>
   );
 }
