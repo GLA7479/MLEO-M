@@ -15,13 +15,13 @@ import { useOv2ChessSession } from "../../../hooks/useOv2ChessSession";
 
 /** Shared premium button language (Chess + Checkers product family). */
 const BTN_PRIMARY =
-  "rounded-lg border border-emerald-500/28 bg-gradient-to-b from-emerald-950/70 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_4px_14px_rgba(0,0,0,0.32)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+  "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_SECONDARY =
-  "rounded-lg border border-zinc-500/28 bg-gradient-to-b from-zinc-800/55 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_12px_rgba(0,0,0,0.28)] transition-[transform,opacity] active:scale-[0.98]";
+  "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98]";
 const BTN_ACCENT =
-  "rounded-lg border border-sky-500/28 bg-gradient-to-b from-sky-950/65 to-sky-950 px-3 py-2 text-[11px] font-semibold text-sky-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_4px_14px_rgba(0,0,0,0.3)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+  "rounded-lg border border-sky-500/24 bg-gradient-to-b from-sky-950/60 to-sky-950 px-3 py-2 text-[11px] font-semibold text-sky-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_DANGER =
-  "w-full rounded-lg border border-white/[0.12] bg-gradient-to-b from-[#2a2228] via-[#1c161a] to-[#121014] py-2 px-3 text-[11px] font-semibold text-rose-100/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_4px_18px_rgba(0,0,0,0.42),0_0_0_1px_rgba(0,0,0,0.35)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+  "w-full rounded-lg border border-[#4a3035]/72 bg-gradient-to-b from-[#2e2226] to-[#10090b] py-2 px-3 text-[11px] font-semibold text-rose-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_3px_12px_rgba(0,0,0,0.32)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
 /** Local cburnett SVG set under `public/assets/chess/cburnett/`. */
 const CBURNETT_BASE = "/assets/chess/cburnett";
@@ -225,13 +225,13 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
       <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
-        <div className="rounded-lg border border-white/[0.1] bg-zinc-900/55 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_18px_rgba(0,0,0,0.22)] sm:px-2 sm:py-2">
+        <div className="rounded-lg border border-white/[0.09] bg-zinc-900/48 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.055),0_3px_12px_rgba(0,0,0,0.18)] sm:px-2 sm:py-2">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[11px] sm:text-[12px]">
             <div
-              className={`flex min-h-[1.625rem] items-center rounded-md border px-2.5 py-1 tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-1px_2px_rgba(0,0,0,0.3)] ${
+              className={`flex min-h-[1.625rem] items-center rounded-md border px-2.5 py-1 tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_2px_rgba(0,0,0,0.22)] ${
                 vm.phase === "playing" && vm.turnSeat === vm.mySeat
-                  ? "border-amber-400/42 bg-amber-950/48 text-amber-50/95"
-                  : "border-white/[0.14] bg-zinc-900/50 text-zinc-300/90"
+                  ? "border-amber-400/38 bg-amber-950/42 text-amber-50/95"
+                  : "border-white/[0.12] bg-zinc-900/44 text-zinc-300/88"
               }`}
             >
               {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
@@ -244,7 +244,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
               )}
             </div>
             {vaultClaimBusy ? (
-              <span className="rounded-md border border-sky-500/18 bg-sky-950/35 px-2 py-0.5 text-[10px] font-medium text-sky-100/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+              <span className="rounded-md border border-sky-500/16 bg-sky-950/32 px-2 py-0.5 text-[10px] font-medium text-sky-100/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]">
                 Settlement…
               </span>
             ) : null}
@@ -272,19 +272,19 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
 
       <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden">
         <div
-          className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_0_0_1px_rgba(0,0,0,0.55),0_10px_36px_rgba(0,0,0,0.5),0_0_64px_rgba(18,26,42,0.35),inset_0_1px_0_rgba(255,255,255,0.16),inset_0_-2px_5px_rgba(0,0,0,0.32)] sm:max-w-[min(100%,548px)]"
+          className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(255,255,255,0.09),0_0_0_1px_rgba(0,0,0,0.5),0_8px_28px_rgba(0,0,0,0.42),0_0_48px_rgba(18,26,42,0.28),inset_0_1px_0_rgba(255,255,255,0.14),inset_0_-2px_5px_rgba(0,0,0,0.28)] sm:max-w-[min(100%,548px)]"
           style={{
             background: "linear-gradient(152deg, #8c5f45 0%, #5a3524 38%, #3a2218 65%, #5c3a28 100%)",
           }}
         >
           <div
-            className="relative overflow-hidden rounded-[8px] p-0.5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.07),inset_0_-3px_8px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(0,0,0,0.28)]"
+            className="relative overflow-hidden rounded-[8px] p-0.5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.065),inset_0_-3px_8px_rgba(0,0,0,0.38),inset_0_0_0_1px_rgba(0,0,0,0.24)]"
             style={{
-              background: "linear-gradient(172deg, #2a201c 0%, #181210 48%, #1f1612 100%)",
+              background: "linear-gradient(172deg, #2f241f 0%, #1c1614 48%, #221a16 100%)",
             }}
           >
             <div
-              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_28px_rgba(0,0,0,0.36),inset_0_0_52px_rgba(0,0,0,0.1)]"
+              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_28px_rgba(0,0,0,0.3),inset_0_0_52px_rgba(0,0,0,0.075)]"
               style={{
                 gridTemplateColumns: "repeat(8, 1fr)",
                 gridTemplateRows: "repeat(8, 1fr)",
@@ -301,13 +301,13 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                 const kingThreat = checkHighlight.inCheck && checkHighlight.kingServerIdx === serverIdx;
                 const attackingKing = attackerServerSet.has(serverIdx);
                 const ringClass = sel
-                  ? "z-[2] shadow-[inset_0_0_0_2px_rgba(125,211,252,0.42)]"
+                  ? "z-[2] shadow-[inset_0_0_0_2px_rgba(125,211,252,0.34)]"
                   : attackingKing
-                    ? "z-[1] shadow-[inset_0_0_0_1px_rgba(217,119,6,0.45)]"
+                    ? "z-[1] shadow-[inset_0_0_0_1px_rgba(217,119,6,0.36)]"
                     : "";
                 const baseSq = light
-                  ? "bg-[#e0b078] shadow-[inset_0_1px_0_rgba(255,250,240,0.32),inset_0_-1px_0_rgba(0,0,0,0.09)]"
-                  : "bg-[#4a3020] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-2px_0_rgba(0,0,0,0.28)]";
+                  ? "bg-[#e0b078] shadow-[inset_0_1px_0_rgba(255,250,240,0.35),inset_0_-1px_0_rgba(0,0,0,0.082)]"
+                  : "bg-[#503628] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-2px_0_rgba(0,0,0,0.22)]";
                 return (
                   <button
                     key={viewPos}
@@ -316,7 +316,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                     onClick={() => void onCellClick(viewPos)}
                     className={`relative flex min-h-0 min-w-0 items-center justify-center outline-none transition-[box-shadow,opacity] disabled:opacity-50 ${baseSq} ${
                       kingThreat
-                        ? "z-[1] before:pointer-events-none before:absolute before:inset-0 before:z-0 before:bg-rose-950/30 before:content-['']"
+                        ? "z-[1] before:pointer-events-none before:absolute before:inset-0 before:z-0 before:bg-rose-950/22 before:content-['']"
                         : ""
                     } ${ringClass}`}
                     style={{ WebkitTapHighlightColor: "transparent" }}
@@ -330,8 +330,8 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                           draggable={false}
                           className={`h-full w-full select-none object-contain ${
                             p === p.toUpperCase() && p !== "."
-                              ? "[filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.09))_drop-shadow(0_2px_2.5px_rgba(0,0,0,0.05))_brightness(0.99)_contrast(1.03)_saturate(1.02)]"
-                              : "[filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.14))_drop-shadow(0_2px_3px_rgba(0,0,0,0.065))_brightness(1.03)_contrast(1.03)]"
+                              ? "[filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.08))_drop-shadow(0_2px_2.5px_rgba(0,0,0,0.045))_brightness(1)_contrast(1.02)_saturate(1.02)]"
+                              : "[filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.12))_drop-shadow(0_2px_3px_rgba(0,0,0,0.055))_brightness(1.025)_contrast(1.02)]"
                           }`}
                         />
                       </div>
@@ -342,7 +342,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
 
               {promoOpen ? (
                 <div
-                  className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 border-t border-white/[0.08] bg-zinc-950 px-2 py-2.5 shadow-[0_-8px_24px_rgba(0,0,0,0.45)] sm:py-3"
+                  className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 border-t border-white/[0.07] bg-zinc-950/96 px-2 py-2.5 shadow-[0_-6px_18px_rgba(0,0,0,0.34)] sm:py-3"
                   role="dialog"
                   aria-label="Choose promotion piece"
                 >
@@ -356,7 +356,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                         type="button"
                         disabled={busy}
                         onClick={() => void onPickPromo(l)}
-                        className="flex h-12 w-12 min-h-12 min-w-12 items-center justify-center rounded-lg border border-zinc-600/28 bg-zinc-800/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_6px_rgba(0,0,0,0.28)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45 sm:h-14 sm:w-14"
+                        className="flex h-12 w-12 min-h-12 min-w-12 items-center justify-center rounded-lg border border-zinc-600/24 bg-zinc-800/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.045),0_2px_5px_rgba(0,0,0,0.22)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45 sm:h-14 sm:w-14"
                         aria-label={`Promote to ${({ q: "queen", Q: "queen", r: "rook", R: "rook", b: "bishop", B: "bishop", n: "knight", N: "knight" }[l] || "piece")}`}
                       >
                         <div className="relative aspect-square w-[85%] max-w-full shrink-0">
@@ -366,8 +366,8 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                             draggable={false}
                             className={`h-full w-full select-none object-contain ${
                               String(l) === String(l).toUpperCase()
-                                ? "[filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.09))_drop-shadow(0_2px_2.5px_rgba(0,0,0,0.05))_brightness(0.99)_contrast(1.03)_saturate(1.02)]"
-                                : "[filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.14))_drop-shadow(0_2px_3px_rgba(0,0,0,0.065))_brightness(1.03)_contrast(1.03)]"
+                                ? "[filter:drop-shadow(0_1px_1.5px_rgba(0,0,0,0.08))_drop-shadow(0_2px_2.5px_rgba(0,0,0,0.045))_brightness(1)_contrast(1.02)_saturate(1.02)]"
+                                : "[filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.12))_drop-shadow(0_2px_3px_rgba(0,0,0,0.055))_brightness(1.025)_contrast(1.02)]"
                             }`}
                           />
                         </div>
@@ -382,7 +382,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
       </div>
 
       {finished ? (
-        <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.12] bg-zinc-900/88 p-3 text-[11px] text-zinc-200/92 shadow-[0_12px_32px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)]">
+        <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.11] bg-zinc-900/78 p-3 text-[11px] text-zinc-200/88 shadow-[0_12px_32px_rgba(0,0,0,0.42),0_0_0_1px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.055),inset_0_-8px_18px_rgba(0,0,0,0.24)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Result</p>
           <p className="mt-1 text-sm font-semibold text-zinc-50">Match finished</p>
           {rk === "stalemate" ? (
@@ -406,7 +406,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
         </div>
       ) : null}
 
-      <div className="shrink-0 rounded-lg border border-white/[0.08] bg-zinc-900/45 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+      <div className="shrink-0 rounded-lg border border-white/[0.09] bg-zinc-900/42 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_8px_rgba(0,0,0,0.16)]">
         <button type="button" disabled={exitBusy || !pk} onClick={() => void onExitToLobby()} className={BTN_DANGER}>
           {exitBusy ? "Leaving…" : "Leave table"}
         </button>

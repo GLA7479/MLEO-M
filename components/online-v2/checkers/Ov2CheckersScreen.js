@@ -17,23 +17,15 @@ import { useOv2CheckersSession } from "../../../hooks/useOv2CheckersSession";
 const finishDismissStorageKey = sid => `ov2_ck_finish_dismiss_${sid}`;
 
 const BTN_PRIMARY =
-  "rounded-lg border border-emerald-500/28 bg-gradient-to-b from-emerald-950/70 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_4px_14px_rgba(0,0,0,0.32)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+  "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_SECONDARY =
-  "rounded-lg border border-zinc-500/28 bg-gradient-to-b from-zinc-800/55 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_12px_rgba(0,0,0,0.28)] transition-[transform,opacity] active:scale-[0.98]";
+  "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98]";
 const BTN_ACCENT =
-  "rounded-lg border border-sky-500/28 bg-gradient-to-b from-sky-950/65 to-sky-950 px-3 py-2 text-[11px] font-semibold text-sky-100/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_4px_14px_rgba(0,0,0,0.3)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+  "rounded-lg border border-sky-500/24 bg-gradient-to-b from-sky-950/60 to-sky-950 px-3 py-2 text-[11px] font-semibold text-sky-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_DANGER =
-  "w-full rounded-lg border border-[#4a3035]/80 bg-gradient-to-b from-[#2e2226] to-[#10090b] py-2 px-3 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_16px_rgba(0,0,0,0.38)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+  "w-full rounded-lg border border-[#4a3035]/72 bg-gradient-to-b from-[#2e2226] to-[#10090b] py-2 px-3 text-[11px] font-semibold text-rose-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_3px_12px_rgba(0,0,0,0.32)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_GHOST =
-  "w-full rounded-lg border border-white/[0.12] bg-zinc-900/45 py-2 px-3 text-xs font-semibold text-zinc-200/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_12px_rgba(0,0,0,0.28)] transition-[transform,opacity] active:scale-[0.98]";
-
-function pieceLabel(p) {
-  if (p === 1) return "b";
-  if (p === 2) return "BK";
-  if (p === 3) return "w";
-  if (p === 4) return "WK";
-  return "";
-}
+  "w-full rounded-lg border border-white/[0.1] bg-zinc-900/42 py-2 px-3 text-xs font-semibold text-zinc-200/76 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98]";
 
 /**
  * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string }, onLeaveToLobby?: () => void|Promise<void>, leaveToLobbyBusy?: boolean } | null, onSessionRefresh?: (prev: string, rpcNew?: string, opts?: { expectClearedSession?: boolean }) => Promise<unknown> }} props
@@ -329,19 +321,19 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
 
       <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-zinc-950">
         <div
-          className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_0_0_1px_rgba(0,0,0,0.55),0_10px_36px_rgba(0,0,0,0.5),0_0_64px_rgba(18,26,42,0.35),inset_0_1px_0_rgba(255,255,255,0.16),inset_0_-2px_5px_rgba(0,0,0,0.32)] sm:max-w-[min(100%,548px)]"
+          className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(255,255,255,0.09),0_0_0_1px_rgba(0,0,0,0.5),0_8px_28px_rgba(0,0,0,0.42),0_0_48px_rgba(18,26,42,0.28),inset_0_1px_0_rgba(255,255,255,0.14),inset_0_-2px_5px_rgba(0,0,0,0.28)] sm:max-w-[min(100%,548px)]"
           style={{
             background: "linear-gradient(152deg, #8c5f45 0%, #5a3524 38%, #3a2218 65%, #5c3a28 100%)",
           }}
         >
           <div
-            className="relative overflow-hidden rounded-[8px] p-0.5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.07),inset_0_-3px_8px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(0,0,0,0.28)]"
+            className="relative overflow-hidden rounded-[8px] p-0.5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.06),inset_0_-3px_8px_rgba(0,0,0,0.4),inset_0_0_0_1px_rgba(0,0,0,0.26)]"
             style={{
               background: "linear-gradient(172deg, #2a201c 0%, #181210 48%, #1f1612 100%)",
             }}
           >
             <div
-              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_28px_rgba(0,0,0,0.36),inset_0_0_52px_rgba(0,0,0,0.1)]"
+              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_28px_rgba(0,0,0,0.32),inset_0_0_52px_rgba(0,0,0,0.08)]"
               style={{
                 gridTemplateColumns: "repeat(8, 1fr)",
                 gridTemplateRows: "repeat(8, 1fr)",
@@ -359,15 +351,15 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
                 const forcedCapHint = !mustChain && forcedMenCaptureHintViewSet.has(viewPos);
                 const showLegalDot = leg && !sel && !mustChain && !forcedCapHint;
                 const hierarchyClass = mustChain
-                  ? "z-[2] shadow-[inset_0_0_0_2px_rgba(251,191,36,0.55),inset_0_0_12px_rgba(251,191,36,0.08)]"
+                  ? "z-[2] shadow-[inset_0_0_0_2px_rgba(251,191,36,0.48),inset_0_0_12px_rgba(251,191,36,0.055)]"
                   : forcedCapHint
-                    ? "z-[1] shadow-[inset_0_0_0_1px_rgba(234,179,8,0.4)]"
+                    ? "z-[1] shadow-[inset_0_0_0_1px_rgba(234,179,8,0.32)]"
                     : sel
-                      ? "z-[1] shadow-[inset_0_0_0_2px_rgba(125,211,252,0.38)]"
+                      ? "z-[1] shadow-[inset_0_0_0_2px_rgba(125,211,252,0.32)]"
                       : "";
                 const baseSq = dark
-                  ? "bg-[#4a3020] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-2px_0_rgba(0,0,0,0.28)]"
-                  : "bg-[#e0b078] shadow-[inset_0_1px_0_rgba(255,250,240,0.32),inset_0_-1px_0_rgba(0,0,0,0.09)]";
+                  ? "bg-[#4a3020] shadow-[inset_0_1px_0_rgba(255,255,255,0.055),inset_0_-2px_0_rgba(0,0,0,0.25)]"
+                  : "bg-[#e0b078] shadow-[inset_0_1px_0_rgba(255,250,240,0.26),inset_0_-1px_0_rgba(0,0,0,0.075)]";
                 const isDark = p === 1 || p === 2;
                 const isKing = p === 2 || p === 4;
                 return (
@@ -381,38 +373,42 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
                   >
                     {showLegalDot ? (
                       <span
-                        className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-200/30 ring-1 ring-emerald-400/22"
+                        className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-200/22 ring-1 ring-emerald-400/14"
                         aria-hidden
                       />
                     ) : null}
                     {p ? (
                       <span
-                        className={`relative z-[1] flex h-[55%] w-[55%] max-h-8 max-w-8 items-center justify-center rounded-full text-[8px] font-bold tracking-tight sm:h-[61%] sm:w-[61%] sm:max-h-9 sm:max-w-9 sm:text-[9px] md:h-[63%] md:w-[63%] md:max-h-[2.375rem] md:max-w-[2.375rem] md:text-[10px] ${
-                          isKing ? "ring-1 ring-black/25" : "ring-1 ring-black/20"
+                        className={`relative z-[1] flex h-[55%] w-[55%] max-h-8 max-w-8 items-center justify-center rounded-full sm:h-[61%] sm:w-[61%] sm:max-h-9 sm:max-w-9 md:h-[63%] md:w-[63%] md:max-h-[2.375rem] md:max-w-[2.375rem] ${
+                          isKing ? "ring-1 ring-black/22" : "ring-1 ring-black/16"
                         }`}
                         style={{
                           background: isDark
                             ? "radial-gradient(circle at 32% 28%, #6a6a72 0%, #35353a 42%, #121214 88%)"
                             : "radial-gradient(circle at 32% 28%, #fffdf7 0%, #e8dcc8 45%, #c4b29a 88%)",
                           boxShadow:
-                            "0 1px 2px rgba(0,0,0,0.65), 0 3px 5px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -3px 6px rgba(0,0,0,0.25)",
-                          color: isDark ? "rgba(245,240,232,0.92)" : "rgba(28,24,20,0.9)",
-                          textShadow: isDark
-                            ? "0 1px 1px rgba(0,0,0,0.6)"
-                            : "0 1px 0 rgba(255,255,255,0.35)",
+                            "0 1px 2px rgba(0,0,0,0.58), 0 2px 4px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -2px 5px rgba(0,0,0,0.22)",
+                          ...(isKing
+                            ? {
+                                color: isDark ? "rgba(252,248,240,0.94)" : "rgba(36,30,24,0.76)",
+                              }
+                            : {}),
                         }}
                       >
                         {isKing ? (
                           <span
-                            className="text-[clamp(9px,2.5vw,11px)] font-normal leading-none sm:text-[clamp(10px,2.6vw,12px)] md:text-[clamp(10px,2.4vw,12px)]"
-                            style={{ opacity: 0.88 }}
+                            className="flex translate-y-px items-center justify-center font-light leading-none"
+                            style={{
+                              fontSize: "clamp(9px, 2.35vw, 10.5px)",
+                              textShadow: isDark
+                                ? "0 0.5px 1.5px rgba(0,0,0,0.5)"
+                                : "0 0.5px 0 rgba(255,255,255,0.45)",
+                            }}
                             aria-hidden
                           >
                             ♔
                           </span>
-                        ) : (
-                          pieceLabel(p)
-                        )}
+                        ) : null}
                       </span>
                     ) : null}
                   </button>
@@ -425,7 +421,7 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
 
       {showResultModal ? (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/[0.68] p-3 backdrop-blur-[4px]">
-          <div className="w-full max-w-sm rounded-2xl border border-white/[0.15] bg-gradient-to-b from-zinc-900/98 to-zinc-950/98 p-5 text-center shadow-[0_28px_72px_rgba(0,0,0,0.72),0_0_0_1px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-12px_28px_rgba(0,0,0,0.32)] sm:max-w-md">
+          <div className="w-full max-w-sm rounded-2xl border border-white/[0.12] bg-gradient-to-b from-zinc-900/96 to-zinc-950/98 p-5 text-center shadow-[0_20px_52px_rgba(0,0,0,0.58),0_0_0_1px_rgba(0,0,0,0.26),inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-10px_22px_rgba(0,0,0,0.26)] sm:max-w-md">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Match result</p>
             <p
               className={`mt-2 text-lg font-semibold tracking-tight sm:text-xl ${
@@ -463,7 +459,7 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
       ) : null}
 
       {finished && !showResultModal ? (
-        <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.14] bg-gradient-to-b from-zinc-900/82 to-zinc-950 p-3 text-[11px] text-zinc-200/92 shadow-[0_16px_44px_rgba(0,0,0,0.5),0_0_0_1px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-10px_24px_rgba(0,0,0,0.3)]">
+        <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.11] bg-gradient-to-b from-zinc-900/78 to-zinc-950 p-3 text-[11px] text-zinc-200/88 shadow-[0_12px_32px_rgba(0,0,0,0.42),0_0_0_1px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.055),inset_0_-8px_18px_rgba(0,0,0,0.24)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Result</p>
           <p className="mt-1 text-sm font-semibold text-zinc-50">Match finished</p>
           {vm.winnerSeat != null && vm.mySeat != null ? (
