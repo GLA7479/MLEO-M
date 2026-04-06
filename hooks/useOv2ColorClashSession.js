@@ -17,6 +17,47 @@ import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/boar
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import { ONLINE_V2_GAME_KINDS } from "../lib/online-v2/ov2Economy";
 
+/** @param {string} sessionId @param {number|null} seat */
+function ov2CcSurgeUsedStorageKey(sessionId, seat) {
+  return `ov2_cc_surge_used_${sessionId}_${seat}`;
+}
+
+/**
+ * Legacy fallback only (pre-migration snapshots without surge fields).
+ * @param {string} sessionId @param {number|null} seat
+ */
+function readOv2CcSurgeUsedStorageFallback(sessionId, seat) {
+  if (typeof window === "undefined" || !sessionId || seat == null || !Number.isInteger(seat)) return false;
+  try {
+    return window.sessionStorage.getItem(ov2CcSurgeUsedStorageKey(sessionId, seat)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Authoritative: parity_state.surgeUsed from snapshot (`surgeUsedForYou` / `surgeUsedBySeat`).
+ * @param {Record<string, unknown>|null|undefined} snap
+ * @returns {boolean|null} null if snapshot has no surge fields (use legacy fallback)
+ */
+function surgeUsedForMeFromSnapshot(snap) {
+  if (!snap || typeof snap !== "object") return /** @type {boolean|null} */ (null);
+  const suy = /** @type {{ surgeUsedForYou?: unknown, surgeUsedBySeat?: unknown, mySeat?: unknown }} */ (snap);
+  if (suy.surgeUsedForYou === true || suy.surgeUsedForYou === false) {
+    return suy.surgeUsedForYou === true;
+  }
+  if (suy.surgeUsedForYou === "true" || suy.surgeUsedForYou === 1) return true;
+  if (suy.surgeUsedForYou === "false" || suy.surgeUsedForYou === 0) return false;
+  const seat = suy.mySeat != null && Number.isInteger(Number(suy.mySeat)) ? Number(suy.mySeat) : null;
+  const map = suy.surgeUsedBySeat;
+  if (map && typeof map === "object" && !Array.isArray(map) && seat != null && seat >= 0 && seat <= 3) {
+    const v = /** @type {Record<string, unknown>} */ (map)[String(seat)] ?? /** @type {Record<number, unknown>} */ (map)[seat];
+    if (v === true || v === "true" || v === 1) return true;
+    if (v === false || v === "false" || v === 0) return false;
+  }
+  return null;
+}
+
 /** @param {null|undefined|{ room?: object, members?: unknown[], self?: { participant_key?: string } }} baseContext */
 export function useOv2ColorClashSession(baseContext) {
   const preview = useOv2UiPreviewOptional("colorclash");
@@ -195,14 +236,17 @@ export function useOv2ColorClashSession(baseContext) {
   }, [roomId, selfKey, snap]);
 
   const playCard = useCallback(
-    async (card, chosenColor) => {
+    async (card, chosenColor, opts) => {
       if (!roomId || !selfKey || !snap) return { ok: false };
       setBusy(true);
       setErr("");
       try {
+        const secondCard = opts?.secondCard != null && typeof opts.secondCard === "object" ? opts.secondCard : null;
         const r = await requestOv2ColorClashPlayCard(roomId, selfKey, card, {
           revision: snap.revision,
           chosenColor: chosenColor != null ? chosenColor : null,
+          secondCard,
+          secondChosenColor: opts?.secondChosenColor != null ? opts.secondChosenColor : null,
         });
         if (!r.ok) {
           setErr(r.error || "Play failed");
@@ -245,6 +289,22 @@ export function useOv2ColorClashSession(baseContext) {
     const turnDeadline = snap?.turnDeadline != null && Number.isFinite(Number(snap.turnDeadline)) ? Number(snap.turnDeadline) : null;
     const turnTimeLeftMs = phase === "playing" && turnDeadline != null ? Math.max(0, turnDeadline - nowMs) : null;
     const turnTimeLeftSec = turnTimeLeftMs != null ? Math.ceil(turnTimeLeftMs / 1000) : null;
+    const sid = snap?.sessionId != null ? String(snap.sessionId) : "";
+    const mySeat = snap?.mySeat != null && Number.isInteger(Number(snap.mySeat)) ? Number(snap.mySeat) : null;
+    const fromServer = surgeUsedForMeFromSnapshot(snap);
+    const surgeUsedForMe =
+      fromServer != null
+        ? fromServer
+        : sid.length > 0 && mySeat != null && readOv2CcSurgeUsedStorageFallback(sid, mySeat);
+    const turnPhase = snap?.turnPhase != null ? String(snap.turnPhase) : "";
+    const surgeAvailableForMe =
+      phase === "playing" && mySeat != null && snap?.turnSeat === mySeat && turnPhase === "play" && !surgeUsedForMe;
+    const wildLockAppliesToMe =
+      mySeat != null &&
+      snap?.lockForSeat != null &&
+      Number(snap.lockForSeat) === mySeat &&
+      snap?.lockedColor != null &&
+      Number.isFinite(Number(snap.lockedColor));
     return {
       phase,
       turnSeat: snap?.turnSeat ?? null,
@@ -266,7 +326,16 @@ export function useOv2ColorClashSession(baseContext) {
       activeSeats: Array.isArray(snap?.activeSeats) ? snap.activeSeats : [],
       playerCount: snap?.playerCount ?? 2,
       myHand: Array.isArray(snap?.myHand) ? snap.myHand : [],
-      pendingDrawForYou: snap?.pendingDrawForYou ?? null,
+      /** @type {Record<string, unknown>[]|null} */
+      pendingDrawForYou: Array.isArray(snap?.pendingDrawForYou) ? snap.pendingDrawForYou : null,
+      clashCount: snap?.clashCount != null ? Math.max(0, Math.min(4, Math.floor(Number(snap.clashCount)))) : 0,
+      lockedColor: snap?.lockedColor != null && Number.isFinite(Number(snap.lockedColor)) ? Math.floor(Number(snap.lockedColor)) : null,
+      lockForSeat:
+        snap?.lockForSeat != null && Number.isFinite(Number(snap.lockForSeat)) ? Math.floor(Number(snap.lockForSeat)) : null,
+      lockExpiresAfterNextTurn: snap?.lockExpiresAfterNextTurn === true,
+      wildLockAppliesToMe,
+      surgeUsedForMe,
+      surgeAvailableForMe,
       result: snap?.result ?? null,
     };
   }, [snap, nowMs]);

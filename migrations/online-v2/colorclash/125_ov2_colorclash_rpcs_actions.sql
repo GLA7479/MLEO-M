@@ -208,6 +208,7 @@ BEGIN
     IF v_next IS NULL OR public.ov2_cc_is_eliminated(v_pub, v_next) THEN
       v_next := v_live2[1];
     END IF;
+    v_pub := public.ov2_cc_pub_clear_wild_lock_on_turn_end(v_pub, v_turn);
     v_pub := jsonb_set(v_pub, '{turnPhase}', '"play"'::jsonb, true);
     v_pub := jsonb_set(v_pub, '{turnSeat}', to_jsonb(v_next), true);
     v_ps := public.ov2_cc_parity_bump_timer(v_ps, v_next, NULL);
@@ -226,6 +227,7 @@ BEGIN
   IF v_next IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NO_NEXT', 'message', 'Turn order error');
   END IF;
+  v_pub := public.ov2_cc_pub_clear_wild_lock_on_turn_end(v_pub, v_turn);
   v_pub := jsonb_set(v_pub, '{turnPhase}', '"play"'::jsonb, true);
   v_pub := jsonb_set(v_pub, '{turnSeat}', to_jsonb(v_next), true);
   v_eng.pending_draw := NULL;
@@ -305,6 +307,7 @@ BEGIN
     ELSE
       v_next := v_live2[1];
     END IF;
+    v_pub := public.ov2_cc_pub_clear_wild_lock_on_turn_end(v_pub, v_seat);
     v_pub := jsonb_set(v_pub, '{turnPhase}', '"play"'::jsonb, true);
     v_pub := jsonb_set(v_pub, '{turnSeat}', to_jsonb(v_next), true);
     v_ps := public.ov2_cc_parity_bump_timer(v_sess.parity_state, v_next, NULL);

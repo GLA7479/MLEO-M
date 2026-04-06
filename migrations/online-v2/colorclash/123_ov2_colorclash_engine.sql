@@ -127,10 +127,117 @@ AS $$
   END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.ov2_cc_clash_cap()
+RETURNS int
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public
+AS $$
+  SELECT 4;
+$$;
+
+-- Wild Lock V2: when non-null, non-wild cards must have this color (wilds still escape).
+CREATE OR REPLACE FUNCTION public.ov2_cc_wild_lock_color_for_turn(p_pub jsonb, p_turn_seat int)
+RETURNS int
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = public
+AS $$
+DECLARE
+  v_lfs int;
+BEGIN
+  IF p_pub IS NULL OR NOT (p_pub ? 'lockForSeat') OR p_pub -> 'lockForSeat' IS NULL OR jsonb_typeof(p_pub -> 'lockForSeat') = 'null' THEN
+    RETURN NULL;
+  END IF;
+  BEGIN
+    v_lfs := (p_pub ->> 'lockForSeat')::int;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN NULL;
+  END;
+  IF v_lfs IS DISTINCT FROM p_turn_seat THEN
+    RETURN NULL;
+  END IF;
+  IF NOT (p_pub ? 'lockedColor') OR p_pub -> 'lockedColor' IS NULL OR jsonb_typeof(p_pub -> 'lockedColor') = 'null' THEN
+    RETURN NULL;
+  END IF;
+  BEGIN
+    RETURN (p_pub ->> 'lockedColor')::int;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN NULL;
+  END;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.ov2_cc_pub_clear_wild_lock_on_turn_end(p_pub jsonb, p_leaving_seat int)
+RETURNS jsonb
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = public
+AS $$
+DECLARE
+  v_lock_seat int;
+  v_out jsonb;
+BEGIN
+  v_out := coalesce(p_pub, '{}'::jsonb);
+  IF NOT (v_out ? 'lockForSeat') OR v_out -> 'lockForSeat' IS NULL THEN
+    RETURN v_out;
+  END IF;
+  BEGIN
+    v_lock_seat := (v_out ->> 'lockForSeat')::int;
+  EXCEPTION
+    WHEN OTHERS THEN
+      RETURN v_out;
+  END;
+  IF v_lock_seat IS DISTINCT FROM p_leaving_seat THEN
+    RETURN v_out;
+  END IF;
+  v_out := jsonb_set(v_out, '{lockedColor}', 'null'::jsonb, true);
+  v_out := jsonb_set(v_out, '{lockForSeat}', 'null'::jsonb, true);
+  v_out := jsonb_set(v_out, '{lockExpiresAfterNextTurn}', 'false'::jsonb, true);
+  RETURN v_out;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.ov2_cc_clash_update_after_play(p_pub jsonb, p_card jsonb, p_current_color int)
+RETURNS int
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = public
+AS $$
+DECLARE
+  v_pt text;
+  v_c int;
+  v_prev int;
+  v_cap int;
+BEGIN
+  v_pt := public.ov2_cc_card_type(p_card);
+  IF v_pt IN ('w', 'f') THEN
+    RETURN 0;
+  END IF;
+  v_c := public.ov2_cc_card_color(p_card);
+  IF v_c IS NULL OR v_c IS DISTINCT FROM p_current_color THEN
+    RETURN 0;
+  END IF;
+  v_prev := coalesce(nullif((p_pub ->> 'clashCount'), '')::int, 0);
+  IF v_prev < 0 THEN
+    v_prev := 0;
+  END IF;
+  v_cap := public.ov2_cc_clash_cap();
+  v_prev := v_prev + 1;
+  IF v_prev > v_cap THEN
+    v_prev := v_cap;
+  END IF;
+  RETURN v_prev;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.ov2_cc_is_playable_on(
   p_card jsonb,
   p_top jsonb,
-  p_current_color int
+  p_current_color int,
+  p_wild_lock_color int DEFAULT NULL
 )
 RETURNS boolean
 LANGUAGE plpgsql
@@ -150,6 +257,12 @@ BEGIN
   END IF;
   v_tt := public.ov2_cc_card_type(p_top);
   v_ct := public.ov2_cc_card_type(p_card);
+  IF p_wild_lock_color IS NOT NULL AND v_ct NOT IN ('w', 'f') THEN
+    v_cc := public.ov2_cc_card_color(p_card);
+    IF v_cc IS NULL OR v_cc IS DISTINCT FROM p_wild_lock_color THEN
+      RETURN false;
+    END IF;
+  END IF;
   IF v_ct IN ('w', 'f') THEN
     RETURN true;
   END IF;
@@ -249,7 +362,8 @@ $$;
 CREATE OR REPLACE FUNCTION public.ov2_cc_has_legal_play(
   p_hand jsonb,
   p_top jsonb,
-  p_current_color int
+  p_current_color int,
+  p_wild_lock_color int DEFAULT NULL
 )
 RETURNS boolean
 LANGUAGE plpgsql
@@ -262,12 +376,69 @@ DECLARE
 BEGIN
   v_n := public.ov2_cc_jsonb_len(p_hand);
   FOR v_i IN 0..(v_n - 1) LOOP
-    IF public.ov2_cc_is_playable_on(p_hand -> v_i, p_top, p_current_color) THEN
+    IF public.ov2_cc_is_playable_on(p_hand -> v_i, p_top, p_current_color, p_wild_lock_color) THEN
       RETURN true;
     END IF;
   END LOOP;
   RETURN false;
 END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.ov2_cc_pending_draw_contains(p_pending jsonb, p_card jsonb)
+RETURNS boolean
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = public
+AS $$
+DECLARE
+  v_n int;
+  v_i int;
+BEGIN
+  IF p_pending IS NULL OR p_card IS NULL THEN
+    RETURN false;
+  END IF;
+  IF jsonb_typeof(p_pending) = 'array' THEN
+    v_n := public.ov2_cc_jsonb_len(p_pending);
+    FOR v_i IN 0..(v_n - 1) LOOP
+      IF (p_pending -> v_i) = p_card THEN
+        RETURN true;
+      END IF;
+    END LOOP;
+    RETURN false;
+  END IF;
+  RETURN p_pending = p_card;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.ov2_cc_surge_used_get(p_parity jsonb, p_seat int)
+RETURNS boolean
+LANGUAGE plpgsql
+IMMUTABLE
+SET search_path = public
+AS $$
+DECLARE
+  v_su jsonb;
+BEGIN
+  v_su := p_parity -> 'surgeUsed';
+  IF v_su IS NULL OR jsonb_typeof(v_su) <> 'object' THEN
+    RETURN false;
+  END IF;
+  RETURN coalesce((v_su ->> p_seat::text) IN ('true', 't', '1'), false);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.ov2_cc_surge_used_set(p_parity jsonb, p_seat int, p_val boolean)
+RETURNS jsonb
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public
+AS $$
+  SELECT jsonb_set(
+    coalesce(p_parity, '{}'::jsonb),
+    ARRAY['surgeUsed', p_seat::text],
+    to_jsonb(coalesce(p_val, false)),
+    true
+  );
 $$;
 
 CREATE OR REPLACE FUNCTION public.ov2_cc_eliminated_get(p_pub jsonb, p_seat int)

@@ -385,6 +385,8 @@ DECLARE
   v_new_hand jsonb;
   v_st int;
   v_dc int;
+  v_mult int;
+  v_base_entry bigint;
 BEGIN
   IF p_room_id IS NULL OR length(v_pk) = 0 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'Invalid arguments');
@@ -430,14 +432,16 @@ BEGIN
       IF v_dc <= 0 THEN
         -- Stock exhaustion (v1): both empty => draw
         v_ps := COALESCE(v_sess.parity_state, '{}'::jsonb);
+        v_mult := public.ov2_mm_parity_stake_mult(v_ps);
+        v_base_entry := COALESCE((v_ps ->> '__entry__')::bigint, 0);
         v_ps := jsonb_set(
           v_ps,
           '{__result__}',
           jsonb_build_object(
             'draw', true,
             'stockExhausted', true,
-            'refundPerSeat', COALESCE((v_ps ->> '__entry__')::bigint, 0),
-            'stakeMultiplier', public.ov2_mm_parity_stake_mult(v_ps),
+            'refundPerSeat', v_base_entry * v_mult,
+            'stakeMultiplier', v_mult,
             'timestamp', (extract(epoch from now()) * 1000)::bigint
           ),
           true

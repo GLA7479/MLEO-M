@@ -74,7 +74,13 @@ BEGIN
       END,
     'turnDeadline', CASE WHEN v_td IS NULL THEN NULL::jsonb ELSE to_jsonb(v_td) END,
     'missedTurns', coalesce(v_ps -> 'missed_turns', '{}'::jsonb),
-    'result', v_ps -> '__result__'
+    'result', v_ps -> '__result__',
+    'surgeUsedBySeat', coalesce(v_ps -> 'surgeUsed', '{}'::jsonb),
+    'surgeUsedForYou',
+      CASE
+        WHEN v_my IS NULL OR v_my NOT IN (0, 1, 2, 3) THEN NULL::jsonb
+        ELSE to_jsonb(coalesce((v_ps -> 'surgeUsed' ->> v_my::text)::boolean, false))
+      END
   );
 END;
 $$;
@@ -220,7 +226,8 @@ BEGIN
   v_ps := jsonb_build_object(
     '__entry__', to_jsonb(v_entry),
     'stake_multiplier', 1,
-    'missed_turns', jsonb_build_object('0', 0, '1', 0, '2', 0, '3', 0)
+    'missed_turns', jsonb_build_object('0', 0, '1', 0, '2', 0, '3', 0),
+    'surgeUsed', jsonb_build_object('0', false, '1', false, '2', false, '3', false)
   );
   v_ps := public.ov2_cc_parity_bump_timer(v_ps, v_turn0, v_turn0);
 
@@ -228,6 +235,10 @@ BEGIN
     'turnPhase', 'play',
     'currentColor', public.ov2_cc_initial_current_color(public.ov2_cc_top_discard(v_eng.discard)),
     'direction', 1,
+    'clashCount', 0,
+    'lockedColor', null::jsonb,
+    'lockForSeat', null::jsonb,
+    'lockExpiresAfterNextTurn', false,
     'eliminated', jsonb_build_object('0', false, '1', false, '2', false, '3', false)
   );
   v_pub := public.ov2_cc_compute_public_core(v_eng, v_pub, v_active);
@@ -341,6 +352,14 @@ DECLARE
   v_tp text;
   v_card jsonb;
   v_hand jsonb;
+  v_top jsonb;
+  v_cc int;
+  v_wlock int;
+  v_has boolean;
+  v_clash int;
+  v_n_draw int;
+  v_k int;
+  v_drawn jsonb;
 BEGIN
   IF p_room_id IS NULL OR length(v_pk) = 0 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'Invalid arguments');
@@ -368,13 +387,33 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'code', 'BAD_PHASE', 'message', 'Draw only at start of turn');
   END IF;
   SELECT * INTO v_eng FROM public.ov2_colorclash_engine WHERE session_id = v_sess.id FOR UPDATE;
-  v_card := public.ov2_cc_draw_one_from_stock(v_eng);
-  IF v_card IS NULL THEN
+  v_drawn := '[]'::jsonb;
+  v_top := public.ov2_cc_top_discard(v_eng.discard);
+  v_cc := coalesce((v_pub ->> 'currentColor')::int, 0);
+  v_wlock := public.ov2_cc_wild_lock_color_for_turn(v_pub, v_seat);
+  v_hand := public.ov2_cc_hand_get(v_eng, v_seat);
+  v_has := public.ov2_cc_has_legal_play(v_hand, v_top, v_cc, v_wlock);
+  v_clash := coalesce(nullif((v_pub ->> 'clashCount'), '')::int, 0);
+  IF v_clash < 0 THEN
+    v_clash := 0;
+  END IF;
+  IF NOT v_has THEN
+    v_n_draw := 1 + v_clash;
+    v_pub := jsonb_set(v_pub, '{clashCount}', to_jsonb(0), true);
+  ELSE
+    v_n_draw := 1;
+  END IF;
+  FOR v_k IN 1..v_n_draw LOOP
+    v_card := public.ov2_cc_draw_one_from_stock(v_eng);
+    EXIT WHEN v_card IS NULL;
+    v_drawn := v_drawn || v_card;
+  END LOOP;
+  IF public.ov2_cc_jsonb_len(v_drawn) <= 0 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'STOCK_EMPTY', 'message', 'No card to draw');
   END IF;
-  v_hand := public.ov2_cc_hand_get(v_eng, v_seat) || v_card;
+  v_hand := v_hand || v_drawn;
   v_eng := public.ov2_cc_hand_set(v_eng, v_seat, v_hand);
-  v_eng.pending_draw := v_card;
+  v_eng.pending_draw := v_drawn;
   v_pub := jsonb_set(v_pub, '{turnPhase}', '"post_draw"'::jsonb, true);
   v_ps := public.ov2_cc_parity_bump_timer(v_sess.parity_state, v_seat, v_seat);
   v_pub := public.ov2_cc_compute_public_core(v_eng, v_pub, v_sess.active_seats);
@@ -441,6 +480,7 @@ BEGIN
   IF v_next IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NO_NEXT', 'message', 'No next player');
   END IF;
+  v_pub := public.ov2_cc_pub_clear_wild_lock_on_turn_end(v_pub, v_seat);
   v_pub := jsonb_set(v_pub, '{turnPhase}', '"play"'::jsonb, true);
   v_pub := jsonb_set(v_pub, '{turnSeat}', to_jsonb(v_next), true);
   v_ps := public.ov2_cc_parity_bump_timer(v_sess.parity_state, v_next, v_seat);
@@ -454,12 +494,16 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.ov2_colorclash_play_card(uuid, text, jsonb, int, bigint);
+
 CREATE OR REPLACE FUNCTION public.ov2_colorclash_play_card(
   p_room_id uuid,
   p_participant_key text,
   p_card jsonb,
   p_chosen_color int DEFAULT NULL,
-  p_expected_revision bigint DEFAULT NULL
+  p_expected_revision bigint DEFAULT NULL,
+  p_second_card jsonb DEFAULT NULL,
+  p_second_chosen_color int DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -474,9 +518,11 @@ DECLARE
   v_eng public.ov2_colorclash_engine%ROWTYPE;
   v_pub jsonb;
   v_ps jsonb;
-  v_tp text;
+  v_turn_phase text;
   v_top jsonb;
   v_cc int;
+  v_cc_before int;
+  v_wlock int;
   v_dir int;
   v_live int[];
   v_nlive int;
@@ -491,6 +537,9 @@ DECLARE
 BEGIN
   IF p_room_id IS NULL OR length(v_pk) = 0 OR p_card IS NULL OR jsonb_typeof(p_card) <> 'object' THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'Invalid arguments');
+  END IF;
+  IF p_second_card IS NOT NULL AND jsonb_typeof(p_second_card) <> 'object' THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'Invalid second card');
   END IF;
   SELECT * INTO v_room FROM public.ov2_rooms WHERE id = p_room_id FOR UPDATE;
   IF NOT FOUND OR v_room.product_game_id IS DISTINCT FROM 'ov2_colorclash' OR v_room.active_session_id IS NULL THEN
@@ -511,16 +560,132 @@ BEGIN
   IF (v_pub ->> 'turnSeat')::int IS DISTINCT FROM v_seat THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NOT_YOUR_TURN', 'message', 'Not your turn');
   END IF;
-  v_tp := coalesce(v_pub ->> 'turnPhase', 'play');
+  v_turn_phase := coalesce(v_pub ->> 'turnPhase', 'play');
   SELECT * INTO v_eng FROM public.ov2_colorclash_engine WHERE session_id = v_sess.id FOR UPDATE;
-  IF v_tp = 'post_draw' THEN
-    IF v_eng.pending_draw IS NULL OR v_eng.pending_draw IS DISTINCT FROM p_card THEN
-      RETURN jsonb_build_object('ok', false, 'code', 'MUST_PLAY_DRAWN', 'message', 'You may only play the card you drew');
+
+  IF p_second_card IS NOT NULL THEN
+    IF v_turn_phase = 'post_draw' THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'SURGE_BAD_PHASE', 'message', 'Surge not allowed after draw');
+    END IF;
+    IF v_turn_phase IS DISTINCT FROM 'play' THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'SURGE_BAD_PHASE', 'message', 'Surge only in play phase');
+    END IF;
+    IF public.ov2_cc_surge_used_get(v_sess.parity_state, v_seat) THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'SURGE_USED', 'message', 'Surge already used');
+    END IF;
+    v_pt := public.ov2_cc_card_type(p_card);
+    IF v_pt IS DISTINCT FROM 'n' OR public.ov2_cc_card_type(p_second_card) IS DISTINCT FROM 'n' THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'SURGE_NUMBERS_ONLY', 'message', 'Surge requires two number cards');
+    END IF;
+    v_wlock := public.ov2_cc_wild_lock_color_for_turn(v_pub, v_seat);
+    v_top := public.ov2_cc_top_discard(v_eng.discard);
+    v_cc := coalesce((v_pub ->> 'currentColor')::int, 0);
+    IF NOT public.ov2_cc_is_playable_on(p_card, v_top, v_cc, v_wlock) THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'ILLEGAL_CARD', 'message', 'Card not playable');
+    END IF;
+    v_new_cc := public.ov2_cc_card_color(p_card);
+    v_new_hand := public.ov2_cc_remove_one_card(public.ov2_cc_hand_get(v_eng, v_seat), p_card);
+    IF v_new_hand IS NULL THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'CARD_NOT_IN_HAND', 'message', 'Card not in hand');
+    END IF;
+    v_eng := public.ov2_cc_hand_set(v_eng, v_seat, v_new_hand);
+    v_eng.discard := v_eng.discard || p_card;
+    v_eng.pending_draw := NULL;
+    v_pub := jsonb_set(v_pub, '{clashCount}', to_jsonb(public.ov2_cc_clash_update_after_play(v_pub, p_card, v_cc)), true);
+    IF public.ov2_cc_jsonb_len(v_new_hand) = 0 THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'SURGE_INCOMPLETE', 'message', 'Surge requires two cards');
+    END IF;
+    v_cc := v_new_cc;
+    v_top := public.ov2_cc_top_discard(v_eng.discard);
+    IF NOT public.ov2_cc_is_playable_on(p_second_card, v_top, v_cc, v_wlock) THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'ILLEGAL_CARD', 'message', 'Second card not playable');
+    END IF;
+    v_new_cc := public.ov2_cc_card_color(p_second_card);
+    v_new_hand := public.ov2_cc_remove_one_card(public.ov2_cc_hand_get(v_eng, v_seat), p_second_card);
+    IF v_new_hand IS NULL THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'CARD_NOT_IN_HAND', 'message', 'Second card not in hand');
+    END IF;
+    v_eng := public.ov2_cc_hand_set(v_eng, v_seat, v_new_hand);
+    v_eng.discard := v_eng.discard || p_second_card;
+    v_pub := jsonb_set(v_pub, '{clashCount}', to_jsonb(public.ov2_cc_clash_update_after_play(v_pub, p_second_card, v_cc)), true);
+    v_ps := public.ov2_cc_surge_used_set(v_sess.parity_state, v_seat, true);
+    v_dir := coalesce((v_pub ->> 'direction')::int, 1);
+    v_live := public.ov2_cc_active_non_eliminated(v_sess.active_seats, v_pub);
+    v_nlive := coalesce(cardinality(v_live), 0);
+
+    IF public.ov2_cc_jsonb_len(v_new_hand) = 0 THEN
+      v_entry := coalesce((v_ps ->> '__entry__')::bigint, 0);
+      v_pc := v_sess.player_count;
+      v_prize := v_entry * v_pc;
+      v_ps := jsonb_set(
+        v_ps,
+        '{__result__}',
+        jsonb_build_object(
+          'winner', v_seat,
+          'prize', v_prize,
+          'lossPerSeat', v_entry,
+          'playerCount', v_pc,
+          'emptyHand', true,
+          'surge', true,
+          'timestamp', (extract(epoch from now()) * 1000)::bigint
+        ),
+        true
+      );
+      v_pub := jsonb_set(v_pub, '{turnPhase}', '"play"'::jsonb, true);
+      v_pub := jsonb_set(v_pub, '{currentColor}', to_jsonb(v_new_cc), true);
+      v_pub := public.ov2_cc_compute_public_core(v_eng, v_pub, v_sess.active_seats);
+      UPDATE public.ov2_colorclash_engine
+      SET discard = v_eng.discard, hand0 = v_eng.hand0, hand1 = v_eng.hand1, hand2 = v_eng.hand2, hand3 = v_eng.hand3, pending_draw = NULL
+      WHERE session_id = v_sess.id;
+      UPDATE public.ov2_colorclash_sessions
+      SET
+        phase = 'finished',
+        winner_seat = v_seat,
+        public_state = v_pub,
+        parity_state = v_ps,
+        revision = v_sess.revision + 1,
+        updated_at = now()
+      WHERE id = v_sess.id
+      RETURNING * INTO v_sess;
+      RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_colorclash_build_client_snapshot(v_sess, v_pk));
+    END IF;
+
+    v_next := public.ov2_cc_next_in_order(v_live, v_seat, 1, v_dir);
+    IF v_next IS NULL THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'NO_NEXT', 'message', 'Turn order error');
+    END IF;
+    v_pub := public.ov2_cc_pub_clear_wild_lock_on_turn_end(v_pub, v_seat);
+    v_pub := jsonb_set(v_pub, '{turnPhase}', '"play"'::jsonb, true);
+    v_pub := jsonb_set(v_pub, '{turnSeat}', to_jsonb(v_next), true);
+    v_pub := jsonb_set(v_pub, '{currentColor}', to_jsonb(v_new_cc), true);
+    v_ps := public.ov2_cc_parity_bump_timer(v_ps, v_next, v_seat);
+    v_pub := public.ov2_cc_compute_public_core(v_eng, v_pub, v_sess.active_seats);
+    UPDATE public.ov2_colorclash_engine
+    SET
+      stock = v_eng.stock,
+      discard = v_eng.discard,
+      hand0 = v_eng.hand0,
+      hand1 = v_eng.hand1,
+      hand2 = v_eng.hand2,
+      hand3 = v_eng.hand3,
+      pending_draw = NULL
+    WHERE session_id = v_sess.id;
+    UPDATE public.ov2_colorclash_sessions
+    SET turn_seat = v_next, public_state = v_pub, parity_state = v_ps, revision = v_sess.revision + 1, updated_at = now()
+    WHERE id = v_sess.id
+    RETURNING * INTO v_sess;
+    RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_colorclash_build_client_snapshot(v_sess, v_pk));
+  END IF;
+
+  IF v_turn_phase = 'post_draw' THEN
+    IF v_eng.pending_draw IS NULL OR NOT public.ov2_cc_pending_draw_contains(v_eng.pending_draw, p_card) THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'MUST_PLAY_DRAWN', 'message', 'You may only play a card you drew');
     END IF;
   END IF;
   v_top := public.ov2_cc_top_discard(v_eng.discard);
   v_cc := coalesce((v_pub ->> 'currentColor')::int, 0);
-  IF NOT public.ov2_cc_is_playable_on(p_card, v_top, v_cc) THEN
+  v_wlock := public.ov2_cc_wild_lock_color_for_turn(v_pub, v_seat);
+  IF NOT public.ov2_cc_is_playable_on(p_card, v_top, v_cc, v_wlock) THEN
     RETURN jsonb_build_object('ok', false, 'code', 'ILLEGAL_CARD', 'message', 'Card not playable');
   END IF;
   v_pt := public.ov2_cc_card_type(p_card);
@@ -534,6 +699,7 @@ BEGIN
   ELSE
     v_new_cc := public.ov2_cc_card_color(p_card);
   END IF;
+  v_cc_before := v_cc;
   v_new_hand := public.ov2_cc_remove_one_card(public.ov2_cc_hand_get(v_eng, v_seat), p_card);
   IF v_new_hand IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'CARD_NOT_IN_HAND', 'message', 'Card not in hand');
@@ -541,6 +707,7 @@ BEGIN
   v_eng := public.ov2_cc_hand_set(v_eng, v_seat, v_new_hand);
   v_eng.discard := v_eng.discard || p_card;
   v_eng.pending_draw := NULL;
+  v_pub := jsonb_set(v_pub, '{clashCount}', to_jsonb(public.ov2_cc_clash_update_after_play(v_pub, p_card, v_cc_before)), true);
   v_dir := coalesce((v_pub ->> 'direction')::int, 1);
   v_live := public.ov2_cc_active_non_eliminated(v_sess.active_seats, v_pub);
   v_nlive := coalesce(cardinality(v_live), 0);
@@ -604,6 +771,12 @@ BEGIN
   IF v_next IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NO_NEXT', 'message', 'Turn order error');
   END IF;
+  v_pub := public.ov2_cc_pub_clear_wild_lock_on_turn_end(v_pub, v_seat);
+  IF v_pt IN ('w', 'f') THEN
+    v_pub := jsonb_set(v_pub, '{lockedColor}', to_jsonb(p_chosen_color), true);
+    v_pub := jsonb_set(v_pub, '{lockForSeat}', to_jsonb(v_next), true);
+    v_pub := jsonb_set(v_pub, '{lockExpiresAfterNextTurn}', 'true'::jsonb, true);
+  END IF;
   v_pub := jsonb_set(v_pub, '{turnPhase}', '"play"'::jsonb, true);
   v_pub := jsonb_set(v_pub, '{turnSeat}', to_jsonb(v_next), true);
   v_pub := jsonb_set(v_pub, '{currentColor}', to_jsonb(v_new_cc), true);
@@ -637,7 +810,7 @@ REVOKE ALL ON FUNCTION public.ov2_colorclash_draw_card(uuid, text, bigint) FROM 
 GRANT EXECUTE ON FUNCTION public.ov2_colorclash_draw_card(uuid, text, bigint) TO anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.ov2_colorclash_pass_after_draw(uuid, text, bigint) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.ov2_colorclash_pass_after_draw(uuid, text, bigint) TO anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION public.ov2_colorclash_play_card(uuid, text, jsonb, int, bigint) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ov2_colorclash_play_card(uuid, text, jsonb, int, bigint) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.ov2_colorclash_play_card(uuid, text, jsonb, int, bigint, jsonb, int) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ov2_colorclash_play_card(uuid, text, jsonb, int, bigint, jsonb, int) TO anon, authenticated, service_role;
 
 COMMIT;

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import {
+  ccCardInPendingDrawList,
   ccCardType,
   ccCardsEqual,
   ccColorName,
@@ -68,6 +69,9 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
   const [exitErr, setExitErr] = useState("");
   const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
   const [wildForCard, setWildForCard] = useState(/** @type {Record<string, unknown>|null} */ (null));
+  /** Two-tap Surge: first tap arms, second number submits (when surgeTwoTapMode). */
+  const [surgeTwoTapMode, setSurgeTwoTapMode] = useState(false);
+  const [surgeArmCard, setSurgeArmCard] = useState(/** @type {Record<string, unknown>|null} */ (null));
 
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
@@ -77,7 +81,14 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
   useEffect(() => {
     setFinishModalDismissedSessionId("");
     setWildForCard(null);
+    setSurgeTwoTapMode(false);
+    setSurgeArmCard(null);
   }, [vm.sessionId]);
+
+  useEffect(() => {
+    setSurgeTwoTapMode(false);
+    setSurgeArmCard(null);
+  }, [vm.turnSeat, vm.turnPhase, vm.revision]);
 
   const onRematch = useCallback(async () => {
     if (!roomId || rematchBusy) return;
@@ -221,6 +232,8 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
         }
       }
       setWildForCard(null);
+      setSurgeTwoTapMode(false);
+      setSurgeArmCard(null);
       await playCard(/** @type {Record<string, unknown>} */ (card), t === "w" || t === "f" ? colorOpt : null);
     },
     [playCard]
@@ -233,15 +246,56 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
       if (vm.mySeat == null || vm.turnSeat !== vm.mySeat) return;
       setErr("");
       if (myTurnPostDraw) {
-        if (!vm.pendingDrawForYou || !ccCardsEqual(card, vm.pendingDrawForYou)) return;
+        if (!vm.pendingDrawForYou || !ccCardInPendingDrawList(vm.pendingDrawForYou, card)) return;
         await tryPlay(card, null);
         return;
       }
       if (myTurnPlaying) {
+        if (surgeTwoTapMode && vm.surgeAvailableForMe) {
+          if (surgeArmCard) {
+            if (ccCardsEqual(card, surgeArmCard)) {
+              setSurgeArmCard(null);
+              return;
+            }
+            const t2 = ccCardType(card);
+            if (t2 === "n") {
+              const first = surgeArmCard;
+              setSurgeArmCard(null);
+              setSurgeTwoTapMode(false);
+              const r = await playCard(first, null, { secondCard: /** @type {Record<string, unknown>} */ (card) });
+              if (!r?.ok) {
+                setSurgeTwoTapMode(true);
+                setSurgeArmCard(first);
+              }
+              return;
+            }
+            setErr("Surge needs a second number card (or cancel).");
+            return;
+          }
+          const t = ccCardType(card);
+          if (t === "n") {
+            setSurgeArmCard(/** @type {Record<string, unknown>} */ (card));
+            return;
+          }
+          setSurgeTwoTapMode(false);
+          await tryPlay(card, null);
+          return;
+        }
         await tryPlay(card, null);
       }
     },
-    [busy, vaultClaimBusy, vm, myTurnPostDraw, myTurnPlaying, tryPlay, setErr]
+    [
+      busy,
+      vaultClaimBusy,
+      vm,
+      myTurnPostDraw,
+      myTurnPlaying,
+      tryPlay,
+      setErr,
+      surgeTwoTapMode,
+      surgeArmCard,
+      playCard,
+    ]
   );
 
   const onPickWildColor = useCallback(
@@ -278,6 +332,24 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
               <span className="rounded border border-white/10 px-2 py-0.5 text-zinc-300">
                 Stock {vm.stockCount} · Pile {vm.discardCount}
               </span>
+              <span className="rounded border border-amber-500/20 px-2 py-0.5 text-amber-100/90" title="Clash stack">
+                Clash {vm.clashCount ?? 0}
+              </span>
+              {vm.wildLockAppliesToMe && vm.lockedColor != null ? (
+                <span className="rounded border border-fuchsia-500/25 px-2 py-0.5 text-fuchsia-100/88" title="Wild lock">
+                  Lock {ccColorName(vm.lockedColor)}
+                </span>
+              ) : null}
+              {vm.mySeat != null ? (
+                <span
+                  className={`rounded border px-2 py-0.5 ${
+                    vm.surgeUsedForMe ? "border-zinc-600 text-zinc-500" : "border-emerald-500/25 text-emerald-100/85"
+                  }`}
+                  title="Surge (once per match)"
+                >
+                  Surge {vm.surgeUsedForMe ? "used" : "ready"}
+                </span>
+              ) : null}
               {vm.currentColor != null ? (
                 <span className="rounded border border-white/10 px-2 py-0.5 text-zinc-200">
                   Match color: {ccColorName(vm.currentColor)}
@@ -337,16 +409,53 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
 
         {vm.phase === "playing" && myTurnPlaying ? (
           <div className="flex flex-wrap justify-center gap-2">
-            <button type="button" disabled={busy || vm.stockCount <= 0} className={BTN_PRIMARY} onClick={() => void drawCard()}>
+            <button
+              type="button"
+              disabled={busy || vm.stockCount <= 0}
+              className={BTN_PRIMARY}
+              onClick={() => {
+                setSurgeTwoTapMode(false);
+                setSurgeArmCard(null);
+                void drawCard();
+              }}
+            >
               Draw
             </button>
+            {vm.surgeAvailableForMe ? (
+              <button
+                type="button"
+                disabled={busy}
+                className={surgeTwoTapMode ? BTN_ACCENT : BTN_SECONDARY}
+                onClick={() => {
+                  setErr("");
+                  setSurgeArmCard(null);
+                  setSurgeTwoTapMode(s => !s);
+                }}
+              >
+                Surge {surgeTwoTapMode ? "on" : "off"}
+              </button>
+            ) : null}
+            {surgeTwoTapMode && surgeArmCard ? (
+              <button
+                type="button"
+                disabled={busy}
+                className={BTN_SECONDARY}
+                onClick={() => {
+                  setSurgeArmCard(null);
+                }}
+              >
+                Cancel 1st
+              </button>
+            ) : null}
           </div>
         ) : null}
 
         {vm.phase === "playing" && myTurnPostDraw ? (
           <div className="flex flex-col items-center gap-2 rounded-lg border border-violet-500/25 bg-violet-950/15 p-2">
             <p className="text-center text-[11px] text-violet-100/90">
-              You drew a card. Play it now if it matches, or pass to end your turn.
+              {Array.isArray(vm.pendingDrawForYou) && vm.pendingDrawForYou.length > 1
+                ? `You drew ${vm.pendingDrawForYou.length} cards. Play any drawn card that matches, or pass.`
+                : "You drew a card. Play it now if it matches, or pass to end your turn."}
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <button type="button" disabled={busy} className={BTN_SECONDARY} onClick={() => void passAfterDraw()}>
@@ -381,9 +490,16 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
         <div className="rounded-xl border border-white/[0.08] bg-zinc-900/50 p-2 sm:p-3">
           <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Your hand</p>
           <div className="flex max-h-[40vh] flex-wrap justify-center gap-1 overflow-y-auto sm:max-h-none sm:gap-1.5">
-            {vm.myHand.map(card => {
-              const key = ccStableCardKey(card);
-              const highlightPostDraw = myTurnPostDraw && vm.pendingDrawForYou && ccCardsEqual(card, vm.pendingDrawForYou);
+            {vm.myHand.map((card, idx) => {
+              const key = `${idx}-${ccStableCardKey(card)}`;
+              const highlightPostDraw =
+                myTurnPostDraw && vm.pendingDrawForYou && ccCardInPendingDrawList(vm.pendingDrawForYou, card);
+              const surgeHighlight =
+                surgeTwoTapMode &&
+                surgeArmCard &&
+                myTurnPlaying &&
+                ccCardsEqual(card, surgeArmCard) &&
+                ccCardType(card) === "n";
               const canTry =
                 vm.phase === "playing" &&
                 vm.mySeat != null &&
@@ -398,11 +514,13 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                   disabled={!canTry}
                   onClick={() => void onCardPress(card)}
                   className={`min-w-[2.35rem] rounded-md border px-1.5 py-1 font-mono text-[10px] sm:min-w-[2.6rem] sm:text-[11px] ${
-                    highlightPostDraw
-                      ? "border-violet-400/60 bg-violet-950/40 text-violet-50"
-                      : canTry
-                        ? "border-sky-500/35 bg-sky-950/35 text-sky-100 active:scale-[0.97]"
-                        : "cursor-default border-white/[0.06] bg-zinc-950/50 text-zinc-500"
+                    surgeHighlight
+                      ? "border-emerald-400/55 bg-emerald-950/35 text-emerald-50"
+                      : highlightPostDraw
+                        ? "border-violet-400/60 bg-violet-950/40 text-violet-50"
+                        : canTry
+                          ? "border-sky-500/35 bg-sky-950/35 text-sky-100 active:scale-[0.97]"
+                          : "cursor-default border-white/[0.06] bg-zinc-950/50 text-zinc-500"
                   }`}
                 >
                   {ccFormatCard(card)}
