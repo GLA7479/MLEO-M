@@ -57,10 +57,6 @@ import {
   requestOv2FleetHuntOpenSession,
 } from "../../../lib/online-v2/fleethunt/ov2FleetHuntSessionAdapter";
 import {
-  fetchOv2TileRushDuelSnapshot,
-  requestOv2TileRushDuelOpenSession,
-} from "../../../lib/online-v2/tilerushduel/ov2TileRushDuelSessionAdapter";
-import {
   fetchOv2GoalDuelSnapshot,
   requestOv2GoalDuelOpenSession,
 } from "../../../lib/online-v2/goal-duel/ov2GoalDuelSessionAdapter";
@@ -169,7 +165,6 @@ export default function Ov2SharedRoomScreen({
   const isMeldMatchRoom = String(room?.product_game_id || "").trim() === OV2_MELDMATCH_PRODUCT_GAME_ID;
   const isColorClashRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.COLOR_CLASH;
   const isFleetHuntRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.FLEET_HUNT;
-  const isTileRushDuelRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.TILE_RUSH_DUEL;
   const isGoalDuelRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.GOAL_DUEL;
   const isStakeSharedRoom =
     isRummy51Room ||
@@ -184,7 +179,6 @@ export default function Ov2SharedRoomScreen({
     isMeldMatchRoom ||
     isColorClashRoom ||
     isFleetHuntRoom ||
-    isTileRushDuelRoom ||
     isGoalDuelRoom;
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
 
@@ -542,17 +536,6 @@ export default function Ov2SharedRoomScreen({
           await router.push(`/ov2-fleet-hunt?room=${encodeURIComponent(roomId)}`);
           return;
         }
-        if (isTileRushDuelRoom) {
-          const open = await requestOv2TileRushDuelOpenSession(roomId, qmAuthorityHostPk, {
-            presenceLeaderKey: qmAuthorityHostPk,
-          });
-          if (cancelled || !open?.ok) return;
-          qmLiveOpenDoneRef.current = true;
-          didRouteToLiveRef.current = true;
-          setLaunchingLive(true);
-          await router.push(`/ov2-tile-rush-duel?room=${encodeURIComponent(roomId)}`);
-          return;
-        }
         if (isGoalDuelRoom) {
           const open = await requestOv2GoalDuelOpenSession(roomId, qmAuthorityHostPk, {
             presenceLeaderKey: qmAuthorityHostPk,
@@ -588,7 +571,6 @@ export default function Ov2SharedRoomScreen({
     isMeldMatchRoom,
     isColorClashRoom,
     isFleetHuntRoom,
-    isTileRushDuelRoom,
     isGoalDuelRoom,
     roomId,
     router,
@@ -863,7 +845,6 @@ export default function Ov2SharedRoomScreen({
         isMeldMatchRoom ||
         isColorClashRoom ||
         isFleetHuntRoom ||
-        isTileRushDuelRoom ||
         isGoalDuelRoom
       ) {
         const prep = await prepareSharedHostPreStartStakes();
@@ -1016,19 +997,6 @@ export default function Ov2SharedRoomScreen({
         didRouteToLiveRef.current = true;
         setLaunchingLive(true);
         await router.push(`/ov2-fleet-hunt?room=${encodeURIComponent(roomId)}`);
-        return;
-      }
-      if (isTileRushDuelRoom) {
-        const open = await requestOv2TileRushDuelOpenSession(roomId, participantId, {
-          presenceLeaderKey: participantId,
-        });
-        if (!open?.ok) {
-          setMsg(open?.error || "Could not open Tile Rush Duel session.");
-          return;
-        }
-        didRouteToLiveRef.current = true;
-        setLaunchingLive(true);
-        await router.push(`/ov2-tile-rush-duel?room=${encodeURIComponent(roomId)}`);
         return;
       }
       if (isGoalDuelRoom) {
@@ -1446,47 +1414,6 @@ export default function Ov2SharedRoomScreen({
       };
     }
 
-    if (isTileRushDuelRoom) {
-      const trdSid = room?.active_session_id || null;
-      if (trdSid) {
-        didRouteToLiveRef.current = true;
-        setLaunchingLive(true);
-        void router.push(`/ov2-tile-rush-duel?room=${encodeURIComponent(roomId)}`);
-        return;
-      }
-      let cancelledTrd = false;
-      void fetchOv2TileRushDuelSnapshot(roomId, { participantKey: participantId }).then(snap => {
-        if (cancelledTrd || didRouteToLiveRef.current) return;
-        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
-        if (ph === "playing" || ph === "finished") {
-          didRouteToLiveRef.current = true;
-          setLaunchingLive(true);
-          void router.push(`/ov2-tile-rush-duel?room=${encodeURIComponent(roomId)}`);
-        }
-      });
-      let intervalTrd = null;
-      const tickTrd = async () => {
-        try {
-          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
-          if (cancelledTrd || didRouteToLiveRef.current) return;
-          if (canon?.active_session_id) {
-            if (intervalTrd) clearInterval(intervalTrd);
-            didRouteToLiveRef.current = true;
-            setLaunchingLive(true);
-            void router.push(`/ov2-tile-rush-duel?room=${encodeURIComponent(roomId)}`);
-          }
-        } catch {
-          // ignore
-        }
-      };
-      void tickTrd();
-      intervalTrd = setInterval(() => void tickTrd(), 2500);
-      return () => {
-        cancelledTrd = true;
-        if (intervalTrd) clearInterval(intervalTrd);
-      };
-    }
-
     if (isGoalDuelRoom) {
       const gdSid = room?.active_session_id || null;
       if (gdSid) {
@@ -1586,7 +1513,6 @@ export default function Ov2SharedRoomScreen({
     isMeldMatchRoom,
     isColorClashRoom,
     isFleetHuntRoom,
-    isTileRushDuelRoom,
     isGoalDuelRoom,
     room?.status,
     room?.active_session_id,
@@ -1802,7 +1728,6 @@ export default function Ov2SharedRoomScreen({
           !isMeldMatchRoom &&
           !isColorClashRoom &&
           !isFleetHuntRoom &&
-          !isTileRushDuelRoom &&
           !isGoalDuelRoom ? (
             <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
               <div className="font-bold">Runtime handoff ready</div>
@@ -1824,7 +1749,6 @@ export default function Ov2SharedRoomScreen({
           isMeldMatchRoom ||
           isColorClashRoom ||
           isFleetHuntRoom ||
-          isTileRushDuelRoom ||
           isGoalDuelRoom) &&
         !launchingLive ? (
           <div className="mt-3 rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
@@ -1934,11 +1858,9 @@ export default function Ov2SharedRoomScreen({
                                 ? "Opening live Color Clash..."
                                 : isFleetHuntRoom
                                   ? "Opening live Fleet Hunt..."
-                                  : isTileRushDuelRoom
-                                    ? "Opening live Tile Rush Duel..."
-                                    : isGoalDuelRoom
-                                      ? "Opening live Goal Duel..."
-                                      : "Opening live Ludo game..."}
+                                  : isGoalDuelRoom
+                                    ? "Opening live Goal Duel..."
+                                    : "Opening live Ludo game..."}
           </p>
         ) : null}
         {error ? <p className="text-[11px] text-red-300">{error}</p> : null}

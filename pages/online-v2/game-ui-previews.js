@@ -15,7 +15,6 @@ import Ov2FlipGridScreen from "../../components/online-v2/flipgrid/Ov2FlipGridSc
 import Ov2FourLineScreen from "../../components/online-v2/fourline/Ov2FourLineScreen";
 import Ov2GoalDuelScreen from "../../components/online-v2/goal-duel/Ov2GoalDuelScreen";
 import Ov2MeldMatchScreen from "../../components/online-v2/meldmatch/Ov2MeldMatchScreen";
-import Ov2TileRushDuelScreen from "../../components/online-v2/tilerushduel/Ov2TileRushDuelScreen";
 
 const PREVIEW_BY_TAB = {
   dominoes: Ov2DominoesScreen,
@@ -24,7 +23,6 @@ const PREVIEW_BY_TAB = {
   meldmatch: Ov2MeldMatchScreen,
   colorclash: Ov2ColorClashScreen,
   fleethunt: Ov2FleetHuntScreen,
-  tilerushduel: Ov2TileRushDuelScreen,
   goalduel: Ov2GoalDuelScreen,
 };
 

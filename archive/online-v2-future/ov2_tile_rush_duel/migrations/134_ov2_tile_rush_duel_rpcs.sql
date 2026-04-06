@@ -107,8 +107,12 @@ DECLARE
   v_ps jsonb;
   v_pub jsonb;
   v_seed text;
+  v_seed_cur text;
   v_tiles jsonb;
   v_now bigint;
+  v_attempt int := 0;
+  v_cols int := public.ov2_trd_const_cols();
+  v_rows int := public.ov2_trd_const_rows();
 BEGIN
   IF p_room_id IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'room_id required');
@@ -190,15 +194,23 @@ BEGIN
   RETURNING * INTO v_sess;
 
   v_seed := public.ov2_trd_layout_seed(v_sess.id, v_sess.match_seq);
-  v_tiles := public.ov2_trd_build_tiles_from_seed(v_seed);
-  IF coalesce(jsonb_array_length(v_tiles), 0) <> public.ov2_trd_const_rows() * public.ov2_trd_const_cols() THEN
-    DELETE FROM public.ov2_tile_rush_duel_sessions WHERE id = v_sess.id;
-    RETURN jsonb_build_object('ok', false, 'code', 'LAYOUT_FAIL', 'message', 'Could not build board');
-  END IF;
+  v_seed_cur := v_seed;
+  LOOP
+    v_tiles := public.ov2_trd_build_tiles_from_seed(v_seed_cur);
+    EXIT
+      WHEN coalesce(jsonb_array_length(v_tiles), 0) = v_rows * v_cols
+        AND public.ov2_trd_has_any_legal_pair(v_tiles, v_cols);
+    v_attempt := v_attempt + 1;
+    IF v_attempt > 300 THEN
+      DELETE FROM public.ov2_tile_rush_duel_sessions WHERE id = v_sess.id;
+      RETURN jsonb_build_object('ok', false, 'code', 'LAYOUT_FAIL', 'message', 'Could not build a playable opening board');
+    END IF;
+    v_seed_cur := md5(coalesce(v_seed, '') || ':trd_open:' || v_attempt::text);
+  END LOOP;
 
   v_ps := jsonb_build_object(
     '__entry__', to_jsonb(v_entry),
-    'layout_seed', to_jsonb(v_seed),
+    'layout_seed', to_jsonb(v_seed_cur),
     'score0', 0,
     'score1', 0,
     'last_scoring_seat', NULL::jsonb,
@@ -358,6 +370,7 @@ DECLARE
   v_rem int;
   v_entry bigint;
   v_mult int := 1;
+  v_rows int := public.ov2_trd_const_rows();
 BEGIN
   IF p_room_id IS NULL OR length(v_pk) = 0 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'Invalid arguments');
@@ -431,6 +444,32 @@ BEGIN
 
   v_pub := jsonb_set(v_pub, '{tiles}', v_new, true);
   v_rem := public.ov2_trd_remaining_tile_count(v_new);
+
+  IF v_rem > 0 AND NOT public.ov2_trd_has_any_legal_pair(v_new, v_cols) THEN
+    v_new := public.ov2_trd_repack_remaining_tiles_valid(
+      v_new,
+      v_cols,
+      v_rows,
+      coalesce(v_sess.id::text, '') || ':' || (v_sess.revision + 1)::text || ':' || v_now::text || ':trd_repack'
+    );
+    IF NOT public.ov2_trd_has_any_legal_pair(v_new, v_cols) THEN
+      v_new := public.ov2_trd_repack_remaining_tiles_valid(
+        v_new,
+        v_cols,
+        v_rows,
+        md5(
+          coalesce(v_sess.id::text, '')
+            || ':'
+            || v_now::text
+            || ':'
+            || coalesce(v_pk, '')
+            || ':trd_repack2'
+        )
+      );
+    END IF;
+    v_pub := jsonb_set(v_pub, '{tiles}', v_new, true);
+    v_ps := jsonb_set(v_ps, '{last_board_repack_ms}', to_jsonb(v_now), true);
+  END IF;
 
   IF v_rem = 0 THEN
     v_entry := coalesce((v_ps ->> '__entry__')::bigint, 0);

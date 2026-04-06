@@ -31,6 +31,8 @@ DECLARE
   v_entry bigint;
   v_mult int := 1;
   v_reason text;
+  v_pub jsonb;
+  v_tiles jsonb;
 BEGIN
   IF p_room_id IS NULL OR length(v_pk) = 0 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'room_id and participant_key required');
@@ -62,6 +64,32 @@ BEGIN
 
   v_ps := coalesce(v_sess.parity_state, '{}'::jsonb);
   v_now := (extract(epoch from clock_timestamp()) * 1000)::bigint;
+
+  v_pub := coalesce(v_sess.public_state, '{}'::jsonb);
+  v_tiles := coalesce(v_pub -> 'tiles', '[]'::jsonb);
+  IF public.ov2_trd_remaining_tile_count(v_tiles) > 0
+     AND NOT public.ov2_trd_has_any_legal_pair(v_tiles, public.ov2_trd_const_cols()) THEN
+    v_tiles := public.ov2_trd_repack_remaining_tiles_valid(
+      v_tiles,
+      public.ov2_trd_const_cols(),
+      public.ov2_trd_const_rows(),
+      coalesce(v_sess.id::text, '') || ':trd_idle_heal:' || v_now::text
+    );
+    IF public.ov2_trd_has_any_legal_pair(v_tiles, public.ov2_trd_const_cols()) THEN
+      v_pub := jsonb_set(v_pub, '{tiles}', v_tiles, true);
+      v_ps := jsonb_set(v_ps, '{last_board_repack_ms}', to_jsonb(v_now), true);
+      UPDATE public.ov2_tile_rush_duel_sessions
+      SET
+        public_state = v_pub,
+        parity_state = v_ps,
+        revision = v_sess.revision + 1,
+        updated_at = now()
+      WHERE id = v_sess.id
+      RETURNING * INTO v_sess;
+      v_ps := coalesce(v_sess.parity_state, '{}'::jsonb);
+    END IF;
+  END IF;
+
   v_de := (v_ps ->> 'duel_end_ms')::bigint;
   v_l0 := coalesce((v_ps ->> 'last_action_ms_0')::bigint, v_now);
   v_l1 := coalesce((v_ps ->> 'last_action_ms_1')::bigint, v_now);

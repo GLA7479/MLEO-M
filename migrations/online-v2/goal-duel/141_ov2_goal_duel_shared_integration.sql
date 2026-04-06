@@ -1,6 +1,5 @@
 -- Wire OV2 Goal Duel into shared-room economy, Quick Match allowlist, max players, and leave/forfeit.
 -- Apply after 140_ov2_goal_duel_rpcs_actions.sql (and after any migration that last replaced ov2_shared_leave_room).
--- Replaces integration surface from 136_ov2_tile_rush_duel_shared_integration.sql and adds Goal Duel.
 
 BEGIN;
 
@@ -23,7 +22,6 @@ AS $$
     WHEN 'ov2_meldmatch' THEN 'ON_HOST_START'
     WHEN 'ov2_colorclash' THEN 'ON_HOST_START'
     WHEN 'ov2_fleet_hunt' THEN 'ON_HOST_START'
-    WHEN 'ov2_tile_rush_duel' THEN 'ON_HOST_START'
     WHEN 'ov2_goal_duel' THEN 'ON_HOST_START'
     WHEN 'ov2_community_cards' THEN 'NONE'
     ELSE 'NONE'
@@ -49,7 +47,6 @@ AS $$
     'ov2_meldmatch',
     'ov2_colorclash',
     'ov2_fleet_hunt',
-    'ov2_tile_rush_duel',
     'ov2_goal_duel'
   );
 $$;
@@ -70,7 +67,6 @@ AS $$
     WHEN 'ov2_flipgrid' THEN 2
     WHEN 'ov2_meldmatch' THEN 2
     WHEN 'ov2_fleet_hunt' THEN 2
-    WHEN 'ov2_tile_rush_duel' THEN 2
     WHEN 'ov2_goal_duel' THEN 2
     WHEN 'ov2_colorclash' THEN 4
     ELSE 4
@@ -103,7 +99,6 @@ DECLARE
   v_in_mm_match boolean := false;
   v_in_cc_match boolean := false;
   v_in_fh_match boolean := false;
-  v_in_trd_match boolean := false;
   v_in_gd_match boolean := false;
   v_ff jsonb;
   v_refund jsonb;
@@ -208,13 +203,6 @@ BEGIN
         SELECT 1 FROM public.ov2_fleet_hunt_seats fhs
         WHERE fhs.session_id = v_room.active_session_id AND fhs.participant_key = v_pk
       );
-    v_in_trd_match := v_room.product_game_id IS NOT DISTINCT FROM 'ov2_tile_rush_duel'
-      AND v_room.active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_tile_rush_duel_sessions WHERE id = v_room.active_session_id), '') = 'playing'
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_tile_rush_duel_seats trds
-        WHERE trds.session_id = v_room.active_session_id AND trds.participant_key = v_pk
-      );
     v_in_gd_match := v_room.product_game_id IS NOT DISTINCT FROM 'ov2_goal_duel'
       AND v_room.active_session_id IS NOT NULL
       AND coalesce((SELECT phase FROM public.ov2_goal_duel_sessions WHERE id = v_room.active_session_id), '') = 'playing'
@@ -223,7 +211,7 @@ BEGIN
         WHERE gds.session_id = v_room.active_session_id AND gds.participant_key = v_pk
       );
 
-    IF v_in_ludo_match OR v_in_r51_match OR v_in_bg_match OR v_in_ck_match OR v_in_ch_match OR v_in_dom_match OR v_in_fl_match OR v_in_fg_match OR v_in_mm_match OR v_in_cc_match OR v_in_fh_match OR v_in_trd_match OR v_in_gd_match THEN
+    IF v_in_ludo_match OR v_in_r51_match OR v_in_bg_match OR v_in_ck_match OR v_in_ch_match OR v_in_dom_match OR v_in_fl_match OR v_in_fg_match OR v_in_mm_match OR v_in_cc_match OR v_in_fh_match OR v_in_gd_match THEN
       IF NOT COALESCE(p_forfeit_game, false) THEN
         RETURN jsonb_build_object(
           'ok', false,
@@ -283,11 +271,6 @@ BEGIN
         END IF;
       ELSIF v_in_fh_match THEN
         v_ff := public.ov2_fleet_hunt_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_trd_match THEN
-        v_ff := public.ov2_tile_rush_duel_voluntary_forfeit(p_room_id, v_pk);
         IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
           RETURN v_ff;
         END IF;

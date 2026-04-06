@@ -64,6 +64,11 @@ const nextConfig = {
       { source: "/slots-upgraded", destination: "/symbol-match", permanent: true },
       { source: "/three-card-poker", destination: "/triple-cards", permanent: true },
       { source: "/ultimate-poker", destination: "/ultimate-cards", permanent: true },
+      {
+        source: "/ov2-tile-rush-duel",
+        destination: "/online-v2/rooms",
+        permanent: false,
+      },
     ];
   },
   async headers() {
