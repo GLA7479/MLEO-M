@@ -446,7 +446,7 @@ BEGIN
       jsonb_build_object(
         'draw', true,
         'board_full', true,
-        'refundPerSeat', v_entry,
+        'refundPerSeat', v_entry * v_mult,
         'stakeMultiplier', v_mult,
         'timestamp', (extract(epoch from now()) * 1000)::bigint
       ),

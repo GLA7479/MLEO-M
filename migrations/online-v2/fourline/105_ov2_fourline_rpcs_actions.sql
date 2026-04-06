@@ -483,6 +483,8 @@ DECLARE
   v_prize bigint;
   v_loss bigint;
   v_entry bigint;
+  v_mult int;
+  v_refund bigint;
   r record;
   v_idem text;
   v_room_id uuid := NEW.room_id;
@@ -496,6 +498,8 @@ BEGIN
 
   IF coalesce((v_res ->> 'draw')::boolean, false) THEN
     v_entry := COALESCE((NEW.parity_state ->> '__entry__')::bigint, 0);
+    v_mult := public.ov2_fl_parity_stake_mult(NEW.parity_state);
+    v_refund := v_entry * v_mult;
     FOR r IN
       SELECT trim(participant_key) AS pk
       FROM public.ov2_fourline_seats
@@ -512,14 +516,15 @@ BEGIN
         v_match_seq,
         r.pk,
         'fl_draw_refund',
-        v_entry,
+        v_refund,
         v_idem,
         v_sess_id,
         jsonb_build_object(
           'gameId', 'ov2_fourline',
           'sessionId', v_sess_id,
           'board_full', coalesce((v_res ->> 'board_full')::boolean, false),
-          'refundPerSeat', v_entry,
+          'refundPerSeat', v_refund,
+          'stakeMultiplier', v_mult,
           'lossAlreadyCommitted', true
         )
       )

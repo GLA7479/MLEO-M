@@ -210,7 +210,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
   );
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
+    <div className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-1 sm:px-2 sm:pb-2">
       <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
         <div className="rounded-lg border border-white/[0.08] bg-zinc-950/50 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
           <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
@@ -260,7 +260,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
         ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
         {vm.phase === "playing" && vm.mustRespondDouble && vm.pendingDouble ? (
           <div className="rounded-lg border border-amber-500/25 bg-amber-950/25 p-2">
             <p className="text-[11px] text-amber-100/90">
