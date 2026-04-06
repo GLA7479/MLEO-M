@@ -28,6 +28,54 @@ const TOP_HOME_S1 = [18, 19, 20, 21, 22, 23];
 const BOT_OUTER = [11, 10, 9, 8, 7, 6];
 const BOT_HOME_S0 = [5, 4, 3, 2, 1, 0];
 
+/** 3×3 cell indices (0–8) for standard pip layouts */
+const DIE_PIPS = {
+  1: [4],
+  2: [0, 8],
+  3: [0, 4, 8],
+  4: [0, 2, 6, 8],
+  5: [0, 2, 4, 6, 8],
+  6: [0, 3, 6, 2, 5, 8],
+};
+
+/**
+ * @param {{ value: number }} props
+ */
+function DieFace({ value }) {
+  const v = Math.min(6, Math.max(1, Math.round(Number(value)) || 1));
+  const cells = DIE_PIPS[v] || DIE_PIPS[1];
+  return (
+    <div
+      className="grid aspect-square min-h-[1.6rem] min-w-[1.6rem] grid-cols-3 grid-rows-3 gap-px rounded-md border border-zinc-600/70 bg-[#F8F8F8] p-0.5 shadow-[0_4px_12px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.95)] sm:min-h-8 sm:min-w-8 sm:gap-0.5 sm:p-1"
+      aria-hidden
+    >
+      {Array.from({ length: 9 }, (_, i) => (
+        <div
+          key={i}
+          className={`min-h-0 min-w-0 rounded-full ${cells.includes(i) ? "bg-[#111] shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]" : "bg-transparent"}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * @param {{ dice: unknown, bump: boolean, className?: string }} props
+ */
+function DiceTray({ dice, bump, className = "" }) {
+  if (!Array.isArray(dice) || dice.length < 2) return null;
+  const a = Math.min(6, Math.max(1, Math.round(Number(dice[0])) || 1));
+  const b = Math.min(6, Math.max(1, Math.round(Number(dice[1])) || 1));
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-0.5 sm:gap-1 ${bump ? "scale-[1.08]" : "scale-100"} transition-transform duration-300 ease-out ${className}`}
+    >
+      <DieFace value={a} />
+      <DieFace value={b} />
+    </span>
+  );
+}
+
 /**
  * @param {{ count: number, maxVisible?: number, compact?: boolean, stackFrom?: 'top' | 'bottom', className?: string }} props
  */
@@ -38,8 +86,8 @@ function CheckerStack({ count, maxVisible = 5, compact = false, stackFrom = "top
   }
   const isLight = count > 0;
   const dot = compact
-    ? "h-[18px] w-[18px] min-h-[18px] min-w-[18px] border border-black/50 shadow-[0_1px_2px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-black/20 sm:h-5 sm:w-5 sm:min-h-5 sm:min-w-5"
-    : "h-5 w-5 min-h-5 min-w-5 border border-black/50 shadow-[0_1px_3px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.14)] ring-1 ring-black/25 sm:h-[1.4rem] sm:w-[1.4rem] sm:min-h-[1.4rem] sm:min-w-[1.4rem] md:h-6 md:w-6 md:min-h-6 md:min-w-6 lg:h-[1.65rem] lg:w-[1.65rem] lg:min-h-[1.65rem] lg:min-w-[1.65rem]";
+    ? "h-[18px] w-[18px] min-h-[18px] min-w-[18px] border border-black/45 shadow-[0_2px_4px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.35)] ring-1 ring-black/15 transition-transform duration-150 ease-out sm:h-5 sm:w-5 sm:min-h-5 sm:min-w-5"
+    : "h-5 w-5 min-h-5 min-w-5 border border-black/45 shadow-[0_2px_4px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.32)] ring-1 ring-black/18 transition-transform duration-150 ease-out sm:h-[1.4rem] sm:w-[1.4rem] sm:min-h-[1.4rem] sm:min-w-[1.4rem] md:h-6 md:w-6 md:min-h-6 md:min-w-6 lg:h-[1.65rem] lg:w-[1.65rem] lg:min-h-[1.65rem] lg:min-w-[1.65rem]";
   const disks = n > maxVisible ? maxVisible - 1 : n;
   const label =
     n > maxVisible ? (
@@ -54,7 +102,11 @@ function CheckerStack({ count, maxVisible = 5, compact = false, stackFrom = "top
   const diskEls = Array.from({ length: disks }, (_, i) => (
     <div
       key={i}
-      className={`shrink-0 rounded-full ${dot} ${isLight ? "bg-gradient-to-b from-amber-50 to-amber-200" : "bg-gradient-to-b from-zinc-500 to-zinc-900"}`}
+      className={`shrink-0 rounded-full ${dot} ${
+        isLight
+          ? "bg-gradient-to-b from-amber-50 via-amber-100 to-amber-200 brightness-[1.03]"
+          : "bg-gradient-to-b from-zinc-500 via-zinc-700 to-zinc-900 ring-1 ring-white/12"
+      }`}
     />
   ));
   const stackGap = "gap-[3.5px] sm:gap-1";
@@ -107,21 +159,25 @@ function BoardPoint({
   const mine = mySeat === 0 ? value > 0 : mySeat === 1 ? value < 0 : false;
   const fill =
     tone === "a"
-      ? "from-amber-800/85 via-amber-900/75 to-amber-950/90"
-      : "from-amber-900/80 via-amber-950/80 to-black/85";
+      ? "from-[#f0dcb8] via-[#E2C79A] to-[#c4a77d]"
+      : "from-[#8f3a3a] via-[#7A2F2F] to-[#4a1e1e]";
   const clip = direction === "down" ? "polygon(50% 100%, 0 0, 100% 0)" : "polygon(50% 0, 0 100%, 100% 100%)";
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={() => onPointClick(pointIndex)}
-      className={`relative isolate flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch overflow-visible rounded-sm border border-black/25 outline-none transition-[box-shadow,transform] ${
+      className={`relative isolate flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch overflow-visible rounded-sm border border-black/20 outline-none transition-[box-shadow,transform] ${
         highlightDestination
-          ? "z-[2] ring-2 ring-emerald-400/90 ring-offset-1 ring-offset-[#24160f] shadow-[0_0_14px_rgba(52,211,153,0.35)]"
+          ? "z-[2] ring-2 ring-sky-400/85 ring-offset-1 ring-offset-[#0E2A22] shadow-[0_0_16px_rgba(56,189,248,0.35)]"
           : ""
-      } ${selectedFrom ? "z-[2] ring-2 ring-sky-400 ring-offset-2 ring-offset-[#24160f]" : ""} ${
-        invalidFlash ? "animate-pulse ring-2 ring-rose-500/70" : ""
-      } ${mine ? "ring-1 ring-emerald-500/40" : ""} ${isHome ? "ring-1 ring-amber-300/35" : ""} disabled:cursor-not-allowed disabled:opacity-50`}
+      } ${
+        selectedFrom
+          ? "z-[2] ring-2 ring-sky-300 ring-offset-2 ring-offset-[#0E2A22] shadow-[0_0_12px_rgba(125,211,252,0.45)]"
+          : ""
+      } ${invalidFlash ? "animate-pulse ring-2 ring-rose-500/70" : ""} ${mine ? "ring-1 ring-emerald-400/45" : ""} ${
+        isHome ? "ring-1 ring-amber-200/40" : ""
+      } disabled:cursor-not-allowed disabled:opacity-50`}
       style={{ WebkitTapHighlightColor: "transparent" }}
       aria-label={`Point ${pointIndex + 1}`}
     >
@@ -172,6 +228,8 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   const [invalidFlashIdx, setInvalidFlashIdx] = useState(/** @type {number|null} */ (null));
   const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
   const [autoRoll, setAutoRoll] = useState(false);
+  const [diceBump, setDiceBump] = useState(false);
+  const prevDiceJsonRef = useRef("");
   const autoRollBusyRef = useRef(false);
   const autoRollEffectGenRef = useRef(0);
   /** When the same (from,to) is legal with more than one die value, player picks here. */
@@ -214,6 +272,23 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     const t = window.setTimeout(() => setInvalidFlashIdx(null), 420);
     return () => window.clearTimeout(t);
   }, [invalidFlashIdx]);
+
+  /** UI-only: brief scale pop when rolled dice values change */
+  useEffect(() => {
+    const s =
+      Array.isArray(vm.dice) && vm.dice.length >= 2 ? JSON.stringify([Number(vm.dice[0]), Number(vm.dice[1])]) : "";
+    if (!s) {
+      prevDiceJsonRef.current = "";
+      return;
+    }
+    if (prevDiceJsonRef.current && prevDiceJsonRef.current !== s) {
+      setDiceBump(true);
+      const t = window.setTimeout(() => setDiceBump(false), 380);
+      prevDiceJsonRef.current = s;
+      return () => window.clearTimeout(t);
+    }
+    prevDiceJsonRef.current = s;
+  }, [vm.dice]);
 
   const room = contextInput?.room && typeof contextInput.room === "object" ? contextInput.room : null;
   const roomId = room?.id != null ? String(room.id) : "";
@@ -636,7 +711,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
 
   const barCol = (
     <div
-      className={`flex w-9 shrink-0 flex-col border-x border-amber-800/80 bg-gradient-to-b from-zinc-800/95 to-zinc-950 sm:w-11 md:w-14 ${
+      className={`flex w-9 shrink-0 flex-col border-x border-black/35 bg-gradient-to-b from-[#061a15] via-[#051410] to-[#040d0b] shadow-[inset_0_0_8px_rgba(0,0,0,0.45)] sm:w-11 md:w-14 ${
         swapBoardHalvesForViewer ? "flex-col-reverse" : ""
       }`}
     >
@@ -660,7 +735,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         <span className="text-[7px] font-semibold text-zinc-500 sm:text-[8px]">P2</span>
         <CheckerStack count={-Math.max(0, displayBar[1])} maxVisible={5} compact={compactBoard} />
       </button>
-      <div className="h-px shrink-0 bg-black/60" aria-hidden />
+      <div className="h-px shrink-0 bg-black/50" aria-hidden />
       <button
         type="button"
         disabled={boardDisabled || vm.mySeat !== 0 || displayBar[0] <= 0 || !vm.canClientMove}
@@ -686,7 +761,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
 
   const offColumn = (
     <div
-      className={`flex w-10 shrink-0 flex-col border-l border-amber-800/55 bg-zinc-950/55 sm:w-12 md:w-[3.25rem] ${
+      className={`flex w-10 shrink-0 flex-col border-l border-white/[0.08] bg-[#0f3228]/85 shadow-[inset_2px_0_12px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.06)] sm:w-12 md:w-[3.25rem] ${
         swapBoardHalvesForViewer ? "flex-col-reverse" : ""
       }`}
     >
@@ -696,9 +771,9 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         onClick={() => {
           if (vm.mySeat === 1) void onBearOffClick();
         }}
-        className={`flex min-h-0 flex-1 flex-col items-center justify-start gap-1 border-b border-black/30 py-1 sm:py-1.5 ${
+        className={`flex min-h-0 flex-1 flex-col items-center justify-start gap-1 border-b border-black/25 py-1 sm:py-1.5 ${
           bearHighlight && vm.mySeat === 1
-            ? "bg-emerald-950/35 ring-2 ring-inset ring-emerald-400/55 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+            ? "bg-emerald-950/40 ring-2 ring-inset ring-emerald-400/60 shadow-[0_0_14px_rgba(52,211,153,0.3)]"
             : ""
         } ${invalidFlashIdx === -1 ? "animate-pulse ring-rose-500/50" : ""} disabled:cursor-default disabled:opacity-60`}
         aria-label="Borne off, seat two"
@@ -715,7 +790,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         }}
         className={`flex min-h-0 flex-1 flex-col items-center justify-end gap-1 py-1 sm:py-1.5 ${
           bearHighlight && vm.mySeat === 0
-            ? "bg-emerald-950/35 ring-2 ring-inset ring-emerald-400/55 shadow-[0_0_12px_rgba(52,211,153,0.25)]"
+            ? "bg-emerald-950/40 ring-2 ring-inset ring-emerald-400/60 shadow-[0_0_14px_rgba(52,211,153,0.3)]"
             : ""
         } disabled:cursor-default disabled:opacity-60`}
         aria-label="Borne off, seat one"
@@ -729,12 +804,12 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
 
   const turnTimerTone =
     vm.turnTimeLeftSec == null
-      ? "border-white/15 bg-black/30 text-zinc-300"
+      ? "border-white/18 bg-zinc-900/60 text-zinc-200"
       : vm.turnTimeLeftSec <= 5
-        ? "animate-pulse border-red-500/55 bg-red-950/45 text-red-100"
+        ? "animate-pulse border-red-500/55 bg-red-950/45 text-red-50"
         : vm.turnTimeLeftSec <= 10
-          ? "border-amber-500/50 bg-amber-950/40 text-amber-100"
-          : "border-sky-500/40 bg-sky-950/30 text-sky-100";
+          ? "border-amber-500/50 bg-amber-950/40 text-amber-50"
+          : "border-sky-500/45 bg-sky-950/40 text-sky-50";
 
   const myMiss =
     vm.mySeat === 0 ? vm.missedStreakBySeat[0] : vm.mySeat === 1 ? vm.missedStreakBySeat[1] : 0;
@@ -814,7 +889,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
             setExitBusy(false);
           }
         }}
-        className="w-full rounded-md border border-red-500/50 bg-red-950/40 py-2 text-xs font-bold uppercase tracking-wide text-red-100 disabled:opacity-45"
+        className="w-full rounded-md border border-rose-900/45 bg-rose-950/30 py-2 text-xs font-bold uppercase tracking-wide text-rose-100/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] disabled:opacity-45"
       >
         {exitBusy ? "…" : "LEAVE"}
       </button>
@@ -831,8 +906,8 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   );
 
   return (
-    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden bg-gradient-to-b from-[#16120f] to-[#080605] px-1 pb-0.5 pt-0 text-white sm:gap-1 sm:px-2 sm:pb-1">
-      <div className="shrink-0 rounded-md border border-white/[0.14] bg-zinc-950/55 px-1.5 py-1 shadow-sm shadow-black/20 sm:px-2 sm:py-1.5">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden bg-[radial-gradient(ellipse_85%_65%_at_50%_42%,#0F1720_0%,#0B0F14_55%,#080b10_100%)] px-1 pb-0.5 pt-0 text-white before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_70%_55%_at_50%_48%,transparent_0%,rgba(5,8,14,0.55)_100%)] sm:gap-1 sm:px-2 sm:pb-1">
+      <div className="relative z-[1] shrink-0 rounded-md border border-white/[0.06] bg-[rgba(20,24,32,0.75)] px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md sm:px-2 sm:py-1.5">
         <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
           <div className="min-w-0 text-[8px] leading-snug text-zinc-300 sm:text-[9px] md:text-[10px]">
             <span className="font-medium">
@@ -860,12 +935,12 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
                 <span className="hidden sm:inline"> · opp {oppMiss}/3</span>
               </span>
             ) : null}
-            {Array.isArray(vm.dice) ? (
-              <span className="pointer-events-none select-none font-mono text-zinc-500" aria-hidden>
-                {JSON.stringify(vm.dice)}
+            {Array.isArray(vm.dice) && vm.dice.length >= 2 ? (
+              <span className="pointer-events-none flex items-center gap-1 select-none" title="Current roll">
+                <DiceTray dice={vm.dice} bump={diceBump} />
                 {draftBase ? (
-                  <span className="ml-1 text-emerald-400/90" title="Dice remaining (draft)">
-                    →{JSON.stringify(displayDiceAvail)}
+                  <span className="font-mono text-[8px] text-emerald-400/90 sm:text-[9px]" title="Dice remaining (draft)">
+                    [{displayDiceAvail.join(",")}]
                   </span>
                 ) : null}
               </span>
@@ -875,7 +950,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
                 type="button"
                 disabled={leaveToLobbyBusy}
                 onClick={() => void onLeaveToLobby()}
-                className="shrink-0 rounded-md border border-red-500/55 bg-red-950/45 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-red-100 shadow-sm shadow-black/20 disabled:pointer-events-none disabled:opacity-45 sm:px-3 sm:py-1.5 sm:text-[11px]"
+                className="shrink-0 rounded-md border border-rose-900/50 bg-rose-950/35 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-rose-100/95 shadow-[0_2px_8px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:border-rose-800/55 disabled:pointer-events-none disabled:opacity-45 sm:px-3 sm:py-1.5 sm:text-[11px]"
               >
                 {leaveToLobbyBusy ? "…" : "LEAVE"}
               </button>
@@ -898,8 +973,8 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         ) : null}
       </div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden">
-        <div className="flex w-full max-w-full flex-col overflow-hidden rounded-lg border border-amber-800/75 bg-gradient-to-b from-[#3a2618] via-[#221409] to-[#120a06] p-px shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_8px_28px_rgba(0,0,0,0.45)] max-md:h-[min(43svh,86vw)] max-md:max-h-[44svh] max-md:flex-none sm:rounded-xl sm:border-amber-800/85 sm:p-0.5 md:h-[min(62vh,572px)] md:max-w-4xl md:p-1 lg:max-w-[52rem] lg:p-1.5 xl:max-w-[56rem]">
+      <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden">
+        <div className="flex w-full max-w-full flex-col overflow-hidden rounded-lg border border-[#3d2e24]/90 bg-gradient-to-b from-[#3A2A20] via-[#2f2218] to-[#2A1F17] p-[2px] shadow-[0_0_0_1px_rgba(0,0,0,0.45),0_6px_22px_rgba(0,0,0,0.42),inset_0_1px_0_rgba(255,255,255,0.12)] max-md:h-[min(43svh,86vw)] max-md:max-h-[44svh] max-md:flex-none sm:rounded-xl sm:p-0.5 md:h-[min(62vh,572px)] md:max-w-4xl md:p-1 lg:max-w-[52rem] lg:p-1.5 xl:max-w-[56rem]">
           <div className="pointer-events-none flex shrink-0 items-end justify-between gap-1 px-0.5 pb-px sm:px-1 sm:pb-0.5">
             <span className="text-[7px] font-bold uppercase tracking-wide text-zinc-500 sm:text-[8px] md:text-[9px]">Outer</span>
             <span className="w-9 shrink-0 text-center text-[7px] font-bold uppercase tracking-[0.16em] text-amber-200/80 sm:w-11 sm:text-[8px] md:w-14 md:text-[9px]">
@@ -912,16 +987,16 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
               Off
             </span>
           </div>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-row gap-px overflow-hidden sm:gap-1">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-row gap-px overflow-hidden rounded-sm bg-[#0E2A22] p-px shadow-[inset_0_2px_10px_rgba(0,0,0,0.38),inset_0_0_0_1px_rgba(0,0,0,0.2)] sm:gap-1 sm:p-0.5">
             <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(leftTopIndices, leftTopDir)}</div>
-              <div className="h-px shrink-0 bg-black/50" aria-hidden />
+              <div className="h-px shrink-0 bg-black/35" aria-hidden />
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(leftBotIndices, leftBotDir)}</div>
             </div>
             {barCol}
             <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(rightTopIndices, rightTopDir)}</div>
-              <div className="h-px shrink-0 bg-black/50" aria-hidden />
+              <div className="h-px shrink-0 bg-black/35" aria-hidden />
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(rightBotIndices, rightBotDir)}</div>
             </div>
             {offColumn}
@@ -980,7 +1055,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
             type="button"
             disabled={busy}
             onClick={() => void roll()}
-            className="rounded-md border border-violet-500/45 bg-violet-950/40 px-2 py-1 text-[9px] font-bold text-violet-100 disabled:opacity-45 sm:px-2.5 sm:py-1.5 sm:text-[10px] md:text-xs"
+            className="rounded-md border border-emerald-500/50 bg-emerald-950/45 px-2 py-1 text-[9px] font-bold text-emerald-50 shadow-[0_2px_10px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.08)] transition hover:border-emerald-400/55 hover:shadow-[0_0_14px_rgba(16,185,129,0.2)] disabled:opacity-45 sm:px-2.5 sm:py-1.5 sm:text-[10px] md:text-xs"
           >
             {busy ? "Rolling…" : "Roll"}
           </button>
@@ -1012,7 +1087,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
               type="button"
               disabled={busy || !submitValidation.ok}
               onClick={() => void confirmTurn()}
-              className="rounded-md border border-emerald-500/55 bg-emerald-950/45 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-emerald-100 disabled:opacity-40 sm:text-[10px]"
+              className="rounded-md border border-sky-500/50 bg-sky-950/45 px-2 py-1 text-[9px] font-bold uppercase tracking-wide text-sky-50 shadow-[0_2px_10px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.07)] transition hover:border-sky-400/55 disabled:opacity-40 sm:text-[10px]"
             >
               {busy ? "…" : "Confirm turn"}
             </button>
