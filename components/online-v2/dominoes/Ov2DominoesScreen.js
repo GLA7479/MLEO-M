@@ -721,7 +721,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
           type="button"
           disabled={disabled}
           onClick={() => void onTileClick(idx)}
-          className={`flex h-[3.8rem] w-[2.4rem] shrink-0 items-center justify-center overflow-hidden rounded-sm bg-white p-0 ring-offset-2 ring-offset-[#0b0f14] ${T_TF} ${
+          className={`flex h-[4.4rem] w-[2.8rem] shrink-0 items-center justify-center overflow-visible rounded-sm bg-white p-0 ring-offset-2 ring-offset-[#0b0f14] ${T_TF} ${
             sel ? "ring-2 ring-sky-500/90" : "ring-0"
           } ${shake ? "animate-ov2-dom-shake" : ""} ${place ? "animate-ov2-dom-place" : ""} disabled:opacity-40`}
         >
