@@ -280,7 +280,7 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
   );
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
+    <div className="relative flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
       <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
         <div className="rounded-lg border border-white/[0.08] bg-zinc-950/50 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:px-2 sm:py-2">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[11px] sm:text-[12px]">
@@ -327,21 +327,21 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
         </div>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_72%_58%_at_50%_48%,transparent_20%,rgba(0,0,0,0.34)_100%)]">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-zinc-950">
         <div
-          className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(0,0,0,0.45),0_0_52px_rgba(0,0,0,0.22),0_22px_56px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-2px_4px_rgba(0,0,0,0.38)] sm:max-w-[min(100%,548px)]"
+          className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_0_0_1px_rgba(0,0,0,0.55),0_10px_36px_rgba(0,0,0,0.5),0_0_64px_rgba(18,26,42,0.35),inset_0_1px_0_rgba(255,255,255,0.16),inset_0_-2px_5px_rgba(0,0,0,0.32)] sm:max-w-[min(100%,548px)]"
           style={{
-            background: "linear-gradient(152deg, #7a4f38 0%, #4a2a1c 40%, #2e1810 68%, #523222 100%)",
+            background: "linear-gradient(152deg, #8c5f45 0%, #5a3524 38%, #3a2218 65%, #5c3a28 100%)",
           }}
         >
           <div
-            className="relative overflow-hidden rounded-[8px] p-0.5 shadow-[inset_0_2px_3px_rgba(255,255,255,0.05),inset_0_-3px_8px_rgba(0,0,0,0.55),inset_0_0_0_1px_rgba(0,0,0,0.32)]"
+            className="relative overflow-hidden rounded-[8px] p-0.5 shadow-[inset_0_2px_4px_rgba(255,255,255,0.07),inset_0_-3px_8px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(0,0,0,0.28)]"
             style={{
-              background: "linear-gradient(172deg, #1c120e 0%, #0c0806 52%, #140d0a 100%)",
+              background: "linear-gradient(172deg, #2a201c 0%, #181210 48%, #1f1612 100%)",
             }}
           >
             <div
-              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_30px_rgba(0,0,0,0.5),inset_0_0_52px_rgba(0,0,0,0.16)]"
+              className="relative grid aspect-square w-full gap-0 rounded-[6px] shadow-[inset_0_0_28px_rgba(0,0,0,0.36),inset_0_0_52px_rgba(0,0,0,0.1)]"
               style={{
                 gridTemplateColumns: "repeat(8, 1fr)",
                 gridTemplateRows: "repeat(8, 1fr)",
@@ -366,8 +366,8 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
                       ? "z-[1] shadow-[inset_0_0_0_2px_rgba(125,211,252,0.38)]"
                       : "";
                 const baseSq = dark
-                  ? "bg-[#1f0f08] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-2px_0_rgba(0,0,0,0.4)]"
-                  : "bg-[#e2a968] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),inset_0_-1px_0_rgba(0,0,0,0.1)]";
+                  ? "bg-[#4a3020] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-2px_0_rgba(0,0,0,0.28)]"
+                  : "bg-[#e0b078] shadow-[inset_0_1px_0_rgba(255,250,240,0.32),inset_0_-1px_0_rgba(0,0,0,0.09)]";
                 const isDark = p === 1 || p === 2;
                 const isKing = p === 2 || p === 4;
                 return (

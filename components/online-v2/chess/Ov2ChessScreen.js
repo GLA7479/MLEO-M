@@ -223,14 +223,14 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
       : "";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden bg-gradient-to-b from-[#101522] via-[#0c0f18] to-[#090c12] px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
       <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
-        <div className="rounded-lg border border-white/[0.12] bg-gradient-to-b from-slate-900/55 to-zinc-950/75 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.09),0_6px_24px_rgba(0,0,0,0.28),0_0_0_1px_rgba(0,0,0,0.2)] backdrop-blur-[6px] sm:px-2 sm:py-2">
+        <div className="rounded-lg border border-white/[0.1] bg-zinc-900/55 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_18px_rgba(0,0,0,0.22)] sm:px-2 sm:py-2">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[11px] sm:text-[12px]">
             <div
               className={`flex min-h-[1.625rem] items-center rounded-md border px-2.5 py-1 tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-1px_2px_rgba(0,0,0,0.3)] ${
                 vm.phase === "playing" && vm.turnSeat === vm.mySeat
-                  ? "border-amber-400/45 bg-gradient-to-b from-amber-950/55 to-amber-950/40 text-amber-50/95"
+                  ? "border-amber-400/42 bg-amber-950/48 text-amber-50/95"
                   : "border-white/[0.14] bg-zinc-900/50 text-zinc-300/90"
               }`}
             >
@@ -270,7 +270,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
         </div>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-[radial-gradient(ellipse_88%_72%_at_50%_38%,#1a2334_0%,#121826_38%,#0c1018_72%,#080a10_100%)] before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_68%_54%_at_50%_50%,transparent_32%,rgba(6,10,22,0.38)_100%)]">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden">
         <div
           className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_0_0_1px_rgba(0,0,0,0.55),0_10px_36px_rgba(0,0,0,0.5),0_0_64px_rgba(18,26,42,0.35),inset_0_1px_0_rgba(255,255,255,0.16),inset_0_-2px_5px_rgba(0,0,0,0.32)] sm:max-w-[min(100%,548px)]"
           style={{
@@ -342,7 +342,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
 
               {promoOpen ? (
                 <div
-                  className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 border-t border-white/[0.08] bg-[#0a0a09]/96 px-2 py-2.5 shadow-[0_-10px_28px_rgba(0,0,0,0.6)] backdrop-blur-sm sm:py-3"
+                  className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 border-t border-white/[0.08] bg-zinc-950 px-2 py-2.5 shadow-[0_-8px_24px_rgba(0,0,0,0.45)] sm:py-3"
                   role="dialog"
                   aria-label="Choose promotion piece"
                 >
@@ -356,7 +356,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                         type="button"
                         disabled={busy}
                         onClick={() => void onPickPromo(l)}
-                        className="flex h-12 w-12 min-h-12 min-w-12 items-center justify-center rounded-lg border border-zinc-600/28 bg-gradient-to-b from-zinc-800/75 to-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_6px_rgba(0,0,0,0.3)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45 sm:h-14 sm:w-14"
+                        className="flex h-12 w-12 min-h-12 min-w-12 items-center justify-center rounded-lg border border-zinc-600/28 bg-zinc-800/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_6px_rgba(0,0,0,0.28)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45 sm:h-14 sm:w-14"
                         aria-label={`Promote to ${({ q: "queen", Q: "queen", r: "rook", R: "rook", b: "bishop", B: "bishop", n: "knight", N: "knight" }[l] || "piece")}`}
                       >
                         <div className="relative aspect-square w-[85%] max-w-full shrink-0">
@@ -382,7 +382,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
       </div>
 
       {finished ? (
-        <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.14] bg-gradient-to-b from-zinc-900/82 to-zinc-950 p-3 text-[11px] text-zinc-200/92 shadow-[0_16px_44px_rgba(0,0,0,0.5),0_0_0_1px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-10px_24px_rgba(0,0,0,0.3)]">
+        <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.12] bg-zinc-900/88 p-3 text-[11px] text-zinc-200/92 shadow-[0_12px_32px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Result</p>
           <p className="mt-1 text-sm font-semibold text-zinc-50">Match finished</p>
           {rk === "stalemate" ? (
@@ -406,7 +406,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
         </div>
       ) : null}
 
-      <div className="shrink-0 rounded-lg border border-white/[0.09] bg-gradient-to-b from-slate-900/35 to-zinc-950/50 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_4px_20px_rgba(0,0,0,0.22)]">
+      <div className="shrink-0 rounded-lg border border-white/[0.08] bg-zinc-900/45 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
         <button type="button" disabled={exitBusy || !pk} onClick={() => void onExitToLobby()} className={BTN_DANGER}>
           {exitBusy ? "Leaving…" : "Leave table"}
         </button>
