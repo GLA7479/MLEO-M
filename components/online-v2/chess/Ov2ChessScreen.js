@@ -9,8 +9,10 @@ import {
   ov2ChessKingCheckHighlights,
   ov2ChessMoveNeedsPromotion,
   ov2ChessPieceOwnedBySeat,
+  ov2ChessServerToViewIdx,
   ov2ChessViewToServerIdx,
 } from "../../../lib/online-v2/chess/ov2ChessBoardView";
+import { requestOv2ChessLegalTos } from "../../../lib/online-v2/chess/ov2ChessSessionAdapter";
 import { useOv2ChessSession } from "../../../hooks/useOv2ChessSession";
 
 /** Shared premium button language (Chess + Checkers product family). */
@@ -58,6 +60,7 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
     session;
   const [selServerIdx, setSelServerIdx] = useState(/** @type {number|null} */ (null));
   const [promoOpen, setPromoOpen] = useState(/** @type {{ from: number, to: number }|null} */ (null));
+  const [legalTosServer, setLegalTosServer] = useState(/** @type {number[]} */ ([]));
   const [rematchBusy, setRematchBusy] = useState(false);
   const [startNextBusy, setStartNextBusy] = useState(false);
   const [exitBusy, setExitBusy] = useState(false);
@@ -66,15 +69,31 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
+  const turn = vm.turnSeat != null ? Number(vm.turnSeat) : null;
+  const mySeat = vm.mySeat;
 
   useEffect(() => {
     setSelServerIdx(null);
     setPromoOpen(null);
+    setLegalTosServer([]);
   }, [vm.sessionId, vm.revision]);
 
+  useEffect(() => {
+    setLegalTosServer([]);
+    if (!roomId || !pk || promoOpen != null) return;
+    if (selServerIdx == null) return;
+    if (vm.readOnly || vm.phase !== "playing" || turn !== mySeat || busy || vaultClaimBusy) return;
+    let cancelled = false;
+    void (async () => {
+      const r = await requestOv2ChessLegalTos(roomId, pk, selServerIdx, { revision: vm.revision });
+      if (!cancelled && r.ok) setLegalTosServer(Array.isArray(r.tos) ? r.tos : []);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, pk, promoOpen, selServerIdx, vm.readOnly, vm.phase, vm.revision, turn, mySeat, busy, vaultClaimBusy]);
+
   const squares = useMemo(() => normalizeOv2ChessSquares(vm.squares), [vm.squares]);
-  const turn = vm.turnSeat != null ? Number(vm.turnSeat) : null;
-  const mySeat = vm.mySeat;
 
   const checkHighlight = useMemo(() => {
     if (String(vm.phase) !== "playing" || turn == null) {
@@ -84,6 +103,15 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
   }, [squares, turn, vm.phase]);
 
   const attackerServerSet = useMemo(() => new Set(checkHighlight.attackerServerIdxs), [checkHighlight.attackerServerIdxs]);
+
+  const legalTosViewSet = useMemo(() => {
+    const s = new Set();
+    if (mySeat == null) return s;
+    for (const t of legalTosServer) {
+      if (Number.isInteger(t) && t >= 0 && t <= 63) s.add(ov2ChessServerToViewIdx(t, mySeat));
+    }
+    return s;
+  }, [legalTosServer, mySeat]);
 
   const promoLetters = mySeat === 0 ? (["Q", "R", "B", "N"]) : mySeat === 1 ? (["q", "r", "b", "n"]) : (["Q", "R", "B", "N"]);
 
@@ -221,27 +249,38 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
     snapshot?.board && typeof snapshot.board === "object" && snapshot.board.resultKind != null
       ? String(snapshot.board.resultKind)
       : "";
+  const rkNorm = rk.replace(/^["']+|["']+$/g, "").toLowerCase();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
       <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
         <div className="rounded-lg border border-white/[0.09] bg-zinc-900/48 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.055),0_3px_12px_rgba(0,0,0,0.18)] sm:px-2 sm:py-2">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[11px] sm:text-[12px]">
-            <div
-              className={`flex min-h-[1.625rem] items-center rounded-md border px-2.5 py-1 tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_2px_rgba(0,0,0,0.22)] ${
-                vm.phase === "playing" && vm.turnSeat === vm.mySeat
-                  ? "border-amber-400/38 bg-amber-950/42 text-amber-50/95"
-                  : "border-white/[0.12] bg-zinc-900/44 text-zinc-300/88"
-              }`}
-            >
-              {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
-                <span className="tracking-wide">
-                  <span className="text-[10px] font-medium uppercase text-zinc-500 sm:text-[10px]">Turn</span>{" "}
-                  <span className="text-[12px] font-semibold text-zinc-50 sm:text-[13px]">~{vm.turnTimeLeftSec}s</span>
+            <div className="flex min-h-[1.625rem] flex-wrap items-center gap-1.5">
+              <div
+                className={`flex min-h-[1.625rem] items-center rounded-md border px-2.5 py-1 tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_2px_rgba(0,0,0,0.22)] ${
+                  vm.phase === "playing" && vm.turnSeat === vm.mySeat
+                    ? "border-amber-400/38 bg-amber-950/42 text-amber-50/95"
+                    : "border-white/[0.12] bg-zinc-900/44 text-zinc-300/88"
+                }`}
+              >
+                {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
+                  <span className="tracking-wide">
+                    <span className="text-[10px] font-medium uppercase text-zinc-500 sm:text-[10px]">Turn</span>{" "}
+                    <span className="text-[12px] font-semibold text-zinc-50 sm:text-[13px]">~{vm.turnTimeLeftSec}s</span>
+                  </span>
+                ) : (
+                  <span className="text-zinc-500">—</span>
+                )}
+              </div>
+              {vm.phase === "playing" && checkHighlight.inCheck ? (
+                <span
+                  className="rounded-md border border-rose-500/28 bg-rose-950/38 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-100/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                  title="The side to move is in check"
+                >
+                  Check
                 </span>
-              ) : (
-                <span className="text-zinc-500">—</span>
-              )}
+              ) : null}
             </div>
             {vaultClaimBusy ? (
               <span className="rounded-md border border-sky-500/16 bg-sky-950/32 px-2 py-0.5 text-[10px] font-medium text-sky-100/82 shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]">
@@ -297,9 +336,11 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                 const serverIdx = mySeat != null ? ov2ChessViewToServerIdx(viewPos, mySeat) : viewPos;
                 const p = squares[serverIdx] ?? ".";
                 const sel = selServerIdx === serverIdx;
+                const leg = legalTosViewSet.has(viewPos);
                 const pieceSrc = pieceImageSrc(p);
                 const kingThreat = checkHighlight.inCheck && checkHighlight.kingServerIdx === serverIdx;
                 const attackingKing = attackerServerSet.has(serverIdx);
+                const showLegalDot = leg && !sel && vm.phase === "playing" && turn === mySeat;
                 const ringClass = sel
                   ? "z-[2] shadow-[inset_0_0_0_2px_rgba(125,211,252,0.34)]"
                   : attackingKing
@@ -322,6 +363,12 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
                     style={{ WebkitTapHighlightColor: "transparent" }}
                     aria-label={kingThreat ? "King in check" : undefined}
                   >
+                    {showLegalDot ? (
+                      <span
+                        className="pointer-events-none absolute left-1/2 top-1/2 z-[2] h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-200/22 ring-1 ring-emerald-400/14"
+                        aria-hidden
+                      />
+                    ) : null}
                     {pieceSrc ? (
                       <div className="relative z-[1] aspect-square w-[85%] max-w-full shrink-0">
                         <img
@@ -385,7 +432,9 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
         <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.11] bg-zinc-900/78 p-3 text-[11px] text-zinc-200/88 shadow-[0_12px_32px_rgba(0,0,0,0.42),0_0_0_1px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.055),inset_0_-8px_18px_rgba(0,0,0,0.24)]">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Result</p>
           <p className="mt-1 text-sm font-semibold text-zinc-50">Match finished</p>
-          {rk === "stalemate" ? (
+          {rkNorm === "checkmate" ? (
+            <p className="mt-1 text-zinc-400/90">Checkmate.</p>
+          ) : rkNorm === "stalemate" ? (
             <p className="mt-1 text-zinc-400/90">Draw by stalemate.</p>
           ) : vm.winnerSeat != null && vm.mySeat != null ? (
             <p className="mt-1 text-zinc-400/90">{vm.winnerSeat === vm.mySeat ? "You won." : "You lost."}</p>

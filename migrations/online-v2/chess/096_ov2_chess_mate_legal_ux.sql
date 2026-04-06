@@ -1,171 +1,7 @@
--- OV2 Chess: complete authoritative move engine (replaces 092 stubs via CREATE OR REPLACE).
--- Fixes knight ray bug from index-offset model by using rank/file deltas.
--- Apply after 091_ov2_chess_engine_core.sql. Does NOT edit files 090–092.
+﻿-- OV2 Chess: re-apply engine terminal + king-capture guard + RPC mate branch hardening + legal-tos helper.
+-- Apply after 094. Idempotent CREATE OR REPLACE.
 
 BEGIN;
-
--- Correct attacks (esp. knight) for ov2_ch_is_square_attacked / ov2_ch_in_check.
-CREATE OR REPLACE FUNCTION public.ov2_ch_piece_attacks_square(
-  p_squares jsonb,
-  p_fr int,
-  p_to int,
-  p_white_piece boolean
-)
-RETURNS boolean
-LANGUAGE plpgsql
-IMMUTABLE
-SET search_path = public
-AS $$
-DECLARE
-  v_ch text;
-  v_k text;
-  v_fr int;
-  v_fc int;
-  v_tr int;
-  v_tc int;
-  v_dr int;
-  v_dc int;
-  v_dir int;
-BEGIN
-  v_ch := public.ov2_ch_sq(p_squares, p_fr);
-  IF v_ch = '.' THEN
-    RETURN false;
-  END IF;
-  v_k := lower(v_ch);
-  v_fr := p_fr / 8;
-  v_fc := p_fr % 8;
-  v_tr := p_to / 8;
-  v_tc := p_to % 8;
-  v_dr := v_tr - v_fr;
-  v_dc := v_tc - v_fc;
-
-  IF v_k = 'n' THEN
-    RETURN (abs(v_dr) = 2 AND abs(v_dc) = 1) OR (abs(v_dr) = 1 AND abs(v_dc) = 2);
-  END IF;
-
-  IF v_k = 'k' THEN
-    RETURN abs(v_dr) <= 1 AND abs(v_dc) <= 1 AND (abs(v_dr) + abs(v_dc) > 0);
-  END IF;
-
-  IF v_k = 'p' THEN
-    IF p_white_piece THEN
-      RETURN v_dr = 1 AND abs(v_dc) = 1;
-    ELSE
-      RETURN v_dr = -1 AND abs(v_dc) = 1;
-    END IF;
-  END IF;
-
-  IF v_k = 'r' THEN
-    IF NOT (v_fr = v_tr OR v_fc = v_tc) THEN
-      RETURN false;
-    END IF;
-    IF v_fr = v_tr THEN
-      v_dir := CASE WHEN v_dc > 0 THEN 1 WHEN v_dc < 0 THEN -1 ELSE 0 END;
-      RETURN public.ov2_ch_sliding_attack(p_squares, p_fr, p_to, 0, v_dir, true);
-    END IF;
-    v_dir := CASE WHEN v_dr > 0 THEN 1 WHEN v_dr < 0 THEN -1 ELSE 0 END;
-    RETURN public.ov2_ch_sliding_attack(p_squares, p_fr, p_to, v_dir, 0, true);
-  END IF;
-
-  IF v_k = 'b' THEN
-    IF abs(v_dr) IS DISTINCT FROM abs(v_dc) OR v_dr = 0 THEN
-      RETURN false;
-    END IF;
-    RETURN public.ov2_ch_sliding_attack(p_squares, p_fr, p_to,
-      CASE WHEN v_dr > 0 THEN 1 ELSE -1 END,
-      CASE WHEN v_dc > 0 THEN 1 ELSE -1 END,
-      true);
-  END IF;
-
-  IF v_k = 'q' THEN
-    IF v_fr = v_tr OR v_fc = v_tc THEN
-      IF v_fr = v_tr THEN
-        v_dir := CASE WHEN v_dc > 0 THEN 1 WHEN v_dc < 0 THEN -1 ELSE 0 END;
-        RETURN public.ov2_ch_sliding_attack(p_squares, p_fr, p_to, 0, v_dir, true);
-      END IF;
-      v_dir := CASE WHEN v_dr > 0 THEN 1 WHEN v_dr < 0 THEN -1 ELSE 0 END;
-      RETURN public.ov2_ch_sliding_attack(p_squares, p_fr, p_to, v_dir, 0, true);
-    END IF;
-    IF abs(v_dr) = abs(v_dc) AND v_dr <> 0 THEN
-      RETURN public.ov2_ch_sliding_attack(p_squares, p_fr, p_to,
-        CASE WHEN v_dr > 0 THEN 1 ELSE -1 END,
-        CASE WHEN v_dc > 0 THEN 1 ELSE -1 END,
-        true);
-    END IF;
-    RETURN false;
-  END IF;
-
-  RETURN false;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public._ov2_ch_seg_clear(p_squares jsonb, p_fr int, p_to int)
-RETURNS boolean
-LANGUAGE plpgsql
-IMMUTABLE
-SET search_path = public
-AS $$
-DECLARE
-  v_fr int := p_fr / 8;
-  v_fc int := p_fr % 8;
-  v_tr int := p_to / 8;
-  v_tc int := p_to % 8;
-  v_dr int;
-  v_dc int;
-  v_steps int;
-  v_i int;
-  v_r int;
-  v_c int;
-BEGIN
-  v_dr := v_tr - v_fr;
-  v_dc := v_tc - v_fc;
-  IF v_dr = 0 AND v_dc = 0 THEN
-    RETURN true;
-  END IF;
-  IF v_dr <> 0 AND v_dc <> 0 AND abs(v_dr) <> abs(v_dc) THEN
-    RETURN false;
-  END IF;
-  IF v_dr = 0 THEN
-    v_steps := abs(v_dc);
-    v_dc := CASE WHEN v_dc > 0 THEN 1 WHEN v_dc < 0 THEN -1 ELSE 0 END;
-    v_dr := 0;
-  ELSIF v_dc = 0 THEN
-    v_steps := abs(v_dr);
-    v_dr := CASE WHEN v_dr > 0 THEN 1 WHEN v_dr < 0 THEN -1 ELSE 0 END;
-    v_dc := 0;
-  ELSE
-    v_steps := abs(v_dr);
-    v_dr := CASE WHEN v_tr > v_fr THEN 1 ELSE -1 END;
-    v_dc := CASE WHEN v_tc > v_fc THEN 1 ELSE -1 END;
-  END IF;
-  FOR v_i IN 1..(v_steps - 1) LOOP
-    v_r := (p_fr / 8) + v_dr * v_i;
-    v_c := (p_fr % 8) + v_dc * v_i;
-    IF public.ov2_ch_sq(p_squares, v_r * 8 + v_c) IS DISTINCT FROM '.' THEN
-      RETURN false;
-    END IF;
-  END LOOP;
-  RETURN true;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public._ov2_ch_sq_attacked_after(
-  p_squares jsonb,
-  p_idx int,
-  p_by_white boolean
-)
-RETURNS boolean
-LANGUAGE plpgsql
-IMMUTABLE
-SET search_path = public
-AS $$
-DECLARE
-  v_b jsonb := jsonb_build_object('squares', p_squares);
-BEGIN
-  RETURN public.ov2_ch_is_square_attacked(v_b, p_idx, p_by_white);
-END;
-$$;
-
 -- Pseudo-legal move only (may leave own king in check). Returns partial board patch or NULL.
 CREATE OR REPLACE FUNCTION public._ov2_ch_pseudo_apply(
   p_board jsonb,
@@ -239,7 +75,7 @@ BEGIN
     IF NOT v_w_move AND public.ov2_ch_is_black_sq(v_tgt) THEN
       RETURN NULL;
     END IF;
-    /* Standard chess: game ends at mate/stalemate — never capture the king as a normal move. */
+    /* Standard chess: game ends at mate/stalemate Ã¢â‚¬â€ never capture the king as a normal move. */
     IF v_w_move AND v_tgt = 'k' THEN
       RETURN NULL;
     END IF;
@@ -734,51 +570,305 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.ov2_ch_move_is_legal(p_board jsonb, p_from int, p_to int, p_promo text)
-RETURNS boolean
+-- Hardened apply RPC (same body as 094 after mate/resultKind fix).
+CREATE OR REPLACE FUNCTION public.ov2_chess_apply_move(
+  p_room_id uuid,
+  p_participant_key text,
+  p_from integer,
+  p_to integer,
+  p_promo text DEFAULT 'Q',
+  p_expected_revision bigint DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_room public.ov2_rooms%ROWTYPE;
+  v_pk text;
+  v_sess public.ov2_chess_sessions%ROWTYPE;
+  v_seat int;
+  v_board jsonb;
+  v_turn int;
+  v_ap jsonb;
+  v_w int;
+  v_entry bigint;
+  v_ps jsonb;
+  v_new_board jsonb;
+  v_snap jsonb;
+  v_rk text;
+BEGIN
+  IF p_room_id IS NULL OR p_from IS NULL OR p_to IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'Invalid arguments');
+  END IF;
+  v_pk := trim(COALESCE(p_participant_key, ''));
+  IF length(v_pk) = 0 THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'participant_key required');
+  END IF;
+
+  SELECT * INTO v_room FROM public.ov2_rooms WHERE id = p_room_id FOR UPDATE;
+  IF NOT FOUND OR v_room.product_game_id IS DISTINCT FROM 'ov2_chess' THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'ROOM_NOT_FOUND', 'message', 'Room not found');
+  END IF;
+  IF v_room.active_session_id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'NO_ACTIVE_SESSION', 'message', 'No active session');
+  END IF;
+
+  SELECT * INTO v_sess FROM public.ov2_chess_sessions WHERE id = v_room.active_session_id FOR UPDATE;
+  IF NOT FOUND OR v_sess.room_id IS DISTINCT FROM p_room_id THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'SESSION_NOT_FOUND', 'message', 'Session not found');
+  END IF;
+  IF p_expected_revision IS NOT NULL AND v_sess.revision IS DISTINCT FROM p_expected_revision THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'REVISION_MISMATCH', 'message', 'Revision mismatch', 'revision', v_sess.revision);
+  END IF;
+  IF v_sess.status IS DISTINCT FROM 'live' OR v_sess.phase IS DISTINCT FROM 'playing' THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'GAME_NOT_PLAYING', 'message', 'Session not playing');
+  END IF;
+
+  SELECT seat_index INTO v_seat FROM public.ov2_chess_seats WHERE session_id = v_sess.id AND participant_key = v_pk;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'NO_SEAT', 'message', 'No seat for participant');
+  END IF;
+
+  v_board := v_sess.board;
+  v_turn := (v_board ->> 'turnSeat')::int;
+  IF v_turn IS DISTINCT FROM v_seat THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'NOT_YOUR_TURN', 'message', 'Not your turn');
+  END IF;
+
+  BEGIN
+    v_ap := public.ov2_ch_apply_move(v_board, p_from, p_to, trim(COALESCE(p_promo, 'Q')));
+  EXCEPTION
+    WHEN OTHERS THEN
+      RAISE LOG 'ov2_chess_apply_move engine err state=% msg=%', SQLSTATE, SQLERRM;
+      RETURN jsonb_build_object('ok', false, 'code', 'ENGINE_ERROR', 'message', 'Move validation failed');
+  END;
+
+  IF coalesce((v_ap ->> 'ok')::boolean, false) IS NOT TRUE THEN
+    RETURN jsonb_build_object(
+      'ok', false,
+      'code', COALESCE(v_ap ->> 'code', 'ILLEGAL_MOVE'),
+      'message', 'Illegal move'
+    );
+  END IF;
+
+  v_new_board := v_ap -> 'board';
+  v_rk := COALESCE(v_ap ->> 'resultKind', v_new_board ->> 'resultKind');
+  IF v_rk IS NOT NULL THEN
+    v_rk := trim(both '"' from v_rk);
+  END IF;
+  v_w := NULL;
+  IF v_ap ? 'winner' AND v_ap -> 'winner' IS NOT NULL AND jsonb_typeof(v_ap -> 'winner') <> 'null' THEN
+    BEGIN
+      v_w := (v_ap ->> 'winner')::int;
+    EXCEPTION
+      WHEN invalid_text_representation THEN
+        v_w := NULL;
+    END;
+  END IF;
+  IF v_w IS NULL AND v_new_board ? 'winner' AND jsonb_typeof(v_new_board -> 'winner') = 'number' THEN
+    BEGIN
+      v_w := (v_new_board ->> 'winner')::int;
+    EXCEPTION
+      WHEN invalid_text_representation THEN
+        v_w := NULL;
+    END;
+  END IF;
+
+  IF v_rk = 'checkmate' AND v_w IS NOT NULL AND v_w IN (0, 1) THEN
+    v_entry := COALESCE((v_sess.parity_state ->> '__entry__')::bigint, 0);
+    v_ps := jsonb_set(
+      COALESCE(v_sess.parity_state, '{}'::jsonb),
+      '{__result__}',
+      jsonb_build_object(
+        'winner', v_w,
+        'prize', v_entry * 2,
+        'lossPerSeat', v_entry,
+        'timestamp', (extract(epoch from now()) * 1000)::bigint
+      ),
+      true
+    );
+    UPDATE public.ov2_chess_sessions
+    SET
+      board = v_new_board,
+      turn_seat = (v_new_board ->> 'turnSeat')::int,
+      winner_seat = v_w,
+      phase = 'finished',
+      parity_state = v_ps,
+      revision = v_sess.revision + 1,
+      updated_at = now()
+    WHERE id = v_sess.id
+    RETURNING * INTO v_sess;
+    v_snap := public.ov2_chess_build_client_snapshot(v_sess, v_pk);
+    RETURN jsonb_build_object('ok', true, 'snapshot', v_snap);
+  END IF;
+
+  IF v_rk = 'stalemate' THEN
+    v_entry := COALESCE((v_sess.parity_state ->> '__entry__')::bigint, 0);
+    v_ps := jsonb_set(
+      COALESCE(v_sess.parity_state, '{}'::jsonb),
+      '{__result__}',
+      jsonb_build_object(
+        'draw', true,
+        'stalemate', true,
+        'refundPerSeat', v_entry,
+        'timestamp', (extract(epoch from now()) * 1000)::bigint
+      ),
+      true
+    );
+    UPDATE public.ov2_chess_sessions
+    SET
+      board = v_new_board,
+      turn_seat = (v_new_board ->> 'turnSeat')::int,
+      winner_seat = NULL,
+      phase = 'finished',
+      parity_state = v_ps,
+      revision = v_sess.revision + 1,
+      updated_at = now()
+    WHERE id = v_sess.id
+    RETURNING * INTO v_sess;
+    v_snap := public.ov2_chess_build_client_snapshot(v_sess, v_pk);
+    RETURN jsonb_build_object('ok', true, 'snapshot', v_snap);
+  END IF;
+
+  v_ps := public.ov2_chess_parity_bump_timer(
+    v_sess.parity_state,
+    (v_new_board ->> 'turnSeat')::int,
+    v_seat
+  );
+  UPDATE public.ov2_chess_sessions
+  SET
+    board = v_new_board,
+    turn_seat = (v_new_board ->> 'turnSeat')::int,
+    parity_state = v_ps,
+    revision = v_sess.revision + 1,
+    updated_at = now()
+  WHERE id = v_sess.id
+  RETURNING * INTO v_sess;
+
+  v_snap := public.ov2_chess_build_client_snapshot(v_sess, v_pk);
+  RETURN jsonb_build_object('ok', true, 'snapshot', v_snap);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.ov2_ch_legal_to_indices(p_board jsonb, p_from int)
+RETURNS jsonb
 LANGUAGE plpgsql
 IMMUTABLE
 SET search_path = public
 AS $$
 DECLARE
-  v_ts int;
-  v_w boolean;
-  v_pa jsonb;
-  v_nb jsonb;
+  v_out int[] := ARRAY[]::integer[];
+  v_j int;
+  v_pr text;
+  v_hit boolean;
 BEGIN
-  IF p_board IS NULL THEN
-    RETURN false;
+  IF p_board IS NULL OR p_from IS NULL OR p_from < 0 OR p_from > 63 THEN
+    RETURN '[]'::jsonb;
   END IF;
-  BEGIN
-    v_ts := (p_board ->> 'turnSeat')::int;
-  EXCEPTION
-    WHEN invalid_text_representation THEN
-      RETURN false;
-  END;
-  IF v_ts NOT IN (0, 1) THEN
-    RETURN false;
+  FOR v_j IN 0..63 LOOP
+    IF v_j = p_from THEN
+      CONTINUE;
+    END IF;
+    v_hit := false;
+    FOREACH v_pr IN ARRAY ARRAY['Q','R','B','N','q','r','b','n'] LOOP
+      IF public.ov2_ch_move_is_legal(p_board, p_from, v_j, v_pr) THEN
+        v_out := array_append(v_out, v_j);
+        v_hit := true;
+        EXIT;
+      END IF;
+    END LOOP;
+  END LOOP;
+  IF coalesce(array_length(v_out, 1), 0) = 0 THEN
+    RETURN '[]'::jsonb;
   END IF;
-  v_w := (v_ts = 0);
-  v_pa := public._ov2_ch_pseudo_apply(p_board, p_from, p_to, p_promo);
-  IF v_pa IS NULL THEN
-    RETURN false;
-  END IF;
-  v_nb := public._ov2_ch_merge_pseudo_patch(p_board, v_pa);
-  IF public.ov2_ch_in_check(v_nb, v_w) THEN
-    RETURN false;
-  END IF;
-  RETURN true;
+  RETURN to_jsonb(v_out);
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public._ov2_ch_seg_clear(jsonb, integer, integer) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public._ov2_ch_sq_attacked_after(jsonb, integer, boolean) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public._ov2_ch_pseudo_apply(jsonb, integer, integer, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public._ov2_ch_merge_pseudo_patch(jsonb, jsonb) FROM PUBLIC;
+CREATE OR REPLACE FUNCTION public.ov2_chess_legal_tos(
+  p_room_id uuid,
+  p_participant_key text,
+  p_from integer,
+  p_expected_revision bigint DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_room public.ov2_rooms%ROWTYPE;
+  v_pk text;
+  v_sess public.ov2_chess_sessions%ROWTYPE;
+  v_seat int;
+  v_board jsonb;
+  v_turn int;
+  v_sq jsonb;
+  v_ch text;
+BEGIN
+  IF p_room_id IS NULL OR p_from IS NULL OR p_from < 0 OR p_from > 63 THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'Invalid arguments');
+  END IF;
+  v_pk := trim(COALESCE(p_participant_key, ''));
+  IF length(v_pk) = 0 THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'participant_key required');
+  END IF;
 
-GRANT EXECUTE ON FUNCTION public.ov2_ch_piece_attacks_square(jsonb, integer, integer, boolean) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.ov2_ch_has_legal_move(jsonb, integer) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.ov2_ch_apply_move(jsonb, integer, integer, text) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.ov2_ch_move_is_legal(jsonb, integer, integer, text) TO anon, authenticated, service_role;
+  SELECT * INTO v_room FROM public.ov2_rooms WHERE id = p_room_id;
+  IF NOT FOUND OR v_room.product_game_id IS DISTINCT FROM 'ov2_chess' THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'ROOM_NOT_FOUND', 'message', 'Room not found');
+  END IF;
+  IF v_room.active_session_id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'NO_ACTIVE_SESSION', 'message', 'No active session');
+  END IF;
+
+  SELECT * INTO v_sess FROM public.ov2_chess_sessions WHERE id = v_room.active_session_id;
+  IF NOT FOUND OR v_sess.room_id IS DISTINCT FROM p_room_id THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'SESSION_NOT_FOUND', 'message', 'Session not found');
+  END IF;
+  IF p_expected_revision IS NOT NULL AND v_sess.revision IS DISTINCT FROM p_expected_revision THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'REVISION_MISMATCH', 'message', 'Revision mismatch', 'revision', v_sess.revision);
+  END IF;
+  IF v_sess.status IS DISTINCT FROM 'live' OR v_sess.phase IS DISTINCT FROM 'playing' THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'GAME_NOT_PLAYING', 'message', 'Session not playing');
+  END IF;
+
+  SELECT seat_index INTO v_seat FROM public.ov2_chess_seats WHERE session_id = v_sess.id AND participant_key = v_pk;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'NO_SEAT', 'message', 'No seat for participant');
+  END IF;
+
+  v_board := v_sess.board;
+  v_turn := (v_board ->> 'turnSeat')::int;
+  IF v_turn IS DISTINCT FROM v_seat THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'NOT_YOUR_TURN', 'message', 'Not your turn');
+  END IF;
+
+  v_sq := v_board -> 'squares';
+  IF v_sq IS NULL OR jsonb_typeof(v_sq) <> 'array' OR jsonb_array_length(v_sq) <> 64 THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'BAD_BOARD', 'message', 'Bad board');
+  END IF;
+  v_ch := public.ov2_ch_sq(v_sq, p_from);
+  IF v_ch = '.' THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'EMPTY_FROM', 'message', 'No piece on square');
+  END IF;
+  IF v_turn = 0 AND NOT public.ov2_ch_is_white_sq(v_ch) THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'NOT_YOUR_PIECE', 'message', 'Not your piece');
+  END IF;
+  IF v_turn = 1 AND NOT public.ov2_ch_is_black_sq(v_ch) THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'NOT_YOUR_PIECE', 'message', 'Not your piece');
+  END IF;
+
+  RETURN jsonb_build_object('ok', true, 'tos', public.ov2_ch_legal_to_indices(v_board, p_from));
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.ov2_ch_legal_to_indices(jsonb, integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ov2_ch_legal_to_indices(jsonb, integer) TO anon, authenticated, service_role;
+
+REVOKE ALL ON FUNCTION public.ov2_chess_legal_tos(uuid, text, integer, bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ov2_chess_legal_tos(uuid, text, integer, bigint) TO anon, authenticated, service_role;
 
 COMMIT;

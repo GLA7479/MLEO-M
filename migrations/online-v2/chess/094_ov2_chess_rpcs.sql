@@ -337,11 +337,22 @@ BEGIN
   END IF;
 
   v_new_board := v_ap -> 'board';
-  v_rk := v_ap ->> 'resultKind';
+  v_rk := COALESCE(v_ap ->> 'resultKind', v_new_board ->> 'resultKind');
+  IF v_rk IS NOT NULL THEN
+    v_rk := trim(both '"' from v_rk);
+  END IF;
   v_w := NULL;
   IF v_ap ? 'winner' AND v_ap -> 'winner' IS NOT NULL AND jsonb_typeof(v_ap -> 'winner') <> 'null' THEN
     BEGIN
       v_w := (v_ap ->> 'winner')::int;
+    EXCEPTION
+      WHEN invalid_text_representation THEN
+        v_w := NULL;
+    END;
+  END IF;
+  IF v_w IS NULL AND v_new_board ? 'winner' AND jsonb_typeof(v_new_board -> 'winner') = 'number' THEN
+    BEGIN
+      v_w := (v_new_board ->> 'winner')::int;
     EXCEPTION
       WHEN invalid_text_representation THEN
         v_w := NULL;
