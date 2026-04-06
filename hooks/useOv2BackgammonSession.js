@@ -125,7 +125,9 @@ export function useOv2BackgammonSession(baseContext) {
         const vkey = `${vsid}|${vdl}|${vturn}`;
         if (vkey !== turnKey || Date.now() < vdl) return;
         const revBefore = cur.revision != null ? Number(cur.revision) : NaN;
-        const r = await requestOv2BackgammonMarkTurnTimeout(roomId, selfKey, {});
+        const r = await requestOv2BackgammonMarkTurnTimeout(roomId, selfKey, {
+          revision: cur.revision,
+        });
         if (r.ok && r.snapshot) setSnap(r.snapshot);
         const sn = r.snapshot && typeof r.snapshot === "object" ? r.snapshot : null;
         const revAfter = sn?.revision != null ? Number(sn.revision) : NaN;

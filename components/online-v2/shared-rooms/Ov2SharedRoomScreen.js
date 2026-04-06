@@ -19,10 +19,15 @@ import {
   requestOv2BackgammonOpenSession,
 } from "../../../lib/online-v2/backgammon/ov2BackgammonSessionAdapter";
 import {
+  fetchOv2CheckersSnapshot,
   OV2_CHECKERS_PRODUCT_GAME_ID,
   requestOv2CheckersOpenSession,
 } from "../../../lib/online-v2/checkers/ov2CheckersSessionAdapter";
-import { OV2_CHESS_PRODUCT_GAME_ID, requestOv2ChessOpenSession } from "../../../lib/online-v2/chess/ov2ChessSessionAdapter";
+import {
+  fetchOv2ChessSnapshot,
+  OV2_CHESS_PRODUCT_GAME_ID,
+  requestOv2ChessOpenSession,
+} from "../../../lib/online-v2/chess/ov2ChessSessionAdapter";
 import {
   commitOv2RoomStake,
   fetchOv2RoomById,
@@ -689,7 +694,7 @@ export default function Ov2SharedRoomScreen({
     setBusy(true);
     setMsg("");
     try {
-      if (isLudoRoom || isBingoRoom || isBackgammonRoom) {
+      if (isLudoRoom || isBingoRoom || isBackgammonRoom || isCheckersRoom || isChessRoom) {
         const prep = await prepareSharedHostPreStartStakes();
         if (!prep.ok) {
           setMsg(prep.error);
@@ -847,6 +852,15 @@ export default function Ov2SharedRoomScreen({
         return;
       }
       let cancelledCk = false;
+      void fetchOv2CheckersSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledCk || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-checkers?room=${encodeURIComponent(roomId)}`);
+        }
+      });
       let intervalCk = null;
       const tickCk = async () => {
         try {
@@ -879,6 +893,15 @@ export default function Ov2SharedRoomScreen({
         return;
       }
       let cancelledCh = false;
+      void fetchOv2ChessSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledCh || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-chess?room=${encodeURIComponent(roomId)}`);
+        }
+      });
       let intervalCh = null;
       const tickCh = async () => {
         try {
