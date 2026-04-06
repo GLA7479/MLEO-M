@@ -1,4 +1,5 @@
 # OV2 migrations — apply in this exact order (full repo list).
+# Hidden join-by-code depends on 058_ov2_shared_hidden_join_by_code.sql; apply it in every environment.
 #
 # Ordering rule:
 # 1) Primary key = leading numeric prefix on the FILE BASENAME (e.g. 028 in `ludo/028_...sql`).
@@ -87,3 +88,21 @@ ludo/076_ov2_ludo_settlement_degenerate_prize_fix.sql
 075_ov2_quick_match_deadline_prune_uncommitted_seats.sql
 077_ov2_shared_pre_game_refund_qm_early_start_hard_close.sql
 078_ov2_shared_hard_close_inactive_schedule_30m.sql
+backgammon/079_ov2_backgammon_schema.sql
+backgammon/080_ov2_backgammon_engine.sql
+backgammon/081_ov2_backgammon_rpcs.sql
+backgammon/082_ov2_backgammon_shared_integration.sql
+backgammon/083_ov2_backgammon_turn_timer.sql
+backgammon/084_ov2_backgammon_submit_turn.sql
+backgammon/085_ov2_backgammon_submit_turn_crash_safe.sql
+checkers/086_ov2_checkers_schema.sql
+checkers/087_ov2_checkers_engine.sql
+checkers/088_ov2_checkers_rpcs.sql
+checkers/089_ov2_checkers_shared_integration.sql
+chess/090_ov2_chess_schema.sql
+chess/091_ov2_chess_engine_core.sql
+chess/092_ov2_chess_engine_apply.sql
+chess/093_ov2_chess_engine_complete.sql
+chess/094_ov2_chess_rpcs.sql
+chess/095_ov2_chess_shared_integration.sql
+chess/096_ov2_chess_mate_legal_ux.sql
