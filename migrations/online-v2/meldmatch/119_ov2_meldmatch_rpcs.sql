@@ -4,7 +4,7 @@
 BEGIN;
 
 CREATE OR REPLACE FUNCTION public.ov2_meldmatch_compute_public_core(
-  p_eng public.ov2_meldmatch_engine%ROWTYPE,
+  p_eng public.ov2_meldmatch_engine,
   p_turn_seat int,
   p_turn_phase text,
   p_phase text,

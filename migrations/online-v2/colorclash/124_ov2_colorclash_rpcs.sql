@@ -114,6 +114,7 @@ DECLARE
   v_turn0 int;
   v_card jsonb;
   v_tt text;
+  v_draw record;
 BEGIN
   IF p_room_id IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'room_id required');
@@ -191,7 +192,11 @@ BEGIN
 
   FOR v_i IN 1..7 LOOP
     FOREACH v_s IN ARRAY v_active LOOP
-      v_card := public.ov2_cc_draw_one_from_stock(v_eng);
+      SELECT * INTO v_draw
+      FROM public.ov2_cc_draw_one_from_stock(v_eng);
+
+      v_eng := v_draw.eng;
+      v_card := v_draw.card;
       EXIT WHEN v_card IS NULL;
       v_eng := public.ov2_cc_hand_set(
         v_eng,
@@ -360,6 +365,7 @@ DECLARE
   v_n_draw int;
   v_k int;
   v_drawn jsonb;
+  v_draw record;
 BEGIN
   IF p_room_id IS NULL OR length(v_pk) = 0 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'Invalid arguments');
@@ -404,7 +410,11 @@ BEGIN
     v_n_draw := 1;
   END IF;
   FOR v_k IN 1..v_n_draw LOOP
-    v_card := public.ov2_cc_draw_one_from_stock(v_eng);
+    SELECT * INTO v_draw
+    FROM public.ov2_cc_draw_one_from_stock(v_eng);
+
+    v_eng := v_draw.eng;
+    v_card := v_draw.card;
     EXIT WHEN v_card IS NULL;
     v_drawn := v_drawn || v_card;
   END LOOP;
@@ -495,6 +505,7 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS public.ov2_colorclash_play_card(uuid, text, jsonb, int, bigint);
+DROP FUNCTION IF EXISTS public.ov2_colorclash_play_card(uuid, text, jsonb, int);
 
 CREATE OR REPLACE FUNCTION public.ov2_colorclash_play_card(
   p_room_id uuid,

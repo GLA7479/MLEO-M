@@ -72,7 +72,7 @@ BEGIN
   EXCEPTION
     WHEN invalid_text_representation THEN
       v_turn := NULL;
-  END IF;
+  END;
 
   SELECT s.seat_index INTO v_my_seat
   FROM public.ov2_flipgrid_seats s

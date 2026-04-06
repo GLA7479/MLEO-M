@@ -290,7 +290,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.ov2_cc_hand_get(p_eng public.ov2_colorclash_engine%ROWTYPE, p_seat int)
+CREATE OR REPLACE FUNCTION public.ov2_cc_hand_get(p_eng public.ov2_colorclash_engine, p_seat int)
 RETURNS jsonb
 LANGUAGE sql
 IMMUTABLE
@@ -306,7 +306,7 @@ AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION public.ov2_cc_hand_set(
-  p_eng public.ov2_colorclash_engine%ROWTYPE,
+  p_eng public.ov2_colorclash_engine,
   p_seat int,
   p_hand jsonb
 )
@@ -552,8 +552,10 @@ AS $$
   SELECT coalesce(cardinality(public.ov2_cc_active_non_eliminated(p_active, p_pub)), 0);
 $$;
 
-CREATE OR REPLACE FUNCTION public.ov2_cc_reshuffle_stock_from_discard(p_eng inout public.ov2_colorclash_engine)
-RETURNS void
+CREATE OR REPLACE FUNCTION public.ov2_cc_reshuffle_stock_from_discard(
+  p_eng public.ov2_colorclash_engine
+)
+RETURNS public.ov2_colorclash_engine
 LANGUAGE plpgsql
 SET search_path = public
 AS $$
@@ -565,7 +567,7 @@ DECLARE
 BEGIN
   v_n := public.ov2_cc_jsonb_len(p_eng.discard);
   IF v_n <= 1 THEN
-    RETURN;
+    RETURN p_eng;
   END IF;
   v_top := p_eng.discard -> (v_n - 1);
   FOR v_i IN 0..(v_n - 2) LOOP
@@ -573,36 +575,48 @@ BEGIN
   END LOOP;
   p_eng.discard := jsonb_build_array(v_top);
   p_eng.stock := public.ov2_cc_shuffle_jsonb_array(v_rest) || p_eng.stock;
+  RETURN p_eng;
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.ov2_cc_draw_one_from_stock(p_eng inout public.ov2_colorclash_engine)
-RETURNS jsonb
+CREATE OR REPLACE FUNCTION public.ov2_cc_draw_one_from_stock(
+  p_eng public.ov2_colorclash_engine
+)
+RETURNS TABLE (eng public.ov2_colorclash_engine, card jsonb)
 LANGUAGE plpgsql
 SET search_path = public
 AS $$
 DECLARE
-  v_n int;
+  v_len int;
+  v_eng public.ov2_colorclash_engine;
   v_card jsonb;
 BEGIN
-  v_n := public.ov2_cc_jsonb_len(p_eng.stock);
-  IF v_n <= 0 THEN
-    PERFORM public.ov2_cc_reshuffle_stock_from_discard(p_eng);
-    v_n := public.ov2_cc_jsonb_len(p_eng.stock);
+  v_eng := p_eng;
+  v_len := public.ov2_cc_jsonb_len(v_eng.stock);
+
+  IF v_len = 0 THEN
+    SELECT * INTO v_eng
+    FROM public.ov2_cc_reshuffle_stock_from_discard(v_eng);
+
+    v_len := public.ov2_cc_jsonb_len(v_eng.stock);
+
+    IF v_len = 0 THEN
+      RETURN QUERY SELECT v_eng, NULL::jsonb;
+      RETURN;
+    END IF;
   END IF;
-  IF v_n <= 0 THEN
-    RETURN NULL;
-  END IF;
-  v_card := p_eng.stock -> (v_n - 1);
-  IF v_n = 1 THEN
-    p_eng.stock := '[]'::jsonb;
+
+  v_card := v_eng.stock -> 0;
+  IF v_len = 1 THEN
+    v_eng.stock := '[]'::jsonb;
   ELSE
-    p_eng.stock := (
-      SELECT coalesce(jsonb_agg(p_eng.stock -> i ORDER BY i), '[]'::jsonb)
-      FROM generate_series(0, v_n - 2) AS g(i)
+    v_eng.stock := (
+      SELECT coalesce(jsonb_agg(v_eng.stock -> i ORDER BY i), '[]'::jsonb)
+      FROM generate_series(1, v_len - 1) AS g(i)
     );
   END IF;
-  RETURN v_card;
+
+  RETURN QUERY SELECT v_eng, v_card;
 END;
 $$;
 
@@ -620,11 +634,16 @@ DECLARE
   v_card jsonb;
   v_hand jsonb;
   v_e public.ov2_colorclash_engine%ROWTYPE;
+  v_draw record;
 BEGIN
   v_e := p_eng;
   v_hand := public.ov2_cc_hand_get(v_e, p_seat);
   FOR v_k IN 1..greatest(0, coalesce(p_n, 0)) LOOP
-    v_card := public.ov2_cc_draw_one_from_stock(v_e);
+    SELECT * INTO v_draw
+    FROM public.ov2_cc_draw_one_from_stock(v_e);
+
+    v_e := v_draw.eng;
+    v_card := v_draw.card;
     EXIT WHEN v_card IS NULL;
     v_hand := v_hand || v_card;
   END LOOP;
@@ -689,7 +708,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.ov2_cc_compute_public_core(
-  p_eng public.ov2_colorclash_engine%ROWTYPE,
+  p_eng public.ov2_colorclash_engine,
   p_pub jsonb,
   p_active int[]
 )
@@ -721,8 +740,3 @@ END;
 $$;
 
 COMMIT;
-</think>
-Fixing stock pop logic in the engine file and completing remaining functions.
-
-<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
-Read
