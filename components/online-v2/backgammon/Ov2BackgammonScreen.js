@@ -228,8 +228,8 @@ function BoardPoint({
 }) {
   const fill =
     tone === "a"
-      ? "from-[#e8d4b4] via-[#e0cda8] to-[#dbc7a3]"
-      : "from-[#763232] via-[#6e2f2f] to-[#4a2220]";
+      ? "from-[#f0dfb8] via-[#e8d19b] to-[#e2c88e]"
+      : "from-[#a13c3c] via-[#8f3434] to-[#742727]";
   const clip = direction === "down" ? "polygon(50% 100%, 0 0, 100% 0)" : "polygon(50% 0, 0 100%, 100% 100%)";
   const pointHighlightClass = invalidFlash
     ? "ring-1 ring-rose-500/50"
@@ -243,7 +243,7 @@ function BoardPoint({
       type="button"
       disabled={disabled}
       onClick={() => onPointClick(pointIndex)}
-      className={`group relative isolate flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch overflow-visible opacity-100 outline-none transition-[transform,opacity] duration-[120ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] ${pointHighlightClass} disabled:cursor-not-allowed disabled:opacity-40 disabled:pointer-events-none`}
+      className={`group relative isolate flex h-full min-h-0 min-w-0 flex-1 flex-col items-stretch overflow-visible opacity-100 outline-none transition-[transform,opacity] duration-[120ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] ${pointHighlightClass} disabled:cursor-not-allowed disabled:!opacity-100 disabled:pointer-events-none`}
       style={{ WebkitTapHighlightColor: "transparent" }}
       aria-label={`Point ${pointIndex + 1}`}
     >
@@ -826,6 +826,19 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
 
   const boardDisabled = busy || vm.readOnly || String(vm.phase) !== "playing";
   const compactBoard = narrowViewport;
+  /** UI only: richer felt while a match is actively in `playing` phase (vs finished / between states). */
+  const activePlayFelt = String(vm.phase).toLowerCase() === "playing";
+  /** Green felt — center playfield only. */
+  const feltPlaySurface = activePlayFelt
+    ? "bg-gradient-to-b from-[#072820] via-[#0b362b] to-[#072820] shadow-[inset_0_0_10px_rgba(0,0,0,0.14)]"
+    : "bg-gradient-to-b from-[#08261e] via-[#0b3127] to-[#08261e] shadow-[inset_0_0_10px_rgba(0,0,0,0.18)]";
+  /** Dark rail (not felt): bar + off — charcoal / near-black, fits wood frame. */
+  const feltBarRailSurface = activePlayFelt
+    ? "bg-gradient-to-b from-[#060908] via-[#0e1311] to-[#060908] shadow-[inset_0_0_16px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.03)]"
+    : "bg-gradient-to-b from-[#080c0a] via-[#121816] to-[#080c0a] shadow-[inset_0_0_16px_rgba(0,0,0,0.48),inset_0_1px_0_rgba(255,255,255,0.028)]";
+  const feltOffRailSurface = activePlayFelt
+    ? "bg-gradient-to-b from-[#060908] via-[#0e1311] to-[#060908] shadow-[inset_2px_0_16px_rgba(0,0,0,0.45),inset_0_0_14px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.03)]"
+    : "bg-gradient-to-b from-[#080c0a] via-[#121816] to-[#080c0a] shadow-[inset_2px_0_16px_rgba(0,0,0,0.4),inset_0_0_14px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.028)]";
 
   const toneAt = useCallback(i => (i % 2 === 0 ? "a" : "b"), []);
 
@@ -860,7 +873,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
 
   const barCol = (
     <div
-      className={`flex w-9 shrink-0 flex-col border-x border-black/32 bg-gradient-to-b from-[#061a15] via-[#051410] to-[#040d0b] shadow-[inset_0_0_10px_rgba(0,0,0,0.32)] sm:w-11 md:w-14 ${
+      className={`flex w-9 shrink-0 flex-col border-x border-black/40 ${feltBarRailSurface} sm:w-11 md:w-14 ${
         swapBoardHalvesForViewer ? "flex-col-reverse" : ""
       }`}
     >
@@ -871,7 +884,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           if (vm.mySeat !== 1) return;
           void onBarClick();
         }}
-        className={`${OV2BG_BTN} flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 py-1 sm:py-1.5 ${
+        className={`${OV2BG_BTN} flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 py-1 disabled:!opacity-100 sm:py-1.5 ${
           vm.mySeat === 1 && myBar > 0 && selFrom === "bar"
             ? "bg-sky-900/50 text-sky-50 ring-2 ring-sky-400/65 ring-inset"
             : ""
@@ -889,7 +902,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           className={surfaceAnim.bar === 1 ? "ov2bg-bar-enter" : ""}
         />
       </button>
-      <div className="h-px shrink-0 bg-black/50" aria-hidden />
+      <div className="h-px shrink-0 bg-black/28" aria-hidden />
       <button
         type="button"
         disabled={boardDisabled || vm.mySeat !== 0 || displayBar[0] <= 0 || !vm.canClientMove}
@@ -897,7 +910,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           if (vm.mySeat !== 0) return;
           void onBarClick();
         }}
-        className={`${OV2BG_BTN} flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 py-1 sm:py-1.5 ${
+        className={`${OV2BG_BTN} flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 py-1 disabled:!opacity-100 sm:py-1.5 ${
           vm.mySeat === 0 && myBar > 0 && selFrom === "bar"
             ? "bg-sky-900/50 text-sky-50 ring-2 ring-sky-400/65 ring-inset"
             : ""
@@ -920,7 +933,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
 
   const offColumn = (
     <div
-      className={`flex w-10 shrink-0 flex-col border-l border-white/[0.09] bg-[#0f3228]/88 shadow-[inset_2px_0_14px_rgba(0,0,0,0.14),inset_0_1px_0_rgba(255,255,255,0.07)] sm:w-12 md:w-[3.25rem] ${
+      className={`flex w-10 shrink-0 flex-col border-l border-white/[0.08] ${feltOffRailSurface} sm:w-12 md:w-[3.25rem] ${
         swapBoardHalvesForViewer ? "flex-col-reverse" : ""
       }`}
     >
@@ -930,7 +943,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         onClick={() => {
           if (vm.mySeat === 1) void onBearOffClick();
         }}
-        className={`${OV2BG_BTN} flex min-h-0 flex-1 flex-col items-center justify-start gap-1 border-b border-black/25 py-1 sm:py-1.5 ${
+        className={`${OV2BG_BTN} flex min-h-0 flex-1 flex-col items-center justify-start gap-1 border-b border-black/25 py-1 disabled:!opacity-100 sm:py-1.5 ${
           bearHighlight && vm.mySeat === 1
             ? "bg-emerald-950/38 ring-2 ring-inset ring-emerald-400/52 shadow-[0_2px_4px_rgba(52,211,153,0.14),0_8px_20px_rgba(52,211,153,0.1)]"
             : ""
@@ -947,7 +960,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         onClick={() => {
           if (vm.mySeat === 0) void onBearOffClick();
         }}
-        className={`${OV2BG_BTN} flex min-h-0 flex-1 flex-col items-center justify-end gap-1 py-1 sm:py-1.5 ${
+        className={`${OV2BG_BTN} flex min-h-0 flex-1 flex-col items-center justify-end gap-1 py-1 disabled:!opacity-100 sm:py-1.5 ${
           bearHighlight && vm.mySeat === 0
             ? "bg-emerald-950/38 ring-2 ring-inset ring-emerald-400/52 shadow-[0_2px_4px_rgba(52,211,153,0.14),0_8px_20px_rgba(52,211,153,0.1)]"
             : ""
@@ -1150,16 +1163,18 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
               Off
             </span>
           </div>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-row gap-px overflow-hidden rounded-sm bg-[#0E2A22] p-px shadow-[inset_0_2px_14px_rgba(0,0,0,0.26),inset_0_0_0_1px_rgba(0,0,0,0.16)] sm:gap-1 sm:p-0.5">
+          <div
+            className={`flex min-h-0 min-w-0 flex-1 flex-row gap-px overflow-hidden rounded-sm p-px sm:gap-1 sm:p-0.5 ${feltPlaySurface}`}
+          >
             <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(leftTopIndices, leftTopDir)}</div>
-              <div className="h-px shrink-0 bg-black/35" aria-hidden />
+              <div className="h-px shrink-0 bg-black/22" aria-hidden />
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(leftBotIndices, leftBotDir)}</div>
             </div>
             {barCol}
             <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(rightTopIndices, rightTopDir)}</div>
-              <div className="h-px shrink-0 bg-black/35" aria-hidden />
+              <div className="h-px shrink-0 bg-black/22" aria-hidden />
               <div className="flex min-h-0 min-w-0 flex-1 basis-0">{renderHalfRow(rightBotIndices, rightBotDir)}</div>
             </div>
             {offColumn}
