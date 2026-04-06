@@ -106,3 +106,9 @@ chess/093_ov2_chess_engine_complete.sql
 chess/094_ov2_chess_rpcs.sql
 chess/095_ov2_chess_shared_integration.sql
 chess/096_ov2_chess_mate_legal_ux.sql
+dominoes/097_ov2_dominoes_schema.sql
+dominoes/098_ov2_dominoes_engine.sql
+dominoes/099_ov2_dominoes_rpcs.sql
+dominoes/100_ov2_dominoes_rpcs_actions.sql
+dominoes/101_1_ov2_dominoes_shared_integration.sql
+dominoes/101_2_ov2_dominoes_snapshot_expose_result.sql

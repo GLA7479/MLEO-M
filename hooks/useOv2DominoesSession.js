@@ -36,6 +36,7 @@ export function useOv2DominoesSession(baseContext) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [vaultClaimBusy, setVaultClaimBusy] = useState(false);
+  const [settlementPrizeAmount, setSettlementPrizeAmount] = useState(/** @type {number|null} */ (null));
   const [nowMs, setNowMs] = useState(() => Date.now());
   const vaultFinishedRef = useRef(/** @type {string|null} */ (null));
   const vaultLinesAppliedForSessionRef = useRef(/** @type {Set<string>} */ (new Set()));
@@ -48,6 +49,7 @@ export function useOv2DominoesSession(baseContext) {
     vaultLinesAppliedForSessionRef.current.clear();
     processedTurnTimeoutKeysRef.current.clear();
     setVaultClaimBusy(false);
+    setSettlementPrizeAmount(null);
   }, [roomId, activeSessionKey]);
 
   useEffect(() => {
@@ -87,6 +89,7 @@ export function useOv2DominoesSession(baseContext) {
     const sid = String(snap.sessionId || "").trim();
     if (!sid || vaultFinishedRef.current === sid) return;
     vaultFinishedRef.current = sid;
+    setSettlementPrizeAmount(null);
     setVaultClaimBusy(true);
     void (async () => {
       try {
@@ -96,7 +99,11 @@ export function useOv2DominoesSession(baseContext) {
             await applyBoardPathSettlementClaimLinesToVault(claim.lines, OV2_DOMINOES_PRODUCT_GAME_ID);
             vaultLinesAppliedForSessionRef.current.add(sid);
           }
-        } else if (!claim.ok) {
+        }
+        if (claim.ok) {
+          const ta = claim.total_amount != null ? Number(claim.total_amount) : NaN;
+          if (Number.isFinite(ta) && ta >= 0) setSettlementPrizeAmount(ta);
+        } else {
           vaultFinishedRef.current = null;
         }
       } catch {
@@ -287,6 +294,71 @@ export function useOv2DominoesSession(baseContext) {
     [roomId, selfKey]
   );
 
+  /**
+   * @param {Record<string, unknown>|null|undefined} res
+   */
+  const parseResultVm = useCallback(res => {
+    if (!res || typeof res !== "object") {
+      return {
+        result: null,
+        resultWinner: null,
+        resultDraw: false,
+        resultBlocked: false,
+        resultEmptyHand: false,
+        resultDoubleDeclined: false,
+        resultDoubleTimeout: false,
+        resultTimeoutLoserSeat: null,
+        resultForfeitBy: "",
+        resultPrize: null,
+        resultLossPerSeat: null,
+        resultStakeMultiplier: null,
+        resultPipTotalsBySeat: /** @type {{ 0: number|null, 1: number|null } | null} */ (null),
+      };
+    }
+    const wRaw = res.winner;
+    const resultWinner =
+      wRaw !== null && wRaw !== undefined && String(wRaw) !== "" && Number.isFinite(Number(wRaw))
+        ? Number(wRaw)
+        : null;
+    const ptIn = res.pipTotals && typeof res.pipTotals === "object" ? /** @type {Record<string, unknown>} */ (res.pipTotals) : null;
+    let resultPipTotalsBySeat = null;
+    if (ptIn) {
+      const p0 = Number(ptIn["0"] ?? ptIn[0]);
+      const p1 = Number(ptIn["1"] ?? ptIn[1]);
+      resultPipTotalsBySeat = {
+        0: Number.isFinite(p0) ? p0 : null,
+        1: Number.isFinite(p1) ? p1 : null,
+      };
+    }
+    const pr = res.prize;
+    const resultPrize = pr != null && Number.isFinite(Number(pr)) ? Number(pr) : null;
+    const ls = res.lossPerSeat;
+    const resultLossPerSeat = ls != null && Number.isFinite(Number(ls)) ? Number(ls) : null;
+    const sm = res.stakeMultiplier;
+    const resultStakeMultiplier =
+      sm != null && Number.isFinite(Number(sm)) ? Math.max(1, Math.min(16, Math.floor(Number(sm)))) : null;
+    const tls = res.timeout_loser_seat;
+    const resultTimeoutLoserSeat =
+      tls !== null && tls !== undefined && String(tls) !== "" && Number.isFinite(Number(tls)) ? Number(tls) : null;
+    const fb = res.forfeit_by;
+    const resultForfeitBy = fb != null && String(fb).trim() !== "" ? String(fb).trim() : "";
+    return {
+      result: res,
+      resultWinner,
+      resultDraw: res.draw === true,
+      resultBlocked: res.blocked === true,
+      resultEmptyHand: res.empty_hand === true,
+      resultDoubleDeclined: res.double_declined === true,
+      resultDoubleTimeout: res.double_timeout === true,
+      resultTimeoutLoserSeat,
+      resultForfeitBy,
+      resultPrize,
+      resultLossPerSeat,
+      resultStakeMultiplier,
+      resultPipTotalsBySeat,
+    };
+  }, []);
+
   const vm = useMemo(() => {
     const phase = snap ? String(snap.phase || "").toLowerCase() : "";
     const line = Array.isArray(snap?.line) ? snap.line : [];
@@ -297,34 +369,52 @@ export function useOv2DominoesSession(baseContext) {
     const turnTimeLeftMs =
       phase === "playing" && turnDeadline != null ? Math.max(0, turnDeadline - nowMs) : null;
     const turnTimeLeftSec = turnTimeLeftMs != null ? Math.ceil(turnTimeLeftMs / 1000) : null;
+    const pd = snap?.pendingDouble && typeof snap.pendingDouble === "object" ? snap.pendingDouble : null;
+    const ddl =
+      pd && pd.deadline_ms != null && Number.isFinite(Number(pd.deadline_ms)) ? Math.floor(Number(pd.deadline_ms)) : null;
+    const doubleTimeLeftMs =
+      phase === "playing" && snap?.mustRespondDouble === true && ddl != null ? Math.max(0, ddl - nowMs) : null;
+    const doubleTimeLeftSec = doubleTimeLeftMs != null ? Math.ceil(doubleTimeLeftMs / 1000) : null;
+    const board = snap?.board && typeof snap.board === "object" ? snap.board : {};
+    const resParsed =
+      phase === "finished" && snap?.result && typeof snap.result === "object"
+        ? parseResultVm(/** @type {Record<string, unknown>} */ (snap.result))
+        : parseResultVm(null);
     return {
       phase,
       line,
+      board,
       turnSeat: snap?.turnSeat ?? null,
       mySeat: snap?.mySeat ?? null,
       winnerSeat: snap?.winnerSeat ?? null,
       revision: snap?.revision ?? 0,
       sessionId: snap?.sessionId != null ? String(snap.sessionId) : "",
       turnDeadline,
+      turnTimeLeftMs,
       turnTimeLeftSec,
+      doubleDeadlineMs: ddl,
+      doubleTimeLeftMs,
+      doubleTimeLeftSec,
       missedStreakBySeat: { 0: m0, 1: m1 },
       myHand: Array.isArray(snap?.myHand) ? snap.myHand : [],
       oppHandCount: snap?.oppHandCount ?? 0,
       boneyardCount: snap?.boneyardCount ?? 0,
       stakeMultiplier: snap?.stakeMultiplier ?? 1,
       doublesAccepted: snap?.doublesAccepted ?? 0,
-      pendingDouble: snap?.pendingDouble ?? null,
+      pendingDouble: pd,
       canClientPlayTiles: snap?.canClientPlayTiles === true,
       canOfferDouble: snap?.canOfferDouble === true,
       mustRespondDouble: snap?.mustRespondDouble === true,
+      ...resParsed,
     };
-  }, [snap, nowMs]);
+  }, [snap, nowMs, parseResultVm]);
 
   return {
     snapshot: snap,
     vm,
     busy,
     vaultClaimBusy,
+    settlementPrizeAmount,
     err,
     setErr,
     playTile,
