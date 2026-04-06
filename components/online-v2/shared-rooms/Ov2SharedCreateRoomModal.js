@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { ONLINE_V2_GAME_KINDS, ONLINE_V2_MIN_STAKE_UNITS } from "../../../lib/online-v2/ov2Economy";
+import { isOv2ColorClashStakeUnitsAllowed } from "../../../lib/online-v2/colorclash/ov2ColorClashStakes";
+import { isOv2FleetHuntStakeUnitsAllowed } from "../../../lib/online-v2/fleethunt/ov2FleetHuntStakes";
+import { isOv2TileRushDuelStakeUnitsAllowed } from "../../../lib/online-v2/tilerushduel/ov2TileRushDuelStakes";
+import { isOv2GoalDuelStakeUnitsAllowed } from "../../../lib/online-v2/goal-duel/ov2GoalDuelStakes";
 
 function defaultMaxPlayersForProduct(productId) {
-  return productId === ONLINE_V2_GAME_KINDS.BINGO ? 8 : 4;
+  if (productId === ONLINE_V2_GAME_KINDS.BINGO) return 8;
+  if (productId === ONLINE_V2_GAME_KINDS.FLEET_HUNT) return 2;
+  if (productId === ONLINE_V2_GAME_KINDS.TILE_RUSH_DUEL) return 2;
+  if (productId === ONLINE_V2_GAME_KINDS.GOAL_DUEL) return 2;
+  return 4;
 }
 
 export default function Ov2SharedCreateRoomModal({ open, games, selectedGameId, onClose, onSubmit, busy }) {
@@ -25,7 +33,13 @@ export default function Ov2SharedCreateRoomModal({ open, games, selectedGameId, 
   }, [open, selectedGameId, games]);
 
   const entryParsed = Math.floor(Number(stakeInput));
-  const entryOk = stakeInput.trim() !== "" && Number.isFinite(entryParsed) && entryParsed >= ONLINE_V2_MIN_STAKE_UNITS;
+  const entryOkBase = stakeInput.trim() !== "" && Number.isFinite(entryParsed) && entryParsed >= ONLINE_V2_MIN_STAKE_UNITS;
+  const entryOk =
+    entryOkBase &&
+    (productGameId !== ONLINE_V2_GAME_KINDS.COLOR_CLASH || isOv2ColorClashStakeUnitsAllowed(entryParsed)) &&
+    (productGameId !== ONLINE_V2_GAME_KINDS.FLEET_HUNT || isOv2FleetHuntStakeUnitsAllowed(entryParsed)) &&
+    (productGameId !== ONLINE_V2_GAME_KINDS.TILE_RUSH_DUEL || isOv2TileRushDuelStakeUnitsAllowed(entryParsed)) &&
+    (productGameId !== ONLINE_V2_GAME_KINDS.GOAL_DUEL || isOv2GoalDuelStakeUnitsAllowed(entryParsed));
 
   const canSubmit = useMemo(() => {
     if (!productGameId) return false;
@@ -73,9 +87,35 @@ export default function Ov2SharedCreateRoomModal({ open, games, selectedGameId, 
             className="w-full rounded-lg border border-white/15 bg-black/40 px-2 py-2 text-sm text-white"
             placeholder="Room entry per seat"
           />
-          <div className="text-[11px] text-zinc-500">Minimum {ONLINE_V2_MIN_STAKE_UNITS}.</div>
-          {stakeInput.trim() !== "" && !entryOk ? (
+          <div className="text-[11px] text-zinc-500">
+            Minimum {ONLINE_V2_MIN_STAKE_UNITS}.
+            {productGameId === ONLINE_V2_GAME_KINDS.COLOR_CLASH ? (
+              <span className="block text-zinc-400">Color Clash entry: 100, 1K, 10K, or 100K only.</span>
+            ) : null}
+            {productGameId === ONLINE_V2_GAME_KINDS.FLEET_HUNT ? (
+              <span className="block text-zinc-400">Fleet Hunt entry: 100, 1K, 10K, or 100K only.</span>
+            ) : null}
+            {productGameId === ONLINE_V2_GAME_KINDS.TILE_RUSH_DUEL ? (
+              <span className="block text-zinc-400">Tile Rush Duel entry: 100, 1K, 10K, or 100K only.</span>
+            ) : null}
+            {productGameId === ONLINE_V2_GAME_KINDS.GOAL_DUEL ? (
+              <span className="block text-zinc-400">Goal Duel entry: 100, 1K, 10K, or 100K only.</span>
+            ) : null}
+          </div>
+          {stakeInput.trim() !== "" && !entryOkBase ? (
             <div className="text-[11px] text-amber-200">Enter at least {ONLINE_V2_MIN_STAKE_UNITS}.</div>
+          ) : null}
+          {stakeInput.trim() !== "" && entryOkBase && productGameId === ONLINE_V2_GAME_KINDS.COLOR_CLASH && !isOv2ColorClashStakeUnitsAllowed(entryParsed) ? (
+            <div className="text-[11px] text-amber-200">Color Clash allows only 100, 1,000, 10,000, or 100,000 per seat.</div>
+          ) : null}
+          {stakeInput.trim() !== "" && entryOkBase && productGameId === ONLINE_V2_GAME_KINDS.FLEET_HUNT && !isOv2FleetHuntStakeUnitsAllowed(entryParsed) ? (
+            <div className="text-[11px] text-amber-200">Fleet Hunt allows only 100, 1,000, 10,000, or 100,000 per seat.</div>
+          ) : null}
+          {stakeInput.trim() !== "" && entryOkBase && productGameId === ONLINE_V2_GAME_KINDS.TILE_RUSH_DUEL && !isOv2TileRushDuelStakeUnitsAllowed(entryParsed) ? (
+            <div className="text-[11px] text-amber-200">Tile Rush Duel allows only 100, 1,000, 10,000, or 100,000 per seat.</div>
+          ) : null}
+          {stakeInput.trim() !== "" && entryOkBase && productGameId === ONLINE_V2_GAME_KINDS.GOAL_DUEL && !isOv2GoalDuelStakeUnitsAllowed(entryParsed) ? (
+            <div className="text-[11px] text-amber-200">Goal Duel allows only 100, 1,000, 10,000, or 100,000 per seat.</div>
           ) : null}
           <div className="grid grid-cols-2 gap-2">
             <input

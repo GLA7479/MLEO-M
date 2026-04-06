@@ -9,6 +9,7 @@ import {
   ONLINE_V2_SHARED_LOBBY_GAMES,
   OV2_SHARED_LAST_ROOM_SESSION_KEY,
 } from "../../lib/online-v2/onlineV2GameRegistry";
+import { isOv2UiPreviewsEnabled } from "../../lib/online-v2/dev/ov2UiPreviewMocks";
 import { getOv2ParticipantId } from "../../lib/online-v2/ov2ParticipantId";
 import {
   OV2_SHARED_DISPLAY_NAME_KEY,
@@ -197,6 +198,13 @@ export default function OnlineV2RoomsScreen() {
                 Shared rooms
               </h1>
               <p className="truncate text-[11px] text-zinc-300 lg:text-xs xl:text-sm">Play with others</p>
+              {isOv2UiPreviewsEnabled() ? (
+                <p className="mt-1 truncate text-[10px] text-zinc-500">
+                  <Link href="/online-v2/game-ui-previews" className="text-amber-400/90 underline decoration-amber-500/30">
+                    New games — UI preview (no DB)
+                  </Link>
+                </p>
+              ) : null}
             </div>
             <OnlineV2VaultStrip />
           </header>

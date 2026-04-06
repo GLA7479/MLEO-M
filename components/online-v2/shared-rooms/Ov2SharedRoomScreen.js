@@ -29,6 +29,42 @@ import {
   requestOv2ChessOpenSession,
 } from "../../../lib/online-v2/chess/ov2ChessSessionAdapter";
 import {
+  fetchOv2DominoesSnapshot,
+  OV2_DOMINOES_PRODUCT_GAME_ID,
+  requestOv2DominoesOpenSession,
+} from "../../../lib/online-v2/dominoes/ov2DominoesSessionAdapter";
+import {
+  fetchOv2FourLineSnapshot,
+  OV2_FOURLINE_PRODUCT_GAME_ID,
+  requestOv2FourLineOpenSession,
+} from "../../../lib/online-v2/fourline/ov2FourLineSessionAdapter";
+import {
+  fetchOv2FlipGridSnapshot,
+  OV2_FLIPGRID_PRODUCT_GAME_ID,
+  requestOv2FlipGridOpenSession,
+} from "../../../lib/online-v2/flipgrid/ov2FlipGridSessionAdapter";
+import {
+  fetchOv2MeldMatchSnapshot,
+  OV2_MELDMATCH_PRODUCT_GAME_ID,
+  requestOv2MeldMatchOpenSession,
+} from "../../../lib/online-v2/meldmatch/ov2MeldMatchSessionAdapter";
+import {
+  fetchOv2ColorClashSnapshot,
+  requestOv2ColorClashOpenSession,
+} from "../../../lib/online-v2/colorclash/ov2ColorClashSessionAdapter";
+import {
+  fetchOv2FleetHuntSnapshot,
+  requestOv2FleetHuntOpenSession,
+} from "../../../lib/online-v2/fleethunt/ov2FleetHuntSessionAdapter";
+import {
+  fetchOv2TileRushDuelSnapshot,
+  requestOv2TileRushDuelOpenSession,
+} from "../../../lib/online-v2/tilerushduel/ov2TileRushDuelSessionAdapter";
+import {
+  fetchOv2GoalDuelSnapshot,
+  requestOv2GoalDuelOpenSession,
+} from "../../../lib/online-v2/goal-duel/ov2GoalDuelSessionAdapter";
+import {
   commitOv2RoomStake,
   fetchOv2RoomById,
   fetchOv2RoomLedgerForViewer,
@@ -40,7 +76,11 @@ import {
   clearOv2SharedLastRoomSessionKey,
   isOv2ActiveSharedProductId,
 } from "../../../lib/online-v2/onlineV2GameRegistry";
-import { buildOnlineV2EconomyEventKey, clampSuggestedOnlineV2Stake } from "../../../lib/online-v2/ov2Economy";
+import {
+  buildOnlineV2EconomyEventKey,
+  clampSuggestedOnlineV2Stake,
+  ONLINE_V2_GAME_KINDS,
+} from "../../../lib/online-v2/ov2Economy";
 import { debitOnlineV2Vault, peekOnlineV2Vault, readOnlineV2Vault } from "../../../lib/online-v2/onlineV2VaultBridge";
 import {
   formatSeatedStakeBlockers,
@@ -123,8 +163,29 @@ export default function Ov2SharedRoomScreen({
   const isBackgammonRoom = String(room?.product_game_id || "").trim() === OV2_BACKGAMMON_PRODUCT_GAME_ID;
   const isCheckersRoom = String(room?.product_game_id || "").trim() === OV2_CHECKERS_PRODUCT_GAME_ID;
   const isChessRoom = String(room?.product_game_id || "").trim() === OV2_CHESS_PRODUCT_GAME_ID;
+  const isDominoesRoom = String(room?.product_game_id || "").trim() === OV2_DOMINOES_PRODUCT_GAME_ID;
+  const isFourLineRoom = String(room?.product_game_id || "").trim() === OV2_FOURLINE_PRODUCT_GAME_ID;
+  const isFlipGridRoom = String(room?.product_game_id || "").trim() === OV2_FLIPGRID_PRODUCT_GAME_ID;
+  const isMeldMatchRoom = String(room?.product_game_id || "").trim() === OV2_MELDMATCH_PRODUCT_GAME_ID;
+  const isColorClashRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.COLOR_CLASH;
+  const isFleetHuntRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.FLEET_HUNT;
+  const isTileRushDuelRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.TILE_RUSH_DUEL;
+  const isGoalDuelRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.GOAL_DUEL;
   const isStakeSharedRoom =
-    isRummy51Room || isLudoRoom || isBingoRoom || isBackgammonRoom || isCheckersRoom || isChessRoom;
+    isRummy51Room ||
+    isLudoRoom ||
+    isBingoRoom ||
+    isBackgammonRoom ||
+    isCheckersRoom ||
+    isChessRoom ||
+    isDominoesRoom ||
+    isFourLineRoom ||
+    isFlipGridRoom ||
+    isMeldMatchRoom ||
+    isColorClashRoom ||
+    isFleetHuntRoom ||
+    isTileRushDuelRoom ||
+    isGoalDuelRoom;
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
 
   const ledgerByParticipant = useMemo(() => {
@@ -415,6 +476,94 @@ export default function Ov2SharedRoomScreen({
           await router.push(`/ov2-chess?room=${encodeURIComponent(roomId)}`);
           return;
         }
+        if (isDominoesRoom) {
+          const open = await requestOv2DominoesOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-dominoes?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isFourLineRoom) {
+          const open = await requestOv2FourLineOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-fourline?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isFlipGridRoom) {
+          const open = await requestOv2FlipGridOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-flipgrid?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isMeldMatchRoom) {
+          const open = await requestOv2MeldMatchOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-meldmatch?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isColorClashRoom) {
+          const open = await requestOv2ColorClashOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-colorclash?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isFleetHuntRoom) {
+          const open = await requestOv2FleetHuntOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-fleet-hunt?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isTileRushDuelRoom) {
+          const open = await requestOv2TileRushDuelOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-tile-rush-duel?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
+        if (isGoalDuelRoom) {
+          const open = await requestOv2GoalDuelOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-goal-duel?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
       } catch {
         /* retry on next snapshot */
       }
@@ -433,6 +582,14 @@ export default function Ov2SharedRoomScreen({
     isBackgammonRoom,
     isCheckersRoom,
     isChessRoom,
+    isDominoesRoom,
+    isFourLineRoom,
+    isFlipGridRoom,
+    isMeldMatchRoom,
+    isColorClashRoom,
+    isFleetHuntRoom,
+    isTileRushDuelRoom,
+    isGoalDuelRoom,
     roomId,
     router,
     // Re-run on each shared snapshot poll so a transient open failure (e.g. first tick after IN_GAME) retries.
@@ -694,7 +851,21 @@ export default function Ov2SharedRoomScreen({
     setBusy(true);
     setMsg("");
     try {
-      if (isLudoRoom || isBingoRoom || isBackgammonRoom || isCheckersRoom || isChessRoom) {
+      if (
+        isLudoRoom ||
+        isBingoRoom ||
+        isBackgammonRoom ||
+        isCheckersRoom ||
+        isChessRoom ||
+        isDominoesRoom ||
+        isFourLineRoom ||
+        isFlipGridRoom ||
+        isMeldMatchRoom ||
+        isColorClashRoom ||
+        isFleetHuntRoom ||
+        isTileRushDuelRoom ||
+        isGoalDuelRoom
+      ) {
         const prep = await prepareSharedHostPreStartStakes();
         if (!prep.ok) {
           setMsg(prep.error);
@@ -767,6 +938,110 @@ export default function Ov2SharedRoomScreen({
         didRouteToLiveRef.current = true;
         setLaunchingLive(true);
         await router.push(`/ov2-chess?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isDominoesRoom) {
+        const open = await requestOv2DominoesOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Dominoes session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-dominoes?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isFourLineRoom) {
+        const open = await requestOv2FourLineOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open FourLine session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-fourline?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isFlipGridRoom) {
+        const open = await requestOv2FlipGridOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open FlipGrid session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-flipgrid?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isMeldMatchRoom) {
+        const open = await requestOv2MeldMatchOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open MeldMatch session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-meldmatch?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isColorClashRoom) {
+        const open = await requestOv2ColorClashOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Color Clash session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-colorclash?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isFleetHuntRoom) {
+        const open = await requestOv2FleetHuntOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Fleet Hunt session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-fleet-hunt?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isTileRushDuelRoom) {
+        const open = await requestOv2TileRushDuelOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Tile Rush Duel session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-tile-rush-duel?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isGoalDuelRoom) {
+        const open = await requestOv2GoalDuelOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Goal Duel session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-goal-duel?room=${encodeURIComponent(roomId)}`);
         return;
       }
       await reload();
@@ -925,6 +1200,334 @@ export default function Ov2SharedRoomScreen({
       };
     }
 
+    if (isDominoesRoom) {
+      const domSid = room?.active_session_id || null;
+      if (domSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-dominoes?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledDom = false;
+      void fetchOv2DominoesSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledDom || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-dominoes?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      let intervalDom = null;
+      const tickDom = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledDom || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalDom) clearInterval(intervalDom);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-dominoes?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickDom();
+      intervalDom = setInterval(() => void tickDom(), 2500);
+      return () => {
+        cancelledDom = true;
+        if (intervalDom) clearInterval(intervalDom);
+      };
+    }
+
+    if (isFourLineRoom) {
+      const flSid = room?.active_session_id || null;
+      if (flSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-fourline?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledFl = false;
+      void fetchOv2FourLineSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledFl || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-fourline?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      let intervalFl = null;
+      const tickFl = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledFl || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalFl) clearInterval(intervalFl);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-fourline?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickFl();
+      intervalFl = setInterval(() => void tickFl(), 2500);
+      return () => {
+        cancelledFl = true;
+        if (intervalFl) clearInterval(intervalFl);
+      };
+    }
+
+    if (isFlipGridRoom) {
+      const fgSid = room?.active_session_id || null;
+      if (fgSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-flipgrid?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledFg = false;
+      void fetchOv2FlipGridSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledFg || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-flipgrid?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      let intervalFg = null;
+      const tickFg = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledFg || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalFg) clearInterval(intervalFg);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-flipgrid?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickFg();
+      intervalFg = setInterval(() => void tickFg(), 2500);
+      return () => {
+        cancelledFg = true;
+        if (intervalFg) clearInterval(intervalFg);
+      };
+    }
+
+    if (isMeldMatchRoom) {
+      const mmSid = room?.active_session_id || null;
+      if (mmSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-meldmatch?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledMm = false;
+      void fetchOv2MeldMatchSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledMm || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "layoff" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-meldmatch?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      let intervalMm = null;
+      const tickMm = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledMm || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalMm) clearInterval(intervalMm);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-meldmatch?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickMm();
+      intervalMm = setInterval(() => void tickMm(), 2500);
+      return () => {
+        cancelledMm = true;
+        if (intervalMm) clearInterval(intervalMm);
+      };
+    }
+
+    if (isColorClashRoom) {
+      const ccSid = room?.active_session_id || null;
+      if (ccSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-colorclash?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledCc = false;
+      void fetchOv2ColorClashSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledCc || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-colorclash?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      let intervalCc = null;
+      const tickCc = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledCc || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalCc) clearInterval(intervalCc);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-colorclash?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickCc();
+      intervalCc = setInterval(() => void tickCc(), 2500);
+      return () => {
+        cancelledCc = true;
+        if (intervalCc) clearInterval(intervalCc);
+      };
+    }
+
+    if (isFleetHuntRoom) {
+      const fhSid = room?.active_session_id || null;
+      if (fhSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-fleet-hunt?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledFh = false;
+      void fetchOv2FleetHuntSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledFh || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "placement" || ph === "battle" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-fleet-hunt?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      let intervalFh = null;
+      const tickFh = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledFh || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalFh) clearInterval(intervalFh);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-fleet-hunt?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickFh();
+      intervalFh = setInterval(() => void tickFh(), 2500);
+      return () => {
+        cancelledFh = true;
+        if (intervalFh) clearInterval(intervalFh);
+      };
+    }
+
+    if (isTileRushDuelRoom) {
+      const trdSid = room?.active_session_id || null;
+      if (trdSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-tile-rush-duel?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledTrd = false;
+      void fetchOv2TileRushDuelSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledTrd || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-tile-rush-duel?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      let intervalTrd = null;
+      const tickTrd = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledTrd || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalTrd) clearInterval(intervalTrd);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-tile-rush-duel?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickTrd();
+      intervalTrd = setInterval(() => void tickTrd(), 2500);
+      return () => {
+        cancelledTrd = true;
+        if (intervalTrd) clearInterval(intervalTrd);
+      };
+    }
+
+    if (isGoalDuelRoom) {
+      const gdSid = room?.active_session_id || null;
+      if (gdSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-goal-duel?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledGd = false;
+      void fetchOv2GoalDuelSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledGd || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-goal-duel?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      let intervalGd = null;
+      const tickGd = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledGd || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalGd) clearInterval(intervalGd);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-goal-duel?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickGd();
+      intervalGd = setInterval(() => void tickGd(), 2500);
+      return () => {
+        cancelledGd = true;
+        if (intervalGd) clearInterval(intervalGd);
+      };
+    }
+
     if (!liveRuntimeId) return;
     if (isLudoRoom) {
       const ludoSid = room?.active_session_id || null;
@@ -977,6 +1580,14 @@ export default function Ov2SharedRoomScreen({
     isBackgammonRoom,
     isCheckersRoom,
     isChessRoom,
+    isDominoesRoom,
+    isFourLineRoom,
+    isFlipGridRoom,
+    isMeldMatchRoom,
+    isColorClashRoom,
+    isFleetHuntRoom,
+    isTileRushDuelRoom,
+    isGoalDuelRoom,
     room?.status,
     room?.active_session_id,
     liveRuntimeId,
@@ -1180,7 +1791,19 @@ export default function Ov2SharedRoomScreen({
         ) : null}
 
         {runtimeHandoff && !isRummy51Room ? (
-          !isLudoRoom && !isBingoRoom && !isBackgammonRoom && !isCheckersRoom && !isChessRoom ? (
+          !isLudoRoom &&
+          !isBingoRoom &&
+          !isBackgammonRoom &&
+          !isCheckersRoom &&
+          !isChessRoom &&
+          !isDominoesRoom &&
+          !isFourLineRoom &&
+          !isFlipGridRoom &&
+          !isMeldMatchRoom &&
+          !isColorClashRoom &&
+          !isFleetHuntRoom &&
+          !isTileRushDuelRoom &&
+          !isGoalDuelRoom ? (
             <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
               <div className="font-bold">Runtime handoff ready</div>
               <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
@@ -1190,7 +1813,19 @@ export default function Ov2SharedRoomScreen({
           ) : null
         ) : null}
         {sharedStatusUpper === "IN_GAME" &&
-        (isRummy51Room || isBingoRoom || isBackgammonRoom || isCheckersRoom || isChessRoom) &&
+        (isRummy51Room ||
+          isBingoRoom ||
+          isBackgammonRoom ||
+          isCheckersRoom ||
+          isChessRoom ||
+          isDominoesRoom ||
+          isFourLineRoom ||
+          isFlipGridRoom ||
+          isMeldMatchRoom ||
+          isColorClashRoom ||
+          isFleetHuntRoom ||
+          isTileRushDuelRoom ||
+          isGoalDuelRoom) &&
         !launchingLive ? (
           <div className="mt-3 rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
             <p className="font-semibold text-teal-50">Match starting</p>
@@ -1287,7 +1922,23 @@ export default function Ov2SharedRoomScreen({
                     ? "Opening live Checkers..."
                     : isChessRoom
                       ? "Opening live Chess..."
-                      : "Opening live Ludo game..."}
+                      : isDominoesRoom
+                        ? "Opening live Dominoes..."
+                        : isFourLineRoom
+                          ? "Opening live FourLine..."
+                          : isFlipGridRoom
+                            ? "Opening live FlipGrid..."
+                            : isMeldMatchRoom
+                              ? "Opening live MeldMatch..."
+                              : isColorClashRoom
+                                ? "Opening live Color Clash..."
+                                : isFleetHuntRoom
+                                  ? "Opening live Fleet Hunt..."
+                                  : isTileRushDuelRoom
+                                    ? "Opening live Tile Rush Duel..."
+                                    : isGoalDuelRoom
+                                      ? "Opening live Goal Duel..."
+                                      : "Opening live Ludo game..."}
           </p>
         ) : null}
         {error ? <p className="text-[11px] text-red-300">{error}</p> : null}
