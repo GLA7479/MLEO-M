@@ -62,7 +62,7 @@ export default function Ov2GameUiPreviewsPage() {
           paddingTop: "max(8px, env(safe-area-inset-top))",
         }}
       >
-        <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden px-2 pt-0 pb-1 md:max-w-4xl md:px-4">
+        <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-1 overflow-hidden px-2 pt-0 pb-1 md:max-w-4xl md:px-4">
           <header className="shrink-0 space-y-1 rounded-xl border border-amber-500/25 bg-amber-950/20 px-3 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Link
@@ -93,10 +93,10 @@ export default function Ov2GameUiPreviewsPage() {
             </div>
           </header>
 
-          <div className="min-h-0 w-full flex-1 overflow-x-hidden">
+          <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden">
             {Screen && ctx ? (
               <Ov2UiPreviewProvider mocks={mocks}>
-                <div className="flex min-h-0 w-full flex-col">
+                <div className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col">
                   <Screen contextInput={ctx} />
                 </div>
               </Ov2UiPreviewProvider>

@@ -433,7 +433,15 @@ export default function Ov2GoalDuelLiveShell() {
           </Link>
         </div>
       ) : roomId && loading && !room ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-zinc-400">Loading room…</div>
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-4 text-center">
+          <p className="text-sm text-zinc-400">Loading room…</p>
+          <Link
+            href="/online-v2/rooms"
+            className="text-[11px] font-semibold text-sky-300/90 underline decoration-sky-500/30 underline-offset-2"
+          >
+            Back to lobby
+          </Link>
+        </div>
       ) : (
         <div className="flex w-full min-h-0 flex-1 flex-col justify-start overflow-x-hidden overflow-y-hidden">
           {showStakePhaseAfterRematchHint ? (
@@ -465,7 +473,7 @@ export default function Ov2GoalDuelLiveShell() {
               {openErr ? <p className="text-[10px] text-red-300/95">{openErr}</p> : null}
             </div>
           ) : null}
-          <div className="flex w-full min-h-0 flex-1 flex-col justify-start overflow-x-hidden overflow-y-hidden">
+          <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col justify-start overflow-x-hidden overflow-y-hidden">
             <Ov2GoalDuelScreen
               key={room?.active_session_id ? String(room.active_session_id) : "ov2-gd-no-session"}
               contextInput={contextInput}

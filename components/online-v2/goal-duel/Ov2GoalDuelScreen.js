@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
@@ -458,14 +459,14 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   }, [vm.phase, mySeat, inputRef, spriteHome, spriteAway, spriteBall]);
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col gap-1 overflow-visible px-1 pb-0 pt-1 sm:gap-1.5 sm:px-1.5">
+    <div className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-1 overflow-hidden px-1 pb-5 pt-1 sm:gap-1.5 sm:px-1.5 sm:pb-6">
       {err ? <div className="rounded-lg border border-red-500/30 bg-red-950/35 px-2 py-1.5 text-[11px] text-red-100">{err}</div> : null}
       {vaultClaimBusy ? (
         <div className="rounded-lg border border-zinc-500/20 bg-zinc-900/40 px-2 py-1 text-[10px] text-zinc-400">Updating vault…</div>
       ) : null}
 
       {vm.phase === "playing" && mySeat != null ? (
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="relative z-10 mx-auto w-full max-w-3xl shrink-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-gradient-to-b from-zinc-900/95 via-zinc-900 to-zinc-950/95 px-1 py-1.5 shadow-[0_0_24px_rgba(251,191,36,0.06),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md sm:px-3 sm:py-2">
             <div className="mb-1 flex items-center justify-center gap-2 border-b border-white/5 pb-1">
               <span className="text-[8px] font-black uppercase tracking-[0.35em] text-amber-400/90 sm:text-[9px]">MLEO Park</span>
@@ -519,46 +520,48 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
             </div>
           </div>
 
-          <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center py-0.5 sm:py-2 max-md:-mx-2 max-md:w-[calc(100%+1rem)]">
-            <div
-              className="relative mx-auto aspect-[2/1] w-full min-h-0 min-w-0 max-w-[min(100%,60rem)] max-h-full overflow-hidden rounded-2xl border border-amber-800/40 bg-black/20 shadow-[0_16px_48px_rgba(0,0,0,0.4)] md:max-h-[min(480px,calc(100dvh-19rem))] lg:max-h-[min(520px,calc(100dvh-18rem))]"
-            >
-              <canvas
-                ref={canvasRef}
-                width={800}
-                height={400}
-                className="absolute inset-0 block h-full w-full touch-none"
-              />
-
-            {goalFx ? (
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-between gap-0">
+            <div className="flex w-full shrink-0 flex-col items-center py-0.5 sm:py-1 max-md:-mx-2 max-md:w-[calc(100%+1rem)]">
               <div
-                className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-start gap-2 pt-[6%]"
-                key={goalFx.side}
+                className="relative mx-auto aspect-[2/1] w-full min-h-0 min-w-0 max-w-[min(100%,60rem)] max-h-full overflow-hidden rounded-2xl border border-amber-800/40 bg-black/20 shadow-[0_16px_48px_rgba(0,0,0,0.4)] md:max-h-[min(480px,calc(100dvh-19rem))] lg:max-h-[min(520px,calc(100dvh-18rem))]"
               >
-                <div
-                  className={`relative skew-x-[-6deg] rounded-lg border-2 px-8 py-3 shadow-[0_0_40px_rgba(255,255,255,0.25)] sm:px-12 sm:py-4 ${
-                    goalFx.side === "left"
-                      ? "border-amber-300/70 bg-gradient-to-r from-amber-500/90 to-orange-600/85"
-                      : "border-sky-300/70 bg-gradient-to-r from-sky-500/90 to-indigo-700/85"
-                  }`}
-                >
-                  <span className="block text-center text-3xl font-black italic tracking-tighter text-white drop-shadow-[0_4px_0_rgba(0,0,0,0.35)] sm:text-5xl">
-                    GOOOAL!
-                  </span>
-                </div>
-              </div>
-            ) : null}
-            {goalFx ? (
-              <div
-                className={`pointer-events-none absolute inset-0 z-[25] mix-blend-screen ${
-                  goalFx.side === "left" ? "bg-amber-400/25" : "bg-cyan-400/20"
-                }`}
-              />
-            ) : null}
-            </div>
-          </div>
+                <canvas
+                  ref={canvasRef}
+                  width={800}
+                  height={400}
+                  className="absolute inset-0 block h-full w-full touch-none"
+                />
 
-          <div className="mx-auto mt-8 flex w-full max-w-[min(100%,60rem)] shrink-0 items-center justify-between gap-3 px-0.5 pt-2 sm:mt-10 sm:gap-4 sm:px-1 sm:pt-2">
+                {goalFx ? (
+                  <div
+                    className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-start gap-2 pt-[6%]"
+                    key={goalFx.side}
+                  >
+                    <div
+                      className={`relative skew-x-[-6deg] rounded-lg border-2 px-8 py-3 shadow-[0_0_40px_rgba(255,255,255,0.25)] sm:px-12 sm:py-4 ${
+                        goalFx.side === "left"
+                          ? "border-amber-300/70 bg-gradient-to-r from-amber-500/90 to-orange-600/85"
+                          : "border-sky-300/70 bg-gradient-to-r from-sky-500/90 to-indigo-700/85"
+                      }`}
+                    >
+                      <span className="block text-center text-3xl font-black italic tracking-tighter text-white drop-shadow-[0_4px_0_rgba(0,0,0,0.35)] sm:text-5xl">
+                        GOOOAL!
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+                {goalFx ? (
+                  <div
+                    className={`pointer-events-none absolute inset-0 z-[25] mix-blend-screen ${
+                      goalFx.side === "left" ? "bg-amber-400/25" : "bg-cyan-400/20"
+                    }`}
+                  />
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex w-full shrink-0 flex-col gap-1.5 pb-4 pt-2 sm:gap-2 sm:pb-5 sm:pt-3">
+            <div className="mx-auto flex w-full max-w-[min(100%,60rem)] items-center justify-between gap-3 px-0.5 sm:gap-4 sm:px-1">
               <div className={CTRL_FLOAT_CLUSTER}>
                 <button
                   type="button"
@@ -611,29 +614,84 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
               </div>
             </div>
 
-          <p className="hidden shrink-0 text-center text-[10px] text-zinc-500 sm:mt-2 sm:block sm:text-[11px]">
-            Desktop: A/D move · W or Space jump · E or K strike
-          </p>
+            <p className="hidden shrink-0 text-center text-[10px] text-zinc-500 sm:block sm:text-[11px]">
+              Desktop: A/D move · W or Space jump · E or K strike
+            </p>
 
-          {roomId && pk ? (
-            <div className="mx-auto mt-4 flex w-full max-w-[min(100%,60rem)] shrink-0 flex-col items-end gap-0.5 px-0.5 pb-0 pt-0 sm:mt-5 sm:px-1">
-              <button
-                type="button"
-                title="Leave the match — counts as forfeit; opponent wins."
-                disabled={leaveToLobbyBusy || exitBusy}
-                className="text-[10px] font-semibold text-red-200/95 underline decoration-red-400/50 transition hover:text-red-100 disabled:opacity-45 sm:text-[11px]"
-                onClick={() => void (onLeaveToLobby ? onLeaveToLobby() : onExitToLobby())}
-              >
-                {leaveToLobbyBusy || exitBusy ? "Leaving…" : "Leave"}
-              </button>
-              {exitErr && !onLeaveToLobby ? <span className="max-w-full text-right text-[9px] text-red-300/95">{exitErr}</span> : null}
-            </div>
-          ) : null}
+            {roomId && pk ? (
+              <div className="mx-auto flex w-full max-w-[min(100%,60rem)] shrink-0 flex-col items-end gap-0.5 px-0.5 pb-0 pt-1 sm:px-1 sm:pt-1.5">
+                <button
+                  type="button"
+                  title="Leave the match — counts as forfeit; opponent wins."
+                  disabled={leaveToLobbyBusy || exitBusy}
+                  className="text-[10px] font-semibold text-red-200/95 underline decoration-red-400/50 transition hover:text-red-100 disabled:opacity-45 sm:text-[11px]"
+                  onClick={() => void (onLeaveToLobby ? onLeaveToLobby() : onExitToLobby())}
+                >
+                  {leaveToLobbyBusy || exitBusy ? "Leaving…" : "Leave"}
+                </button>
+                {exitErr && !onLeaveToLobby ? <span className="max-w-full text-right text-[9px] text-red-300/95">{exitErr}</span> : null}
+              </div>
+            ) : null}
+          </div>
+          </div>
         </div>
       ) : null}
 
       {!session.snapshot && room?.active_session_id ? (
-        <div className="py-6 text-center text-[12px] text-zinc-500">Loading match…</div>
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-4 py-8 text-center">
+          <p className="text-sm text-zinc-300">Loading match…</p>
+          <p className="max-w-sm text-[11px] leading-snug text-zinc-500">
+            If this takes too long, leave the table or return to the lobby — you are not stuck here.
+          </p>
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              disabled={leaveToLobbyBusy || exitBusy}
+              className={BTN_SECONDARY}
+              onClick={() => void (onLeaveToLobby ? onLeaveToLobby() : onExitToLobby())}
+            >
+              {leaveToLobbyBusy || exitBusy ? "Leaving…" : "Leave table"}
+            </button>
+            <Link
+              href="/online-v2/rooms"
+              className="text-[11px] font-semibold text-sky-300/90 underline decoration-sky-500/30 underline-offset-2 transition hover:text-sky-200"
+            >
+              Back to lobby
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      {session.snapshot &&
+      room?.active_session_id &&
+      !(vm.phase === "playing" && mySeat != null) &&
+      !finished &&
+      !showResultModal ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-4 py-8 text-center">
+          <p className="text-sm text-zinc-300">
+            {vm.phase === "playing" && mySeat == null
+              ? "You are not seated in this match."
+              : vm.phase && vm.phase !== "playing" && vm.phase !== "finished"
+                ? "Waiting for the match…"
+                : "Match is not ready yet."}
+          </p>
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              disabled={leaveToLobbyBusy || exitBusy}
+              className={BTN_SECONDARY}
+              onClick={() => void (onLeaveToLobby ? onLeaveToLobby() : onExitToLobby())}
+            >
+              {leaveToLobbyBusy || exitBusy ? "Leaving…" : "Leave table"}
+            </button>
+            <Link
+              href="/online-v2/rooms"
+              className="text-[11px] font-semibold text-sky-300/90 underline decoration-sky-500/30 underline-offset-2 transition hover:text-sky-200"
+            >
+              Back to lobby
+            </Link>
+          </div>
+        </div>
       ) : null}
 
       {showResultModal ? (
