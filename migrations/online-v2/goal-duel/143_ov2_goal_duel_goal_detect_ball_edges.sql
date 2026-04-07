@@ -1,7 +1,5 @@
--- Fix: ground-line goals were not detected (ball y≈349 vs old cap y<=300).
--- Forward patch only: run on DBs that already applied 138 before this change.
--- Do not re-run 138 on those environments; this file replaces ov2_gd_detect_goal_event in place.
--- Superseded in semantics by 143 (edge naming / <= >=); run 143 after for identical final logic.
+-- Goal detection uses ball edges (x ± r), not ball center — matches full-ball rendering.
+-- Forward patch: run on DBs that already have 138/142; replaces ov2_gd_detect_goal_event in place.
 
 BEGIN;
 
@@ -32,16 +30,21 @@ BEGIN
   v_goal_line_left := v_gm;
   v_goal_line_right := v_aw - v_gm;
 
+  -- Vertical band: crosses + low drives + ground-line goals
   IF v_by < 140 OR v_by > v_gy - v_br THEN
     RETURN NULL;
   END IF;
 
+  -- Left goal (scorer seat 1): left edge crosses inner goal mouth from the field
   IF v_left_edge <= v_goal_line_left THEN
     RETURN 1;
   END IF;
+
+  -- Right goal (scorer seat 0): right edge crosses inner goal mouth from the field
   IF v_right_edge >= v_goal_line_right THEN
     RETURN 0;
   END IF;
+
   RETURN NULL;
 END;
 $$;

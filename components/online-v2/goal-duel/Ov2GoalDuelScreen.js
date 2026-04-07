@@ -9,7 +9,9 @@ import { useOv2GoalDuelSession } from "../../../hooks/useOv2GoalDuelSession";
 import {
   drawGoalDuelArena,
   drawGoalDuelDog,
+  drawGoalDuelKickImpacts,
   drawGoalDuelTennisBall,
+  goalDuelScreenShakeSum,
   inferDogJumping,
   inferDogMotion,
   TEAM_RIVAL_DOG,
@@ -39,6 +41,29 @@ const GD_SCREEN_NO_SELECT_CSS = `
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+@keyframes gd-gd-goal-flash {
+  0% { opacity: 0.42; }
+  30% { opacity: 0.14; }
+  100% { opacity: 0; }
+}
+@keyframes gd-gd-goal-wrap-pulse {
+  0% { filter: brightness(1) saturate(1); }
+  12% { filter: brightness(1.09) saturate(1.06); }
+  100% { filter: brightness(1) saturate(1); }
+}
+@keyframes gd-gd-goal-vignette {
+  0% { opacity: 0.38; }
+  25% { opacity: 0.2; }
+  100% { opacity: 0; }
+}
+@keyframes gd-gd-timer-urgent-10 {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.88; }
+}
+@keyframes gd-gd-timer-urgent-5 {
+  0%, 100% { transform: scale(1); text-shadow: 0 0 0 rgba(16,185,129,0); }
+  50% { transform: scale(1.03); text-shadow: 0 0 12px rgba(52,211,153,0.45); }
+}
 `.trim();
 
 const BTN_PRIMARY =
@@ -53,22 +78,42 @@ const CTRL_ROW =
   "pointer-events-auto grid w-full touch-manipulation select-none items-stretch justify-items-stretch gap-3 [-webkit-tap-highlight-color:transparent] [grid-template-columns:6rem_minmax(0,1fr)_minmax(0,1fr)_6rem] sm:gap-4";
 
 /** Large hit target (6×6rem min on mobile); visible face stays ~4rem inside. */
-const CTRL_MOVE_HIT =
-  "relative flex min-h-[6rem] min-w-[6rem] max-w-[6rem] w-full touch-manipulation select-none items-center justify-center self-center rounded-[24px] border border-transparent px-1 py-2 transition-[transform,opacity] active:scale-[0.99] [-webkit-tap-highlight-color:transparent] sm:min-h-[3.5rem] sm:min-w-[4.75rem] sm:max-w-[4.75rem] sm:px-1.5 sm:py-2";
+const CTRL_MOVE_HIT_BASE =
+  "relative flex min-h-[6rem] min-w-[6rem] max-w-[6rem] w-full touch-manipulation select-none items-center justify-center self-center rounded-[24px] border border-transparent px-1 py-2 transition-[transform,box-shadow,filter] duration-75 active:scale-[0.985] [-webkit-tap-highlight-color:transparent] sm:min-h-[3.5rem] sm:min-w-[4.75rem] sm:max-w-[4.75rem] sm:px-1.5 sm:py-2";
 
 /** Visible arrow ~4rem × 4rem (no downscale vs column). */
-const CTRL_MOVE_FACE =
-  "pointer-events-none flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-2 border-cyan-400/55 bg-gradient-to-b from-cyan-400/50 via-cyan-600/45 to-cyan-950/88 text-2xl text-cyan-50 shadow-[0_8px_32px_rgba(6,182,212,0.22),0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-md sm:h-14 sm:w-14 sm:text-xl";
+const CTRL_MOVE_FACE_BASE =
+  "pointer-events-none flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-2 border-cyan-400/55 bg-gradient-to-b from-cyan-400/50 via-cyan-600/45 to-cyan-950/88 text-2xl text-cyan-50 shadow-[0_8px_32px_rgba(6,182,212,0.22),0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-md transition-[transform,box-shadow,filter] duration-75 sm:h-14 sm:w-14 sm:text-xl";
 
-const CTRL_ACTION_HIT =
-  "relative flex min-h-[6rem] w-full min-w-0 touch-manipulation select-none flex-col items-center justify-center rounded-[24px] border border-transparent px-2 py-2.5 transition-[transform,opacity] active:scale-[0.99] [-webkit-tap-highlight-color:transparent] sm:min-h-[3.25rem] sm:px-2 sm:py-2";
+const CTRL_ACTION_HIT_BASE =
+  "relative flex min-h-[6rem] w-full min-w-0 touch-manipulation select-none flex-col items-center justify-center rounded-[24px] border border-transparent px-2 py-2.5 transition-[transform,box-shadow,filter] duration-75 active:scale-[0.985] [-webkit-tap-highlight-color:transparent] sm:min-h-[3.25rem] sm:px-2 sm:py-2";
 
-const CTRL_ACTION_FACE =
-  "pointer-events-none flex min-h-[4.5rem] w-full min-w-0 max-w-full flex-col items-center justify-center gap-0.5 rounded-2xl px-1 font-bold uppercase leading-none backdrop-blur-md sm:min-h-[3rem]";
+const CTRL_ACTION_FACE_BASE =
+  "pointer-events-none flex min-h-[4.5rem] w-full min-w-0 max-w-full flex-col items-center justify-center gap-0.5 rounded-2xl px-1 font-bold uppercase leading-none backdrop-blur-md transition-[transform,box-shadow,filter] duration-75 sm:min-h-[3rem]";
 
-const CTRL_JUMP_FACE = `${CTRL_ACTION_FACE} border-2 border-emerald-400/55 bg-gradient-to-b from-emerald-400/48 via-emerald-600/42 to-emerald-950/90 text-[11px] text-emerald-50 sm:text-[11px] shadow-[0_8px_32px_rgba(52,211,153,0.2),0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)]`;
+const CTRL_JUMP_FACE_BASE = `${CTRL_ACTION_FACE_BASE} border-2 border-emerald-400/55 bg-gradient-to-b from-emerald-400/48 via-emerald-600/42 to-emerald-950/90 text-[11px] text-emerald-50 sm:text-[11px] shadow-[0_8px_32px_rgba(52,211,153,0.2),0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)]`;
 
-const CTRL_KICK_FACE = `${CTRL_ACTION_FACE} border-2 border-red-500/65 bg-gradient-to-b from-red-500/58 via-red-600/45 to-red-950/92 text-[11px] text-red-50 sm:text-[11px] shadow-[0_8px_32px_rgba(248,113,113,0.35),0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)]`;
+const CTRL_KICK_FACE_BASE = `${CTRL_ACTION_FACE_BASE} border-2 border-red-500/65 bg-gradient-to-b from-red-500/58 via-red-600/45 to-red-950/92 text-[11px] text-red-50 sm:text-[11px] shadow-[0_8px_32px_rgba(248,113,113,0.35),0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)]`;
+
+/** @param {boolean} down */
+const ctrlMoveHitClass = down =>
+  `${CTRL_MOVE_HIT_BASE} ${down ? "scale-[0.97] shadow-[inset_0_2px_8px_rgba(0,0,0,0.35)]" : ""}`;
+
+/** @param {boolean} down */
+const ctrlMoveFaceClass = down =>
+  `${CTRL_MOVE_FACE_BASE} ${down ? "scale-[0.96] brightness-110 shadow-[0_4px_20px_rgba(6,182,212,0.38),inset_0_2px_0_rgba(255,255,255,0.28)]" : ""}`;
+
+/** @param {boolean} down */
+const ctrlActionHitClass = down =>
+  `${CTRL_ACTION_HIT_BASE} ${down ? "scale-[0.97] shadow-[inset_0_2px_8px_rgba(0,0,0,0.38)]" : ""}`;
+
+/** @param {boolean} down */
+const ctrlJumpFaceClass = down =>
+  `${CTRL_JUMP_FACE_BASE} ${down ? "scale-[0.96] brightness-110 shadow-[0_6px_24px_rgba(52,211,153,0.42),inset_0_2px_0_rgba(255,255,255,0.26)]" : ""}`;
+
+/** @param {boolean} down */
+const ctrlKickFaceClass = down =>
+  `${CTRL_KICK_FACE_BASE} ${down ? "scale-[0.96] brightness-110 shadow-[0_6px_26px_rgba(248,113,113,0.48),inset_0_2px_0_rgba(255,255,255,0.24)]" : ""}`;
 
 /** @param {unknown} m */
 function memberGdRematchRequested(m) {
@@ -126,6 +171,8 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
   const GD_MOUSE_PAD_ID = /** @type {const} */ ({ left: -1, right: -2, jump: -3, kick: -4 });
 
+  const [padVisual, setPadVisual] = useState(() => ({ l: false, r: false, j: false, k: false }));
+
   const computePadInput = useCallback(() => {
     const k = kbdRef.current;
     const map = touchMapRef.current;
@@ -139,12 +186,14 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       if (v === "jump") jump = true;
       if (v === "kick") kick = true;
     });
-    setInput({
+    const next = {
       l: k.l || left,
       r: k.r || right,
       j: k.j || jump,
       k: k.k || kick,
-    });
+    };
+    setInput(next);
+    setPadVisual(next);
   }, [setInput]);
 
   /** @param {"left"|"right"|"jump"|"kick"} key */
@@ -194,6 +243,15 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   );
   const kickP0UntilRef = useRef(0);
   const kickP1UntilRef = useRef(0);
+  /** Render-only kick bursts + shake; pruned in the canvas loop. */
+  const kickFlashesRef = useRef(
+    /** @type {Array<{ ax: number, ay: number, startMs: number, durationMs: number }>} */ ([])
+  );
+  const shakePulsesRef = useRef(/** @type {Array<{ until: number, start: number, amp: number }>} */ ([]));
+  const prevKickHeldRef = useRef(false);
+  /** Throttle ball-proximity kick FX (collision block runs every frame while overlapping). */
+  const lastBallKickFxP0Ref = useRef(0);
+  const lastBallKickFxP1Ref = useRef(0);
   const prevScoreRef = useRef(/** @type {[number, number]} */ ([0, 0]));
   const [goalFx, setGoalFx] = useState(/** @type {{ scorer: 0|1 }|null} */ (null));
   const [spriteHome, setSpriteHome] = useState(/** @type {CanvasImageSource|null} */ (null));
@@ -274,6 +332,12 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       kbdRef.current = { l: false, r: false, j: false, k: false };
       touchMapRef.current.clear();
       setInput({ l: false, r: false, j: false, k: false });
+      setPadVisual({ l: false, r: false, j: false, k: false });
+      kickFlashesRef.current = [];
+      shakePulsesRef.current = [];
+      prevKickHeldRef.current = false;
+      lastBallKickFxP0Ref.current = 0;
+      lastBallKickFxP1Ref.current = 0;
     }
   }, [vm.phase, setInput]);
 
@@ -406,6 +470,15 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
   const mySeat = vm.mySeat;
 
+  const matchTimeLeftNum =
+    vm.matchTimeLeftSec != null && Number.isFinite(Number(vm.matchTimeLeftSec))
+      ? Number(vm.matchTimeLeftSec)
+      : null;
+  const timerUrgent10 =
+    vm.phase === "playing" && matchTimeLeftNum != null && matchTimeLeftNum <= 10 && matchTimeLeftNum >= 0;
+  const timerUrgent5 =
+    vm.phase === "playing" && matchTimeLeftNum != null && matchTimeLeftNum <= 5 && matchTimeLeftNum >= 0;
+
   const isDrawResult = Boolean(vm.result && vm.result.isDraw === true);
 
   const winnerLabel = useMemo(() => {
@@ -431,9 +504,13 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     if (s0 > ps0) {
       setGoalFx({ scorer: 0 });
       window.setTimeout(() => setGoalFx(null), 1700);
+      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      shakePulsesRef.current.push({ start: now, until: now + 400, amp: 3.5 });
     } else if (s1 > ps1) {
       setGoalFx({ scorer: 1 });
       window.setTimeout(() => setGoalFx(null), 1700);
+      const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+      shakePulsesRef.current.push({ start: now, until: now + 400, amp: 3.5 });
     }
     prevScoreRef.current = [s0, s1];
   }, [vm.phase, vm.score0, vm.score1]);
@@ -485,6 +562,15 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
       const dtSec = prev && prev.t > 0 ? Math.min(0.08, (nowMs - prev.t) / 1000) : 0.016;
 
+      shakePulsesRef.current = shakePulsesRef.current.filter(p => nowMs < p.until);
+      kickFlashesRef.current = kickFlashesRef.current.filter(f => nowMs < f.startMs + f.durationMs + 24);
+      if (kickFlashesRef.current.length > 10) {
+        kickFlashesRef.current.splice(0, kickFlashesRef.current.length - 10);
+      }
+      if (shakePulsesRef.current.length > 6) {
+        shakePulsesRef.current.splice(0, shakePulsesRef.current.length - 6);
+      }
+
       const bvx = prev ? (bx - prev.bx) / Math.max(dtSec, 0.001) : 0;
       const bvy = prev ? (by - prev.by) / Math.max(dtSec, 0.001) : 0;
       const bspeed = Math.hypot(bvx, bvy);
@@ -492,13 +578,37 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       if (bspeed > 220 && prev) {
         const d0 = Math.hypot(bx - p0x, by - p0y);
         const d1 = Math.hypot(bx - p1x, by - p1y);
-        if (d0 < 54 && d0 <= d1) kickP0UntilRef.current = nowMs + 160;
-        else if (d1 < 54) kickP1UntilRef.current = nowMs + 160;
+        if (d0 < 54 && d0 <= d1) {
+          kickP0UntilRef.current = nowMs + 160;
+          if (nowMs - lastBallKickFxP0Ref.current > 105) {
+            lastBallKickFxP0Ref.current = nowMs;
+            kickFlashesRef.current.push({ ax: bx, ay: by, startMs: nowMs, durationMs: 158 });
+            shakePulsesRef.current.push({ start: nowMs, until: nowMs + 128, amp: 1.08 });
+          }
+        } else if (d1 < 54) {
+          kickP1UntilRef.current = nowMs + 160;
+          if (nowMs - lastBallKickFxP1Ref.current > 105) {
+            lastBallKickFxP1Ref.current = nowMs;
+            kickFlashesRef.current.push({ ax: bx, ay: by, startMs: nowMs, durationMs: 158 });
+            shakePulsesRef.current.push({ start: nowMs, until: nowMs + 128, amp: 1.08 });
+          }
+        }
       }
 
       const inp = inputRef?.current ?? { l: false, r: false, j: false, k: false };
       if (mySeat === 0 && inp.k) kickP0UntilRef.current = nowMs + 110;
       if (mySeat === 1 && inp.k) kickP1UntilRef.current = nowMs + 110;
+
+      const kh = Boolean(inp.k);
+      const kickEdge = kh && !prevKickHeldRef.current;
+      prevKickHeldRef.current = kh;
+      if (kickEdge && mySeat === 0) {
+        kickFlashesRef.current.push({ ax: p0x, ay: p0y - hh0 * 0.42, startMs: nowMs, durationMs: 142 });
+        shakePulsesRef.current.push({ start: nowMs, until: nowMs + 118, amp: 0.92 });
+      } else if (kickEdge && mySeat === 1) {
+        kickFlashesRef.current.push({ ax: p1x, ay: p1y - hh1 * 0.42, startMs: nowMs, durationMs: 142 });
+        shakePulsesRef.current.push({ start: nowMs, until: nowMs + 118, amp: 0.92 });
+      }
 
       const m0 = inferDogMotion(prev, p0x, p0y, "p0", dtSec);
       const m1 = inferDogMotion(prev, p1x, p1y, "p1", dtSec);
@@ -510,6 +620,11 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       const facing0 = Math.abs(m0.vx) > vxTh ? m0.facing : f0Srv;
       const facing1 = Math.abs(m1.vx) > vxTh ? m1.facing : f1Srv;
       const runPhase = nowMs * 0.007;
+      const idlePhase = nowMs * 0.00285;
+
+      const sh = goalDuelScreenShakeSum(nowMs, shakePulsesRef.current);
+      ctx.save();
+      ctx.translate(sh.dx, sh.dy);
 
       drawGoalDuelArena(ctx, W, H, aw, ah, gy, gm, sx, sy);
 
@@ -534,6 +649,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
           running: m0.running && !j0,
           kicking: k0,
           runPhase,
+          idlePhase,
         },
         { variant: "star", sprite: spriteHome }
       );
@@ -552,11 +668,15 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
           running: m1.running && !j1,
           kicking: k1,
           runPhase: runPhase + 0.45,
+          idlePhase: idlePhase + 1.1,
         },
         { variant: "rival", sprite: spriteAway }
       );
 
       drawGoalDuelTennisBall(ctx, bx, by, brd, sx, sy, bvx, bvy, { sprite: spriteBall });
+
+      drawGoalDuelKickImpacts(ctx, kickFlashesRef.current, nowMs, sx, sy);
+      ctx.restore();
 
       motionPrevRef.current = { p0x, p0y, p1x, p1y, bx, by, t: nowMs };
       raf = window.requestAnimationFrame(paint);
@@ -626,12 +746,40 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 </span>
               </div>
 
-              <div className="order-2 flex min-w-[4.25rem] flex-col items-center justify-center rounded-xl border border-emerald-500/30 bg-gradient-to-b from-emerald-950/90 to-emerald-950/70 px-2 py-1 shadow-[inset_0_0_20px_rgba(16,185,129,0.12)] sm:min-w-[5.25rem] sm:px-3 sm:py-1.5">
-                <span className="text-[7px] font-bold uppercase tracking-[0.2em] text-emerald-400/80">Time</span>
-                <span className="font-mono text-lg font-black tabular-nums text-emerald-100 sm:text-2xl">
+              <div
+                className={`order-2 flex min-w-[4.25rem] flex-col items-center justify-center rounded-xl border px-2 py-1 shadow-[inset_0_0_20px_rgba(16,185,129,0.12)] transition-[box-shadow,border-color] duration-300 sm:min-w-[5.25rem] sm:px-3 sm:py-1.5 ${
+                  timerUrgent5
+                    ? "border-amber-400/55 bg-gradient-to-b from-amber-950/88 to-emerald-950/70 shadow-[inset_0_0_28px_rgba(245,158,11,0.22),0_0_18px_rgba(251,191,36,0.22)]"
+                    : timerUrgent10
+                      ? "border-emerald-400/45 bg-gradient-to-b from-emerald-950/92 to-emerald-950/68 shadow-[inset_0_0_24px_rgba(16,185,129,0.2),0_0_12px_rgba(52,211,153,0.12)]"
+                      : "border-emerald-500/30 bg-gradient-to-b from-emerald-950/90 to-emerald-950/70"
+                }`}
+              >
+                <span
+                  className={`text-[7px] font-bold uppercase tracking-[0.2em] ${
+                    timerUrgent5 ? "text-amber-300/95" : timerUrgent10 ? "text-emerald-300/90" : "text-emerald-400/80"
+                  }`}
+                >
+                  Time
+                </span>
+                <span
+                  className={`font-mono text-lg font-black tabular-nums sm:text-2xl ${
+                    timerUrgent5
+                      ? "text-amber-100 [animation:gd-gd-timer-urgent-5_0.85s_ease-in-out_infinite]"
+                      : timerUrgent10
+                        ? "text-emerald-50 [animation:gd-gd-timer-urgent-10_1.25s_ease-in-out_infinite]"
+                        : "text-emerald-100"
+                  }`}
+                >
                   {vm.matchTimeLeftSec != null ? `${vm.matchTimeLeftSec}` : "—"}
                 </span>
-                <span className="text-[8px] font-semibold text-emerald-500/70">sec</span>
+                <span
+                  className={`text-[8px] font-semibold ${
+                    timerUrgent5 ? "text-amber-400/85" : timerUrgent10 ? "text-emerald-400/85" : "text-emerald-500/70"
+                  }`}
+                >
+                  sec
+                </span>
               </div>
 
               <div
@@ -674,7 +822,9 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
           <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-between gap-0">
             <div className="flex w-full shrink-0 flex-col items-center py-0.5 sm:py-1 max-md:-mx-2 max-md:w-[calc(100%+1rem)]">
               <div
-                className="relative mx-auto aspect-[2/1] w-full min-h-0 min-w-0 max-w-[min(100%,60rem)] max-h-full overflow-hidden rounded-2xl border border-amber-800/40 bg-black/20 shadow-[0_16px_48px_rgba(0,0,0,0.4)] md:max-h-[min(480px,calc(100dvh-19rem))] lg:max-h-[min(520px,calc(100dvh-18rem))]"
+                className={`relative mx-auto aspect-[2/1] w-full min-h-0 min-w-0 max-w-[min(100%,60rem)] max-h-full overflow-hidden rounded-2xl border border-amber-800/40 bg-black/20 shadow-[0_16px_48px_rgba(0,0,0,0.4)] md:max-h-[min(480px,calc(100dvh-19rem))] lg:max-h-[min(520px,calc(100dvh-18rem))] ${
+                  goalFx ? "[animation:gd-gd-goal-wrap-pulse_0.55s_ease-out_1]" : ""
+                }`}
               >
                 <canvas
                   ref={canvasRef}
@@ -685,17 +835,31 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
                 {goalFx ? (
                   <div
+                    className="pointer-events-none absolute inset-0 z-[22] bg-[radial-gradient(circle_at_50%_55%,rgba(0,0,0,0)_0%,rgba(0,0,0,0.42)_72%,rgba(0,0,0,0.62)_100%)] [animation:gd-gd-goal-vignette_0.65s_ease-out_1]"
+                    aria-hidden
+                  />
+                ) : null}
+                {goalFx ? (
+                  <div
+                    className={`pointer-events-none absolute inset-0 z-[24] mix-blend-screen [animation:gd-gd-goal-flash_0.45s_ease-out_1] ${
+                      goalFx.scorer === 0 ? "bg-amber-200/30" : "bg-cyan-200/28"
+                    }`}
+                    aria-hidden
+                  />
+                ) : null}
+                {goalFx ? (
+                  <div
                     className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-start gap-2 pt-[6%]"
                     key={goalFx.scorer}
                   >
                     <div
-                      className={`relative skew-x-[-6deg] rounded-lg border-2 px-8 py-3 shadow-[0_0_40px_rgba(255,255,255,0.25)] sm:px-12 sm:py-4 ${
+                      className={`relative skew-x-[-6deg] rounded-xl border-[3px] px-9 py-3.5 shadow-[0_0_52px_rgba(255,255,255,0.32),0_12px_40px_rgba(0,0,0,0.45)] ring-2 ring-white/25 sm:px-14 sm:py-5 ${
                         goalFx.scorer === 0
-                          ? "border-amber-300/70 bg-gradient-to-r from-amber-500/90 to-orange-600/85"
-                          : "border-sky-300/70 bg-gradient-to-r from-sky-500/90 to-indigo-700/85"
+                          ? "border-amber-200/85 bg-gradient-to-r from-amber-400/95 via-orange-500/92 to-orange-700/88"
+                          : "border-sky-200/85 bg-gradient-to-r from-sky-400/95 via-indigo-600/92 to-indigo-900/88"
                       }`}
                     >
-                      <span className="block text-center text-3xl font-black italic tracking-tighter text-white drop-shadow-[0_4px_0_rgba(0,0,0,0.35)] sm:text-5xl">
+                      <span className="block text-center text-3xl font-black italic tracking-tighter text-white drop-shadow-[0_5px_0_rgba(0,0,0,0.42),0_0_24px_rgba(255,255,255,0.35)] sm:text-5xl">
                         GOOOAL!
                       </span>
                     </div>
@@ -704,7 +868,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 {goalFx ? (
                   <div
                     className={`pointer-events-none absolute inset-0 z-[25] mix-blend-screen ${
-                      goalFx.scorer === 0 ? "bg-amber-400/25" : "bg-cyan-400/20"
+                      goalFx.scorer === 0 ? "bg-amber-400/28" : "bg-cyan-400/24"
                     }`}
                   />
                 ) : null}
@@ -717,7 +881,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 type="button"
                 draggable={false}
                 aria-label="Move left"
-                className={CTRL_MOVE_HIT}
+                className={ctrlMoveHitClass(padVisual.l)}
                 onTouchStart={e => handleTouchStart("left", e)}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
@@ -725,7 +889,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 onMouseUp={() => handleMouseUpPad("left")}
                 onMouseLeave={() => handleMouseUpPad("left")}
               >
-                <span className={CTRL_MOVE_FACE} aria-hidden>
+                <span className={ctrlMoveFaceClass(padVisual.l)} aria-hidden>
                   ◀
                 </span>
               </button>
@@ -733,7 +897,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 type="button"
                 draggable={false}
                 aria-label="Jump"
-                className={CTRL_ACTION_HIT}
+                className={ctrlActionHitClass(padVisual.j)}
                 onTouchStart={e => handleTouchStart("jump", e)}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
@@ -741,7 +905,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 onMouseUp={() => handleMouseUpPad("jump")}
                 onMouseLeave={() => handleMouseUpPad("jump")}
               >
-                <span className={CTRL_JUMP_FACE}>
+                <span className={ctrlJumpFaceClass(padVisual.j)}>
                   <span className="text-2xl leading-none sm:text-2xl" aria-hidden>
                     ▲
                   </span>
@@ -752,7 +916,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 type="button"
                 draggable={false}
                 aria-label="Kick"
-                className={CTRL_ACTION_HIT}
+                className={ctrlActionHitClass(padVisual.k)}
                 onTouchStart={e => handleTouchStart("kick", e)}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
@@ -760,7 +924,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 onMouseUp={() => handleMouseUpPad("kick")}
                 onMouseLeave={() => handleMouseUpPad("kick")}
               >
-                <span className={CTRL_KICK_FACE}>
+                <span className={ctrlKickFaceClass(padVisual.k)}>
                   <span className="text-2xl leading-none sm:text-2xl" aria-hidden>
                     ⚡
                   </span>
@@ -771,7 +935,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 type="button"
                 draggable={false}
                 aria-label="Move right"
-                className={CTRL_MOVE_HIT}
+                className={ctrlMoveHitClass(padVisual.r)}
                 onTouchStart={e => handleTouchStart("right", e)}
                 onTouchEnd={handleTouchEnd}
                 onTouchCancel={handleTouchEnd}
@@ -779,7 +943,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 onMouseUp={() => handleMouseUpPad("right")}
                 onMouseLeave={() => handleMouseUpPad("right")}
               >
-                <span className={CTRL_MOVE_FACE} aria-hidden>
+                <span className={ctrlMoveFaceClass(padVisual.r)} aria-hidden>
                   ▶
                 </span>
               </button>

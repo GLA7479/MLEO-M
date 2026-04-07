@@ -267,18 +267,30 @@ DECLARE
   v_bx float8;
   v_by float8;
   v_br float8;
+  v_left_edge float8;
+  v_right_edge float8;
+  v_goal_line_left float8;
+  v_goal_line_right float8;
 BEGIN
   v_bx := coalesce((p_pub -> 'ball' ->> 'x')::float8, 0);
   v_by := coalesce((p_pub -> 'ball' ->> 'y')::float8, 0);
   v_br := coalesce((p_pub -> 'ball' ->> 'r')::float8, 11);
+
+  v_left_edge := v_bx - v_br;
+  v_right_edge := v_bx + v_br;
+  v_goal_line_left := v_gm;
+  v_goal_line_right := v_aw - v_gm;
+
   -- vertical band: crosses + low drives + ground-line goals (previously capped at y<=300, missing rolling goals at y≈gy-r)
   IF v_by < 140 OR v_by > v_gy - v_br THEN
     RETURN NULL;
   END IF;
-  IF v_bx - v_br < v_gm THEN
+
+  -- Ball edges vs inner goal mouth — not center alone (matches full-ball render)
+  IF v_left_edge <= v_goal_line_left THEN
     RETURN 1;
   END IF;
-  IF v_bx + v_br > v_aw - v_gm THEN
+  IF v_right_edge >= v_goal_line_right THEN
     RETURN 0;
   END IF;
   RETURN NULL;

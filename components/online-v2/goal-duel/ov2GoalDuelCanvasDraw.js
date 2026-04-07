@@ -353,7 +353,11 @@ function isDrawableImage(s) {
  */
 function drawGoalDuelDogSprite(ctx, px, py, hw, hh, sx, sy, anim, img) {
   const facing = anim.facing >= 0 ? 1 : -1;
-  const bob = anim.running ? Math.sin(anim.runPhase * Math.PI * 2) * 2 * sy : 0;
+  const idleBreath =
+    !anim.running && !anim.jumping && !anim.kicking
+      ? Math.sin(Number(anim.idlePhase ?? 0)) * 1.15 * sy
+      : 0;
+  const bob = (anim.running ? Math.sin(anim.runPhase * Math.PI * 2) * 2 * sy : 0) + idleBreath;
   const squash = anim.kicking ? 0.92 : anim.jumping ? 1.03 : 1;
   const stretchY = anim.jumping ? 0.92 : 1;
   const tilt = (anim.jumping ? -0.11 : anim.running ? 0.055 : 0) * facing;
@@ -419,6 +423,7 @@ function drawGoalDuelDogPlaceholder(ctx, px, py, hw, hh, sx, sy) {
  * @param {boolean} anim.running
  * @param {boolean} anim.kicking
  * @param {number} anim.runPhase
+ * @param {number} [anim.idlePhase] radians — subtle idle bob when not running / jumping / kicking
  * @param {{ variant?: 'star'|'rival', sprite?: CanvasImageSource|null, coatImage?: CanvasImageSource|null }} [opts]
  */
 export function drawGoalDuelDog(ctx, px, py, hw, hh, sx, sy, _palette, anim, opts = {}) {
@@ -447,7 +452,7 @@ export function drawGoalDuelTennisBall(ctx, bx, by, br, sx, sy, vx, vy, opts = {
   const r = br * Math.min(sx, sy);
   const speed = Math.hypot(vx, vy);
   const ang = Math.atan2(vy, vx);
-  const blur = Math.min(1, speed / 180);
+  const blur = Math.min(1, speed / 150);
   const sprite = opts.sprite ?? null;
 
   ctx.fillStyle = "rgba(0,0,0,0.32)";
@@ -457,12 +462,27 @@ export function drawGoalDuelTennisBall(ctx, bx, by, br, sx, sy, vx, vy, opts = {
 
   if (isDrawableImage(sprite)) {
     const rot = ang * 0.35 + speed * 0.0012;
-    if (blur > 0.08) {
-      for (let i = 2; i >= 1; i--) {
-        const o = i * r * 0.18 * blur;
-        ctx.fillStyle = `rgba(255,255,220,${0.04 * blur * i})`;
+    const speedGlow = Math.min(1, Math.max(0, (speed - 95) / 320));
+    if (speedGlow > 0.04) {
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      const rg = ctx.createRadialGradient(cx, cy, r * 0.2, cx, cy, r * (2.1 + speedGlow * 0.9));
+      rg.addColorStop(0, `rgba(255,255,235,${0.14 * speedGlow})`);
+      rg.addColorStop(0.55, `rgba(255,240,160,${0.06 * speedGlow})`);
+      rg.addColorStop(1, "rgba(255,220,120,0)");
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * (2.35 + speedGlow * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    if (blur > 0.06) {
+      const streaks = blur > 0.35 ? 3 : 2;
+      for (let i = streaks; i >= 1; i--) {
+        const o = i * r * 0.2 * blur;
+        ctx.fillStyle = `rgba(255,255,230,${0.045 * blur * i})`;
         ctx.beginPath();
-        ctx.arc(cx - Math.cos(ang) * o * 2.2, cy - Math.sin(ang) * o * 2.2, r * 0.95, 0, Math.PI * 2);
+        ctx.arc(cx - Math.cos(ang) * o * 2.35, cy - Math.sin(ang) * o * 2.35, r * (0.92 + blur * 0.06), 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -475,13 +495,13 @@ export function drawGoalDuelTennisBall(ctx, bx, by, br, sx, sy, vx, vy, opts = {
       /* decode race */
     }
     ctx.restore();
-    if (speed > 40) {
-      ctx.strokeStyle = `rgba(255,255,200,${0.12 + Math.min(0.3, speed / 400)})`;
-      ctx.lineWidth = r * 0.45;
+    if (speed > 32) {
+      ctx.strokeStyle = `rgba(255,255,210,${0.1 + Math.min(0.38, speed / 340)})`;
+      ctx.lineWidth = r * (0.42 + blur * 0.35);
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(cx - Math.cos(ang) * r * 2.2, cy - Math.sin(ang) * r * 2.2);
-      ctx.lineTo(cx - Math.cos(ang) * r * (2.9 + blur * 1.8), cy - Math.sin(ang) * r * (2.9 + blur * 1.8));
+      ctx.moveTo(cx - Math.cos(ang) * r * 2.15, cy - Math.sin(ang) * r * 2.15);
+      ctx.lineTo(cx - Math.cos(ang) * r * (2.85 + blur * 2.15), cy - Math.sin(ang) * r * (2.85 + blur * 2.15));
       ctx.stroke();
     }
     return;
@@ -542,15 +562,94 @@ export function drawGoalDuelTennisBall(ctx, bx, by, br, sx, sy, vx, vy, opts = {
   ctx.arc(cx - r * 0.25, cy - r * 0.35, r * 0.55, 0.2, 1.1);
   ctx.stroke();
 
-  if (speed > 40) {
-    ctx.strokeStyle = `rgba(255,255,200,${0.15 + Math.min(0.35, speed / 400)})`;
-    ctx.lineWidth = r * 0.5;
+  if (speed > 32) {
+    ctx.strokeStyle = `rgba(255,255,210,${0.12 + Math.min(0.4, speed / 340)})`;
+    ctx.lineWidth = r * (0.48 + blur * 0.25);
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(cx - Math.cos(ang) * r * 2.4, cy - Math.sin(ang) * r * 2.4);
-    ctx.lineTo(cx - Math.cos(ang) * r * (3.2 + blur * 2), cy - Math.sin(ang) * r * (3.2 + blur * 2));
+    ctx.moveTo(cx - Math.cos(ang) * r * 2.35, cy - Math.sin(ang) * r * 2.35);
+    ctx.lineTo(cx - Math.cos(ang) * r * (3.1 + blur * 2.1), cy - Math.sin(ang) * r * (3.1 + blur * 2.1));
     ctx.stroke();
   }
+}
+
+/**
+ * Short-lived kick impact bursts (world/arena coords). Render-only.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Array<{ ax: number, ay: number, startMs: number, durationMs: number }>} flashes
+ * @param {number} nowMs
+ * @param {number} sx
+ * @param {number} sy
+ */
+export function drawGoalDuelKickImpacts(ctx, flashes, nowMs, sx, sy) {
+  for (let i = 0; i < flashes.length; i++) {
+    const f = flashes[i];
+    const elapsed = nowMs - f.startMs;
+    if (elapsed < 0 || elapsed >= f.durationMs) continue;
+    const t = elapsed / f.durationMs;
+    const cx = f.ax * sx;
+    const cy = f.ay * sy;
+    const ease = 1 - t;
+    const a = 0.55 * ease * ease;
+    const r0 = (14 + 22 * (1 - t)) * Math.min(sx, sy);
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r0);
+    g.addColorStop(0, `rgba(255,255,245,${0.5 * a})`);
+    g.addColorStop(0.45, `rgba(255,230,160,${0.22 * a})`);
+    g.addColorStop(1, "rgba(255,200,120,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255,255,255,${0.35 * a})`;
+    ctx.lineWidth = 2.2 * Math.min(sx, sy);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r0 * (0.55 + 0.2 * (1 - t)), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/**
+ * Decaying screen shake for canvas (pixels). Deterministic per frame.
+ *
+ * @param {number} nowMs
+ * @param {{ until: number, start: number, amp: number }|null} pulse
+ */
+export function goalDuelScreenShakeOffset(nowMs, pulse) {
+  if (!pulse || nowMs >= pulse.until) return { dx: 0, dy: 0 };
+  const dur = Math.max(1, pulse.until - pulse.start);
+  const left = pulse.until - nowMs;
+  const decay = left / dur;
+  const amp = pulse.amp * decay;
+  const w = nowMs * 0.09;
+  return {
+    dx: Math.sin(w * 1.9 + pulse.start * 0.001) * amp * 0.65,
+    dy: Math.sin(w * 2.4 + pulse.start * 0.002) * amp * 0.55,
+  };
+}
+
+/**
+ * @param {number} nowMs
+ * @param {Array<{ until: number, start: number, amp: number }>} pulses
+ */
+export function goalDuelScreenShakeSum(nowMs, pulses) {
+  let dx = 0;
+  let dy = 0;
+  for (let i = 0; i < pulses.length; i++) {
+    const o = goalDuelScreenShakeOffset(nowMs, pulses[i]);
+    dx += o.dx;
+    dy += o.dy;
+  }
+  const cap = 4.5;
+  const m = Math.hypot(dx, dy);
+  if (m > cap && m > 0) {
+    dx *= cap / m;
+    dy *= cap / m;
+  }
+  return { dx, dy };
 }
 
 /**
