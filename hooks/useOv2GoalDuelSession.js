@@ -130,6 +130,7 @@ export function useOv2GoalDuelSession(baseContext) {
       snapshot: { ...preview.snapshot, public: pub },
       inputRef: previewInputRef,
       setInput: previewSetInput,
+      flushInputNow: () => {},
       isUiPreview: true,
     };
   }
@@ -154,6 +155,7 @@ export function useOv2GoalDuelSession(baseContext) {
   const snapRef = useRef(/** @type {typeof snap} */ (null));
   const processedMatchEndKeysRef = useRef(/** @type {Set<string>} */ (new Set()));
   const inputRef = useRef({ l: false, r: false, j: false, k: false, jTap: false, kTap: false });
+  const lastImmediateFlushMsRef = useRef(0);
 
   const gdDebugRef = useRef(
     /** @type {{
@@ -388,19 +390,13 @@ export function useOv2GoalDuelSession(baseContext) {
    * Client render uses local presentation + smoothing; see Ov2GoalDuelScreen + ov2GoalDuelPresentation.js.
    */
   const GD_STEP_SEND_MS = 50;
-  useEffect(() => {
-    if (!roomId || !selfKey || roomProductId !== OV2_GOAL_DUEL_PRODUCT_GAME_ID) return undefined;
-    if (!snap || String(snap.phase || "").toLowerCase() !== "playing") return undefined;
-    let cancelled = false;
-    const tick = () => {
-      if (cancelled) return;
+  const sendCurrentInputStep = useCallback(
+    async reason => {
+      if (!roomId || !selfKey || roomProductId !== OV2_GOAL_DUEL_PRODUCT_GAME_ID) return;
+      const curSnap = snapRef.current;
+      if (!curSnap || String(curSnap.phase || "").toLowerCase() !== "playing") return;
       const i = inputRef.current;
-      const liveSeat = snapRef.current?.mySeat;
-      /**
-       * Seat 1 receives a mirrored snapshot for viewer-relative visuals, so outbound left/right
-       * must be swapped back into the server's world axes. Jump/kick taps are latched for one send
-       * so short mobile taps cannot disappear entirely between 50 ms step intervals.
-       */
+      const liveSeat = curSnap.mySeat;
       const sendL = liveSeat === 1 ? i.r : i.l;
       const sendR = liveSeat === 1 ? i.l : i.r;
       const sendJ = Boolean(i.j || i.jTap);
@@ -414,29 +410,45 @@ export function useOv2GoalDuelSession(baseContext) {
         gdDebugRef.current.lastSend = { l: Boolean(sendL), r: Boolean(sendR), j: Boolean(sendJ), k: Boolean(sendK) };
         // eslint-disable-next-line no-console
         console.info("[ov2/gd][send]", {
+          reason,
           seat: liveSeat,
-          rev: snapRef.current?.revision,
+          rev: curSnap.revision,
           send: gdDebugRef.current.lastSend,
           raw: rawBeforeClear,
         });
       }
-      void (async () => {
-        const resp = await requestOv2GoalDuelStep(roomId, selfKey, sendL, sendR, sendJ, sendK, {
-          revision: snapRef.current?.revision,
-        });
-        if (resp.ok && resp.snapshot) applySnapIfNewer("step_response", resp.snapshot);
-        else if (!resp.ok && resp.code === "REVISION_MISMATCH" && roomId && selfKey) {
-          const fresh = await fetchOv2GoalDuelSnapshot(roomId, { participantKey: selfKey });
-          if (fresh) applySnapIfNewer("mismatch_recovery_fetch", fresh);
-        }
-      })();
+      const resp = await requestOv2GoalDuelStep(roomId, selfKey, sendL, sendR, sendJ, sendK, {
+        revision: curSnap.revision,
+      });
+      if (resp.ok && resp.snapshot) applySnapIfNewer("step_response", resp.snapshot);
+      else if (!resp.ok && resp.code === "REVISION_MISMATCH" && roomId && selfKey) {
+        const fresh = await fetchOv2GoalDuelSnapshot(roomId, { participantKey: selfKey });
+        if (fresh) applySnapIfNewer("mismatch_recovery_fetch", fresh);
+      }
+    },
+    [roomId, selfKey, roomProductId, applySnapIfNewer]
+  );
+
+  const flushInputNow = useCallback(() => {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (now - lastImmediateFlushMsRef.current < 18) return;
+    lastImmediateFlushMsRef.current = now;
+    void sendCurrentInputStep("input_edge");
+  }, [sendCurrentInputStep]);
+  useEffect(() => {
+    if (!roomId || !selfKey || roomProductId !== OV2_GOAL_DUEL_PRODUCT_GAME_ID) return undefined;
+    if (!snap || String(snap.phase || "").toLowerCase() !== "playing") return undefined;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      void sendCurrentInputStep("interval");
     };
     const id = window.setInterval(tick, GD_STEP_SEND_MS);
     return () => {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [roomId, selfKey, roomProductId, snap?.phase, snap?.sessionId]);
+  }, [roomId, selfKey, roomProductId, snap?.phase, snap?.sessionId, sendCurrentInputStep]);
 
   const setInput = useCallback(partial => {
     const c = inputRef.current;
@@ -494,6 +506,7 @@ export function useOv2GoalDuelSession(baseContext) {
     err,
     setErr,
     setInput,
+    flushInputNow,
     inputRef,
     gdDebug: gdDebugRef.current,
     requestRematch,

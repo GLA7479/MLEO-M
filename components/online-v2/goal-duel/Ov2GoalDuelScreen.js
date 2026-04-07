@@ -142,6 +142,8 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     vaultClaimBusy,
     err,
     setErr,
+    setInput,
+    flushInputNow,
     inputRef,
     requestRematch,
     cancelRematch,
@@ -235,6 +237,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     j: false,
     k: false,
   }));
+  const horizontalIntentRef = useRef(/** @type {"left"|"right"|null} */ (null));
 
   /**
    * `PointerEvent.pointerId` → which pad control (independent; true multi-touch).
@@ -252,8 +255,12 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   const resetPadInputAndVisuals = useCallback(() => {
     kbdRef.current = { l: false, r: false, j: false, k: false };
     pointerPadMapRef.current.clear();
+    horizontalIntentRef.current = null;
     const cur = inputRef.current;
+    const hadActive = Boolean(cur.l || cur.r || cur.j || cur.k || cur.jTap || cur.kTap);
     cur.l = cur.r = cur.j = cur.k = cur.jTap = cur.kTap = false;
+    setInput({ l: false, r: false, j: false, k: false });
+    if (hadActive) flushInputNow();
     const ui = padUiRef.current;
     const keys = /** @type {const} */ (["l", "r", "j", "k"]);
     for (let i = 0; i < keys.length; i++) {
@@ -261,7 +268,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       ui[key].hit?.classList.remove("gd-pad-down");
       ui[key].face?.classList.remove("gd-pad-face-down");
     }
-  }, []);
+  }, [flushInputNow, inputRef, setInput]);
 
   const computePadInput = useCallback(() => {
     const k = kbdRef.current;
@@ -277,15 +284,42 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       if (v === "kick") kick = true;
     });
     const cur = inputRef.current;
-    cur.l = k.l || left;
-    cur.r = k.r || right;
-    cur.j = k.j || jump;
-    cur.k = k.k || kick;
+    const prevL = cur.l;
+    const prevR = cur.r;
+    const prevJ = cur.j;
+    const prevK = cur.k;
+    const anyLeft = k.l || left;
+    const anyRight = k.r || right;
+    let nextL = anyLeft;
+    let nextR = anyRight;
+    if (anyLeft && anyRight) {
+      if (horizontalIntentRef.current === "left") {
+        nextL = true;
+        nextR = false;
+      } else if (horizontalIntentRef.current === "right") {
+        nextL = false;
+        nextR = true;
+      } else {
+        nextL = false;
+        nextR = false;
+      }
+    } else if (anyLeft) {
+      horizontalIntentRef.current = "left";
+    } else if (anyRight) {
+      horizontalIntentRef.current = "right";
+    } else {
+      horizontalIntentRef.current = null;
+    }
+    const nextJ = k.j || jump;
+    const nextK = k.k || kick;
+    setInput({ l: nextL, r: nextR, j: nextJ, k: nextK });
+    const changed = prevL !== nextL || prevR !== nextR || prevJ !== nextJ || prevK !== nextK;
+    if (changed) flushInputNow();
     const ui = padUiRef.current;
     const keys = /** @type {const} */ (["l", "r", "j", "k"]);
     for (let i = 0; i < keys.length; i++) {
       const key = keys[i];
-      const down = cur[key];
+      const down = key === "l" ? nextL : key === "r" ? nextR : key === "j" ? nextJ : nextK;
       const h = ui[key].hit;
       const f = ui[key].face;
       if (h) {
@@ -297,13 +331,14 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
         else f.classList.remove("gd-pad-face-down");
       }
     }
-  }, []);
+  }, [flushInputNow, inputRef, setInput]);
 
   /** @param {"left"|"right"|"jump"|"kick"} key */
   const handlePointerDownPad = useCallback(
     (key, e) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
       e.preventDefault();
+      if (key === "left" || key === "right") horizontalIntentRef.current = key;
       pointerPadMapRef.current.set(e.pointerId, key);
       if (key === "jump") inputRef.current.jTap = true;
       if (key === "kick") inputRef.current.kTap = true;
@@ -493,8 +528,14 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     const down = e => {
       if (vm.phase !== "playing") return;
       const key = e.key.toLowerCase();
-      if (key === "arrowleft" || key === "a") kbdRef.current.l = true;
-      if (key === "arrowright" || key === "d") kbdRef.current.r = true;
+      if (key === "arrowleft" || key === "a") {
+        horizontalIntentRef.current = "left";
+        kbdRef.current.l = true;
+      }
+      if (key === "arrowright" || key === "d") {
+        horizontalIntentRef.current = "right";
+        kbdRef.current.r = true;
+      }
       if (key === " " || key === "w" || key === "arrowup") {
         e.preventDefault();
         if (!kbdRef.current.j) inputRef.current.jTap = true;
