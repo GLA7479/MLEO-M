@@ -10,6 +10,7 @@
 
 const GRAV = 2200;
 const P_ACCEL = 5200;
+const P_BRAKE = 3600;
 const P_MAX_X = 420;
 const JUMP_V = 680;
 const HW = 14;
@@ -200,6 +201,11 @@ function stepPlayerPhysics(p, sin, dt, arena) {
   if (sin.l && !sin.r) ax -= P_ACCEL;
   if (sin.r && !sin.l) ax += P_ACCEL;
   p.vx += ax * dt;
+  if (ax === 0) {
+    const brake = P_BRAKE * dt;
+    if (Math.abs(p.vx) <= brake) p.vx = 0;
+    else p.vx -= Math.sign(p.vx) * brake;
+  }
   if (p.vx > P_MAX_X) p.vx = P_MAX_X;
   if (p.vx < -P_MAX_X) p.vx = -P_MAX_X;
   const feet = p.y + HH;
