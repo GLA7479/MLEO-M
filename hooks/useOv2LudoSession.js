@@ -751,6 +751,18 @@ export function useOv2LudoSession(baseContext) {
   const doubleTimeLeftSec = doubleTimeLeftMs != null ? Math.ceil(doubleTimeLeftMs / 1000) : null;
   const isDoubleTimerActive = doubleTimeLeftMs != null && doubleTimeLeftMs > 0;
 
+  const doubleInitiationsRecord = useMemo(() => {
+    const d = authoritativeSnapshot?.doubleInitiations;
+    if (!d || typeof d !== "object" || Array.isArray(d)) return {};
+    return /** @type {Record<string, unknown>} */ (d);
+  }, [authoritativeSnapshot?.doubleInitiations]);
+  const myDoubleOfferCount =
+    liveMySeat != null
+      ? Math.max(0, Math.floor(Number(doubleInitiationsRecord[String(liveMySeat)] ?? 0) || 0))
+      : 0;
+  const isDoubleOfferCapped = myDoubleOfferCount >= 2;
+  const isAtDoubleMultiplierCap = currentMultiplier >= 16;
+
   const seatStrikeCountMap = useMemo(() => {
     const out = { 0: 0, 1: 0, 2: 0, 3: 0 };
     const raw = authoritativeSnapshot?.missedTurns;
@@ -810,6 +822,10 @@ export function useOv2LudoSession(baseContext) {
       diceRolling,
       liveDiceDisplayValue,
       doubleCycleUsedSeats: authoritativeSnapshot?.doubleCycleUsedSeats ?? [],
+      doubleInitiations: doubleInitiationsRecord,
+      myDoubleOfferCount,
+      isDoubleOfferCapped,
+      isAtDoubleMultiplierCap,
       /** Authoritative session phase when in live match (`lobby` | `playing` | `finished` | …). */
       matchPhase: authoritativeSnapshot?.phase ?? null,
       phaseLine,

@@ -65,6 +65,8 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
     result,
     liveDiceDisplayValue,
     doubleCycleUsedSeats,
+    isDoubleOfferCapped,
+    isAtDoubleMultiplierCap,
   } = vm;
 
   const isReadOnlyRoom = playMode === OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
@@ -123,7 +125,9 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
     !boardViewReadOnly &&
     doubleAwaitingSeat == null &&
     (doubleState?.proposed_by == null || doubleState?.awaiting == null) &&
-    !isDoubleCycleLockedForMe;
+    !isDoubleCycleLockedForMe &&
+    !isDoubleOfferCapped &&
+    !isAtDoubleMultiplierCap;
   const isAwaitingMyDouble = isLiveMatch && mySeat != null && doubleAwaitingSeat === mySeat;
   const turnTimerTone =
     !isTurnTimerActive || turnTimeLeftSec == null
