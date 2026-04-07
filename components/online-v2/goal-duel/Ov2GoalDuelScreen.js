@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { useOv2GoalDuelSession } from "../../../hooks/useOv2GoalDuelSession";
@@ -27,29 +27,27 @@ const GD_SPRITE_BALL = "/images/online-v2/goal-duel/gd-ball.png";
 /** Canvas-only scale for dogs + ball; server snapshot coords unchanged. Py offset keeps feet on ground. */
 const GD_VISUAL_ENTITY_SCALE = 1.32;
 
-const finishDismissStorageKey = sid => `ov2_gd_finish_dismiss_${sid}`;
-
 const BTN_PRIMARY =
   "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_SECONDARY =
   "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
 /**
- * [LEFT][JUMP][KICK][RIGHT] — 6rem move columns on mobile; touch-none blocks browser gestures in the pad.
+ * [LEFT][JUMP][KICK][RIGHT] — 6rem move columns on mobile; touch-manipulation for responsive taps.
  */
 const CTRL_ROW =
-  "pointer-events-auto grid w-full touch-none select-none items-stretch justify-items-stretch gap-3 [-webkit-tap-highlight-color:transparent] [grid-template-columns:6rem_minmax(0,1fr)_minmax(0,1fr)_6rem] sm:gap-4";
+  "pointer-events-auto grid w-full touch-manipulation select-none items-stretch justify-items-stretch gap-3 [-webkit-tap-highlight-color:transparent] [grid-template-columns:6rem_minmax(0,1fr)_minmax(0,1fr)_6rem] sm:gap-4";
 
 /** Large hit target (6×6rem min on mobile); visible face stays ~4rem inside. */
 const CTRL_MOVE_HIT =
-  "relative flex min-h-[6rem] min-w-[6rem] max-w-[6rem] w-full touch-none select-none items-center justify-center self-center rounded-[24px] border border-transparent px-1 py-2 transition-[transform,opacity] active:scale-[0.99] [-webkit-tap-highlight-color:transparent] sm:min-h-[3.5rem] sm:min-w-[4.75rem] sm:max-w-[4.75rem] sm:px-1.5 sm:py-2";
+  "relative flex min-h-[6rem] min-w-[6rem] max-w-[6rem] w-full touch-manipulation select-none items-center justify-center self-center rounded-[24px] border border-transparent px-1 py-2 transition-[transform,opacity] active:scale-[0.99] [-webkit-tap-highlight-color:transparent] sm:min-h-[3.5rem] sm:min-w-[4.75rem] sm:max-w-[4.75rem] sm:px-1.5 sm:py-2";
 
 /** Visible arrow ~4rem × 4rem (no downscale vs column). */
 const CTRL_MOVE_FACE =
   "pointer-events-none flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-2 border-cyan-400/55 bg-gradient-to-b from-cyan-400/50 via-cyan-600/45 to-cyan-950/88 text-2xl text-cyan-50 shadow-[0_8px_32px_rgba(6,182,212,0.22),0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-md sm:h-14 sm:w-14 sm:text-xl";
 
 const CTRL_ACTION_HIT =
-  "relative flex min-h-[6rem] w-full min-w-0 touch-none select-none flex-col items-center justify-center rounded-[24px] border border-transparent px-2 py-2.5 transition-[transform,opacity] active:scale-[0.99] [-webkit-tap-highlight-color:transparent] sm:min-h-[3.25rem] sm:px-2 sm:py-2";
+  "relative flex min-h-[6rem] w-full min-w-0 touch-manipulation select-none flex-col items-center justify-center rounded-[24px] border border-transparent px-2 py-2.5 transition-[transform,opacity] active:scale-[0.99] [-webkit-tap-highlight-color:transparent] sm:min-h-[3.25rem] sm:px-2 sm:py-2";
 
 const CTRL_ACTION_FACE =
   "pointer-events-none flex min-h-[4.5rem] w-full min-w-0 max-w-full flex-col items-center justify-center gap-0.5 rounded-2xl px-1 font-bold uppercase leading-none backdrop-blur-md sm:min-h-[3rem]";
@@ -57,15 +55,6 @@ const CTRL_ACTION_FACE =
 const CTRL_JUMP_FACE = `${CTRL_ACTION_FACE} border-2 border-emerald-400/55 bg-gradient-to-b from-emerald-400/48 via-emerald-600/42 to-emerald-950/90 text-[11px] text-emerald-50 sm:text-[11px] shadow-[0_8px_32px_rgba(52,211,153,0.2),0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)]`;
 
 const CTRL_KICK_FACE = `${CTRL_ACTION_FACE} border-2 border-red-500/65 bg-gradient-to-b from-red-500/58 via-red-600/45 to-red-950/92 text-[11px] text-red-50 sm:text-[11px] shadow-[0_8px_32px_rgba(248,113,113,0.35),0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)]`;
-
-/** @param {number} pointerId */
-function gdPtrKey(pointerId) {
-  return `p:${pointerId}`;
-}
-/** @param {number} touchId */
-function gdTouchKey(touchId) {
-  return `t:${touchId}`;
-}
 
 /** @param {unknown} m */
 function memberGdRematchRequested(m) {
@@ -102,67 +91,57 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   const [startNextBusy, setStartNextBusy] = useState(false);
   const [exitBusy, setExitBusy] = useState(false);
   const [exitErr, setExitErr] = useState("");
-  const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
   const canvasRef = useRef(/** @type {HTMLCanvasElement|null} */ (null));
   const vmRef = useRef(vm);
   vmRef.current = vm;
-  /** Desktop keyboard (merged with touch in commitInputFromRefs). */
+  /** Desktop keyboard — merged with on-screen pad via flushPadInput. */
   const kbdRef = useRef(/** @type {{ l: boolean, r: boolean, j: boolean, k: boolean }} */ ({
     l: false,
     r: false,
     j: false,
     k: false,
   }));
-  /** Touch move: exclusive l/r from pointer arbitration (never both true). */
-  const touchMoveRef = useRef(/** @type {{ l: boolean, r: boolean }} */ ({ l: false, r: false }));
-  /** Keys `p:${pointerId}` (mouse/pen) or `t:${touchId}` — avoids double-count when both APIs exist. */
-  const movePtrLRef = useRef(/** @type {Set<string>} */ (new Set()));
-  const movePtrRRef = useRef(/** @type {Set<string>} */ (new Set()));
-  /** Last pointerdown on a move button while both sides have ≥1 pointer — wins tie. */
-  const lastMoveDownRef = useRef(/** @type {"l"|"r"|null} */ (null));
-  const ptrJRef = useRef(/** @type {Set<string>} */ (new Set()));
-  const ptrKRef = useRef(/** @type {Set<string>} */ (new Set()));
 
-  /** Native non-passive touch listeners (React synthetic touch is passive → preventDefault ignored). */
-  const ctrlPadLRef = useRef(/** @type {HTMLButtonElement|null} */ (null));
-  const ctrlPadRRef = useRef(/** @type {HTMLButtonElement|null} */ (null));
-  const ctrlPadJRef = useRef(/** @type {HTMLButtonElement|null} */ (null));
-  const ctrlPadKRef = useRef(/** @type {HTMLButtonElement|null} */ (null));
+  /**
+   * On-screen pad state (multi-touch: left + jump, etc.). Maps to session `{ l, r, j, k }` via `setInput`.
+   * Session hook owns `inputRef`; we never shadow it.
+   */
+  const padInputRef = useRef(/** @type {{ left: boolean, right: boolean, jump: boolean, kick: boolean }} */ ({
+    left: false,
+    right: false,
+    jump: false,
+    kick: false,
+  }));
 
-  const commitInputFromRefs = useCallback(() => {
+  const flushPadInput = useCallback(() => {
     const k = kbdRef.current;
-    const t = touchMoveRef.current;
+    const p = padInputRef.current;
     setInput({
-      l: k.l || t.l,
-      r: k.r || t.r,
-      j: k.j || ptrJRef.current.size > 0,
-      k: k.k || ptrKRef.current.size > 0,
+      l: k.l || p.left,
+      r: k.r || p.right,
+      j: k.j || p.jump,
+      k: k.k || p.kick,
     });
   }, [setInput]);
 
-  const syncTouchMove = useCallback(() => {
-    const L = movePtrLRef.current.size;
-    const R = movePtrRRef.current.size;
-    let tl = false;
-    let tr = false;
-    if (L === 0 && R === 0) {
-      tl = false;
-      tr = false;
-    } else if (L > 0 && R === 0) {
-      tl = true;
-    } else if (R > 0 && L === 0) {
-      tr = true;
-    } else {
-      const last = lastMoveDownRef.current;
-      if (last === "l") {
-        tl = true;
-      } else {
-        tr = true;
-      }
-    }
-    touchMoveRef.current = { l: tl, r: tr };
-    commitInputFromRefs();
-  }, [commitInputFromRefs]);
+  const setMove = useCallback(
+    (dir, val) => {
+      if (dir === "left") padInputRef.current.left = val;
+      else padInputRef.current.right = val;
+      flushPadInput();
+    },
+    [flushPadInput]
+  );
+
+  const setAction = useCallback(
+    (type, val) => {
+      if (type === "jump") padInputRef.current.jump = val;
+      else padInputRef.current.kick = val;
+      flushPadInput();
+    },
+    [flushPadInput]
+  );
+
   const motionPrevRef = useRef(
     /** @type {{ p0x: number, p0y: number, p1x: number, p1y: number, bx: number, by: number, t: number }|null} */ (null)
   );
@@ -180,10 +159,6 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
   const onLeaveToLobby = typeof contextInput?.onLeaveToLobby === "function" ? contextInput.onLeaveToLobby : null;
   const leaveToLobbyBusy = Boolean(contextInput?.leaveToLobbyBusy);
-
-  useEffect(() => {
-    setFinishModalDismissedSessionId("");
-  }, [vm.sessionId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -250,166 +225,10 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   useEffect(() => {
     if (vm.phase !== "playing") {
       kbdRef.current = { l: false, r: false, j: false, k: false };
-      touchMoveRef.current = { l: false, r: false };
-      movePtrLRef.current.clear();
-      movePtrRRef.current.clear();
-      lastMoveDownRef.current = null;
-      ptrJRef.current.clear();
-      ptrKRef.current.clear();
+      padInputRef.current = { left: false, right: false, jump: false, kick: false };
       setInput({ l: false, r: false, j: false, k: false });
     }
   }, [vm.phase, setInput]);
-
-  const activateMove = useCallback(
-    (side, key) => {
-      if (vmRef.current.phase !== "playing") return;
-      const set = side === "l" ? movePtrLRef.current : movePtrRRef.current;
-      set.add(key);
-      lastMoveDownRef.current = side;
-      syncTouchMove();
-    },
-    [syncTouchMove]
-  );
-
-  const deactivateMove = useCallback(
-    (side, key) => {
-      const set = side === "l" ? movePtrLRef.current : movePtrRRef.current;
-      if (!set.delete(key)) return;
-      syncTouchMove();
-    },
-    [syncTouchMove]
-  );
-
-  const deactivateMoveForced = useCallback(
-    (side, key) => {
-      const set = side === "l" ? movePtrLRef.current : movePtrRRef.current;
-      set.delete(key);
-      syncTouchMove();
-    },
-    [syncTouchMove]
-  );
-
-  const activateAction = useCallback(
-    (kind, key) => {
-      if (vmRef.current.phase !== "playing") return;
-      const set = kind === "j" ? ptrJRef.current : ptrKRef.current;
-      set.add(key);
-      commitInputFromRefs();
-    },
-    [commitInputFromRefs]
-  );
-
-  const deactivateAction = useCallback(
-    (kind, key) => {
-      const set = kind === "j" ? ptrJRef.current : ptrKRef.current;
-      if (!set.delete(key)) return;
-      commitInputFromRefs();
-    },
-    [commitInputFromRefs]
-  );
-
-  const deactivateActionForced = useCallback(
-    (kind, key) => {
-      const set = kind === "j" ? ptrJRef.current : ptrKRef.current;
-      set.delete(key);
-      commitInputFromRefs();
-    },
-    [commitInputFromRefs]
-  );
-
-  const bindMoveControls = useCallback(
-    side => ({
-      onPointerDown: e => {
-        if (e.pointerType === "touch") return;
-        if (vmRef.current.phase !== "playing") return;
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-        const key = gdPtrKey(e.pointerId);
-        activateMove(side, key);
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {
-          /* ignore */
-        }
-      },
-      onPointerUp: e => {
-        if (e.pointerType === "touch") return;
-        const key = gdPtrKey(e.pointerId);
-        const set = side === "l" ? movePtrLRef.current : movePtrRRef.current;
-        if (!set.has(key)) return;
-        deactivateMove(side, key);
-        try {
-          e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch {
-          /* ignore */
-        }
-      },
-      onPointerCancel: e => {
-        if (e.pointerType === "touch") return;
-        const key = gdPtrKey(e.pointerId);
-        deactivateMoveForced(side, key);
-        try {
-          e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch {
-          /* ignore */
-        }
-      },
-      onLostPointerCapture: e => {
-        if (e.pointerType === "touch") return;
-        const key = gdPtrKey(e.pointerId);
-        deactivateMoveForced(side, key);
-      },
-    }),
-    [activateMove, deactivateMove, deactivateMoveForced]
-  );
-
-  const bindActionControls = useCallback(
-    kind => ({
-      onPointerDown: e => {
-        if (e.pointerType === "touch") return;
-        if (vmRef.current.phase !== "playing") return;
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.pointerType === "mouse" && e.button !== 0) return;
-        const key = gdPtrKey(e.pointerId);
-        activateAction(kind, key);
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {
-          /* ignore */
-        }
-      },
-      onPointerUp: e => {
-        if (e.pointerType === "touch") return;
-        const key = gdPtrKey(e.pointerId);
-        const set = kind === "j" ? ptrJRef.current : ptrKRef.current;
-        if (!set.has(key)) return;
-        deactivateAction(kind, key);
-        try {
-          e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch {
-          /* ignore */
-        }
-      },
-      onPointerCancel: e => {
-        if (e.pointerType === "touch") return;
-        const key = gdPtrKey(e.pointerId);
-        deactivateActionForced(kind, key);
-        try {
-          e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch {
-          /* ignore */
-        }
-      },
-      onLostPointerCapture: e => {
-        if (e.pointerType === "touch") return;
-        const key = gdPtrKey(e.pointerId);
-        deactivateActionForced(kind, key);
-      },
-    }),
-    [activateAction, deactivateAction, deactivateActionForced]
-  );
 
   useEffect(() => {
     const down = e => {
@@ -422,7 +241,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
         kbdRef.current.j = true;
       }
       if (key === "e" || key === "k") kbdRef.current.k = true;
-      commitInputFromRefs();
+      flushPadInput();
     };
     const up = e => {
       const key = e.key.toLowerCase();
@@ -430,7 +249,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       if (key === "arrowright" || key === "d") kbdRef.current.r = false;
       if (key === " " || key === "w" || key === "arrowup") kbdRef.current.j = false;
       if (key === "e" || key === "k") kbdRef.current.k = false;
-      commitInputFromRefs();
+      flushPadInput();
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -438,7 +257,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [vm.phase, commitInputFromRefs]);
+  }, [vm.phase, flushPadInput]);
 
   const onRematch = useCallback(async () => {
     if (!roomId || rematchBusy) return;
@@ -524,131 +343,12 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
   const finished = vm.phase === "finished";
   const finishSessionId = finished ? String(vm.sessionId || "").trim() : "";
-  const finishModalDismissed =
-    finishSessionId.length > 0 &&
-    (finishModalDismissedSessionId === finishSessionId ||
-      (typeof window !== "undefined" &&
-        (() => {
-          try {
-            return window.sessionStorage.getItem(finishDismissStorageKey(finishSessionId)) === "1";
-          } catch {
-            return false;
-          }
-        })()));
-  const showResultModal = finished && finishSessionId.length > 0 && !finishModalDismissed;
+  /** Single post-match UI: result modal only (no dismissed / dead-end fallback). */
+  const showResultModal = finished && finishSessionId.length > 0;
 
   const mySeat = vm.mySeat;
 
-  /** Touch input uses native `{ passive: false }` listeners so `preventDefault` suppresses scroll/gesture. */
-  useLayoutEffect(() => {
-    if (typeof window === "undefined" || vm.phase !== "playing" || mySeat == null) return undefined;
-
-    const passiveOpts = /** @type {AddEventListenerOptions} */ ({ passive: false });
-
-    /** @param {"l"|"r"} side */
-    const moveTouchStart = side => /** @param {TouchEvent} e */ e => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (vmRef.current.phase !== "playing") return;
-      const { changedTouches } = e;
-      for (let i = 0; i < changedTouches.length; i++) {
-        activateMove(side, gdTouchKey(changedTouches[i].identifier));
-      }
-    };
-    /** @param {"l"|"r"} side */
-    const moveTouchEnd = side => /** @param {TouchEvent} e */ e => {
-      e.preventDefault();
-      e.stopPropagation();
-      const { changedTouches } = e;
-      for (let i = 0; i < changedTouches.length; i++) {
-        deactivateMove(side, gdTouchKey(changedTouches[i].identifier));
-      }
-    };
-    /** @param {"l"|"r"} side */
-    const moveTouchCancel = side => /** @param {TouchEvent} e */ e => {
-      e.preventDefault();
-      e.stopPropagation();
-      const { changedTouches } = e;
-      for (let i = 0; i < changedTouches.length; i++) {
-        deactivateMoveForced(side, gdTouchKey(changedTouches[i].identifier));
-      }
-    };
-
-    /** @param {"j"|"k"} kind */
-    const actionTouchStart = kind => /** @param {TouchEvent} e */ e => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (vmRef.current.phase !== "playing") return;
-      const { changedTouches } = e;
-      for (let i = 0; i < changedTouches.length; i++) {
-        activateAction(kind, gdTouchKey(changedTouches[i].identifier));
-      }
-    };
-    /** @param {"j"|"k"} kind */
-    const actionTouchEnd = kind => /** @param {TouchEvent} e */ e => {
-      e.preventDefault();
-      e.stopPropagation();
-      const { changedTouches } = e;
-      for (let i = 0; i < changedTouches.length; i++) {
-        deactivateAction(kind, gdTouchKey(changedTouches[i].identifier));
-      }
-    };
-    /** @param {"j"|"k"} kind */
-    const actionTouchCancel = kind => /** @param {TouchEvent} e */ e => {
-      e.preventDefault();
-      e.stopPropagation();
-      const { changedTouches } = e;
-      for (let i = 0; i < changedTouches.length; i++) {
-        deactivateActionForced(kind, gdTouchKey(changedTouches[i].identifier));
-      }
-    };
-
-    const pairs = [
-      { el: ctrlPadLRef.current, start: moveTouchStart("l"), end: moveTouchEnd("l"), cancel: moveTouchCancel("l") },
-      { el: ctrlPadRRef.current, start: moveTouchStart("r"), end: moveTouchEnd("r"), cancel: moveTouchCancel("r") },
-      { el: ctrlPadJRef.current, start: actionTouchStart("j"), end: actionTouchEnd("j"), cancel: actionTouchCancel("j") },
-      { el: ctrlPadKRef.current, start: actionTouchStart("k"), end: actionTouchEnd("k"), cancel: actionTouchCancel("k") },
-    ];
-
-    const cleanups = [];
-    for (const p of pairs) {
-      if (!p.el) continue;
-      p.el.addEventListener("touchstart", p.start, passiveOpts);
-      p.el.addEventListener("touchend", p.end, passiveOpts);
-      p.el.addEventListener("touchcancel", p.cancel, passiveOpts);
-      cleanups.push(() => {
-        p.el.removeEventListener("touchstart", p.start, passiveOpts);
-        p.el.removeEventListener("touchend", p.end, passiveOpts);
-        p.el.removeEventListener("touchcancel", p.cancel, passiveOpts);
-      });
-    }
-
-    return () => {
-      cleanups.forEach(fn => fn());
-    };
-  }, [
-    vm.phase,
-    mySeat,
-    activateMove,
-    deactivateMove,
-    deactivateMoveForced,
-    activateAction,
-    deactivateAction,
-    deactivateActionForced,
-  ]);
-
   const isDrawResult = Boolean(vm.result && vm.result.isDraw === true);
-  const dismissFinishModal = useCallback(() => {
-    if (!finishSessionId) return;
-    setFinishModalDismissedSessionId(finishSessionId);
-    if (typeof window !== "undefined") {
-      try {
-        window.sessionStorage.setItem(finishDismissStorageKey(finishSessionId), "1");
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [finishSessionId]);
 
   const winnerLabel = useMemo(() => {
     if (isDrawResult) return "Draw";
@@ -917,7 +617,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   ref={canvasRef}
                   width={800}
                   height={400}
-                  className="absolute inset-0 block h-full w-full touch-none"
+                  className="absolute inset-0 block h-full w-full touch-manipulation"
                 />
 
                 {goalFx ? (
@@ -950,12 +650,38 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
             <div className="flex w-full shrink-0 flex-col gap-1.5 pb-4 pt-2 sm:gap-2 sm:pb-5 sm:pt-3">
             <div className={`${CTRL_ROW} mx-auto min-w-0 max-w-[min(100%,60rem)] px-0.5 sm:px-1`}>
-              <button ref={ctrlPadLRef} type="button" draggable={false} aria-label="Move left" className={CTRL_MOVE_HIT} {...bindMoveControls("l")}>
+              <button
+                type="button"
+                draggable={false}
+                aria-label="Move left"
+                className={CTRL_MOVE_HIT}
+                onTouchStart={() => setMove("left", true)}
+                onTouchEnd={() => setMove("left", false)}
+                onTouchCancel={() => setMove("left", false)}
+                onMouseDown={e => {
+                  if (e.button === 0) setMove("left", true);
+                }}
+                onMouseUp={() => setMove("left", false)}
+                onMouseLeave={() => setMove("left", false)}
+              >
                 <span className={CTRL_MOVE_FACE} aria-hidden>
                   ◀
                 </span>
               </button>
-              <button ref={ctrlPadJRef} type="button" draggable={false} aria-label="Jump" className={CTRL_ACTION_HIT} {...bindActionControls("j")}>
+              <button
+                type="button"
+                draggable={false}
+                aria-label="Jump"
+                className={CTRL_ACTION_HIT}
+                onTouchStart={() => setAction("jump", true)}
+                onTouchEnd={() => setAction("jump", false)}
+                onTouchCancel={() => setAction("jump", false)}
+                onMouseDown={e => {
+                  if (e.button === 0) setAction("jump", true);
+                }}
+                onMouseUp={() => setAction("jump", false)}
+                onMouseLeave={() => setAction("jump", false)}
+              >
                 <span className={CTRL_JUMP_FACE}>
                   <span className="text-2xl leading-none sm:text-2xl" aria-hidden>
                     ▲
@@ -963,7 +689,20 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   <span>Jump</span>
                 </span>
               </button>
-              <button ref={ctrlPadKRef} type="button" draggable={false} aria-label="Kick" className={CTRL_ACTION_HIT} {...bindActionControls("k")}>
+              <button
+                type="button"
+                draggable={false}
+                aria-label="Kick"
+                className={CTRL_ACTION_HIT}
+                onTouchStart={() => setAction("kick", true)}
+                onTouchEnd={() => setAction("kick", false)}
+                onTouchCancel={() => setAction("kick", false)}
+                onMouseDown={e => {
+                  if (e.button === 0) setAction("kick", true);
+                }}
+                onMouseUp={() => setAction("kick", false)}
+                onMouseLeave={() => setAction("kick", false)}
+              >
                 <span className={CTRL_KICK_FACE}>
                   <span className="text-2xl leading-none sm:text-2xl" aria-hidden>
                     ⚡
@@ -971,7 +710,20 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   <span>Kick</span>
                 </span>
               </button>
-              <button ref={ctrlPadRRef} type="button" draggable={false} aria-label="Move right" className={CTRL_MOVE_HIT} {...bindMoveControls("r")}>
+              <button
+                type="button"
+                draggable={false}
+                aria-label="Move right"
+                className={CTRL_MOVE_HIT}
+                onTouchStart={() => setMove("right", true)}
+                onTouchEnd={() => setMove("right", false)}
+                onTouchCancel={() => setMove("right", false)}
+                onMouseDown={e => {
+                  if (e.button === 0) setMove("right", true);
+                }}
+                onMouseUp={() => setMove("right", false)}
+                onMouseLeave={() => setMove("right", false)}
+              >
                 <span className={CTRL_MOVE_FACE} aria-hidden>
                   ▶
                 </span>
@@ -1029,8 +781,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       {session.snapshot &&
       room?.active_session_id &&
       !(vm.phase === "playing" && mySeat != null) &&
-      !finished &&
-      !showResultModal ? (
+      !finished ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-4 py-8 text-center">
           <p className="text-sm text-zinc-300">
             {vm.phase === "playing" && mySeat == null
@@ -1117,9 +868,6 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
               ) : (
                 <p className="text-center text-[11px] text-zinc-500">Host starts the next match when both players rematch.</p>
               )}
-              <button type="button" className={BTN_SECONDARY} onClick={() => dismissFinishModal()}>
-                Dismiss
-              </button>
               <button
                 type="button"
                 className="mt-1 text-[11px] text-zinc-500 underline"
@@ -1131,13 +879,6 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
               {exitErr ? <p className="text-[11px] text-red-300">{exitErr}</p> : null}
             </div>
           </div>
-        </div>
-      ) : null}
-
-      {finished && !showResultModal ? (
-        <div className="rounded-xl border border-white/[0.06] bg-zinc-950/40 p-3 text-[11px] text-zinc-400">
-          <p className="font-semibold text-zinc-200">{winnerLabel}</p>
-          <p className="mt-1">Result dismissed — you can rematch from the lobby or use buttons below if still available.</p>
         </div>
       ) : null}
     </div>
