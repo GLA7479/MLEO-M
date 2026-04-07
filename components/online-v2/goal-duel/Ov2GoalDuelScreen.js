@@ -98,6 +98,8 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   const roomId = room?.id != null ? String(room.id) : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
+  const onLeaveToLobby = typeof contextInput?.onLeaveToLobby === "function" ? contextInput.onLeaveToLobby : null;
+  const leaveToLobbyBusy = Boolean(contextInput?.leaveToLobbyBusy);
 
   useEffect(() => {
     setFinishModalDismissedSessionId("");
@@ -588,6 +590,21 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 </button>
               </div>
             </div>
+
+          {roomId && pk ? (
+            <div className="mx-auto flex w-full max-w-[min(100%,36rem)] shrink-0 flex-col items-end gap-0.5 px-0.5 pt-1 sm:px-1">
+              <button
+                type="button"
+                title="Leave the match — counts as forfeit; opponent wins."
+                disabled={leaveToLobbyBusy || exitBusy}
+                className="text-[10px] font-semibold text-red-200/95 underline decoration-red-400/50 transition hover:text-red-100 disabled:opacity-45 sm:text-[11px]"
+                onClick={() => void (onLeaveToLobby ? onLeaveToLobby() : onExitToLobby())}
+              >
+                {leaveToLobbyBusy || exitBusy ? "Leaving…" : "Leave"}
+              </button>
+              {exitErr && !onLeaveToLobby ? <span className="max-w-full text-right text-[9px] text-red-300/95">{exitErr}</span> : null}
+            </div>
+          ) : null}
 
           <p className="hidden shrink-0 text-center text-[10px] text-zinc-500 sm:block sm:text-[11px]">
             Desktop: A/D move · W or Space jump · E or K strike
