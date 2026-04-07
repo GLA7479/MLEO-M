@@ -64,6 +64,8 @@ export const TEAM_COOL = TEAM_RIVAL_DOG;
 export function drawGoalDuelArena(ctx, W, H, aw, ah, gy, gm, sx, sy) {
   const groundY = gy * sy;
   const horizon = groundY * 0.42;
+  /** Grass band starts here — pitch markings use this so lines never sit in the sky layer */
+  const grassTop = groundY * 0.5;
 
   const sky = ctx.createLinearGradient(0, 0, W, horizon);
   sky.addColorStop(0, "#1e0f3d");
@@ -74,44 +76,95 @@ export function drawGoalDuelArena(ctx, W, H, aw, ah, gy, gm, sx, sy) {
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, horizon);
 
-  const sunG = ctx.createRadialGradient(W * 0.78, horizon * 0.55, 0, W * 0.78, horizon * 0.55, W * 0.35);
-  sunG.addColorStop(0, "rgba(255,220,140,0.55)");
-  sunG.addColorStop(0.5, "rgba(255,160,80,0.12)");
+  const sunG = ctx.createRadialGradient(W * 0.78, horizon * 0.55, 0, W * 0.78, horizon * 0.55, W * 0.38);
+  sunG.addColorStop(0, "rgba(255,230,160,0.62)");
+  sunG.addColorStop(0.45, "rgba(255,170,90,0.16)");
   sunG.addColorStop(1, "rgba(255,120,40,0)");
   ctx.fillStyle = sunG;
   ctx.fillRect(0, 0, W, horizon);
 
-  ctx.fillStyle = "rgba(15,8,35,0.55)";
+  const cornerL = ctx.createLinearGradient(0, 0, W * 0.45, horizon * 0.85);
+  cornerL.addColorStop(0, "rgba(120,180,255,0.12)");
+  cornerL.addColorStop(1, "rgba(80,40,120,0)");
+  ctx.fillStyle = cornerL;
+  ctx.fillRect(0, 0, W * 0.5, horizon);
+  const cornerR = ctx.createLinearGradient(W, 0, W * 0.55, horizon * 0.85);
+  cornerR.addColorStop(0, "rgba(255,160,90,0.1)");
+  cornerR.addColorStop(1, "rgba(120,60,40,0)");
+  ctx.fillStyle = cornerR;
+  ctx.fillRect(W * 0.5, 0, W * 0.5, horizon);
+
+  const glowMid = ctx.createRadialGradient(W * 0.5, horizon * 0.12, 0, W * 0.5, horizon * 0.28, W * 0.42);
+  glowMid.addColorStop(0, "rgba(255,250,235,0.09)");
+  glowMid.addColorStop(1, "rgba(255,200,140,0)");
+  ctx.fillStyle = glowMid;
+  ctx.fillRect(0, 0, W, horizon);
+
+  /* Stadium floodlights — sky / horizon band only (never on grass); not pitch geometry */
+  for (let i = 0; i < 6; i++) {
+    const lx = (0.03 + i * 0.158) * W;
+    const beamH = horizon * 0.88;
+    const cone = ctx.createLinearGradient(lx - 55, 0, lx, beamH);
+    cone.addColorStop(0, "rgba(255,255,245,0.2)");
+    cone.addColorStop(0.35, "rgba(255,235,190,0.09)");
+    cone.addColorStop(1, "rgba(255,200,120,0)");
+    ctx.fillStyle = cone;
+    ctx.beginPath();
+    ctx.moveTo(lx - 28 * sx, 0);
+    ctx.lineTo(lx + 28 * sx, 0);
+    ctx.lineTo(lx + 115 * sx, beamH);
+    ctx.lineTo(lx - 115 * sx, beamH);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,252,220,0.65)";
+    ctx.beginPath();
+    ctx.arc(lx, horizon * 0.06, 4 * sx, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (let i = 0; i < 6; i++) {
+    const lx = (0.08 + i * 0.168) * W;
+    const beamH = horizon * 0.72;
+    const cone = ctx.createLinearGradient(lx - 30, horizon * 0.08, lx, beamH);
+    cone.addColorStop(0, "rgba(255,255,255,0.06)");
+    cone.addColorStop(1, "rgba(255,220,160,0)");
+    ctx.fillStyle = cone;
+    ctx.beginPath();
+    ctx.moveTo(lx - 18 * sx, horizon * 0.06);
+    ctx.lineTo(lx + 18 * sx, horizon * 0.06);
+    ctx.lineTo(lx + 72 * sx, beamH);
+    ctx.lineTo(lx - 72 * sx, beamH);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const skyWash = ctx.createRadialGradient(W * 0.5, horizon * 0.18, 0, W * 0.5, horizon * 0.38, W * 0.58);
+  skyWash.addColorStop(0, "rgba(255,248,210,0.12)");
+  skyWash.addColorStop(1, "rgba(255,180,100,0)");
+  ctx.fillStyle = skyWash;
+  ctx.fillRect(0, 0, W, horizon);
+
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  for (let s = 0; s < 90; s++) {
+    const sparkX = ((s * 97.3) % W);
+    const sparkY = ((s * 53.7) % (horizon * 0.32));
+    ctx.fillStyle = s % 4 === 0 ? "rgba(255,255,255,0.5)" : "rgba(255,230,180,0.35)";
+    ctx.fillRect(sparkX, sparkY, 1.1, 1.1);
+  }
+  ctx.restore();
+
+  ctx.fillStyle = "rgba(15,8,35,0.42)";
   ctx.beginPath();
-  ctx.moveTo(0, horizon * 0.92);
+  ctx.moveTo(0, horizon * 0.94);
   for (let i = 0; i <= 24; i++) {
     const x = (i / 24) * W;
-    const y = horizon * 0.88 + Math.sin(i * 0.7) * 3 * sy + (i % 3) * 2;
+    const y = horizon * 0.9 + Math.sin(i * 0.7) * 2 * sy;
     ctx.lineTo(x, y);
   }
   ctx.lineTo(W, horizon);
   ctx.lineTo(0, horizon);
   ctx.closePath();
   ctx.fill();
-
-  for (let i = 0; i < 6; i++) {
-    const lx = (0.08 + i * 0.17) * W;
-    const cone = ctx.createLinearGradient(lx - 30, 0, lx, horizon);
-    cone.addColorStop(0, "rgba(255,255,200,0.08)");
-    cone.addColorStop(1, "rgba(255,255,220,0)");
-    ctx.fillStyle = cone;
-    ctx.beginPath();
-    ctx.moveTo(lx - 25 * sx, 0);
-    ctx.lineTo(lx + 25 * sx, 0);
-    ctx.lineTo(lx + 80 * sx, horizon * 0.95);
-    ctx.lineTo(lx - 80 * sx, horizon * 0.95);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "rgba(255,250,220,0.85)";
-    ctx.beginPath();
-    ctx.arc(lx, horizon * 0.08, 4 * sx, 0, Math.PI * 2);
-    ctx.fill();
-  }
 
   ctx.fillStyle = "rgba(12,10,22,0.75)";
   const crowdH = 14 * sy;
@@ -122,21 +175,14 @@ export function drawGoalDuelArena(ctx, W, H, aw, ah, gy, gm, sx, sy) {
     ctx.fillRect(x, horizon - crowdH - h, 3, h);
   }
 
-  ctx.strokeStyle = "rgba(255,255,255,0.12)";
-  ctx.lineWidth = 2;
-  const fenceY = groundY * 0.48;
-  for (let x = 0; x < W; x += 28 * sx) {
-    ctx.beginPath();
-    ctx.moveTo(x, fenceY - 20 * sy);
-    ctx.lineTo(x, fenceY);
-    ctx.stroke();
-  }
-  ctx.beginPath();
-  ctx.moveTo(0, fenceY - 8 * sy);
-  ctx.lineTo(W, fenceY - 8 * sy);
-  ctx.stroke();
+  /* Soft rim where stands meet grass — gradient only, no hard line (avoids “pitch line in the sky” read) */
+  const rimGrad = ctx.createLinearGradient(0, grassTop - 5, 0, grassTop + 4);
+  rimGrad.addColorStop(0, "rgba(0,0,0,0)");
+  rimGrad.addColorStop(0.45, "rgba(255,210,150,0.045)");
+  rimGrad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = rimGrad;
+  ctx.fillRect(0, grassTop - 5, W, 10);
 
-  const grassTop = groundY * 0.5;
   const grassH = H - grassTop;
   const stripeW = 22 * sx;
   for (let x = 0; x < W + stripeW; x += stripeW * 2) {
@@ -166,55 +212,44 @@ export function drawGoalDuelArena(ctx, W, H, aw, ah, gy, gm, sx, sy) {
 
   const fieldLeft = gm * sx;
   const fieldRight = W - gm * sx;
-  const fieldTop = 78 * sy;
+  /** Pitch markings must sit on grass only — old `78 * sy` sat above `grassTop` and drew lines into the sky. */
+  const fieldTop = grassTop + 12 * sy;
   const fieldW = fieldRight - fieldLeft;
   const fieldH = groundY - fieldTop;
 
-  ctx.strokeStyle = "rgba(255,255,255,0.42)";
-  ctx.shadowColor = "rgba(255,255,255,0.15)";
-  ctx.shadowBlur = 4;
-  ctx.lineWidth = 2.5;
-  ctx.strokeRect(fieldLeft + 1, fieldTop + 1, fieldW - 2, fieldH - 2);
-  ctx.shadowBlur = 0;
-
-  ctx.strokeStyle = "rgba(255,255,255,0.38)";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([12 * sx, 10 * sx]);
+  const midX = (aw / 2) * sx;
+  const midCy = fieldTop + fieldH * 0.52;
+  /** Start center line lower — no long vertical “stem” into the upper grass band */
+  const lineTop = fieldTop + fieldH * 0.28;
+  ctx.strokeStyle = "rgba(255,255,255,0.17)";
+  ctx.lineWidth = 1.25;
+  ctx.setLineDash([10 * sx, 8 * sx]);
   ctx.beginPath();
-  ctx.moveTo((aw / 2) * sx, fieldTop);
-  ctx.lineTo((aw / 2) * sx, groundY);
+  ctx.moveTo(midX, lineTop);
+  ctx.lineTo(midX, groundY);
   ctx.stroke();
   ctx.setLineDash([]);
 
-  const midX = (aw / 2) * sx;
-  const midCy = fieldTop + fieldH * 0.5;
-  const circleR = Math.min(48 * sx, 40 * sy);
-  ctx.strokeStyle = "rgba(255,255,255,0.36)";
-  ctx.lineWidth = 2;
+  const circleR = Math.min(36 * sx, 32 * sy);
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.lineWidth = 1.25;
   ctx.beginPath();
   ctx.arc(midX, midCy, circleR, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  ctx.fillStyle = "rgba(255,255,255,0.05)";
   ctx.beginPath();
-  ctx.arc(midX, midCy, 3 * sx, 0, Math.PI * 2);
+  ctx.arc(midX, midCy, 2.5 * sx, 0, Math.PI * 2);
   ctx.fill();
 
   const spotY = groundY - 4 * sy;
-  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.fillStyle = "rgba(0,0,0,0.14)";
   ctx.beginPath();
-  ctx.ellipse(midX, spotY + 2 * sy, fieldW * 0.42, 5 * sy, 0, 0, Math.PI * 2);
+  ctx.ellipse(midX, spotY + 2 * sy, fieldW * 0.38, 4 * sy, 0, 0, Math.PI * 2);
   ctx.fill();
 
   drawStadiumGoal(ctx, fieldLeft, groundY, 132 * sy, sx, sy, "left");
   drawStadiumGoal(ctx, fieldRight, groundY, 132 * sy, sx, sy, "right");
-
-  ctx.fillStyle = "rgba(255,200,100,0.08)";
-  ctx.fillRect(fieldLeft + fieldW * 0.15, fieldTop + 4, fieldW * 0.7, 10 * sy);
-  ctx.fillStyle = "rgba(255,255,255,0.2)";
-  ctx.font = `bold ${Math.max(8, 9 * sx)}px system-ui,sans-serif`;
-  ctx.textAlign = "center";
-  ctx.fillText("MLEO PARK — TENNIS CUP", midX, fieldTop + 10 * sy);
 
   ctx.strokeStyle = "rgba(20,40,25,0.35)";
   ctx.lineWidth = 2;

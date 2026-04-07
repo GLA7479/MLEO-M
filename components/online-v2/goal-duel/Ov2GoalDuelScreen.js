@@ -458,7 +458,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   }, [vm.phase, mySeat, inputRef, spriteHome, spriteAway, spriteBall]);
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col gap-2 overflow-visible px-1.5 pb-1 pt-1 sm:gap-3 sm:px-2">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-1 overflow-visible px-1 pb-0 pt-1 sm:gap-1.5 sm:px-1.5">
       {err ? <div className="rounded-lg border border-red-500/30 bg-red-950/35 px-2 py-1.5 text-[11px] text-red-100">{err}</div> : null}
       {vaultClaimBusy ? (
         <div className="rounded-lg border border-zinc-500/20 bg-zinc-900/40 px-2 py-1 text-[10px] text-zinc-400">Updating vault…</div>
@@ -519,8 +519,16 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
             </div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-[min(100%,36rem)] shrink-0 overflow-hidden rounded-2xl border border-amber-800/50 bg-transparent">
-              <canvas ref={canvasRef} width={800} height={400} className="block h-auto w-full touch-none" />
+          <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center py-0.5 sm:py-2 max-md:-mx-2 max-md:w-[calc(100%+1rem)]">
+            <div
+              className="relative mx-auto aspect-[2/1] w-full min-h-0 min-w-0 max-w-[min(100%,60rem)] max-h-full overflow-hidden rounded-2xl border border-amber-800/40 bg-black/20 shadow-[0_16px_48px_rgba(0,0,0,0.4)] md:max-h-[min(480px,calc(100dvh-19rem))] lg:max-h-[min(520px,calc(100dvh-18rem))]"
+            >
+              <canvas
+                ref={canvasRef}
+                width={800}
+                height={400}
+                className="absolute inset-0 block h-full w-full touch-none"
+              />
 
             {goalFx ? (
               <div
@@ -547,9 +555,10 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 }`}
               />
             ) : null}
+            </div>
           </div>
 
-          <div className="mx-auto mt-10 flex w-full max-w-[min(100%,36rem)] shrink-0 items-center justify-between gap-4 px-0.5 pt-0.5 sm:mt-3 sm:gap-5 sm:px-1 sm:pt-1">
+          <div className="mx-auto mt-8 flex w-full max-w-[min(100%,60rem)] shrink-0 items-center justify-between gap-3 px-0.5 pt-2 sm:mt-10 sm:gap-4 sm:px-1 sm:pt-2">
               <div className={CTRL_FLOAT_CLUSTER}>
                 <button
                   type="button"
@@ -602,12 +611,12 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
               </div>
             </div>
 
-          <p className="hidden shrink-0 text-center text-[10px] text-zinc-500 sm:block sm:text-[11px]">
+          <p className="hidden shrink-0 text-center text-[10px] text-zinc-500 sm:mt-2 sm:block sm:text-[11px]">
             Desktop: A/D move · W or Space jump · E or K strike
           </p>
 
           {roomId && pk ? (
-            <div className="mx-auto mt-auto flex w-full max-w-[min(100%,36rem)] shrink-0 flex-col items-end gap-1 px-0.5 pt-8 pb-1 sm:px-1 sm:pt-10">
+            <div className="mx-auto mt-4 flex w-full max-w-[min(100%,60rem)] shrink-0 flex-col items-end gap-0.5 px-0.5 pb-0 pt-0 sm:mt-5 sm:px-1">
               <button
                 type="button"
                 title="Leave the match — counts as forfeit; opponent wins."

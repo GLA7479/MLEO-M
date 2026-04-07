@@ -62,7 +62,7 @@ export default function Ov2GameUiPreviewsPage() {
           paddingTop: "max(8px, env(safe-area-inset-top))",
         }}
       >
-        <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden px-2 pt-0 pb-2 md:max-w-4xl md:px-4">
+        <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden px-2 pt-0 pb-1 md:max-w-4xl md:px-4">
           <header className="shrink-0 space-y-1 rounded-xl border border-amber-500/25 bg-amber-950/20 px-3 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Link
@@ -93,10 +93,10 @@ export default function Ov2GameUiPreviewsPage() {
             </div>
           </header>
 
-          <div className="w-full shrink-0 overflow-x-hidden">
+          <div className="min-h-0 w-full flex-1 overflow-x-hidden">
             {Screen && ctx ? (
               <Ov2UiPreviewProvider mocks={mocks}>
-                <div className="flex w-full flex-col">
+                <div className="flex min-h-0 w-full flex-col">
                   <Screen contextInput={ctx} />
                 </div>
               </Ov2UiPreviewProvider>
@@ -107,8 +107,8 @@ export default function Ov2GameUiPreviewsPage() {
         </div>
 
         <div
-          className="mx-auto w-full max-w-2xl shrink-0 px-2 md:max-w-4xl md:px-4"
-          style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}
+          className="mx-auto w-full max-w-2xl shrink-0 px-0 md:max-w-4xl"
+          style={{ paddingBottom: "max(4px, env(safe-area-inset-bottom))" }}
         >
           <OnlineV2ReservedAdSlot />
         </div>
