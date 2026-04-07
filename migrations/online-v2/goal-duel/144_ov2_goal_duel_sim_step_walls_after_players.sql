@@ -1,43 +1,8 @@
--- Goal Duel: arcade constants + single-step simulation (server-authoritative).
--- Apply after 137_ov2_goal_duel_schema.sql.
+-- Forward patch: run on DBs that already have 138.
+-- Resolves ball vs players before arena walls/ceiling so ov2_gd_detect_goal_event (RPC) sees the same state as post-collision physics.
 
 BEGIN;
 
-CREATE OR REPLACE FUNCTION public.ov2_gd_match_duration_ms()
-RETURNS bigint
-LANGUAGE sql
-IMMUTABLE
-SET search_path = public
-AS $$ SELECT 60000::bigint; $$;
-
-CREATE OR REPLACE FUNCTION public.ov2_gd_min_step_interval_ms()
-RETURNS int
-LANGUAGE sql
-IMMUTABLE
-SET search_path = public
-AS $$ SELECT 20; $$;
-
-CREATE OR REPLACE FUNCTION public.ov2_gd_inactivity_forfeit_ms()
-RETURNS bigint
-LANGUAGE sql
-IMMUTABLE
-SET search_path = public
-AS $$ SELECT 120000::bigint; $$;
-
-CREATE OR REPLACE FUNCTION public.ov2_gd_arena_w()
-RETURNS float8
-LANGUAGE sql IMMUTABLE SET search_path = public AS $$ SELECT 800::float8; $$;
-
-CREATE OR REPLACE FUNCTION public.ov2_gd_arena_h()
-RETURNS float8
-LANGUAGE sql IMMUTABLE SET search_path = public AS $$ SELECT 400::float8; $$;
-
-CREATE OR REPLACE FUNCTION public.ov2_gd_goal_margin()
-RETURNS float8
-LANGUAGE sql IMMUTABLE SET search_path = public AS $$ SELECT 48::float8; $$;
-
--- One simulation step. Inputs: p_in0/p_in1 jsonb { "l","r","j","k" } booleans.
--- Returns { public_state, parity_state } merged (caller updates scores on goal inside parity).
 CREATE OR REPLACE FUNCTION public.ov2_gd_sim_step(
   p_pub jsonb,
   p_ps jsonb,
@@ -239,95 +204,6 @@ BEGIN
     'kick_ms', jsonb_build_object('0', v_k0, '1', v_k1)
   );
 END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.ov2_gd_initial_public_state()
-RETURNS jsonb
-LANGUAGE sql
-IMMUTABLE
-SET search_path = public
-AS $$
-  SELECT jsonb_build_object(
-    'v', 1,
-    'ball', jsonb_build_object('x', 400::float8, 'y', 220::float8, 'vx', 0::float8, 'vy', 0::float8, 'r', 11::float8),
-    'p0', jsonb_build_object('x', 180::float8, 'y', 338::float8, 'vx', 0::float8, 'vy', 0::float8, 'face', 1::float8, 'hw', 14::float8, 'hh', 22::float8),
-    'p1', jsonb_build_object('x', 620::float8, 'y', 338::float8, 'vx', 0::float8, 'vy', 0::float8, 'face', -1::float8, 'hw', 14::float8, 'hh', 22::float8),
-    'arena', jsonb_build_object(
-      'w', public.ov2_gd_arena_w(),
-      'h', public.ov2_gd_arena_h(),
-      'groundY', 360::float8,
-      'goalMargin', public.ov2_gd_goal_margin()
-    )
-  );
-$$;
-
-CREATE OR REPLACE FUNCTION public.ov2_gd_detect_goal_event(p_pub jsonb)
-RETURNS int
-LANGUAGE plpgsql
-IMMUTABLE
-SET search_path = public
-AS $$
-DECLARE
-  v_aw float8 := public.ov2_gd_arena_w();
-  v_gm float8 := public.ov2_gd_goal_margin();
-  v_bx float8;
-  v_by float8;
-  v_br float8;
-  v_vx float8;
-  v_left_edge float8;
-  v_right_edge float8;
-  v_goal_line_left float8;
-  v_goal_line_right float8;
-  v_goal_depth float8 := 6.0;
-  v_goal_top float8 := 160.0;
-  v_goal_bottom float8 := 350.0;
-BEGIN
-  v_bx := coalesce((p_pub -> 'ball' ->> 'x')::float8, 0);
-  v_by := coalesce((p_pub -> 'ball' ->> 'y')::float8, 0);
-  v_br := coalesce((p_pub -> 'ball' ->> 'r')::float8, 11);
-  v_vx := coalesce((p_pub -> 'ball' ->> 'vx')::float8, 0);
-
-  v_left_edge := v_bx - v_br;
-  v_right_edge := v_bx + v_br;
-  v_goal_line_left := v_gm;
-  v_goal_line_right := v_aw - v_gm;
-
-  -- MUST match canvas goal opening (see ov2GoalDuelCanvasDraw drawStadiumGoal)
-  IF v_by < v_goal_top OR v_by > v_goal_bottom THEN
-    RETURN NULL;
-  END IF;
-
-  -- Left goal: depth + entry direction, or already deep inside (vx may flip after post/bounce)
-  IF (v_goal_line_left - v_left_edge) >= v_goal_depth
-     AND (
-       v_vx < 0
-       OR v_left_edge < v_goal_line_left - v_goal_depth * 0.5
-     )
-  THEN
-    RETURN 1;
-  END IF;
-
-  -- Right goal: same
-  IF (v_right_edge - v_goal_line_right) >= v_goal_depth
-     AND (
-       v_vx > 0
-       OR v_right_edge > v_goal_line_right + v_goal_depth * 0.5
-     )
-  THEN
-    RETURN 0;
-  END IF;
-
-  RETURN NULL;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.ov2_gd_reset_after_goal(p_pub jsonb)
-RETURNS jsonb
-LANGUAGE sql
-IMMUTABLE
-SET search_path = public
-AS $$
-  SELECT public.ov2_gd_initial_public_state();
 $$;
 
 COMMIT;

@@ -1,5 +1,6 @@
 -- Goal detection uses ball edges (x ± r), not ball center — matches full-ball rendering.
 -- Forward patch: run on DBs that already have 138/142; replaces ov2_gd_detect_goal_event in place.
+-- Superseded by 145_ov2_goal_duel_detect_goal_direction_depth.sql (vx + depth + canvas Y band).
 
 BEGIN;
 

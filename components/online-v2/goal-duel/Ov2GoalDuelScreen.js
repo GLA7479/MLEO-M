@@ -64,6 +64,30 @@ const GD_SCREEN_NO_SELECT_CSS = `
   0%, 100% { transform: scale(1); text-shadow: 0 0 0 rgba(16,185,129,0); }
   50% { transform: scale(1.03); text-shadow: 0 0 12px rgba(52,211,153,0.45); }
 }
+/* Pad pressed — toggled via classList only (no React state); matches prior Tailwind press look */
+.gd-no-select .gd-pad-row button.gd-pad-down {
+  transform: scale(0.97);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.36);
+}
+.gd-no-select .gd-pad-row .gd-pad-face.gd-pad-face--move.gd-pad-face-down {
+  transform: scale(0.96);
+  filter: brightness(1.1);
+  box-shadow: 0 4px 20px rgba(6, 182, 212, 0.38), inset 0 2px 0 rgba(255, 255, 255, 0.28);
+}
+.gd-no-select .gd-pad-row .gd-pad-face.gd-pad-face--jump.gd-pad-face-down {
+  transform: scale(0.96);
+  filter: brightness(1.1);
+  box-shadow: 0 6px 24px rgba(52, 211, 153, 0.42), inset 0 2px 0 rgba(255, 255, 255, 0.26);
+}
+.gd-no-select .gd-pad-row .gd-pad-face.gd-pad-face--kick.gd-pad-face-down {
+  transform: scale(0.96);
+  filter: brightness(1.1);
+  box-shadow: 0 6px 26px rgba(248, 113, 113, 0.48), inset 0 2px 0 rgba(255, 255, 255, 0.24);
+}
+.gd-no-select .gd-pad-row button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
 `.trim();
 
 const BTN_PRIMARY =
@@ -72,21 +96,21 @@ const BTN_SECONDARY =
   "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
 /**
- * [LEFT][JUMP][KICK][RIGHT] — 6rem move columns on mobile; touch-manipulation for responsive taps.
+ * [LEFT][JUMP][KICK][RIGHT] — 6rem move columns on mobile; `touch-none` avoids scroll/zoom stealing gestures.
  */
 const CTRL_ROW =
-  "pointer-events-auto grid w-full touch-manipulation select-none items-stretch justify-items-stretch gap-3 [-webkit-tap-highlight-color:transparent] [grid-template-columns:6rem_minmax(0,1fr)_minmax(0,1fr)_6rem] sm:gap-4";
+  "pointer-events-auto grid w-full touch-none select-none items-stretch justify-items-stretch gap-3 [-webkit-tap-highlight-color:transparent] [grid-template-columns:6rem_minmax(0,1fr)_minmax(0,1fr)_6rem] sm:gap-4";
 
 /** Large hit target (6×6rem min on mobile); visible face stays ~4rem inside. */
 const CTRL_MOVE_HIT_BASE =
-  "relative flex min-h-[6rem] min-w-[6rem] max-w-[6rem] w-full touch-manipulation select-none items-center justify-center self-center rounded-[24px] border border-transparent px-1 py-2 transition-[transform,box-shadow,filter] duration-75 active:scale-[0.985] [-webkit-tap-highlight-color:transparent] sm:min-h-[3.5rem] sm:min-w-[4.75rem] sm:max-w-[4.75rem] sm:px-1.5 sm:py-2";
+  "relative flex min-h-[6rem] min-w-[6rem] max-w-[6rem] w-full touch-none select-none items-center justify-center self-center rounded-[24px] border border-transparent px-1 py-2 transition-[transform,box-shadow,filter] duration-75 sm:min-h-[3.5rem] sm:min-w-[4.75rem] sm:max-w-[4.75rem] sm:px-1.5 sm:py-2";
 
 /** Visible arrow ~4rem × 4rem (no downscale vs column). */
 const CTRL_MOVE_FACE_BASE =
   "pointer-events-none flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-2 border-cyan-400/55 bg-gradient-to-b from-cyan-400/50 via-cyan-600/45 to-cyan-950/88 text-2xl text-cyan-50 shadow-[0_8px_32px_rgba(6,182,212,0.22),0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-md transition-[transform,box-shadow,filter] duration-75 sm:h-14 sm:w-14 sm:text-xl";
 
 const CTRL_ACTION_HIT_BASE =
-  "relative flex min-h-[6rem] w-full min-w-0 touch-manipulation select-none flex-col items-center justify-center rounded-[24px] border border-transparent px-2 py-2.5 transition-[transform,box-shadow,filter] duration-75 active:scale-[0.985] [-webkit-tap-highlight-color:transparent] sm:min-h-[3.25rem] sm:px-2 sm:py-2";
+  "relative flex min-h-[6rem] w-full min-w-0 touch-none select-none flex-col items-center justify-center rounded-[24px] border border-transparent px-2 py-2.5 transition-[transform,box-shadow,filter] duration-75 sm:min-h-[3.25rem] sm:px-2 sm:py-2";
 
 const CTRL_ACTION_FACE_BASE =
   "pointer-events-none flex min-h-[4.5rem] w-full min-w-0 max-w-full flex-col items-center justify-center gap-0.5 rounded-2xl px-1 font-bold uppercase leading-none backdrop-blur-md transition-[transform,box-shadow,filter] duration-75 sm:min-h-[3rem]";
@@ -94,26 +118,6 @@ const CTRL_ACTION_FACE_BASE =
 const CTRL_JUMP_FACE_BASE = `${CTRL_ACTION_FACE_BASE} border-2 border-emerald-400/55 bg-gradient-to-b from-emerald-400/48 via-emerald-600/42 to-emerald-950/90 text-[11px] text-emerald-50 sm:text-[11px] shadow-[0_8px_32px_rgba(52,211,153,0.2),0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)]`;
 
 const CTRL_KICK_FACE_BASE = `${CTRL_ACTION_FACE_BASE} border-2 border-red-500/65 bg-gradient-to-b from-red-500/58 via-red-600/45 to-red-950/92 text-[11px] text-red-50 sm:text-[11px] shadow-[0_8px_32px_rgba(248,113,113,0.35),0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)]`;
-
-/** @param {boolean} down */
-const ctrlMoveHitClass = down =>
-  `${CTRL_MOVE_HIT_BASE} ${down ? "scale-[0.97] shadow-[inset_0_2px_8px_rgba(0,0,0,0.35)]" : ""}`;
-
-/** @param {boolean} down */
-const ctrlMoveFaceClass = down =>
-  `${CTRL_MOVE_FACE_BASE} ${down ? "scale-[0.96] brightness-110 shadow-[0_4px_20px_rgba(6,182,212,0.38),inset_0_2px_0_rgba(255,255,255,0.28)]" : ""}`;
-
-/** @param {boolean} down */
-const ctrlActionHitClass = down =>
-  `${CTRL_ACTION_HIT_BASE} ${down ? "scale-[0.97] shadow-[inset_0_2px_8px_rgba(0,0,0,0.38)]" : ""}`;
-
-/** @param {boolean} down */
-const ctrlJumpFaceClass = down =>
-  `${CTRL_JUMP_FACE_BASE} ${down ? "scale-[0.96] brightness-110 shadow-[0_6px_24px_rgba(52,211,153,0.42),inset_0_2px_0_rgba(255,255,255,0.26)]" : ""}`;
-
-/** @param {boolean} down */
-const ctrlKickFaceClass = down =>
-  `${CTRL_KICK_FACE_BASE} ${down ? "scale-[0.96] brightness-110 shadow-[0_6px_26px_rgba(248,113,113,0.48),inset_0_2px_0_rgba(255,255,255,0.24)]" : ""}`;
 
 /** @param {unknown} m */
 function memberGdRematchRequested(m) {
@@ -164,18 +168,34 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   }));
 
   /**
-   * `touch.identifier` → which pad button (reliable multi-touch; end/cancel remove by id).
-   * Mouse uses synthetic negative keys (no collision with real touch ids).
+   * `PointerEvent.pointerId` → which pad control (independent; true multi-touch).
    */
-  const touchMapRef = useRef(/** @type {Map<number, "left"|"right"|"jump"|"kick">} */ (new Map()));
+  const pointerPadMapRef = useRef(/** @type {Map<number, "left"|"right"|"jump"|"kick">} */ (new Map()));
 
-  const GD_MOUSE_PAD_ID = /** @type {const} */ ({ left: -1, right: -2, jump: -3, kick: -4 });
+  /** Pad button + face nodes — pressed look is `classList` only (`gd-pad-down` / `gd-pad-face-down`). */
+  const padUiRef = useRef({
+    l: { hit: /** @type {HTMLButtonElement|null} */ (null), face: /** @type {HTMLElement|null} */ (null) },
+    r: { hit: null, face: null },
+    j: { hit: null, face: null },
+    k: { hit: null, face: null },
+  });
 
-  const [padVisual, setPadVisual] = useState(() => ({ l: false, r: false, j: false, k: false }));
+  const resetPadInputAndVisuals = useCallback(() => {
+    kbdRef.current = { l: false, r: false, j: false, k: false };
+    pointerPadMapRef.current.clear();
+    setInput({ l: false, r: false, j: false, k: false });
+    const ui = padUiRef.current;
+    const keys = /** @type {const} */ (["l", "r", "j", "k"]);
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      ui[key].hit?.classList.remove("gd-pad-down");
+      ui[key].face?.classList.remove("gd-pad-face-down");
+    }
+  }, [setInput]);
 
   const computePadInput = useCallback(() => {
     const k = kbdRef.current;
-    const map = touchMapRef.current;
+    const map = pointerPadMapRef.current;
     let left = false;
     let right = false;
     let jump = false;
@@ -193,50 +213,99 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       k: k.k || kick,
     };
     setInput(next);
-    setPadVisual(next);
+    const ui = padUiRef.current;
+    const keys = /** @type {const} */ (["l", "r", "j", "k"]);
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      const down = next[key];
+      const h = ui[key].hit;
+      const f = ui[key].face;
+      if (h) {
+        if (down) h.classList.add("gd-pad-down");
+        else h.classList.remove("gd-pad-down");
+      }
+      if (f) {
+        if (down) f.classList.add("gd-pad-face-down");
+        else f.classList.remove("gd-pad-face-down");
+      }
+    }
   }, [setInput]);
 
   /** @param {"left"|"right"|"jump"|"kick"} key */
-  const handleTouchStart = useCallback(
-    (key, e) => {
-      const { changedTouches } = e;
-      for (let i = 0; i < changedTouches.length; i++) {
-        touchMapRef.current.set(changedTouches[i].identifier, key);
-      }
-      computePadInput();
-    },
-    [computePadInput]
-  );
-
-  const handleTouchEnd = useCallback(
-    e => {
-      const { changedTouches } = e;
-      for (let i = 0; i < changedTouches.length; i++) {
-        touchMapRef.current.delete(changedTouches[i].identifier);
-      }
-      computePadInput();
-    },
-    [computePadInput]
-  );
-
-  /** @param {"left"|"right"|"jump"|"kick"} key */
-  const handleMouseDownPad = useCallback(
+  const handlePointerDownPad = useCallback(
     (key, e) => {
       if (e.button !== 0) return;
-      touchMapRef.current.set(GD_MOUSE_PAD_ID[key], key);
+      e.preventDefault();
+      pointerPadMapRef.current.set(e.pointerId, key);
+      const el = /** @type {HTMLButtonElement|null} */ (e.currentTarget);
+      try {
+        if (el && typeof el.setPointerCapture === "function") el.setPointerCapture(e.pointerId);
+      } catch {
+        /* capture unsupported or duplicate */
+      }
       computePadInput();
     },
     [computePadInput]
   );
 
-  /** @param {"left"|"right"|"jump"|"kick"} key */
-  const handleMouseUpPad = useCallback(
-    key => {
-      touchMapRef.current.delete(GD_MOUSE_PAD_ID[key]);
+  const handlePointerEndPad = useCallback(
+    e => {
+      pointerPadMapRef.current.delete(e.pointerId);
+      const el = /** @type {HTMLButtonElement|null} */ (e.currentTarget);
+      try {
+        if (el && typeof el.releasePointerCapture === "function" && el.hasPointerCapture?.(e.pointerId)) {
+          el.releasePointerCapture(e.pointerId);
+        }
+      } catch {
+        /* ignore */
+      }
       computePadInput();
     },
     [computePadInput]
   );
+
+  const handleLostPointerCapturePad = useCallback(
+    e => {
+      pointerPadMapRef.current.delete(e.pointerId);
+      computePadInput();
+    },
+    [computePadInput]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    /** Drops one pointer from the pad map — multi-touch safe (does not clear other fingers). */
+    const onWinPointer = ev => {
+      if (pointerPadMapRef.current.delete(ev.pointerId)) {
+        computePadInput();
+      }
+    };
+    window.addEventListener("pointerup", onWinPointer);
+    window.addEventListener("pointercancel", onWinPointer);
+    return () => {
+      window.removeEventListener("pointerup", onWinPointer);
+      window.removeEventListener("pointercancel", onWinPointer);
+    };
+  }, [computePadInput]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const onVis = () => {
+      if (document.visibilityState !== "hidden") return;
+      if (pointerPadMapRef.current.size === 0 && !kbdRef.current.l && !kbdRef.current.r && !kbdRef.current.j && !kbdRef.current.k) {
+        return;
+      }
+      resetPadInputAndVisuals();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [resetPadInputAndVisuals]);
+
+  useEffect(() => {
+    return () => {
+      resetPadInputAndVisuals();
+    };
+  }, [resetPadInputAndVisuals]);
 
   const motionPrevRef = useRef(
     /** @type {{ p0x: number, p0y: number, p1x: number, p1y: number, bx: number, by: number, t: number }|null} */ (null)
@@ -329,17 +398,14 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
   useEffect(() => {
     if (vm.phase !== "playing") {
-      kbdRef.current = { l: false, r: false, j: false, k: false };
-      touchMapRef.current.clear();
-      setInput({ l: false, r: false, j: false, k: false });
-      setPadVisual({ l: false, r: false, j: false, k: false });
+      resetPadInputAndVisuals();
       kickFlashesRef.current = [];
       shakePulsesRef.current = [];
       prevKickHeldRef.current = false;
       lastBallKickFxP0Ref.current = 0;
       lastBallKickFxP1Ref.current = 0;
     }
-  }, [vm.phase, setInput]);
+  }, [vm.phase, resetPadInputAndVisuals]);
 
   useEffect(() => {
     const down = e => {
@@ -876,20 +942,31 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
             </div>
 
             <div className="flex w-full shrink-0 flex-col gap-1.5 pb-4 pt-2 sm:gap-2 sm:pb-5 sm:pt-3">
-            <div className={`${CTRL_ROW} mx-auto min-w-0 max-w-[min(100%,60rem)] px-0.5 sm:px-1`}>
+            <div
+              className={`gd-pad-row ${CTRL_ROW} mx-auto min-w-0 max-w-[min(100%,60rem)] px-0.5 sm:px-1`}
+              style={{ touchAction: "none" }}
+            >
               <button
                 type="button"
                 draggable={false}
                 aria-label="Move left"
-                className={ctrlMoveHitClass(padVisual.l)}
-                onTouchStart={e => handleTouchStart("left", e)}
-                onTouchEnd={handleTouchEnd}
-                onTouchCancel={handleTouchEnd}
-                onMouseDown={e => handleMouseDownPad("left", e)}
-                onMouseUp={() => handleMouseUpPad("left")}
-                onMouseLeave={() => handleMouseUpPad("left")}
+                ref={el => {
+                  padUiRef.current.l.hit = el;
+                }}
+                className={CTRL_MOVE_HIT_BASE}
+                onPointerDown={e => handlePointerDownPad("left", e)}
+                onPointerUp={handlePointerEndPad}
+                onPointerCancel={handlePointerEndPad}
+                onPointerLeave={handlePointerEndPad}
+                onLostPointerCapture={handleLostPointerCapturePad}
               >
-                <span className={ctrlMoveFaceClass(padVisual.l)} aria-hidden>
+                <span
+                  ref={el => {
+                    padUiRef.current.l.face = el;
+                  }}
+                  className={`${CTRL_MOVE_FACE_BASE} gd-pad-face gd-pad-face--move`}
+                  aria-hidden
+                >
                   ◀
                 </span>
               </button>
@@ -897,15 +974,22 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 type="button"
                 draggable={false}
                 aria-label="Jump"
-                className={ctrlActionHitClass(padVisual.j)}
-                onTouchStart={e => handleTouchStart("jump", e)}
-                onTouchEnd={handleTouchEnd}
-                onTouchCancel={handleTouchEnd}
-                onMouseDown={e => handleMouseDownPad("jump", e)}
-                onMouseUp={() => handleMouseUpPad("jump")}
-                onMouseLeave={() => handleMouseUpPad("jump")}
+                ref={el => {
+                  padUiRef.current.j.hit = el;
+                }}
+                className={CTRL_ACTION_HIT_BASE}
+                onPointerDown={e => handlePointerDownPad("jump", e)}
+                onPointerUp={handlePointerEndPad}
+                onPointerCancel={handlePointerEndPad}
+                onPointerLeave={handlePointerEndPad}
+                onLostPointerCapture={handleLostPointerCapturePad}
               >
-                <span className={ctrlJumpFaceClass(padVisual.j)}>
+                <span
+                  ref={el => {
+                    padUiRef.current.j.face = el;
+                  }}
+                  className={`${CTRL_JUMP_FACE_BASE} gd-pad-face gd-pad-face--jump`}
+                >
                   <span className="text-2xl leading-none sm:text-2xl" aria-hidden>
                     ▲
                   </span>
@@ -916,15 +1000,22 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 type="button"
                 draggable={false}
                 aria-label="Kick"
-                className={ctrlActionHitClass(padVisual.k)}
-                onTouchStart={e => handleTouchStart("kick", e)}
-                onTouchEnd={handleTouchEnd}
-                onTouchCancel={handleTouchEnd}
-                onMouseDown={e => handleMouseDownPad("kick", e)}
-                onMouseUp={() => handleMouseUpPad("kick")}
-                onMouseLeave={() => handleMouseUpPad("kick")}
+                ref={el => {
+                  padUiRef.current.k.hit = el;
+                }}
+                className={CTRL_ACTION_HIT_BASE}
+                onPointerDown={e => handlePointerDownPad("kick", e)}
+                onPointerUp={handlePointerEndPad}
+                onPointerCancel={handlePointerEndPad}
+                onPointerLeave={handlePointerEndPad}
+                onLostPointerCapture={handleLostPointerCapturePad}
               >
-                <span className={ctrlKickFaceClass(padVisual.k)}>
+                <span
+                  ref={el => {
+                    padUiRef.current.k.face = el;
+                  }}
+                  className={`${CTRL_KICK_FACE_BASE} gd-pad-face gd-pad-face--kick`}
+                >
                   <span className="text-2xl leading-none sm:text-2xl" aria-hidden>
                     ⚡
                   </span>
@@ -935,15 +1026,23 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 type="button"
                 draggable={false}
                 aria-label="Move right"
-                className={ctrlMoveHitClass(padVisual.r)}
-                onTouchStart={e => handleTouchStart("right", e)}
-                onTouchEnd={handleTouchEnd}
-                onTouchCancel={handleTouchEnd}
-                onMouseDown={e => handleMouseDownPad("right", e)}
-                onMouseUp={() => handleMouseUpPad("right")}
-                onMouseLeave={() => handleMouseUpPad("right")}
+                ref={el => {
+                  padUiRef.current.r.hit = el;
+                }}
+                className={CTRL_MOVE_HIT_BASE}
+                onPointerDown={e => handlePointerDownPad("right", e)}
+                onPointerUp={handlePointerEndPad}
+                onPointerCancel={handlePointerEndPad}
+                onPointerLeave={handlePointerEndPad}
+                onLostPointerCapture={handleLostPointerCapturePad}
               >
-                <span className={ctrlMoveFaceClass(padVisual.r)} aria-hidden>
+                <span
+                  ref={el => {
+                    padUiRef.current.r.face = el;
+                  }}
+                  className={`${CTRL_MOVE_FACE_BASE} gd-pad-face gd-pad-face--move`}
+                  aria-hidden
+                >
                   ▶
                 </span>
               </button>
