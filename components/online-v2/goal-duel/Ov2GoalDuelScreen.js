@@ -27,6 +27,20 @@ const GD_SPRITE_BALL = "/images/online-v2/goal-duel/gd-ball.png";
 /** Canvas-only scale for dogs + ball; server snapshot coords unchanged. Py offset keeps feet on ground. */
 const GD_VISUAL_ENTITY_SCALE = 1.32;
 
+/** Injected once — scoped by `.gd-no-select` class on this screen’s root only. */
+const GD_SCREEN_NO_SELECT_CSS = `
+.gd-no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.gd-no-select * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+`.trim();
+
 const BTN_PRIMARY =
   "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_SECONDARY =
@@ -92,9 +106,11 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   const [exitBusy, setExitBusy] = useState(false);
   const [exitErr, setExitErr] = useState("");
   const canvasRef = useRef(/** @type {HTMLCanvasElement|null} */ (null));
+  /** Root of this screen — `contextmenu` listener scoped here (not `window`). */
+  const gdScreenRootRef = useRef(/** @type {HTMLDivElement|null} */ (null));
   const vmRef = useRef(vm);
   vmRef.current = vm;
-  /** Desktop keyboard — merged with on-screen pad via flushPadInput. */
+  /** Desktop keyboard — merged with pad via computePadInput. */
   const kbdRef = useRef(/** @type {{ l: boolean, r: boolean, j: boolean, k: boolean }} */ ({
     l: false,
     r: false,
@@ -103,43 +119,74 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   }));
 
   /**
-   * On-screen pad state (multi-touch: left + jump, etc.). Maps to session `{ l, r, j, k }` via `setInput`.
-   * Session hook owns `inputRef`; we never shadow it.
+   * `touch.identifier` → which pad button (reliable multi-touch; end/cancel remove by id).
+   * Mouse uses synthetic negative keys (no collision with real touch ids).
    */
-  const padInputRef = useRef(/** @type {{ left: boolean, right: boolean, jump: boolean, kick: boolean }} */ ({
-    left: false,
-    right: false,
-    jump: false,
-    kick: false,
-  }));
+  const touchMapRef = useRef(/** @type {Map<number, "left"|"right"|"jump"|"kick">} */ (new Map()));
 
-  const flushPadInput = useCallback(() => {
+  const GD_MOUSE_PAD_ID = /** @type {const} */ ({ left: -1, right: -2, jump: -3, kick: -4 });
+
+  const computePadInput = useCallback(() => {
     const k = kbdRef.current;
-    const p = padInputRef.current;
+    const map = touchMapRef.current;
+    let left = false;
+    let right = false;
+    let jump = false;
+    let kick = false;
+    map.forEach(v => {
+      if (v === "left") left = true;
+      if (v === "right") right = true;
+      if (v === "jump") jump = true;
+      if (v === "kick") kick = true;
+    });
     setInput({
-      l: k.l || p.left,
-      r: k.r || p.right,
-      j: k.j || p.jump,
-      k: k.k || p.kick,
+      l: k.l || left,
+      r: k.r || right,
+      j: k.j || jump,
+      k: k.k || kick,
     });
   }, [setInput]);
 
-  const setMove = useCallback(
-    (dir, val) => {
-      if (dir === "left") padInputRef.current.left = val;
-      else padInputRef.current.right = val;
-      flushPadInput();
+  /** @param {"left"|"right"|"jump"|"kick"} key */
+  const handleTouchStart = useCallback(
+    (key, e) => {
+      const { changedTouches } = e;
+      for (let i = 0; i < changedTouches.length; i++) {
+        touchMapRef.current.set(changedTouches[i].identifier, key);
+      }
+      computePadInput();
     },
-    [flushPadInput]
+    [computePadInput]
   );
 
-  const setAction = useCallback(
-    (type, val) => {
-      if (type === "jump") padInputRef.current.jump = val;
-      else padInputRef.current.kick = val;
-      flushPadInput();
+  const handleTouchEnd = useCallback(
+    e => {
+      const { changedTouches } = e;
+      for (let i = 0; i < changedTouches.length; i++) {
+        touchMapRef.current.delete(changedTouches[i].identifier);
+      }
+      computePadInput();
     },
-    [flushPadInput]
+    [computePadInput]
+  );
+
+  /** @param {"left"|"right"|"jump"|"kick"} key */
+  const handleMouseDownPad = useCallback(
+    (key, e) => {
+      if (e.button !== 0) return;
+      touchMapRef.current.set(GD_MOUSE_PAD_ID[key], key);
+      computePadInput();
+    },
+    [computePadInput]
+  );
+
+  /** @param {"left"|"right"|"jump"|"kick"} key */
+  const handleMouseUpPad = useCallback(
+    key => {
+      touchMapRef.current.delete(GD_MOUSE_PAD_ID[key]);
+      computePadInput();
+    },
+    [computePadInput]
   );
 
   const motionPrevRef = useRef(
@@ -225,7 +272,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   useEffect(() => {
     if (vm.phase !== "playing") {
       kbdRef.current = { l: false, r: false, j: false, k: false };
-      padInputRef.current = { left: false, right: false, jump: false, kick: false };
+      touchMapRef.current.clear();
       setInput({ l: false, r: false, j: false, k: false });
     }
   }, [vm.phase, setInput]);
@@ -241,7 +288,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
         kbdRef.current.j = true;
       }
       if (key === "e" || key === "k") kbdRef.current.k = true;
-      flushPadInput();
+      computePadInput();
     };
     const up = e => {
       const key = e.key.toLowerCase();
@@ -249,7 +296,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       if (key === "arrowright" || key === "d") kbdRef.current.r = false;
       if (key === " " || key === "w" || key === "arrowup") kbdRef.current.j = false;
       if (key === "e" || key === "k") kbdRef.current.k = false;
-      flushPadInput();
+      computePadInput();
     };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
@@ -257,7 +304,18 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [vm.phase, flushPadInput]);
+  }, [vm.phase, computePadInput]);
+
+  useEffect(() => {
+    const el = gdScreenRootRef.current;
+    if (!el) return undefined;
+    /** @param {MouseEvent} e */
+    const onCtx = e => {
+      e.preventDefault();
+    };
+    el.addEventListener("contextmenu", onCtx);
+    return () => el.removeEventListener("contextmenu", onCtx);
+  }, []);
 
   const onRematch = useCallback(async () => {
     if (!roomId || rematchBusy) return;
@@ -509,7 +567,12 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   }, [vm.phase, mySeat, inputRef, spriteHome, spriteAway, spriteBall]);
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-1 overflow-hidden px-1 pb-5 pt-1 sm:gap-1.5 sm:px-1.5 sm:pb-6">
+    <>
+      <style>{GD_SCREEN_NO_SELECT_CSS}</style>
+      <div
+        ref={gdScreenRootRef}
+        className="gd-no-select flex h-full min-h-0 min-w-0 w-full flex-1 flex-col gap-1 overflow-hidden px-1 pb-5 pt-1 sm:gap-1.5 sm:px-1.5 sm:pb-6"
+      >
       {err ? <div className="rounded-lg border border-red-500/30 bg-red-950/35 px-2 py-1.5 text-[11px] text-red-100">{err}</div> : null}
       {vaultClaimBusy ? (
         <div className="rounded-lg border border-zinc-500/20 bg-zinc-900/40 px-2 py-1 text-[10px] text-zinc-400">Updating vault…</div>
@@ -655,14 +718,12 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 draggable={false}
                 aria-label="Move left"
                 className={CTRL_MOVE_HIT}
-                onTouchStart={() => setMove("left", true)}
-                onTouchEnd={() => setMove("left", false)}
-                onTouchCancel={() => setMove("left", false)}
-                onMouseDown={e => {
-                  if (e.button === 0) setMove("left", true);
-                }}
-                onMouseUp={() => setMove("left", false)}
-                onMouseLeave={() => setMove("left", false)}
+                onTouchStart={e => handleTouchStart("left", e)}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                onMouseDown={e => handleMouseDownPad("left", e)}
+                onMouseUp={() => handleMouseUpPad("left")}
+                onMouseLeave={() => handleMouseUpPad("left")}
               >
                 <span className={CTRL_MOVE_FACE} aria-hidden>
                   ◀
@@ -673,14 +734,12 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 draggable={false}
                 aria-label="Jump"
                 className={CTRL_ACTION_HIT}
-                onTouchStart={() => setAction("jump", true)}
-                onTouchEnd={() => setAction("jump", false)}
-                onTouchCancel={() => setAction("jump", false)}
-                onMouseDown={e => {
-                  if (e.button === 0) setAction("jump", true);
-                }}
-                onMouseUp={() => setAction("jump", false)}
-                onMouseLeave={() => setAction("jump", false)}
+                onTouchStart={e => handleTouchStart("jump", e)}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                onMouseDown={e => handleMouseDownPad("jump", e)}
+                onMouseUp={() => handleMouseUpPad("jump")}
+                onMouseLeave={() => handleMouseUpPad("jump")}
               >
                 <span className={CTRL_JUMP_FACE}>
                   <span className="text-2xl leading-none sm:text-2xl" aria-hidden>
@@ -694,14 +753,12 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 draggable={false}
                 aria-label="Kick"
                 className={CTRL_ACTION_HIT}
-                onTouchStart={() => setAction("kick", true)}
-                onTouchEnd={() => setAction("kick", false)}
-                onTouchCancel={() => setAction("kick", false)}
-                onMouseDown={e => {
-                  if (e.button === 0) setAction("kick", true);
-                }}
-                onMouseUp={() => setAction("kick", false)}
-                onMouseLeave={() => setAction("kick", false)}
+                onTouchStart={e => handleTouchStart("kick", e)}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                onMouseDown={e => handleMouseDownPad("kick", e)}
+                onMouseUp={() => handleMouseUpPad("kick")}
+                onMouseLeave={() => handleMouseUpPad("kick")}
               >
                 <span className={CTRL_KICK_FACE}>
                   <span className="text-2xl leading-none sm:text-2xl" aria-hidden>
@@ -715,14 +772,12 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 draggable={false}
                 aria-label="Move right"
                 className={CTRL_MOVE_HIT}
-                onTouchStart={() => setMove("right", true)}
-                onTouchEnd={() => setMove("right", false)}
-                onTouchCancel={() => setMove("right", false)}
-                onMouseDown={e => {
-                  if (e.button === 0) setMove("right", true);
-                }}
-                onMouseUp={() => setMove("right", false)}
-                onMouseLeave={() => setMove("right", false)}
+                onTouchStart={e => handleTouchStart("right", e)}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchEnd}
+                onMouseDown={e => handleMouseDownPad("right", e)}
+                onMouseUp={() => handleMouseUpPad("right")}
+                onMouseLeave={() => handleMouseUpPad("right")}
               >
                 <span className={CTRL_MOVE_FACE} aria-hidden>
                   ▶
@@ -881,6 +936,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
           </div>
         </div>
       ) : null}
-    </div>
+      </div>
+    </>
   );
 }
