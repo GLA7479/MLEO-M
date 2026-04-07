@@ -20,6 +20,8 @@ const finishDismissStorageKey = sid => `ov2_fh_finish_dismiss_${sid}`;
 /** Delay after turn change before auto-follow switches boards (lets hit/miss/sunk read). */
 const OV2_FH_AUTO_FOLLOW_DELAY_MS = 1100;
 
+const LOADING_TIMEOUT_MS = 8000;
+
 const BTN_PRIMARY =
   "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_SECONDARY =
@@ -135,6 +137,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
   const [desktopBattleMode, setDesktopBattleMode] = useState(/** @type {"split" | "offense" | "defense"} */ ("split"));
   /** When ON, switch visible board on turn change only (local UX; default OFF). */
   const [autoFollowTurn, setAutoFollowTurn] = useState(false);
+  const [loadingError, setLoadingError] = useState(false);
   const prevBattleTurnSeatRef = useRef(/** @type {number|null} */ (null));
   const autoFollowTimeoutRef = useRef(/** @type {ReturnType<typeof setTimeout>|null} */ (null));
   const desktopBattleModeRef = useRef(desktopBattleMode);
@@ -144,6 +147,18 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
   const roomId = room?.id != null ? String(room.id) : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
+
+  useEffect(() => {
+    if (vm.sessionId) return;
+
+    setLoadingError(false);
+
+    const t = setTimeout(() => {
+      setLoadingError(true);
+    }, LOADING_TIMEOUT_MS);
+
+    return () => clearTimeout(t);
+  }, [vm?.sessionId]);
 
   useEffect(() => {
     setFinishModalDismissedSessionId("");
@@ -1023,7 +1038,21 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
       ) : null}
 
       {!snapshot && room?.active_session_id ? (
-        <div className="py-6 text-center text-[12px] text-zinc-500">Loading match…</div>
+        loadingError ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-10">
+            <div className="text-red-400 text-sm font-semibold">Failed to load match</div>
+
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-zinc-800 px-4 py-2 text-sm hover:bg-zinc-700"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div>Loading match…</div>
+        )
       ) : null}
 
       {showResultModal ? (
