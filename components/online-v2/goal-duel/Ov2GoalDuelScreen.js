@@ -86,6 +86,8 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   const canvasRef = useRef(/** @type {HTMLCanvasElement|null} */ (null));
   const vmRef = useRef(vm);
   vmRef.current = vm;
+  /** One active pointer id per control — capture + no pointerleave clears (fixes mobile ghost / wrong button). */
+  const gdPointerRef = useRef(/** @type {Record<"l"|"r"|"j"|"k", number|null>} */ ({ l: null, r: null, j: null, k: null }));
   const motionPrevRef = useRef(
     /** @type {{ p0x: number, p0y: number, p1x: number, p1y: number, bx: number, by: number, t: number }|null} */ (null)
   );
@@ -169,6 +171,57 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       ball.onerror = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (vm.phase !== "playing") {
+      gdPointerRef.current = { l: null, r: null, j: null, k: null };
+      setInput({ l: false, r: false, j: false, k: false });
+    }
+  }, [vm.phase, setInput]);
+
+  const bindGdPointer = useCallback(
+    key => ({
+      onPointerDown: e => {
+        if (vmRef.current.phase !== "playing") return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        gdPointerRef.current[key] = e.pointerId;
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+        setInput({ [key]: true });
+      },
+      onPointerUp: e => {
+        if (gdPointerRef.current[key] !== e.pointerId) return;
+        gdPointerRef.current[key] = null;
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+        setInput({ [key]: false });
+      },
+      onPointerCancel: e => {
+        if (gdPointerRef.current[key] !== e.pointerId) return;
+        gdPointerRef.current[key] = null;
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+        setInput({ [key]: false });
+      },
+      onLostPointerCapture: e => {
+        if (gdPointerRef.current[key] !== e.pointerId) return;
+        gdPointerRef.current[key] = null;
+        setInput({ [key]: false });
+      },
+    }),
+    [setInput]
+  );
 
   useEffect(() => {
     const down = e => {
@@ -567,10 +620,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   type="button"
                   aria-label="Move left"
                   className={CTRL_MOVE_BTN}
-                  onPointerDown={() => setInput({ l: true })}
-                  onPointerUp={() => setInput({ l: false })}
-                  onPointerCancel={() => setInput({ l: false })}
-                  onPointerLeave={() => setInput({ l: false })}
+                  {...bindGdPointer("l")}
                 >
                   ◀
                 </button>
@@ -578,10 +628,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   type="button"
                   aria-label="Move right"
                   className={CTRL_MOVE_BTN}
-                  onPointerDown={() => setInput({ r: true })}
-                  onPointerUp={() => setInput({ r: false })}
-                  onPointerCancel={() => setInput({ r: false })}
-                  onPointerLeave={() => setInput({ r: false })}
+                  {...bindGdPointer("r")}
                 >
                   ▶
                 </button>
@@ -591,10 +638,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   type="button"
                   aria-label="Jump"
                   className={CTRL_JUMP_BTN}
-                  onPointerDown={() => setInput({ j: true })}
-                  onPointerUp={() => setInput({ j: false })}
-                  onPointerCancel={() => setInput({ j: false })}
-                  onPointerLeave={() => setInput({ j: false })}
+                  {...bindGdPointer("j")}
                 >
                   <span className="text-xl leading-none sm:text-2xl">▲</span>
                   <span>Jump</span>
@@ -603,10 +647,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   type="button"
                   aria-label="Kick"
                   className={CTRL_KICK_BTN}
-                  onPointerDown={() => setInput({ k: true })}
-                  onPointerUp={() => setInput({ k: false })}
-                  onPointerCancel={() => setInput({ k: false })}
-                  onPointerLeave={() => setInput({ k: false })}
+                  {...bindGdPointer("k")}
                 >
                   <span className="text-xl leading-none sm:text-2xl">⚡</span>
                   <span>Kick</span>

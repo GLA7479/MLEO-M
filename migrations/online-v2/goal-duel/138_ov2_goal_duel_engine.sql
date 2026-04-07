@@ -263,6 +263,7 @@ AS $$
 DECLARE
   v_aw float8 := public.ov2_gd_arena_w();
   v_gm float8 := public.ov2_gd_goal_margin();
+  v_gy float8 := 360.0; -- must match ov2_gd_sim_step ground line
   v_bx float8;
   v_by float8;
   v_br float8;
@@ -270,8 +271,8 @@ BEGIN
   v_bx := coalesce((p_pub -> 'ball' ->> 'x')::float8, 0);
   v_by := coalesce((p_pub -> 'ball' ->> 'y')::float8, 0);
   v_br := coalesce((p_pub -> 'ball' ->> 'r')::float8, 11);
-  -- vertical band for goal mouth (arcade)
-  IF v_by < 140 OR v_by > 300 THEN
+  -- vertical band: crosses + low drives + ground-line goals (previously capped at y<=300, missing rolling goals at y≈gy-r)
+  IF v_by < 140 OR v_by > v_gy - v_br THEN
     RETURN NULL;
   END IF;
   IF v_bx - v_br < v_gm THEN

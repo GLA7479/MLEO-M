@@ -41,6 +41,8 @@ export function useOv2GoalDuelSession(baseContext) {
       if (pub && typeof pub === "object") {
         const mySeat = Number(preview.snapshot?.mySeat ?? 0);
         const inp = previewInputRef.current;
+        const effL = mySeat === 1 ? inp.r : inp.l;
+        const effR = mySeat === 1 ? inp.l : inp.r;
         const arena = /** @type {Record<string, unknown>} */ (pub.arena || {});
         const aw = Number(arena.w ?? 800) || 800;
         const gy = Number(arena.groundY ?? 360) || 360;
@@ -52,8 +54,8 @@ export function useOv2GoalDuelSession(baseContext) {
           const hh = Number(p.hh ?? 22) || 22;
           const runSpeed = 260;
           let vx = 0;
-          if (inp.l) vx -= runSpeed;
-          if (inp.r) vx += runSpeed;
+          if (effL) vx -= runSpeed;
+          if (effR) vx += runSpeed;
           const y0 = Number(p.y ?? gy - hh);
           const feet = y0 + hh;
           const onGround = feet >= gy - 2;
@@ -141,6 +143,12 @@ export function useOv2GoalDuelSession(baseContext) {
   const snapRef = useRef(/** @type {typeof snap} */ (null));
   const processedMatchEndKeysRef = useRef(/** @type {Set<string>} */ (new Set()));
   const inputRef = useRef({ l: false, r: false, j: false, k: false });
+
+  useEffect(() => {
+    if (!snap || String(snap.phase || "").toLowerCase() !== "playing") {
+      inputRef.current = { l: false, r: false, j: false, k: false };
+    }
+  }, [snap?.phase, snap?.sessionId]);
 
   useEffect(() => {
     setSnap(null);
@@ -280,10 +288,17 @@ export function useOv2GoalDuelSession(baseContext) {
       if (cancelled) return;
       const i = inputRef.current;
       void (async () => {
-        const r = await requestOv2GoalDuelStep(roomId, selfKey, i.l, i.r, i.j, i.k, {
+        const seat = snapRef.current?.mySeat;
+        const sendL = seat === 1 ? i.r : i.l;
+        const sendR = seat === 1 ? i.l : i.r;
+        const resp = await requestOv2GoalDuelStep(roomId, selfKey, sendL, sendR, i.j, i.k, {
           revision: snapRef.current?.revision,
         });
-        if (r.ok && r.snapshot) setSnap(r.snapshot);
+        if (resp.ok && resp.snapshot) setSnap(resp.snapshot);
+        else if (!resp.ok && resp.code === "REVISION_MISMATCH" && roomId && selfKey) {
+          const fresh = await fetchOv2GoalDuelSnapshot(roomId, { participantKey: selfKey });
+          if (fresh) setSnap(fresh);
+        }
       })();
     }, 45);
     return () => {
