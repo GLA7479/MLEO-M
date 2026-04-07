@@ -367,7 +367,6 @@ export default function Ov2FleetHuntLiveShell() {
       title="Fleet Hunt"
       showSubtitle={false}
       chromePreset="ov2_board"
-      suppressReservedAdSlot
       infoPanel={
         <>
           <div className="space-y-0 text-[11px] leading-relaxed text-zinc-400">

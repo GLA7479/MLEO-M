@@ -38,34 +38,6 @@ const I = {
   shipsRow: "⛴",
 };
 
-/**
- * Reserved sponsor / ad layout — matches OV2 `OnlineV2ReservedAdSlot` discipline; no ad logic.
- * @param {{ variant: "mobile" | "desktop", className?: string }} props
- */
-function FleetHuntAdSlot({ variant, className = "" }) {
-  const desktop = variant === "desktop";
-  return (
-    <section
-      className={[
-        "shrink-0 border border-white/[0.08] bg-zinc-950/55",
-        "bg-[repeating-linear-gradient(135deg,rgba(255,255,255,0.04)_0,rgba(255,255,255,0.04)_5px,transparent_5px,transparent_10px)]",
-        desktop
-          ? "hidden min-h-[6rem] w-[7.25rem] flex-col justify-center rounded-xl px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:flex md:w-[8rem]"
-          : "flex h-11 w-full flex-col justify-center border-t border-dashed border-white/[0.12] sm:hidden",
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      aria-label="Reserved sponsor placement"
-    >
-      <p className="px-1 text-center text-[8px] font-semibold uppercase leading-tight tracking-[0.16em] text-zinc-500">
-        {desktop ? "Ad / Sponsor slot" : "Reserved for sponsor"}
-      </p>
-      <p className="mt-1 px-1 text-center text-[8px] leading-snug text-zinc-600">Placeholder — future campaigns</p>
-    </section>
-  );
-}
-
 /** @param {unknown} m */
 function memberRematchRequested(m) {
   const meta = m?.meta;
@@ -82,6 +54,44 @@ function shotLookup(shots, r, c) {
   return (
     shots.find(s => s && typeof s === "object" && Math.floor(Number(s.r)) === r && Math.floor(Number(s.c)) === c) || null
   );
+}
+
+/**
+ * Classify each ship cell for hull styling (straight ships only; presentation).
+ * @param {unknown} shipsCells
+ * @returns {Map<string, { kind: "single" } | { kind: "h" | "v", part: string }>}
+ */
+function buildShipSegmentMap(shipsCells) {
+  const map = new Map();
+  if (!Array.isArray(shipsCells)) return map;
+  for (const ship of shipsCells) {
+    if (!ship || typeof ship !== "object" || !Array.isArray(ship.cells) || ship.cells.length === 0) continue;
+    const cells = ship.cells.map(cell => {
+      if (!cell || typeof cell !== "object") return null;
+      return { r: Math.floor(Number(cell.r)), c: Math.floor(Number(cell.c)) };
+    }).filter(x => x != null);
+    const L = cells.length;
+    if (L === 0) continue;
+    if (L === 1) {
+      map.set(`${cells[0].r},${cells[0].c}`, { kind: "single" });
+      continue;
+    }
+    const allSameRow = cells.every(x => x.r === cells[0].r);
+    if (allSameRow) {
+      cells.sort((a, b) => a.c - b.c);
+      cells.forEach((cell, i) => {
+        const part = i === 0 ? "left" : i === L - 1 ? "right" : "mid";
+        map.set(`${cell.r},${cell.c}`, { kind: "h", part });
+      });
+    } else {
+      cells.sort((a, b) => a.r - b.r);
+      cells.forEach((cell, i) => {
+        const part = i === 0 ? "top" : i === L - 1 ? "bottom" : "mid";
+        map.set(`${cell.r},${cell.c}`, { kind: "v", part });
+      });
+    }
+  }
+  return map;
 }
 
 /**
@@ -309,13 +319,28 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
     [myOutgoing]
   );
 
+  /** Smaller board cap on desktop when only one board is shown (offense or defense tab). */
+  const boardDesktopCompact = desktopBattleMode !== "split";
+
   /**
    * @param {"offense"|"defense"} mode
-   * @param {{ onCell?: ((r: number, c: number) => void) | null, shipsCells?: unknown, outgoing?: unknown[], incoming?: unknown[], dim?: boolean, gridClassName?: string, lockedOverlay?: boolean, showAxisLabels?: boolean }} opts
+   * @param {{ onCell?: ((r: number, c: number) => void) | null, shipsCells?: unknown, outgoing?: unknown[], incoming?: unknown[], dim?: boolean, gridClassName?: string, lockedOverlay?: boolean, showAxisLabels?: boolean, sizeCompact?: boolean, tacticalFrame?: null | "offense" | "defense" }} opts
    */
   const renderGrid = (
     mode,
-    { onCell, shipsCells, outgoing, incoming, dim, gridClassName = "", lockedOverlay = false, showAxisLabels = true }
+    {
+      onCell,
+      shipsCells,
+      outgoing,
+      incoming,
+      dim,
+      gridClassName = "",
+      lockedOverlay = false,
+      showAxisLabels = true,
+      sizeCompact = false,
+      /** @type {null | "offense" | "defense"} */
+      tacticalFrame = null,
+    }
   ) => {
     const shipSet = new Set();
     if (Array.isArray(shipsCells)) {
@@ -325,6 +350,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
         }
       }
     }
+    const shipSegMap = mode === "defense" && Array.isArray(shipsCells) ? buildShipSegmentMap(shipsCells) : null;
 
     const cells = Array.from({ length: FH_GRID_SIZE * FH_GRID_SIZE }, (_, i) => {
       const r = Math.floor(i / FH_GRID_SIZE);
@@ -337,6 +363,45 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
       const clickable = Boolean(onCell) && !dim;
       const incK = inc && typeof inc === "object" && inc.k != null ? String(inc.k).toLowerCase() : "";
       const outK = out && typeof out === "object" && out.k != null ? String(out.k).toLowerCase() : "";
+      const seg = shipSegMap?.get(key);
+
+      /** Hull styling: defense board ship cells (connected vessel read). */
+      let hullClass = "";
+      if (mode === "defense" && hasShip && !outK && !inc) {
+        hullClass = [
+          "border border-slate-500/50 bg-gradient-to-b from-slate-500/85 to-slate-900/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.16),inset_0_-3px_6px_rgba(0,0,0,0.45)]",
+          "before:pointer-events-none before:absolute before:inset-x-[2px] before:top-[3px] before:h-[1.5px] before:bg-white/22 before:content-['']",
+          seg?.kind === "single" && "rounded-[4px]",
+          seg?.kind === "h" && seg.part === "left" && "rounded-l-[5px] rounded-r-none",
+          seg?.kind === "h" && seg.part === "right" && "rounded-r-[5px] rounded-l-none",
+          seg?.kind === "h" && seg.part === "mid" && "rounded-none",
+          seg?.kind === "v" && seg.part === "top" && "rounded-t-[5px] rounded-b-none",
+          seg?.kind === "v" && seg.part === "bottom" && "rounded-b-[5px] rounded-t-none",
+          seg?.kind === "v" && seg.part === "mid" && "rounded-none",
+        ]
+          .filter(Boolean)
+          .join(" ");
+      } else if (mode === "defense" && hasShip && (inc || outK)) {
+        hullClass =
+          "rounded-[3px] border border-slate-500/35 bg-gradient-to-b from-slate-600/50 to-slate-800/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]";
+      }
+
+      const baseCell = [
+        "relative aspect-square min-h-0 min-w-0 text-[8px] font-bold transition-[box-shadow,opacity,background-color] duration-150 outline-none outline-offset-0",
+        hullClass ||
+          (mode === "defense" && !hasShip ? "rounded-[3px] border border-slate-700/50 bg-slate-950/80" : "") ||
+          (mode === "offense" && !out ? "rounded-[3px] border border-slate-700/45 bg-slate-950/78" : ""),
+        outK === "miss" ? "border-sky-800/40 bg-sky-950/88 !shadow-[inset_0_0_0_1px_rgba(56,189,248,0.12)]" : "",
+        outK === "hit" || outK === "sunk" ? "border-rose-800/45 bg-rose-950/90 !shadow-[inset_0_0_0_1px_rgba(251,113,133,0.15)]" : "",
+        inc && !hasShip ? "border-sky-600/30 bg-sky-950/75 !shadow-[inset_0_0_0_1px_rgba(56,189,248,0.12)]" : "",
+        isHit ? "!shadow-[inset_0_0_0_2px_rgba(251,191,36,0.35)]" : "",
+        clickable
+          ? "cursor-pointer hover:z-[1] hover:shadow-[inset_0_0_0_1px_rgba(34,211,238,0.28)] focus-visible:z-[1] focus-visible:shadow-[inset_0_0_0_2px_rgba(34,211,238,0.45)] active:shadow-[inset_0_0_0_1px_rgba(34,211,238,0.2)] active:brightness-[0.97]"
+          : "cursor-default",
+        dim || !clickable ? "opacity-[0.88]" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
 
       return (
         <button
@@ -344,32 +409,30 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
           type="button"
           disabled={!clickable}
           onClick={() => onCell && onCell(r, c)}
-          className={[
-            "relative aspect-square min-h-0 min-w-0 rounded-[3px] border text-[8px] font-bold transition",
-            hasShip ? "border-slate-400/45 bg-slate-700/90" : "border-slate-600/40 bg-slate-900/75",
-            outK === "miss" ? "bg-sky-950/85" : "",
-            outK === "hit" || outK === "sunk" ? "bg-rose-950/88" : "",
-            inc && !hasShip ? "border-sky-500/35" : "",
-            isHit ? "ring-1 ring-amber-400/55" : "",
-            clickable
-              ? "cursor-pointer hover:z-[1] hover:ring-1 hover:ring-sky-400/45 hover:brightness-110 active:scale-95"
-              : "cursor-default",
-            dim || !clickable ? "opacity-[0.88]" : "",
-          ].join(" ")}
+          className={baseCell}
         >
           {out ? <span className="sr-only">{fhShotKindLabel(out.k)}</span> : null}
           {mode === "defense" && inc && !hasShip ? (
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] text-sky-300/95" aria-hidden>
+            <span
+              className="absolute inset-0 flex items-center justify-center text-[13px] leading-none text-sky-200/95 sm:text-[15px]"
+              aria-hidden
+            >
               {I.miss}
             </span>
           ) : null}
           {mode === "defense" && inc && hasShip ? (
-            <span className="absolute inset-0 flex items-center justify-center text-[11px] text-rose-100/95" aria-hidden>
+            <span
+              className="absolute inset-0 flex items-center justify-center text-[14px] leading-none text-rose-50/95 sm:text-[16px]"
+              aria-hidden
+            >
               {incK === "sunk" ? I.sunk : I.hit}
             </span>
           ) : null}
           {mode === "offense" && out ? (
-            <span className="absolute inset-0 flex items-center justify-center text-[11px] text-sky-50/95" aria-hidden>
+            <span
+              className="absolute inset-0 flex items-center justify-center text-[14px] leading-none text-sky-50/95 sm:text-[16px]"
+              aria-hidden
+            >
               {outK === "miss" ? I.miss : outK === "sunk" ? I.sunk : I.hit}
             </span>
           ) : null}
@@ -381,8 +444,14 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
       <div
         className={[
           "grid aspect-square w-full min-w-0 gap-0.5",
-          "max-w-[min(100%,22rem)] sm:max-w-[min(100%,26rem)]",
-          "max-sm:mx-auto max-sm:w-[min(92vw,min(40dvh,300px))] max-sm:max-w-none",
+          tacticalFrame === "offense"
+            ? "rounded-sm shadow-[inset_0_0_0_1px_rgba(34,211,238,0.22),inset_0_0_12px_rgba(34,211,238,0.06)]"
+            : tacticalFrame === "defense"
+              ? "rounded-sm shadow-[inset_0_0_0_1px_rgba(52,211,153,0.2),inset_0_0_12px_rgba(16,185,129,0.05)]"
+              : "",
+          sizeCompact
+            ? "max-w-[min(100%,min(17rem,50dvh))] sm:max-w-[min(100%,min(24rem,58dvh))] max-sm:mx-auto max-sm:w-[min(96vw,min(44dvh,320px))] max-sm:max-w-none"
+            : "max-w-[min(100%,22rem)] sm:max-w-[min(100%,26rem)] max-sm:mx-auto max-sm:w-[min(96vw,min(48dvh,340px))] max-sm:max-w-none",
           gridClassName,
         ]
           .filter(Boolean)
@@ -411,10 +480,17 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
     }
 
     return (
-      <div className="relative w-full max-w-[min(100%,calc(22rem+1.5rem))] sm:max-w-[min(100%,calc(26rem+1.5rem))] max-sm:mx-auto">
+      <div
+        className={[
+          "relative w-full max-sm:mx-auto",
+          sizeCompact
+            ? "max-sm:max-w-[min(100%,min(19rem,54dvh))] sm:max-w-[min(100%,calc(min(24rem,58dvh)+1.5rem))]"
+            : "max-sm:max-w-[min(100%,min(26rem,50dvh))] sm:max-w-[min(100%,calc(26rem+1.5rem))]",
+        ].join(" ")}
+      >
         <div className="flex w-full flex-row items-stretch gap-0.5">
           <div
-            className="grid w-[1.125rem] shrink-0 grid-rows-10 gap-0.5 self-stretch py-[2px] sm:w-5"
+            className="hidden w-[1.125rem] shrink-0 grid-rows-10 gap-0.5 self-stretch py-[2px] sm:grid sm:w-5"
             aria-hidden
           >
             {Array.from({ length: FH_GRID_SIZE }, (_, r) => (
@@ -427,7 +503,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
             ))}
           </div>
           <div className="flex min-w-0 flex-1 flex-col">
-            <div className="mb-0.5 flex justify-between gap-0.5 px-0.5" aria-hidden>
+            <div className="mb-0.5 hidden justify-between gap-0.5 px-0.5 sm:flex" aria-hidden>
               {Array.from({ length: FH_GRID_SIZE }, (_, c) => (
                 <div
                   key={`axis-c-${c}`}
@@ -450,7 +526,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
   const lockDisabled = busy || vm.phase !== "placement" || myLocked;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden px-1.5 pt-1 max-sm:min-h-0 max-sm:flex-1 max-sm:pb-0 sm:flex-row sm:items-stretch sm:gap-2 sm:overflow-y-auto sm:pb-3 sm:pt-1 md:gap-3 md:px-2">
+    <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden px-1.5 pt-1 max-sm:min-h-0 max-sm:flex-1 max-sm:pb-0 sm:gap-2 sm:overflow-y-auto sm:pb-3 sm:pt-1 md:gap-3 md:px-2">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden sm:min-h-0 sm:gap-2 sm:overflow-y-auto md:gap-3">
       {err ? <div className="rounded-lg border border-red-500/30 bg-red-950/35 px-2 py-1.5 text-[11px] text-red-100">{err}</div> : null}
       {vaultClaimBusy ? (
@@ -493,9 +569,9 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
                       type="button"
                       onClick={() => setPickLen(len)}
                       className={[
-                        "min-h-[32px] min-w-[2.25rem] rounded-lg border px-2.5 py-1.5 text-[11px] font-bold tabular-nums transition",
+                        "min-h-[32px] min-w-[2.25rem] rounded-lg border px-2.5 py-1.5 text-[11px] font-bold tabular-nums transition-colors",
                         activePickLen === len
-                          ? "border-emerald-400/70 bg-emerald-950/55 text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-2 ring-emerald-500/35 ring-offset-1 ring-offset-zinc-950"
+                          ? "border-emerald-500/55 bg-emerald-950/55 text-emerald-50 shadow-[inset_0_0_0_2px_rgba(52,211,153,0.35)]"
                           : "border-zinc-600/45 bg-zinc-900/65 text-zinc-300 hover:border-zinc-500/55",
                       ].join(" ")}
                     >
@@ -508,14 +584,14 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
                 <span className="w-full text-[10px] text-zinc-500 sm:w-auto">{I.target} Orientation:</span>
                 <button
                   type="button"
-                  className={BTN_SECONDARY + (orientationH ? " ring-2 ring-sky-500/45 ring-offset-1 ring-offset-zinc-950" : "")}
+                  className={BTN_SECONDARY + (orientationH ? " shadow-[inset_0_0_0_2px_rgba(56,189,248,0.35)]" : "")}
                   onClick={() => setOrientationH(true)}
                 >
                   ↔ Horizontal
                 </button>
                 <button
                   type="button"
-                  className={BTN_SECONDARY + (!orientationH ? " ring-2 ring-sky-500/45 ring-offset-1 ring-offset-zinc-950" : "")}
+                  className={BTN_SECONDARY + (!orientationH ? " shadow-[inset_0_0_0_2px_rgba(56,189,248,0.35)]" : "")}
                   onClick={() => setOrientationH(false)}
                 >
                   ↕ Vertical
@@ -575,51 +651,40 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
       ) : null}
 
       {vm.phase === "battle" && mySeat != null ? (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden sm:gap-3">
-          <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[10px] text-zinc-300 sm:text-[11px]">
-            <span className="font-medium">
-              {I.target} Battle —{" "}
-              {vm.turnSeat === mySeat ? (
-                <span className="text-emerald-200/95">Your turn</span>
-              ) : (
-                <span className="text-zinc-400">Opponent turn</span>
-              )}
-              {vm.turnTimeLeftSec != null ? (
-                <span className="ml-1.5 text-amber-200/90 sm:ml-2">
-                  {I.timer} {vm.turnTimeLeftSec}s
-                </span>
-              ) : null}
+        <div
+          className={[
+            "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+            boardDesktopCompact ? "gap-1 sm:gap-1.5" : "gap-1.5 sm:gap-3",
+          ].join(" ")}
+        >
+          <div className="flex min-h-[2.25rem] flex-shrink-0 flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-white/[0.05] bg-zinc-950/40 px-1.5 py-1.5 text-[9px] text-zinc-400 sm:min-h-[2.5rem] sm:text-[10px]">
+            <span className="inline-flex shrink-0 items-center gap-0.5 font-medium text-zinc-500">
+              {I.target} Battle
             </span>
-            <span className="tabular-nums text-zinc-400">
-              ×{vm.stakeMultiplier} · {I.double} {vm.doublesAccepted}/4
-            </span>
-          </div>
-
-          <div className="flex flex-shrink-0 flex-wrap gap-1 rounded-lg border border-white/[0.05] bg-zinc-950/40 px-1.5 py-1 text-[9px] text-zinc-400 sm:text-[10px]">
-            <span
-              className={[
-                "inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5",
-                vm.turnSeat === mySeat ? "border-emerald-500/30 bg-emerald-950/25 text-emerald-100/95" : "border-zinc-600/35 bg-zinc-900/45 text-zinc-400",
-              ].join(" ")}
-            >
-              {vm.turnSeat === mySeat ? "Your turn" : "Opponent turn"}
-            </span>
-            <span className="inline-flex items-center gap-0.5 rounded-md border border-zinc-600/35 bg-zinc-900/50 px-1.5 py-0.5 text-zinc-300">
+            <span className="inline-flex min-h-[22px] items-center gap-0.5 rounded-md border border-zinc-600/35 bg-zinc-900/50 px-1.5 py-0.5 text-zinc-300">
               Stake ×{vm.stakeMultiplier}
             </span>
-            <span className="inline-flex items-center gap-0.5 rounded-md border border-zinc-600/35 bg-zinc-900/50 px-1.5 py-0.5">
+            <span className="inline-flex min-h-[22px] items-center gap-0.5 rounded-md border border-zinc-600/35 bg-zinc-900/50 px-1.5 py-0.5">
               {I.double} Doubles {vm.doublesAccepted}/4
             </span>
-            {vm.turnTimeLeftSec != null ? (
-              <span className="inline-flex items-center gap-0.5 rounded-md border border-amber-500/25 bg-amber-950/20 px-1.5 py-0.5 text-amber-100/90">
-                {I.timer} {vm.turnTimeLeftSec}s
-              </span>
-            ) : null}
             {pd ? (
-              <span className="inline-flex items-center gap-0.5 rounded-md border border-amber-500/35 bg-amber-950/30 px-1.5 py-0.5 text-amber-100/95">
+              <span className="inline-flex min-h-[22px] min-w-[7.25rem] max-w-[10rem] items-center justify-center gap-0.5 rounded-md border border-amber-500/35 bg-amber-950/30 px-1.5 py-0.5 text-center text-amber-100/95">
                 {I.lock} Double pending
               </span>
             ) : null}
+            <button
+              type="button"
+              className={[
+                "ml-auto min-h-[22px] min-w-[7.5rem] shrink-0 rounded-md border px-2 py-1 text-[9px] font-semibold transition-opacity sm:text-[10px]",
+                canOfferDouble && !busy
+                  ? "cursor-pointer border-zinc-500/28 bg-gradient-to-b from-zinc-800/55 to-zinc-950 text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                  : "cursor-not-allowed border-zinc-700/25 bg-zinc-950/65 text-zinc-500 opacity-55",
+              ].join(" ")}
+              disabled={!canOfferDouble || busy}
+              onClick={() => void offerDouble()}
+            >
+              {I.double} Offer double
+            </button>
           </div>
 
           <div className="flex flex-shrink-0 flex-wrap gap-1 text-[9px] text-zinc-500 sm:text-[10px]">
@@ -641,17 +706,23 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
             </span>
           </div>
 
-          <div className="mb-1 hidden min-h-[2.25rem] w-full gap-0.5 rounded-xl border border-white/[0.07] bg-zinc-950/35 p-0.5 sm:flex">
+          <div
+            className={[
+              "mb-0.5 hidden w-full gap-0.5 rounded-xl border border-white/[0.07] bg-zinc-950/35 p-0.5 sm:flex",
+              boardDesktopCompact ? "min-h-[2rem]" : "min-h-[2.25rem]",
+            ].join(" ")}
+          >
             {["split", "offense", "defense"].map(key => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setDesktopBattleMode(key)}
                 className={[
-                  "min-h-[36px] flex-1 rounded-lg px-1.5 py-1.5 text-[10px] font-semibold transition",
+                  "flex-1 rounded-lg border px-1.5 font-semibold transition-colors",
+                  boardDesktopCompact ? "min-h-[32px] py-1 text-[9px]" : "min-h-[36px] py-1.5 text-[10px]",
                   desktopBattleMode === key
-                    ? "border border-sky-500/45 bg-sky-950/45 text-sky-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                    : "border border-transparent text-zinc-500 hover:border-zinc-600/40 hover:bg-zinc-900/40 hover:text-zinc-300",
+                    ? "border-sky-500/50 bg-sky-950/45 text-sky-50 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.35)]"
+                    : "border-zinc-600/35 bg-zinc-900/35 text-zinc-500 hover:border-zinc-500/45 hover:bg-zinc-900/50 hover:text-zinc-300",
                 ].join(" ")}
               >
                 {key === "split" ? "Split" : key === "offense" ? `${I.radar} Your shots` : `${I.fleet} Your fleet`}
@@ -681,15 +752,6 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
                 </p>
               )}
             </div>
-          ) : canOfferDouble ? (
-            <button
-              type="button"
-              className={BTN_SECONDARY + " w-full shrink-0 sm:w-auto"}
-              disabled={busy}
-              onClick={() => void offerDouble()}
-            >
-              {I.double} Offer double
-            </button>
           ) : null}
 
           <div className="mb-1 flex gap-1 sm:hidden">
@@ -697,9 +759,9 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               type="button"
               onClick={() => setMobileBattleTab("offense")}
               className={[
-                "min-h-[36px] flex-1 rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition",
+                "min-h-[36px] flex-1 rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition-colors",
                 mobileBattleTab === "offense"
-                  ? "border-sky-500/45 bg-sky-950/40 text-sky-100"
+                  ? "border-sky-500/50 bg-sky-950/40 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.35)]"
                   : "border-zinc-600/40 bg-zinc-900/50 text-zinc-400",
               ].join(" ")}
             >
@@ -709,9 +771,9 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               type="button"
               onClick={() => setMobileBattleTab("defense")}
               className={[
-                "min-h-[36px] flex-1 rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition",
+                "min-h-[36px] flex-1 rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition-colors",
                 mobileBattleTab === "defense"
-                  ? "border-sky-500/45 bg-sky-950/40 text-sky-100"
+                  ? "border-sky-500/50 bg-sky-950/40 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.35)]"
                   : "border-zinc-600/40 bg-zinc-900/50 text-zinc-400",
               ].join(" ")}
             >
@@ -719,55 +781,89 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
             </button>
           </div>
 
-          <div
-            className={[
-              "flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden sm:gap-3",
-              desktopBattleMode === "split" ? "xl:flex-row xl:items-stretch xl:gap-4" : "",
-            ].join(" ")}
-          >
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+            <div
+              className={[
+                "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+                boardDesktopCompact ? "gap-1 sm:gap-2" : "gap-1.5 sm:gap-3",
+                desktopBattleMode === "split" ? "xl:flex-row xl:items-stretch xl:gap-4" : "",
+              ].join(" ")}
+            >
             <section
               className={[
-                "min-h-0 flex-col space-y-0.5 overflow-hidden sm:space-y-1",
+                "min-h-0 flex flex-col overflow-hidden",
+                boardDesktopCompact ? "space-y-0 sm:space-y-0.5" : "space-y-0.5 sm:space-y-1",
                 mobileBattleTab === "offense" ? "max-sm:flex max-sm:flex-1" : "max-sm:hidden",
                 desktopBattleMode === "defense" ? "sm:hidden" : "sm:flex sm:flex-none xl:flex-1 xl:min-w-0",
                 "rounded-xl border border-sky-500/15 bg-sky-950/10 p-1 sm:p-1.5",
               ].join(" ")}
             >
-              <h3 className="flex-shrink-0 text-[9px] font-semibold uppercase tracking-wide text-sky-300/90 sm:text-[10px]">
+              <h3
+                className={[
+                  "flex-shrink-0 font-semibold uppercase tracking-wide text-sky-300/90",
+                  boardDesktopCompact ? "text-[8px] sm:text-[9px]" : "text-[9px] sm:text-[10px]",
+                ].join(" ")}
+              >
                 {I.radar} Command — radar (your shots)
               </h3>
-              <div className="mx-auto flex min-h-0 w-full flex-1 items-center justify-center sm:flex-none">
+              <div className="mx-auto flex min-h-0 w-full min-w-0 flex-1 items-center justify-center overflow-visible sm:flex-none">
                 {renderGrid("offense", {
                   onCell: onTargetCell,
                   shipsCells: [],
                   outgoing: myOutgoing,
                   incoming: [],
                   dim: vm.turnSeat !== mySeat || Boolean(pd),
+                  sizeCompact: boardDesktopCompact,
+                  tacticalFrame: boardDesktopCompact && desktopBattleMode === "offense" ? "offense" : null,
                 })}
               </div>
             </section>
 
             <section
               className={[
-                "min-h-0 flex-col space-y-0.5 overflow-hidden sm:space-y-1",
+                "min-h-0 flex flex-col overflow-hidden",
+                boardDesktopCompact ? "space-y-0 sm:space-y-0.5" : "space-y-0.5 sm:space-y-1",
                 mobileBattleTab === "defense" ? "max-sm:flex max-sm:flex-1" : "max-sm:hidden",
                 desktopBattleMode === "offense" ? "sm:hidden" : "sm:flex sm:flex-none xl:flex-1 xl:min-w-0",
                 "rounded-xl border border-emerald-500/12 bg-emerald-950/8 p-1 sm:p-1.5",
               ].join(" ")}
             >
-              <h3 className="flex-shrink-0 text-[9px] font-semibold uppercase tracking-wide text-emerald-300/85 sm:text-[10px]">
+              <h3
+                className={[
+                  "flex-shrink-0 font-semibold uppercase tracking-wide text-emerald-300/85",
+                  boardDesktopCompact ? "text-[8px] sm:text-[9px]" : "text-[9px] sm:text-[10px]",
+                ].join(" ")}
+              >
                 {I.fleet} Fleet status — your ships
               </h3>
-              <div className="mx-auto flex min-h-0 w-full flex-1 items-center justify-center sm:flex-none">
+              <div className="mx-auto flex min-h-0 w-full min-w-0 flex-1 items-center justify-center overflow-visible sm:flex-none">
                 {renderGrid("defense", {
                   onCell: null,
                   shipsCells: vm.myShips.map(s => s.cells || []),
                   outgoing: [],
                   incoming: incomingOnMe,
                   dim: false,
+                  sizeCompact: boardDesktopCompact,
+                  tacticalFrame: boardDesktopCompact && desktopBattleMode === "defense" ? "defense" : null,
                 })}
               </div>
             </section>
+            </div>
+            <div
+              className="pointer-events-none absolute right-1.5 top-1.5 z-20 flex min-h-[2.75rem] min-w-[6.25rem] flex-col items-end justify-start rounded-md border border-white/[0.12] bg-zinc-950/92 px-2 py-1.5 text-[9px] shadow-[0_2px_12px_rgba(0,0,0,0.45)] backdrop-blur-[2px] sm:right-2 sm:top-2 sm:text-[10px]"
+              aria-live="polite"
+            >
+              <span
+                className={
+                  vm.turnSeat === mySeat ? "font-semibold leading-tight text-emerald-200/95" : "font-medium leading-tight text-zinc-400"
+                }
+              >
+                {vm.turnSeat === mySeat ? "Your turn" : "Opponent turn"}
+              </span>
+              <span className="min-h-[1rem] text-right tabular-nums text-amber-200/90">
+                {vm.turnTimeLeftSec != null ? `${vm.turnTimeLeftSec}s` : <span className="invisible">00s</span>}
+              </span>
+            </div>
           </div>
 
           <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5 rounded-lg border border-white/[0.06] bg-zinc-950/35 px-1.5 py-1 text-[9px] text-zinc-500 sm:text-[10px]">
@@ -872,10 +968,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
           <p className="mt-1">Result dismissed — you can rematch from the lobby or use buttons below if still available.</p>
         </div>
       ) : null}
-      <FleetHuntAdSlot variant="mobile" />
       </div>
-
-      <FleetHuntAdSlot variant="desktop" />
     </div>
   );
 }
