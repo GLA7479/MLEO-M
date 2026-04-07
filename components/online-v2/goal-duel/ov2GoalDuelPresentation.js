@@ -143,7 +143,7 @@ export function gdHardSyncPresentationFromAuthoritative(st, pub) {
  * @param {{ aw: number, gy: number, gm: number }} arena
  */
 function stepPlayerPhysics(p, sin, dt, arena) {
-  const { aw, gy, gm } = arena;
+  const { aw, gy } = arena;
   const gyNum = gy;
   let ax = 0;
   if (sin.l && !sin.r) ax -= P_ACCEL;
@@ -162,8 +162,9 @@ function stepPlayerPhysics(p, sin, dt, arena) {
     p.y = gyNum - HH;
     p.vy = 0;
   }
-  const minX = gm + HW;
-  const maxX = aw - gm - HW;
+  // Server sim clamps players to the arena walls, not the goal mouth margin.
+  const minX = HW;
+  const maxX = aw - HW;
   if (p.x < minX) p.x = minX;
   if (p.x > maxX) p.x = maxX;
 }

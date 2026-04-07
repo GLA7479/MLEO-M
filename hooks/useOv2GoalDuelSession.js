@@ -19,9 +19,14 @@ import { ONLINE_V2_GAME_KINDS } from "../lib/online-v2/ov2Economy";
 /** @param {null|undefined|{ room?: object, members?: unknown[], self?: { participant_key?: string } }} baseContext */
 export function useOv2GoalDuelSession(baseContext) {
   const preview = useOv2UiPreviewOptional("goalduel");
+  const gdDebug =
+    typeof process !== "undefined" &&
+    process.env.NODE_ENV === "development" &&
+    typeof window !== "undefined" &&
+    window.localStorage?.getItem("ov2_gd_debug") === "1";
 
   /** UI previews: real input ref + local physics so controls and canvas respond (no server). */
-  const previewInputRef = useRef({ l: false, r: false, j: false, k: false });
+  const previewInputRef = useRef({ l: false, r: false, j: false, k: false, jTap: false, kTap: false });
   const previewSetInput = useCallback(partial => {
     const c = previewInputRef.current;
     if (partial.l !== undefined) c.l = partial.l;
@@ -76,8 +81,8 @@ export function useOv2GoalDuelSession(baseContext) {
           }
           p.y = y;
           let x = Number(p.x ?? 400) + vx * dt;
-          const minX = gm + hw;
-          const maxX = aw - gm - hw;
+          const minX = hw;
+          const maxX = aw - hw;
           p.x = Math.max(minX, Math.min(maxX, x));
         }
         const ball = /** @type {Record<string, unknown>|undefined} */ (pub.ball);
@@ -148,12 +153,29 @@ export function useOv2GoalDuelSession(baseContext) {
   const vaultLinesAppliedForSessionRef = useRef(/** @type {Set<string>} */ (new Set()));
   const snapRef = useRef(/** @type {typeof snap} */ (null));
   const processedMatchEndKeysRef = useRef(/** @type {Set<string>} */ (new Set()));
-  const inputRef = useRef({ l: false, r: false, j: false, k: false });
+  const inputRef = useRef({ l: false, r: false, j: false, k: false, jTap: false, kTap: false });
+
+  const gdDebugRef = useRef(
+    /** @type {{
+     *   enabled: boolean,
+     *   lastStepSendMs: number,
+     *   lastSnapshotReceiveMs: number,
+     *   lastSend: { l: boolean, r: boolean, j: boolean, k: boolean }|null,
+     *   lastRecv: { revision: number, mySeat: 0|1|null, p0x: number, p0y: number, p1x: number, p1y: number, bx: number, by: number }|null,
+     * }} */ ({
+      enabled: false,
+      lastStepSendMs: 0,
+      lastSnapshotReceiveMs: 0,
+      lastSend: null,
+      lastRecv: null,
+    })
+  );
+  gdDebugRef.current.enabled = Boolean(gdDebug);
 
   useEffect(() => {
     if (!snap || String(snap.phase || "").toLowerCase() !== "playing") {
       const c = inputRef.current;
-      c.l = c.r = c.j = c.k = false;
+      c.l = c.r = c.j = c.k = c.jTap = c.kTap = false;
     }
   }, [snap?.phase, snap?.sessionId]);
 
@@ -188,7 +210,35 @@ export function useOv2GoalDuelSession(baseContext) {
     const unsub = subscribeOv2GoalDuelSnapshot(roomId, {
       participantKey: selfKey ?? "",
       onSnapshot: s => {
-        if (!cancelled) setSnap(s);
+        if (cancelled) return;
+        if (gdDebug) {
+          const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+          const pub = s.public && typeof s.public === "object" ? s.public : {};
+          const p0 = pub.p0 && typeof pub.p0 === "object" ? pub.p0 : {};
+          const p1 = pub.p1 && typeof pub.p1 === "object" ? pub.p1 : {};
+          const ball = pub.ball && typeof pub.ball === "object" ? pub.ball : {};
+          gdDebugRef.current.lastSnapshotReceiveMs = now;
+          gdDebugRef.current.lastRecv = {
+            revision: Number(s.revision ?? 0) || 0,
+            mySeat: s.mySeat === 0 || s.mySeat === 1 ? s.mySeat : null,
+            p0x: Number(p0.x ?? NaN),
+            p0y: Number(p0.y ?? NaN),
+            p1x: Number(p1.x ?? NaN),
+            p1y: Number(p1.y ?? NaN),
+            bx: Number(ball.x ?? NaN),
+            by: Number(ball.y ?? NaN),
+          };
+          // Throttle-ish: revision changes only.
+          // eslint-disable-next-line no-console
+          console.info("[ov2/gd][recv]", {
+            rev: gdDebugRef.current.lastRecv.revision,
+            seat: gdDebugRef.current.lastRecv.mySeat,
+            p0: [gdDebugRef.current.lastRecv.p0x, gdDebugRef.current.lastRecv.p0y],
+            p1: [gdDebugRef.current.lastRecv.p1x, gdDebugRef.current.lastRecv.p1y],
+            b: [gdDebugRef.current.lastRecv.bx, gdDebugRef.current.lastRecv.by],
+          });
+        }
+        setSnap(s);
       },
     });
     return () => {
@@ -299,11 +349,32 @@ export function useOv2GoalDuelSession(baseContext) {
     const tick = () => {
       if (cancelled) return;
       const i = inputRef.current;
-      /** Server stores p_l/p_r per seat as world axes (same as sim); do not swap by seat. */
-      const sendL = i.l;
-      const sendR = i.r;
+      const liveSeat = snapRef.current?.mySeat;
+      /**
+       * Seat 1 receives a mirrored snapshot for viewer-relative visuals, so outbound left/right
+       * must be swapped back into the server's world axes. Jump/kick taps are latched for one send
+       * so short mobile taps cannot disappear entirely between 50 ms step intervals.
+       */
+      const sendL = liveSeat === 1 ? i.r : i.l;
+      const sendR = liveSeat === 1 ? i.l : i.r;
+      const sendJ = Boolean(i.j || i.jTap);
+      const sendK = Boolean(i.k || i.kTap);
+      i.jTap = false;
+      i.kTap = false;
+      if (gdDebug) {
+        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        gdDebugRef.current.lastStepSendMs = now;
+        gdDebugRef.current.lastSend = { l: Boolean(sendL), r: Boolean(sendR), j: Boolean(sendJ), k: Boolean(sendK) };
+        // eslint-disable-next-line no-console
+        console.info("[ov2/gd][send]", {
+          seat: liveSeat,
+          rev: snapRef.current?.revision,
+          send: gdDebugRef.current.lastSend,
+          raw: { l: i.l, r: i.r, j: i.j, k: i.k, jTap: i.jTap, kTap: i.kTap },
+        });
+      }
       void (async () => {
-        const resp = await requestOv2GoalDuelStep(roomId, selfKey, sendL, sendR, i.j, i.k, {
+        const resp = await requestOv2GoalDuelStep(roomId, selfKey, sendL, sendR, sendJ, sendK, {
           revision: snapRef.current?.revision,
         });
         if (resp.ok && resp.snapshot) setSnap(resp.snapshot);
@@ -377,6 +448,7 @@ export function useOv2GoalDuelSession(baseContext) {
     setErr,
     setInput,
     inputRef,
+    gdDebug: gdDebugRef.current,
     requestRematch,
     cancelRematch,
     startNextMatch,

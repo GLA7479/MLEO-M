@@ -146,10 +146,76 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     requestRematch,
     cancelRematch,
     startNextMatch,
+    gdDebug: gdDebugStats,
     isHost,
     roomMatchSeq,
     isUiPreview = false,
   } = session;
+
+  const gdDebug =
+    typeof process !== "undefined" &&
+    process.env.NODE_ENV === "development" &&
+    typeof window !== "undefined" &&
+    window.localStorage?.getItem("ov2_gd_debug") === "1";
+
+  /** Dev-only isolate modes (debug only; no query params). */
+  const readGdMode = () => {
+    if (!gdDebug || typeof window === "undefined") return "";
+    try {
+      return String(window.localStorage?.getItem("ov2_gd_mode") || "").trim();
+    } catch {
+      return "";
+    }
+  };
+
+  /**
+   * Mirrors/unmirrors a public state the same way server does (involutive).
+   * Debug-only diagnostic: allows rendering raw world when seat 1 snapshot is mirrored.
+   * @param {Record<string, any>} pub
+   * @param {number} aw
+   */
+  const gdMirrorPublicState = (pub, aw) => {
+    const out = { ...pub };
+    const flipX = o => {
+      if (!o || typeof o !== "object") return o;
+      const x = Number(o.x);
+      const vx = Number(o.vx);
+      const face = Number(o.face);
+      const r = "r" in o ? Number(o.r) : undefined;
+      const base = { ...o };
+      if (Number.isFinite(x)) base.x = aw - x;
+      if (Number.isFinite(vx)) base.vx = -vx;
+      if (Number.isFinite(face)) base.face = -face;
+      if (r !== undefined && Number.isFinite(r) && Number.isFinite(x)) base.x = aw - x; // keep r untouched
+      return base;
+    };
+    out.ball = flipX(out.ball);
+    out.p0 = flipX(out.p0);
+    out.p1 = flipX(out.p1);
+    return out;
+  };
+
+  const drawGdDebugOverlay = (ctx, W, H, lines) => {
+    if (!lines || lines.length === 0) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 0.92;
+    const pad = 8;
+    const lh = 14;
+    const boxW = Math.min(W - 10, 520);
+    const boxH = Math.min(H - 10, pad * 2 + lh * (lines.length + 1));
+    ctx.fillStyle = "rgba(0,0,0,0.62)";
+    ctx.fillRect(5, 5, boxW, boxH);
+    ctx.globalAlpha = 1;
+    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace";
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    let y = 5 + pad + lh;
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], 5 + pad, y);
+      y += lh;
+    }
+    ctx.restore();
+  };
 
   const [rematchBusy, setRematchBusy] = useState(false);
   const [startNextBusy, setStartNextBusy] = useState(false);
@@ -187,7 +253,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     kbdRef.current = { l: false, r: false, j: false, k: false };
     pointerPadMapRef.current.clear();
     const cur = inputRef.current;
-    cur.l = cur.r = cur.j = cur.k = false;
+    cur.l = cur.r = cur.j = cur.k = cur.jTap = cur.kTap = false;
     const ui = padUiRef.current;
     const keys = /** @type {const} */ (["l", "r", "j", "k"]);
     for (let i = 0; i < keys.length; i++) {
@@ -236,10 +302,13 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   /** @param {"left"|"right"|"jump"|"kick"} key */
   const handlePointerDownPad = useCallback(
     (key, e) => {
-      if (e.button !== 0) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
       e.preventDefault();
       pointerPadMapRef.current.set(e.pointerId, key);
+      if (key === "jump") inputRef.current.jTap = true;
+      if (key === "kick") inputRef.current.kTap = true;
       const el = /** @type {HTMLButtonElement|null} */ (e.currentTarget);
+      el?.blur();
       try {
         if (el && typeof el.setPointerCapture === "function") el.setPointerCapture(e.pointerId);
       } catch {
@@ -301,6 +370,17 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
+  }, [resetPadInputAndVisuals]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const reset = () => resetPadInputAndVisuals();
+    window.addEventListener("blur", reset);
+    window.addEventListener("pagehide", reset);
+    return () => {
+      window.removeEventListener("blur", reset);
+      window.removeEventListener("pagehide", reset);
+    };
   }, [resetPadInputAndVisuals]);
 
   useEffect(() => {
@@ -417,9 +497,13 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       if (key === "arrowright" || key === "d") kbdRef.current.r = true;
       if (key === " " || key === "w" || key === "arrowup") {
         e.preventDefault();
+        if (!kbdRef.current.j) inputRef.current.jTap = true;
         kbdRef.current.j = true;
       }
-      if (key === "e" || key === "k") kbdRef.current.k = true;
+      if (key === "e" || key === "k") {
+        if (!kbdRef.current.k) inputRef.current.kTap = true;
+        kbdRef.current.k = true;
+      }
       computePadInput();
     };
     const up = e => {
@@ -593,7 +677,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     let raf = 0;
     const paint = () => {
       const live = vmRef.current;
-      const pub = live.public && typeof live.public === "object" ? live.public : {};
+      let pub = live.public && typeof live.public === "object" ? live.public : {};
       const aw = Number(pub.arena?.w ?? 800) || 800;
       const ah = Number(pub.arena?.h ?? 400) || 400;
       const gy = Number(pub.arena?.groundY ?? 360) || 360;
@@ -602,6 +686,13 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       const H = c.height;
       const sx = W / aw;
       const sy = H / ah;
+
+      const gdMode = readGdMode();
+      const authOnlyRender = gdDebug && gdMode === "authOnly";
+      const debugUnmirror = gdDebug && gdMode === "unmirror" && (mySeat === 1 || mySeat === "1");
+      if (debugUnmirror) {
+        pub = gdMirrorPublicState(/** @type {any} */ (pub), aw);
+      }
 
       const p0Auth = pub.p0 && typeof pub.p0 === "object" ? pub.p0 : {};
       const p1Auth = pub.p1 && typeof pub.p1 === "object" ? pub.p1 : {};
@@ -626,7 +717,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       let bx;
       let by;
       let br;
-      if (!isUiPreview && (mySeat === 0 || mySeat === 1)) {
+      if (!authOnlyRender && !isUiPreview && (mySeat === 0 || mySeat === 1)) {
         if (!presentationRef.current) presentationRef.current = gdCreatePresentationState();
         gdAdvancePresentation(presentationRef.current, pub, inp, mySeat, dtSec, {
           sessionId: String(live.sessionId ?? ""),
@@ -784,6 +875,37 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
       drawGoalDuelKickImpacts(ctx, kickFlashesRef.current, nowMs, sx, sy);
       ctx.restore();
+
+      if (gdDebug) {
+        const scr = { l: Boolean(inp.l), r: Boolean(inp.r), j: Boolean(inp.j), k: Boolean(inp.k) };
+        const world = gdDebugStats?.lastSend;
+        const authLocalKey = mySeat === 0 ? "p0" : "p1";
+        const authLocal = authLocalKey === "p0" ? p0Auth : p1Auth;
+        const ax = Number(authLocal.x ?? NaN);
+        const ay = Number(authLocal.y ?? NaN);
+        const dx = Number.isFinite(ax) ? ax - (mySeat === 0 ? p0x : p1x) : NaN;
+        const dy = Number.isFinite(ay) ? ay - (mySeat === 0 ? p0y : p1y) : NaN;
+        const dist = Number.isFinite(dx) && Number.isFinite(dy) ? Math.hypot(dx, dy) : NaN;
+
+        const lines = [
+          `GD_DEBUG mode=${gdMode || "presentation"} seat=${String(mySeat)} rev=${String(live.revision ?? "")}`,
+          `screen intent: L=${scr.l} R=${scr.r} J=${scr.j} K=${scr.k}  jTap=${Boolean(inp.jTap)} kTap=${Boolean(inp.kTap)}`,
+          `world(send): ${world ? `L=${world.l} R=${world.r} J=${world.j} K=${world.k}` : "(no send yet)"}`,
+          `timing: lastSend=${Math.round(Number(gdDebugStats?.lastStepSendMs || 0))}ms lastRecv=${Math.round(
+            Number(gdDebugStats?.lastSnapshotReceiveMs || 0)
+          )}ms`,
+          `local authΔ: dx=${Number.isFinite(dx) ? dx.toFixed(1) : "?"} dy=${Number.isFinite(dy) ? dy.toFixed(1) : "?"} dist=${
+            Number.isFinite(dist) ? dist.toFixed(1) : "?"
+          }`,
+          `auth p0=(${Number(p0Auth.x ?? 0).toFixed(1)},${Number(p0Auth.y ?? 0).toFixed(1)}) p1=(${Number(p1Auth.x ?? 0).toFixed(
+            1
+          )},${Number(p1Auth.y ?? 0).toFixed(1)}) ball=(${Number(ballAuth.x ?? 0).toFixed(1)},${Number(ballAuth.y ?? 0).toFixed(1)})`,
+          `pres p0=(${p0x.toFixed(1)},${p0y.toFixed(1)}) p1=(${p1x.toFixed(1)},${p1y.toFixed(1)}) ball=(${bx.toFixed(1)},${by.toFixed(
+            1
+          )})`,
+        ];
+        drawGdDebugOverlay(ctx, W, H, lines);
+      }
 
       motionPrevRef.current = { p0x, p0y, p1x, p1y, bx, by, t: nowMs };
       raf = window.requestAnimationFrame(paint);
@@ -998,7 +1120,6 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 onPointerDown={e => handlePointerDownPad("left", e)}
                 onPointerUp={handlePointerEndPad}
                 onPointerCancel={handlePointerEndPad}
-                onPointerLeave={handlePointerEndPad}
                 onLostPointerCapture={handleLostPointerCapturePad}
               >
                 <span
@@ -1022,7 +1143,6 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 onPointerDown={e => handlePointerDownPad("jump", e)}
                 onPointerUp={handlePointerEndPad}
                 onPointerCancel={handlePointerEndPad}
-                onPointerLeave={handlePointerEndPad}
                 onLostPointerCapture={handleLostPointerCapturePad}
               >
                 <span
@@ -1048,7 +1168,6 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 onPointerDown={e => handlePointerDownPad("kick", e)}
                 onPointerUp={handlePointerEndPad}
                 onPointerCancel={handlePointerEndPad}
-                onPointerLeave={handlePointerEndPad}
                 onLostPointerCapture={handleLostPointerCapturePad}
               >
                 <span
@@ -1074,7 +1193,6 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 onPointerDown={e => handlePointerDownPad("right", e)}
                 onPointerUp={handlePointerEndPad}
                 onPointerCancel={handlePointerEndPad}
-                onPointerLeave={handlePointerEndPad}
                 onLostPointerCapture={handleLostPointerCapturePad}
               >
                 <span
