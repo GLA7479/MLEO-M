@@ -159,8 +159,8 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     window.localStorage?.getItem("ov2_gd_debug") === "1";
 
   /** Dev-only isolate modes (debug only; no query params). */
-  const readGdMode = () => {
-    if (!gdDebug || typeof window === "undefined") return "";
+  const readGdMode = debugEnabled => {
+    if (!debugEnabled || typeof window === "undefined") return "";
     try {
       return String(window.localStorage?.getItem("ov2_gd_mode") || "").trim();
     } catch {
@@ -687,9 +687,14 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       const sx = W / aw;
       const sy = H / ah;
 
-      const gdMode = readGdMode();
-      const authOnlyRender = gdDebug && gdMode === "authOnly";
-      const debugUnmirror = gdDebug && gdMode === "unmirror" && (mySeat === 1 || mySeat === "1");
+      const debugEnabled =
+        typeof process !== "undefined" &&
+        process.env.NODE_ENV === "development" &&
+        typeof window !== "undefined" &&
+        window.localStorage?.getItem("ov2_gd_debug") === "1";
+      const gdMode = readGdMode(debugEnabled);
+      const authOnlyRender = debugEnabled && gdMode === "authOnly";
+      const debugUnmirror = debugEnabled && gdMode === "unmirror" && (mySeat === 1 || mySeat === "1");
       if (debugUnmirror) {
         pub = gdMirrorPublicState(/** @type {any} */ (pub), aw);
       }
@@ -876,7 +881,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       drawGoalDuelKickImpacts(ctx, kickFlashesRef.current, nowMs, sx, sy);
       ctx.restore();
 
-      if (gdDebug) {
+      if (debugEnabled) {
         const scr = { l: Boolean(inp.l), r: Boolean(inp.r), j: Boolean(inp.j), k: Boolean(inp.k) };
         const world = gdDebugStats?.lastSend;
         const authLocalKey = mySeat === 0 ? "p0" : "p1";

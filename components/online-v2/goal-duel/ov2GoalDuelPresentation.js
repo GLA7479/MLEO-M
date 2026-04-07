@@ -23,6 +23,9 @@ const LOCAL_DEAD_ZONE = 4;
 const LOCAL_CORRECT_RATE = 4.2;
 /** Caps blend factor for one correction tick (fresh auth). */
 const LOCAL_CORRECT_MAX_STEP = 0.28;
+/** While steering, allow limited x-correction if drift is large (prevents long-lived lead). */
+const LOCAL_STEER_DRIFT_X = 26;
+const LOCAL_STEER_X_CORRECT_SCALE = 0.22;
 /** Remote player smoothing (higher = snappier follow of snapshots). */
 const REMOTE_SMOOTH_RATE = 14;
 
@@ -200,9 +203,14 @@ function softCorrectLocalPlayer(p, auth, dt, opts) {
    * Production rule: while the player is actively controlling an axis, do not apply soft correction that can
    * feel like opposing force. Authority will still be enforced via: (a) snap on large desync, (b) settle when neutral.
    */
-  const hx = opts.steerX ? 0 : 1;
+  let hx = 1;
+  if (opts.steerX) {
+    // Default: no opposing pull while steering.
+    // Safety valve: if x-drift grows large, apply a small catch-up so drift cannot accumulate to ~60px.
+    hx = Math.abs(dx) >= LOCAL_STEER_DRIFT_X ? LOCAL_STEER_X_CORRECT_SCALE : 0;
+  }
   const hy = opts.jumpHeld ? 0 : 1;
-  if (hx !== 0) p.x += dx * t;
+  if (hx !== 0) p.x += dx * t * hx;
   if (hy !== 0) p.y += dy * t;
 }
 
@@ -347,7 +355,36 @@ export function gdAdvancePresentation(st, authPub, inp, mySeat, dtSec, meta) {
     !Number.isFinite(st.lastAuthRevisionFrame) || authRevision !== st.lastAuthRevisionFrame;
   st.lastAuthRevisionFrame = authRevision;
 
+  // Temporary dev-only debug output for diagnosis (Goal Duel only).
+  // Note: prints only when enabled and when error is noticeable, throttled.
+  const dbgOn =
+    typeof process !== "undefined" &&
+    process.env.NODE_ENV === "development" &&
+    typeof window !== "undefined" &&
+    window.localStorage?.getItem("ov2_gd_debug") === "1";
+
   stepPlayerPhysics(local, sin, dt, arena);
+  if (dbgOn) {
+    const dx = authLocal.x - local.x;
+    const dy = authLocal.y - local.y;
+    const dist = Math.hypot(dx, dy);
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const last = Number(st.__dbgLastMs ?? 0);
+    if ((dist >= 18 || Math.abs(dx) >= 18) && now - last > 160) {
+      st.__dbgLastMs = now;
+      // eslint-disable-next-line no-console
+      console.info("[ov2/gd][pres]", {
+        rev: authRevision,
+        freshAuth,
+        steerX: sin.l !== sin.r,
+        jumpHeld: Boolean(sin.j),
+        auth: { x: authLocal.x, vx: authLocal.vx },
+        pres: { x: local.x, vx: local.vx },
+        dx,
+        dist,
+      });
+    }
+  }
   softCorrectLocalPlayer(local, authLocal, dt, {
     freshAuth,
     steerX: sin.l !== sin.r,

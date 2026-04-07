@@ -172,6 +172,45 @@ export function useOv2GoalDuelSession(baseContext) {
   );
   gdDebugRef.current.enabled = Boolean(gdDebug);
 
+  /**
+   * Apply a snapshot only if it is not stale/out-of-order.
+   * Goal: prevent backward micro-snaps caused by older revisions arriving late from different sources.
+   *
+   * Rules:
+   * - If we already have a sessionId, only accept matching sessionId.
+   * - Drop strictly older revisions (incoming < current).
+   * - Allow equal revision (idempotent) and newer revision.
+   *
+   * @param {"initial_fetch"|"realtime_recv"|"step_response"|"mismatch_recovery_fetch"|"mark_match_events"} source
+   * @param {any} nextSnap
+   */
+  const applySnapIfNewer = useCallback((source, nextSnap) => {
+    if (!nextSnap) return;
+    setSnap(prev => {
+      const cur = prev && typeof prev === "object" ? prev : null;
+      const curSid = cur?.sessionId != null ? String(cur.sessionId) : "";
+      const nextSid = nextSnap?.sessionId != null ? String(nextSnap.sessionId) : "";
+      const curRev = cur?.revision != null ? Number(cur.revision) : -Infinity;
+      const nextRev = nextSnap?.revision != null ? Number(nextSnap.revision) : -Infinity;
+
+      if (curSid && nextSid && nextSid !== curSid) {
+        if (gdDebugRef.current.enabled) {
+          // eslint-disable-next-line no-console
+          console.info("[ov2/gd][drop-snap]", { source, reason: "session_mismatch", curSid, nextSid, curRev, nextRev });
+        }
+        return prev;
+      }
+      if (Number.isFinite(curRev) && Number.isFinite(nextRev) && nextRev < curRev) {
+        if (gdDebugRef.current.enabled) {
+          // eslint-disable-next-line no-console
+          console.info("[ov2/gd][drop-snap]", { source, reason: "older_revision", curSid, nextSid, curRev, nextRev });
+        }
+        return prev;
+      }
+      return nextSnap;
+    });
+  }, []);
+
   useEffect(() => {
     if (!snap || String(snap.phase || "").toLowerCase() !== "playing") {
       const c = inputRef.current;
@@ -205,13 +244,13 @@ export function useOv2GoalDuelSession(baseContext) {
     let cancelled = false;
     void (async () => {
       const s = await fetchOv2GoalDuelSnapshot(roomId, { participantKey: selfKey ?? "" });
-      if (!cancelled) setSnap(s ?? null);
+      if (!cancelled) applySnapIfNewer("initial_fetch", s ?? null);
     })();
     const unsub = subscribeOv2GoalDuelSnapshot(roomId, {
       participantKey: selfKey ?? "",
       onSnapshot: s => {
         if (cancelled) return;
-        if (gdDebug) {
+        if (gdDebugRef.current.enabled) {
           const now = typeof performance !== "undefined" ? performance.now() : Date.now();
           const pub = s.public && typeof s.public === "object" ? s.public : {};
           const p0 = pub.p0 && typeof pub.p0 === "object" ? pub.p0 : {};
@@ -238,7 +277,7 @@ export function useOv2GoalDuelSession(baseContext) {
             b: [gdDebugRef.current.lastRecv.bx, gdDebugRef.current.lastRecv.by],
           });
         }
-        setSnap(s);
+        applySnapIfNewer("realtime_recv", s);
       },
     });
     return () => {
@@ -299,7 +338,7 @@ export function useOv2GoalDuelSession(baseContext) {
         const r = await requestOv2GoalDuelMarkMatchEvents(roomId, selfKey, {
           revision: cur.revision,
         });
-        if (r.ok && r.snapshot) setSnap(r.snapshot);
+        if (r.ok && r.snapshot) applySnapIfNewer("mark_match_events", r.snapshot);
         const sn = r.snapshot && typeof r.snapshot === "object" ? r.snapshot : null;
         const revAfter = sn?.revision != null ? Number(sn.revision) : NaN;
         const phaseAfter = sn ? String(sn.phase || "").toLowerCase() : "";
@@ -359,9 +398,10 @@ export function useOv2GoalDuelSession(baseContext) {
       const sendR = liveSeat === 1 ? i.l : i.r;
       const sendJ = Boolean(i.j || i.jTap);
       const sendK = Boolean(i.k || i.kTap);
+      const rawBeforeClear = { l: i.l, r: i.r, j: i.j, k: i.k, jTap: i.jTap, kTap: i.kTap };
       i.jTap = false;
       i.kTap = false;
-      if (gdDebug) {
+      if (gdDebugRef.current.enabled) {
         const now = typeof performance !== "undefined" ? performance.now() : Date.now();
         gdDebugRef.current.lastStepSendMs = now;
         gdDebugRef.current.lastSend = { l: Boolean(sendL), r: Boolean(sendR), j: Boolean(sendJ), k: Boolean(sendK) };
@@ -370,17 +410,17 @@ export function useOv2GoalDuelSession(baseContext) {
           seat: liveSeat,
           rev: snapRef.current?.revision,
           send: gdDebugRef.current.lastSend,
-          raw: { l: i.l, r: i.r, j: i.j, k: i.k, jTap: i.jTap, kTap: i.kTap },
+          raw: rawBeforeClear,
         });
       }
       void (async () => {
         const resp = await requestOv2GoalDuelStep(roomId, selfKey, sendL, sendR, sendJ, sendK, {
           revision: snapRef.current?.revision,
         });
-        if (resp.ok && resp.snapshot) setSnap(resp.snapshot);
+        if (resp.ok && resp.snapshot) applySnapIfNewer("step_response", resp.snapshot);
         else if (!resp.ok && resp.code === "REVISION_MISMATCH" && roomId && selfKey) {
           const fresh = await fetchOv2GoalDuelSnapshot(roomId, { participantKey: selfKey });
-          if (fresh) setSnap(fresh);
+          if (fresh) applySnapIfNewer("mismatch_recovery_fetch", fresh);
         }
       })();
     };

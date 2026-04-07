@@ -3,6 +3,14 @@
 This document is the **Phase 1 + Phase 2** deliverable.
 It must be updated **only** after reproducing issues using the debug overlay + logs (enabled via `localStorage.ov2_gd_debug=1`).
 
+## Important: this branch is not a clean baseline
+
+All evidence collected here is from the `gd-debug-audit` branch, which already contains prior stabilization/presentation work.
+Treat this as an **instrumented investigation branch**, not a pristine baseline.
+
+**Do not conclude root cause from this branch alone.**
+Use it to capture evidence and isolate likely layers; final conclusions should be cross-checked against a clean baseline branch or a tagged known-good commit.
+
 ## Debug enablement (dev only)
 
 - **Flag**: `localStorage.setItem("ov2_gd_debug","1")`
@@ -10,6 +18,16 @@ It must be updated **only** after reproducing issues using the debug overlay + l
 - **Isolate mode (optional, debug only)**: `localStorage.setItem("ov2_gd_mode", "<mode>")`
   - supported: `authOnly`, `unmirror` (seat-1 snapshot unmirrored locally for diagnostics)
   - clear: `localStorage.removeItem("ov2_gd_mode")`
+
+## Overlay/logs not visible — verified causes
+
+If `ov2_gd_debug=1` but you still see no overlay/logs, check:
+
+1. **Not in dev build**: overlay/logs are gated by `NODE_ENV===development` (prod build will never show them).
+2. **Not in `playing` phase**: the canvas `paint()` loop (and overlay) runs only while the game is actively playing.
+3. **Stale closure** (fixed on `gd-debug-audit`): the overlay/log toggles must be re-checked at runtime, not only at mount.
+   - The screen now reads `localStorage.ov2_gd_debug` inside the paint loop each frame.
+   - The session hook now uses `gdDebugRef.current.enabled` inside send/recv handlers.
 
 ## What the instrumentation shows
 
@@ -99,4 +117,7 @@ For each case, state: **bug persists? yes/no**, and paste evidence.
 2. seat 1 baseline: TBD
 3. seat 1 authOnly (`ov2_gd_mode=authOnly`): TBD
 4. seat 1 unmirror (`ov2_gd_mode=unmirror`): TBD
+
+> Interpretation rule: if a symptom persists in `authOnly`, presentation/reconciliation becomes **less likely** as the *primary* cause,
+> but it is **not ruled out** (other presentation-linked systems like mirroring or input/send translation can still influence what you see).
 
