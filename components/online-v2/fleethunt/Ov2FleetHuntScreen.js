@@ -986,17 +986,19 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
             </section>
             </div>
             <div
-              className="pointer-events-none absolute right-1.5 top-1.5 z-20 flex min-h-[2.75rem] min-w-[6.25rem] flex-col items-end justify-start rounded-md border border-white/[0.12] bg-zinc-950/92 px-2 py-1.5 text-[9px] shadow-[0_2px_12px_rgba(0,0,0,0.45)] backdrop-blur-[2px] sm:right-2 sm:top-2 sm:text-[10px]"
+              className="pointer-events-none absolute right-1 top-1 z-20 flex min-w-[3.25rem] flex-col items-center gap-1 rounded border border-white/[0.12] bg-zinc-950/92 px-1.5 py-0.5 text-[8px] shadow-[0_1px_8px_rgba(0,0,0,0.4)] backdrop-blur-[2px] sm:right-1.5 sm:top-1.5 sm:min-w-[3.5rem] sm:text-[9px]"
               aria-live="polite"
             >
               <span
                 className={
-                  vm.turnSeat === mySeat ? "font-semibold leading-tight text-emerald-200/95" : "font-medium leading-tight text-zinc-400"
+                  vm.turnSeat === mySeat
+                    ? "w-full text-center font-semibold uppercase leading-none tracking-wide text-emerald-200/95"
+                    : "w-full text-center font-medium uppercase leading-none tracking-wide text-zinc-400"
                 }
               >
-                {vm.turnSeat === mySeat ? "Your turn" : "Opponent turn"}
+                {vm.turnSeat === mySeat ? "YOU TURN" : "OPP TURN"}
               </span>
-              <span className="min-h-[1rem] text-right tabular-nums text-amber-200/90">
+              <span className="w-full text-center tabular-nums text-[12px] font-semibold leading-none text-amber-200/90 sm:text-[14px]">
                 {vm.turnTimeLeftSec != null ? `${vm.turnTimeLeftSec}s` : <span className="invisible">00s</span>}
               </span>
             </div>
