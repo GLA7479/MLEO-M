@@ -711,15 +711,15 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
             <button
               type="button"
               className={[
-                "ml-auto min-h-[22px] min-w-[7.5rem] shrink-0 rounded-md border px-2 py-1 text-[9px] font-semibold transition-opacity sm:text-[10px]",
+                "ml-auto min-h-[20px] min-w-[3.75rem] shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold transition-opacity sm:min-h-[22px] sm:min-w-[4rem] sm:px-2 sm:py-1 sm:text-[10px]",
                 canOfferDouble && !busy
-                  ? "cursor-pointer border-zinc-500/28 bg-gradient-to-b from-zinc-800/55 to-zinc-950 text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
-                  : "cursor-not-allowed border-zinc-700/25 bg-zinc-950/65 text-zinc-500 opacity-55",
+                  ? "cursor-pointer border-emerald-500/35 bg-gradient-to-b from-emerald-800/55 to-emerald-950 text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] hover:from-emerald-700/50 hover:to-emerald-950"
+                  : "cursor-not-allowed border-emerald-800/20 bg-emerald-950/40 text-emerald-600/55 opacity-80",
               ].join(" ")}
               disabled={!canOfferDouble || busy}
               onClick={() => void offerDouble()}
             >
-              {I.double} Offer double
+              Double
             </button>
           </div>
 
@@ -902,24 +902,37 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
             </div>
           </div>
 
-          <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5 rounded-lg border border-white/[0.06] bg-zinc-950/35 px-1.5 py-1 text-[9px] text-zinc-500 sm:text-[10px]">
-            <span className="font-semibold text-zinc-500">Enemy sunk</span>
-            <div className="flex flex-wrap gap-1">
-              {FH_SHIP_LENGTHS.map((len, i) => (
-                <span
-                  key={`sunk-${len}-${i}`}
-                  className={[
-                    "inline-flex min-w-[1.5rem] items-center justify-center rounded border px-1 py-0.5 tabular-nums",
-                    i < sunkEnemyCount
-                      ? "border-rose-500/35 bg-rose-950/35 text-rose-100/90 line-through opacity-80"
-                      : "border-zinc-600/40 bg-zinc-900/50 text-zinc-400",
-                  ].join(" ")}
-                  title="Classes you have sunk (order may vary)"
-                >
-                  {len}
-                </span>
-              ))}
+          <div className="flex flex-shrink-0 flex-col gap-1 rounded-lg border border-white/[0.06] bg-zinc-950/35 px-1.5 py-1 text-[9px] text-zinc-500 sm:text-[10px]">
+            <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1.5">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                <span className="font-semibold text-zinc-500">Enemy sunk</span>
+                <div className="flex flex-wrap gap-1">
+                  {FH_SHIP_LENGTHS.map((len, i) => (
+                    <span
+                      key={`sunk-${len}-${i}`}
+                      className={[
+                        "inline-flex min-w-[1.5rem] items-center justify-center rounded border px-1 py-0.5 tabular-nums",
+                        i < sunkEnemyCount
+                          ? "border-rose-500/35 bg-rose-950/35 text-rose-100/90 line-through opacity-80"
+                          : "border-zinc-600/40 bg-zinc-900/50 text-zinc-400",
+                      ].join(" ")}
+                      title="Classes you have sunk (order may vary)"
+                    >
+                      {len}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="ml-auto shrink-0 rounded-md border border-rose-500/40 bg-gradient-to-b from-rose-900/65 to-red-950 px-2 py-1 text-[9px] font-semibold text-rose-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition hover:from-rose-800/55 hover:to-red-950 disabled:cursor-not-allowed disabled:border-rose-900/30 disabled:from-rose-950/40 disabled:to-red-950/50 disabled:text-rose-400/55 disabled:opacity-55 sm:text-[10px]"
+                disabled={exitBusy}
+                onClick={() => void onExitToLobby()}
+              >
+                {exitBusy ? "Leaving…" : "Leave table"}
+              </button>
             </div>
+            {exitErr ? <p className="text-[10px] leading-snug text-red-300/90">{exitErr}</p> : null}
           </div>
         </div>
       ) : null}
