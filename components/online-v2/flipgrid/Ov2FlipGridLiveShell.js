@@ -349,8 +349,9 @@ export default function Ov2FlipGridLiveShell() {
       },
       onLeaveToLobby: onLeaveTable,
       leaveToLobbyBusy: leaveBusy,
+      leaveToLobbyError: leaveErr,
     };
-  }, [roomId, room, members, participantId, selfDisplayName, onLeaveTable, leaveBusy]);
+  }, [roomId, room, members, participantId, selfDisplayName, onLeaveTable, leaveBusy, leaveErr]);
 
   if (!roomId) {
     return (
