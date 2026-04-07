@@ -644,7 +644,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
       ) : null}
 
       {vm.phase === "placement" && mySeat != null ? (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col space-y-1.5 overflow-hidden rounded-xl border border-white/[0.06] bg-zinc-950/50 p-1.5 max-sm:py-1.5 sm:space-y-2 sm:p-3">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-x-hidden overflow-y-auto rounded-xl border border-white/[0.06] bg-zinc-950/50 p-1.5 max-sm:py-1.5 sm:gap-2 sm:p-3">
           <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[10px] text-zinc-300 sm:text-[11px]">
             <span className="font-medium">
               {I.fleet} Placement — {myLocked ? `${I.lock} Locked` : "Arrange your fleet"}
@@ -690,22 +690,24 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
                   ))
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="mb-1 flex flex-shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 sm:mb-1.5">
                 <span className="w-full text-[10px] text-zinc-500 sm:w-auto">{I.target} Orientation:</span>
-                <button
-                  type="button"
-                  className={BTN_SECONDARY + (orientationH ? " shadow-[inset_0_0_0_2px_rgba(56,189,248,0.35)]" : "")}
-                  onClick={() => setOrientationH(true)}
-                >
-                  ↔ Horizontal
-                </button>
-                <button
-                  type="button"
-                  className={BTN_SECONDARY + (!orientationH ? " shadow-[inset_0_0_0_2px_rgba(56,189,248,0.35)]" : "")}
-                  onClick={() => setOrientationH(false)}
-                >
-                  ↕ Vertical
-                </button>
+                <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:w-auto sm:gap-2">
+                  <button
+                    type="button"
+                    className={BTN_SECONDARY + (orientationH ? " shadow-[inset_0_0_0_2px_rgba(56,189,248,0.35)]" : "")}
+                    onClick={() => setOrientationH(true)}
+                  >
+                    ↔ Horizontal
+                  </button>
+                  <button
+                    type="button"
+                    className={BTN_SECONDARY + (!orientationH ? " shadow-[inset_0_0_0_2px_rgba(56,189,248,0.35)]" : "")}
+                    onClick={() => setOrientationH(false)}
+                  >
+                    ↕ Vertical
+                  </button>
+                </div>
               </div>
             </>
           ) : null}
@@ -720,10 +722,10 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
             })}
           </div>
           {!myLocked ? (
-            <div className="flex flex-shrink-0 flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:gap-2">
+            <div className="grid w-full min-w-0 shrink-0 grid-cols-6 gap-x-1.5 gap-y-2 pt-1 sm:gap-x-2 sm:gap-y-2 sm:pt-1.5">
               <button
                 type="button"
-                className={BTN_SECONDARY}
+                className={`col-span-2 ${BTN_SECONDARY} w-full min-w-0 px-2 !text-xs leading-tight sm:!text-sm`}
                 disabled={busy || draftShips.length === 0}
                 onClick={() => setDraftShips(prev => prev.slice(0, -1))}
               >
@@ -731,24 +733,34 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               </button>
               <button
                 type="button"
-                className={BTN_SECONDARY}
+                className={`col-span-2 ${BTN_SECONDARY} w-full min-w-0 px-2 !text-xs leading-tight sm:!text-sm`}
                 disabled={busy || draftShips.length === 0}
                 onClick={() => setDraftShips([])}
               >
                 Clear
               </button>
-              <button type="button" className={BTN_SECONDARY} disabled={busy} onClick={() => void randomPlacement()}>
+              <button
+                type="button"
+                className={`col-span-2 ${BTN_SECONDARY} w-full min-w-0 px-2 !text-xs leading-tight sm:!text-sm`}
+                disabled={busy}
+                onClick={() => void randomPlacement()}
+              >
                 Random
               </button>
               <button
                 type="button"
-                className={BTN_PRIMARY}
+                className={`col-span-2 col-start-2 ${BTN_PRIMARY} w-full min-w-0 px-2 !text-xs leading-tight sm:!text-sm`}
                 disabled={saveDisabled}
                 onClick={() => void submitPlacement(draftShips)}
               >
                 Save layout
               </button>
-              <button type="button" className={BTN_PRIMARY} disabled={lockDisabled} onClick={() => void lockPlacement()}>
+              <button
+                type="button"
+                className={`col-span-2 col-start-4 ${BTN_PRIMARY} w-full min-w-0 px-2 !text-xs leading-tight sm:!text-sm`}
+                disabled={lockDisabled}
+                onClick={() => void lockPlacement()}
+              >
                 Lock in
               </button>
             </div>
