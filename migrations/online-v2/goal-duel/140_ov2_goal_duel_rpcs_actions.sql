@@ -151,6 +151,155 @@ BEGIN
 END;
 $$;
 
+-- Replaces 139: after match_end_ms, finalize via ov2_goal_duel_mark_match_events (same timer winner/draw logic); no sim/score.
+CREATE OR REPLACE FUNCTION public.ov2_goal_duel_step(
+  p_room_id uuid,
+  p_participant_key text,
+  p_l boolean,
+  p_r boolean,
+  p_j boolean,
+  p_k boolean,
+  p_expected_revision bigint DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_room public.ov2_rooms%ROWTYPE;
+  v_pk text := trim(coalesce(p_participant_key, ''));
+  v_sess public.ov2_goal_duel_sessions%ROWTYPE;
+  v_seat int;
+  v_now bigint;
+  v_ps jsonb;
+  v_pub jsonb;
+  v_in0 jsonb;
+  v_in1 jsonb;
+  v_last bigint;
+  v_dt int;
+  v_out jsonb;
+  v_new_pub jsonb;
+  v_k0 bigint;
+  v_k1 bigint;
+  v_goal int;
+  v_s0 int;
+  v_s1 int;
+  v_mend bigint;
+BEGIN
+  IF p_room_id IS NULL OR length(v_pk) = 0 THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'Invalid arguments');
+  END IF;
+  SELECT * INTO v_room FROM public.ov2_rooms WHERE id = p_room_id FOR UPDATE;
+  IF NOT FOUND OR v_room.product_game_id IS DISTINCT FROM 'ov2_goal_duel' OR v_room.active_session_id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'ROOM_NOT_FOUND', 'message', 'Room not found');
+  END IF;
+  SELECT * INTO v_sess FROM public.ov2_goal_duel_sessions WHERE id = v_room.active_session_id FOR UPDATE;
+  IF NOT FOUND OR v_sess.phase IS DISTINCT FROM 'playing' THEN
+    RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_goal_duel_build_client_snapshot(v_sess, v_pk));
+  END IF;
+  IF p_expected_revision IS NOT NULL AND v_sess.revision IS DISTINCT FROM p_expected_revision THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'REVISION_MISMATCH', 'revision', v_sess.revision);
+  END IF;
+  SELECT seat_index INTO v_seat FROM public.ov2_goal_duel_seats WHERE session_id = v_sess.id AND participant_key = v_pk;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'NO_SEAT', 'message', 'No seat');
+  END IF;
+
+  v_now := (extract(epoch from clock_timestamp()) * 1000)::bigint;
+  v_ps := coalesce(v_sess.parity_state, '{}'::jsonb);
+  v_pub := coalesce(v_sess.public_state, '{}'::jsonb);
+
+  IF v_seat = 0 THEN
+    v_ps := jsonb_set(
+      v_ps,
+      ARRAY['pending_inputs', '0'],
+      jsonb_build_object('l', p_l, 'r', p_r, 'j', p_j, 'k', p_k),
+      true
+    );
+    v_ps := jsonb_set(v_ps, '{last_action_ms_0}', to_jsonb(v_now), true);
+  ELSE
+    v_ps := jsonb_set(
+      v_ps,
+      ARRAY['pending_inputs', '1'],
+      jsonb_build_object('l', p_l, 'r', p_r, 'j', p_j, 'k', p_k),
+      true
+    );
+    v_ps := jsonb_set(v_ps, '{last_action_ms_1}', to_jsonb(v_now), true);
+  END IF;
+
+  BEGIN
+    v_mend := (v_ps ->> 'match_end_ms')::bigint;
+  EXCEPTION
+    WHEN OTHERS THEN
+      v_mend := NULL;
+  END;
+  IF v_mend IS NOT NULL AND v_now >= v_mend THEN
+    UPDATE public.ov2_goal_duel_sessions
+    SET parity_state = v_ps, updated_at = now()
+    WHERE id = v_sess.id
+    RETURNING * INTO v_sess;
+    RETURN public.ov2_goal_duel_mark_match_events(p_room_id, p_participant_key, p_expected_revision);
+  END IF;
+
+  v_in0 := coalesce(v_ps -> 'pending_inputs' -> '0', '{}'::jsonb);
+  v_in1 := coalesce(v_ps -> 'pending_inputs' -> '1', '{}'::jsonb);
+  v_k0 := coalesce((v_ps ->> 'last_kick_ms_0')::bigint, 0);
+  v_k1 := coalesce((v_ps ->> 'last_kick_ms_1')::bigint, 0);
+
+  BEGIN
+    v_last := (v_ps ->> 'last_step_ms')::bigint;
+  EXCEPTION
+    WHEN invalid_text_representation THEN
+      v_last := v_now;
+  END;
+  v_dt := (v_now - v_last)::int;
+  IF v_dt < public.ov2_gd_min_step_interval_ms() THEN
+    UPDATE public.ov2_goal_duel_sessions
+    SET parity_state = v_ps, updated_at = now()
+    WHERE id = v_sess.id
+    RETURNING * INTO v_sess;
+    RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_goal_duel_build_client_snapshot(v_sess, v_pk));
+  END IF;
+  IF v_dt > 120 THEN
+    v_dt := 120;
+  END IF;
+
+  v_out := public.ov2_gd_sim_step(v_pub, v_ps, v_in0, v_in1, v_dt, v_now);
+  v_new_pub := v_out -> 'public_state';
+  v_k0 := coalesce((v_out -> 'kick_ms' ->> '0')::bigint, v_k0);
+  v_k1 := coalesce((v_out -> 'kick_ms' ->> '1')::bigint, v_k1);
+  v_ps := jsonb_set(v_ps, '{last_kick_ms_0}', to_jsonb(v_k0), true);
+  v_ps := jsonb_set(v_ps, '{last_kick_ms_1}', to_jsonb(v_k1), true);
+  v_ps := jsonb_set(v_ps, '{last_step_ms}', to_jsonb(v_now), true);
+
+  v_goal := public.ov2_gd_detect_goal_event(v_new_pub);
+  v_s0 := coalesce((v_ps ->> 'score0')::int, 0);
+  v_s1 := coalesce((v_ps ->> 'score1')::int, 0);
+  IF v_goal IS NOT NULL THEN
+    IF v_goal = 0 THEN
+      v_s0 := v_s0 + 1;
+    ELSE
+      v_s1 := v_s1 + 1;
+    END IF;
+    v_ps := jsonb_set(v_ps, '{score0}', to_jsonb(v_s0), true);
+    v_ps := jsonb_set(v_ps, '{score1}', to_jsonb(v_s1), true);
+    v_new_pub := public.ov2_gd_reset_after_goal(v_new_pub);
+  END IF;
+
+  UPDATE public.ov2_goal_duel_sessions
+  SET
+    public_state = v_new_pub,
+    parity_state = v_ps,
+    revision = v_sess.revision + 1,
+    updated_at = now()
+  WHERE id = v_sess.id
+  RETURNING * INTO v_sess;
+
+  RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_goal_duel_build_client_snapshot(v_sess, v_pk));
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.ov2_goal_duel_voluntary_forfeit(
   p_room_id uuid,
   p_participant_key text

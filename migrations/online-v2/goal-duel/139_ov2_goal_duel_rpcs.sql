@@ -354,6 +354,7 @@ DECLARE
   v_goal int;
   v_s0 int;
   v_s1 int;
+  v_mend bigint;
 BEGIN
   IF p_room_id IS NULL OR length(v_pk) = 0 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'Invalid arguments');
@@ -395,6 +396,21 @@ BEGIN
       true
     );
     v_ps := jsonb_set(v_ps, '{last_action_ms_1}', to_jsonb(v_now), true);
+  END IF;
+
+  -- Match clock: do not run simulation or goal detection after buzzer (movement-based scoring must stop).
+  BEGIN
+    v_mend := (v_ps ->> 'match_end_ms')::bigint;
+  EXCEPTION
+    WHEN OTHERS THEN
+      v_mend := NULL;
+  END;
+  IF v_mend IS NOT NULL AND v_now >= v_mend THEN
+    UPDATE public.ov2_goal_duel_sessions
+    SET parity_state = v_ps, updated_at = now()
+    WHERE id = v_sess.id
+    RETURNING * INTO v_sess;
+    RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_goal_duel_build_client_snapshot(v_sess, v_pk));
   END IF;
 
   v_in0 := coalesce(v_ps -> 'pending_inputs' -> '0', '{}'::jsonb);
