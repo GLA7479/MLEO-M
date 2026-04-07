@@ -60,24 +60,28 @@ function fourLineWinningIndicesFromLastMove(cells, row, col, seat) {
 }
 
 /**
- * @param {{ seat: null|0|1, hideDisc?: boolean, isWinning?: boolean, pulseWin?: boolean }} props
+ * @param {{ seat: null|0|1, hideDisc?: boolean, isWinning?: boolean }} props
  */
-function CellDisc({ seat, hideDisc = false, isWinning = false, pulseWin = false }) {
+function CellDisc({ seat, hideDisc = false, isWinning = false }) {
   const hole = (
     <div
-      className={`relative flex aspect-square w-full max-w-[3rem] items-center justify-center rounded-full sm:max-w-none ${
+      className={`relative flex aspect-square w-full max-w-[3.25rem] items-center justify-center rounded-full sm:max-w-none ${
         isWinning
-          ? "shadow-[inset_0_2px_6px_rgba(0,0,0,0.55),inset_0_-1px_0_rgba(255,255,255,0.06),0_0_0_2px_rgba(52,211,153,0.45)]"
-          : "shadow-[inset_0_3px_8px_rgba(0,0,0,0.65),inset_0_1px_0_rgba(255,255,255,0.05)]"
-      } ${pulseWin ? "animate-pulse" : ""}`}
-      style={{ background: "radial-gradient(ellipse at 50% 35%, rgba(39,39,42,0.55) 0%, rgba(9,9,11,0.92) 55%, rgba(0,0,0,0.45) 100%)" }}
+          ? "shadow-[inset_0_3px_10px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_rgba(52,211,153,0.38),0_0_12px_rgba(45,212,191,0.14)]"
+          : "shadow-[inset_0_3px_10px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1),inset_0_-2px_4px_rgba(0,0,0,0.35)]"
+      }`}
+      style={{
+        background: isWinning
+          ? "radial-gradient(ellipse at 50% 34%, rgba(55,55,62,0.75) 0%, rgba(22,22,26,0.97) 52%, rgba(8,8,10,0.92) 100%)"
+          : "radial-gradient(ellipse at 50% 32%, rgba(72,73,82,0.88) 0%, rgba(35,36,42,0.98) 45%, rgba(18,18,22,1) 100%)",
+      }}
     >
       {seat === 0 || seat === 1 ? (
         <div
-          className={`absolute inset-[10%] rounded-full border border-black/25 transition-opacity duration-75 ${
+          className={`absolute inset-[10%] rounded-full border transition-opacity duration-75 ${
             seat === 0
-              ? "bg-gradient-to-b from-sky-300/95 to-blue-700/95 shadow-[0_3px_8px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.22)]"
-              : "bg-gradient-to-b from-amber-200/95 to-yellow-600/95 shadow-[0_3px_8px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.2)]"
+              ? "border-sky-300/25 bg-gradient-to-b from-sky-100 to-blue-800 shadow-[0_2px_8px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.32),inset_0_-1px_0_rgba(15,23,42,0.45)]"
+              : "border-amber-300/22 bg-gradient-to-b from-amber-50 to-amber-700 shadow-[0_2px_8px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.3),inset_0_-1px_0_rgba(120,53,15,0.35)]"
           } ${hideDisc ? "opacity-0" : "opacity-100"}`}
         />
       ) : null}
@@ -90,13 +94,101 @@ function CellDisc({ seat, hideDisc = false, isWinning = false, pulseWin = false 
 function GhostOrMiniDisc({ seat, className = "" }) {
   const cls =
     seat === 0
-      ? "bg-gradient-to-b from-sky-300/90 to-blue-700/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]"
-      : "bg-gradient-to-b from-amber-200/90 to-yellow-600/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]";
+      ? "border-sky-400/35 bg-gradient-to-b from-sky-100/85 to-blue-800/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
+      : "border-amber-400/28 bg-gradient-to-b from-amber-50/85 to-amber-700/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)]";
   return (
     <div
-      className={`pointer-events-none aspect-square w-[42%] max-w-[1.65rem] rounded-full border border-black/20 opacity-75 ${cls} ${className}`}
+      className={`pointer-events-none aspect-square w-[42%] max-w-[1.65rem] rounded-full opacity-75 ${cls} ${className}`}
       aria-hidden
     />
+  );
+}
+
+/**
+ * @param {{
+ *   seat0Label: string,
+ *   seat1Label: string,
+ *   mySeat: null|0|1,
+ *   indicatorSeat: null|0|1,
+ *   phase: string,
+ *   mustRespondDouble: boolean,
+ * }} props
+ */
+function FourLinePlayerHeader({ seat0Label, seat1Label, mySeat, indicatorSeat, phase, mustRespondDouble }) {
+  const playing = phase === "playing";
+  const active0 = playing && indicatorSeat === 0;
+  const active1 = playing && indicatorSeat === 1;
+  return (
+    <div className="grid w-full grid-cols-2 gap-1.5 sm:gap-2">
+      <div
+        className={`min-w-0 rounded-lg border px-2 py-1.5 sm:px-2.5 sm:py-2 ${
+          active0
+            ? "border-sky-400/45 bg-gradient-to-br from-sky-950/55 to-zinc-900/90 shadow-[0_0_0_1px_rgba(56,189,248,0.2)]"
+            : "border-white/[0.1] bg-zinc-900/55"
+        }`}
+      >
+        <div className="flex items-center gap-1.5">
+          <span
+            className="h-6 w-6 shrink-0 rounded-full border border-sky-400/25 bg-gradient-to-b from-sky-200 to-blue-700 shadow-sm"
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-sky-200/95">Blue</span>
+              {mySeat === 0 ? (
+                <span className="rounded bg-sky-500/25 px-1 py-px text-[9px] font-semibold uppercase text-sky-100">You</span>
+              ) : mySeat === 1 ? (
+                <span className="rounded bg-zinc-700/50 px-1 py-px text-[9px] font-medium text-zinc-400">Foe</span>
+              ) : null}
+            </div>
+            <p className="truncate text-[11px] font-medium leading-tight text-zinc-100 sm:text-xs" title={seat0Label}>
+              {seat0Label}
+            </p>
+          </div>
+        </div>
+        <div className="mt-1 flex min-h-[1.125rem] items-end">
+          {active0 ? (
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-sky-300/95">
+              {mustRespondDouble ? "Respond" : "Turn"}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <div
+        className={`min-w-0 rounded-lg border px-2 py-1.5 sm:px-2.5 sm:py-2 ${
+          active1
+            ? "border-amber-400/45 bg-gradient-to-br from-amber-950/45 to-zinc-900/90 shadow-[0_0_0_1px_rgba(251,191,36,0.2)]"
+            : "border-white/[0.1] bg-zinc-900/55"
+        }`}
+      >
+        <div className="flex items-center gap-1.5">
+          <span
+            className="h-6 w-6 shrink-0 rounded-full border border-amber-400/25 bg-gradient-to-b from-amber-100 to-amber-700 shadow-sm"
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-amber-200/95">Gold</span>
+              {mySeat === 1 ? (
+                <span className="rounded bg-amber-500/25 px-1 py-px text-[9px] font-semibold uppercase text-amber-100">You</span>
+              ) : mySeat === 0 ? (
+                <span className="rounded bg-zinc-700/50 px-1 py-px text-[9px] font-medium text-zinc-400">Foe</span>
+              ) : null}
+            </div>
+            <p className="truncate text-[11px] font-medium leading-tight text-zinc-100 sm:text-xs" title={seat1Label}>
+              {seat1Label}
+            </p>
+          </div>
+        </div>
+        <div className="mt-1 flex min-h-[1.125rem] items-end">
+          {active1 ? (
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-amber-300/95">
+              {mustRespondDouble ? "Respond" : "Turn"}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -133,6 +225,20 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
   const roomId = room?.id != null ? String(room.id) : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
   const cells = useMemo(() => parseFourLineCells(vm.cells), [vm.cells]);
+
+  const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
+  const seatDisplayName = useMemo(() => {
+    /** @type {{ 0: string, 1: string }} */
+    const out = { 0: "", 1: "" };
+    for (const m of members) {
+      const si = m?.seat_index;
+      if (si !== 0 && si !== 1) continue;
+      out[si] = String(m?.display_name ?? "").trim();
+    }
+    return out;
+  }, [members]);
+  const seat0Label = seatDisplayName[0] ? seatDisplayName[0] : "Guest";
+  const seat1Label = seatDisplayName[1] ? seatDisplayName[1] : "Guest";
 
   useEffect(() => {
     setFinishModalDismissedSessionId("");
@@ -239,9 +345,6 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
   const showResultModal = finished && finishSessionId.length > 0 && !finishModalDismissed;
   const didIWin = vm.mySeat != null && vm.winnerSeat != null && vm.winnerSeat === vm.mySeat;
   const isDraw = finished && vm.winnerSeat == null;
-
-  const myColorLabel = vm.mySeat === 0 ? "Blue" : vm.mySeat === 1 ? "Gold" : "—";
-  const oppColorLabel = vm.mySeat === 0 ? "Gold" : vm.mySeat === 1 ? "Blue" : "—";
 
   const canPickColumn =
     vm.phase === "playing" &&
@@ -384,12 +487,12 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
   const turnBoardGlow =
     vm.phase === "playing" && !vm.mustRespondDouble && (indicatorSeat === 0 || indicatorSeat === 1)
       ? indicatorSeat === 0
-        ? "shadow-[0_0_0_2px_rgba(56,189,248,0.38),0_0_36px_rgba(56,189,248,0.14)]"
-        : "shadow-[0_0_0_2px_rgba(251,191,36,0.35),0_0_36px_rgba(245,158,11,0.12)]"
+        ? "shadow-[0_0_0_1px_rgba(56,189,248,0.28),0_0_22px_rgba(56,189,248,0.1)]"
+        : "shadow-[0_0_0_1px_rgba(251,191,36,0.26),0_0_22px_rgba(245,158,11,0.09)]"
       : vm.phase === "playing" && vm.mustRespondDouble && (indicatorSeat === 0 || indicatorSeat === 1)
         ? indicatorSeat === 0
-          ? "shadow-[0_0_0_2px_rgba(56,189,248,0.32),0_0_28px_rgba(56,189,248,0.1)]"
-          : "shadow-[0_0_0_2px_rgba(251,191,36,0.3),0_0_28px_rgba(245,158,11,0.09)]"
+          ? "shadow-[0_0_0_1px_rgba(56,189,248,0.22),0_0_18px_rgba(56,189,248,0.07)]"
+          : "shadow-[0_0_0_1px_rgba(251,191,36,0.2),0_0_18px_rgba(245,158,11,0.06)]"
         : "";
 
   const finishedActions = (
@@ -426,18 +529,20 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
     return { text: `−${at} chips`, className: "font-semibold tabular-nums text-rose-300/95" };
   }, [finished, vaultClaimBusy, vm.chipsPerSeatAtStake, vm.chipsPrizeTotal, isDraw, didIWin]);
 
+  const hasSession = Boolean(vm.sessionId && String(vm.sessionId).trim() !== "");
+
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col gap-1 overflow-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-1 sm:px-2 sm:pb-2">
-      <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
-        <div className="rounded-lg border border-white/[0.08] bg-zinc-950/50 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+    <div className="relative flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden bg-zinc-950 px-1 pb-1 sm:gap-1 sm:px-2 sm:pb-1.5">
+      <div className="flex shrink-0 flex-col gap-0.5">
+        <div className="rounded-lg border border-white/[0.1] bg-zinc-900/70 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
           <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
             <div
-              className={`flex items-center rounded-md border px-2 py-1 tabular-nums ${
+              className={`flex items-center rounded-md border px-2 py-0.5 tabular-nums ${
                 vm.phase === "playing" &&
                 (vm.turnSeat === vm.mySeat ||
                   (vm.mustRespondDouble && Number(vm.pendingDouble?.responder_seat) === vm.mySeat))
-                  ? "border-amber-400/38 bg-amber-950/50 text-amber-50/92"
-                  : "border-white/[0.12] bg-zinc-950/65 text-zinc-400"
+                  ? "border-amber-400/35 bg-amber-950/45 text-amber-50/92"
+                  : "border-white/[0.12] bg-zinc-950/55 text-zinc-400"
               }`}
             >
               {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
@@ -449,22 +554,16 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
                 <span>—</span>
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded border border-white/10 px-2 py-0.5 text-zinc-300">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded border border-white/12 bg-zinc-950/40 px-2 py-0.5 font-medium text-zinc-200">
                 Table ×{vm.stakeMultiplier}
               </span>
-              <span className="hidden rounded border border-white/10 px-2 py-0.5 sm:inline">
-                You: {myColorLabel}
-              </span>
-              <span className="hidden rounded border border-white/10 px-2 py-0.5 sm:inline">
-                Opponent: {oppColorLabel}
-              </span>
+              {vaultClaimBusy ? (
+                <span className="rounded-md border border-sky-500/22 bg-sky-950/40 px-2 py-0.5 text-[10px] text-sky-100/90">
+                  Settlement…
+                </span>
+              ) : null}
             </div>
-            {vaultClaimBusy ? (
-              <span className="rounded-md border border-sky-500/18 bg-sky-950/35 px-2 py-0.5 text-[10px] text-sky-100/88">
-                Settlement…
-              </span>
-            ) : null}
           </div>
         </div>
         {err ? (
@@ -477,10 +576,10 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
         ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden overscroll-contain">
         {vm.phase === "playing" && vm.mustRespondDouble && vm.pendingDouble ? (
-          <div className="rounded-lg border border-amber-500/25 bg-amber-950/25 p-2">
-            <p className="text-[11px] text-amber-100/90">
+          <div className="shrink-0 rounded-lg border border-amber-500/28 bg-amber-950/30 p-2">
+            <p className="text-[11px] leading-snug text-amber-100/92">
               Opponent proposes table ×{String(vm.pendingDouble.proposed_mult ?? "")}. Declining or timing out ends the round at
               the current ×{vm.stakeMultiplier}.
             </p>
@@ -495,26 +594,38 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
           </div>
         ) : null}
 
-        <div
-          className={`mx-auto w-full max-w-md rounded-xl border border-white/[0.08] bg-zinc-950/78 p-2 transition-[transform,opacity,box-shadow] duration-200 sm:max-w-lg sm:p-3 md:max-w-xl ${turnBoardGlow} ${
-            winFreeze ? "scale-[0.99] opacity-[0.93]" : "scale-100 opacity-100"
-          }`}
-        >
-          <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-            <span
-              className={`mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full border border-black/20 align-middle shadow-sm ${
-                indicatorSeat === 0
-                  ? "bg-gradient-to-b from-sky-300 to-blue-600"
-                  : indicatorSeat === 1
-                    ? "bg-gradient-to-b from-amber-200 to-yellow-600"
-                    : "bg-zinc-700/80"
-              }`}
-              aria-hidden
-            />
-            Board{" "}
-            <span className="font-normal normal-case text-zinc-500/85">· drop to connect four</span>
-          </p>
-          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 md:gap-2">
+        {hasSession ? (
+          <FourLinePlayerHeader
+            seat0Label={seat0Label}
+            seat1Label={seat1Label}
+            mySeat={vm.mySeat}
+            indicatorSeat={indicatorSeat}
+            phase={vm.phase}
+            mustRespondDouble={vm.mustRespondDouble === true}
+          />
+        ) : null}
+
+        <div className="flex min-h-0 min-w-0 shrink-0 flex-col">
+          <div
+            className={`relative mx-auto w-full max-w-lg rounded-2xl border border-zinc-600/25 bg-gradient-to-b from-zinc-800/55 to-zinc-900/90 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-[transform,opacity,box-shadow] duration-200 sm:max-w-xl sm:p-2.5 md:max-w-2xl ${turnBoardGlow} ${
+              winFreeze ? "scale-[0.998] opacity-[0.97]" : "scale-100 opacity-100"
+            }`}
+          >
+            <p className="mb-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400 sm:mb-2">
+              <span
+                className={`mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full border border-zinc-700/80 align-middle shadow-sm ${
+                  indicatorSeat === 0
+                    ? "bg-gradient-to-b from-sky-300 to-blue-600"
+                    : indicatorSeat === 1
+                      ? "bg-gradient-to-b from-amber-200 to-amber-700"
+                      : "bg-zinc-600"
+                }`}
+                aria-hidden
+              />
+              Playfield
+              <span className="font-normal normal-case tracking-normal text-zinc-500"> · connect four</span>
+            </p>
+            <div className="grid grid-cols-7 gap-0.5 sm:gap-1.5 md:gap-2">
             {Array.from({ length: OV2_FOURLINE_COLS }, (_, c) => {
               const playable = canPickColumn && fourLineColumnPlayable(c, cells);
               const showGhost =
@@ -534,12 +645,12 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
               const pulseTintSeat = movePulseCol === c && hoverCol !== c ? lastMoveSeatForPulse : null;
               const tintSeat = hoverTintSeat ?? pulseTintSeat;
               const colTint =
-                tintSeat === 0 ? "bg-sky-500/14" : tintSeat === 1 ? "bg-amber-400/11" : "bg-transparent";
+                tintSeat === 0 ? "bg-sky-500/10" : tintSeat === 1 ? "bg-amber-400/08" : "bg-transparent";
               return (
                 <div
                   key={c}
                   data-fl-col
-                  className={`relative flex min-w-0 flex-col gap-1 rounded-md transition-[background-color] duration-150 ${colTint}`}
+                  className={`relative flex min-w-0 flex-col gap-0.5 overflow-visible rounded-md transition-[background-color] duration-150 sm:gap-1 ${colTint}`}
                   onPointerEnter={() => {
                     if (vm.phase !== "playing" || vm.mustRespondDouble) return;
                     setHoverCol(c);
@@ -551,25 +662,25 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
                     disabled={!playable}
                     aria-label={`Play column ${c + 1}`}
                     onClick={() => void onColumn(c)}
-                    className={`relative z-10 flex h-9 min-h-[2.25rem] items-center justify-center rounded-md border text-[11px] font-bold transition sm:h-10 ${
+                    className={`relative z-10 flex h-8 min-h-[2rem] items-center justify-center rounded-md border text-[11px] font-bold transition sm:h-10 ${
                       playable
-                        ? "border-sky-500/35 bg-sky-950/40 text-sky-100 active:scale-[0.97]"
-                        : "cursor-not-allowed border-white/[0.06] bg-zinc-950/40 text-zinc-600 opacity-50"
+                        ? "border-sky-500/40 bg-sky-950/50 text-sky-100 shadow-sm active:scale-[0.97]"
+                        : "cursor-not-allowed border-white/[0.08] bg-zinc-950/50 text-zinc-500 opacity-55"
                     }`}
                   >
                     ▼
                   </button>
-                  <div className="relative flex min-h-0 flex-col gap-1" data-fl-cells>
+                  <div className="relative flex min-h-0 flex-col gap-0.5 overflow-visible sm:gap-1" data-fl-cells>
                     {showGhost ? (
-                      <div className="pointer-events-none absolute left-0 right-0 top-0 z-[15] flex justify-center">
+                      <div className="pointer-events-none absolute left-0 right-0 top-0 z-[15] flex justify-center overflow-visible">
                         <GhostOrMiniDisc seat={ghostSeat} />
                       </div>
                     ) : null}
                     {dropAnim && dropAnim.col === c && cellStridePx > 0 ? (
                       <div
-                        className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex justify-center"
+                        className="pointer-events-none absolute left-0 right-0 top-0 z-20 flex justify-center overflow-visible will-change-transform"
                         style={{
-                          transform: `translateY(${dropTranslatePx}px)`,
+                          transform: `translateZ(0) translateY(${dropTranslatePx}px)`,
                           transition:
                             dropTranslatePx === 0
                               ? "none"
@@ -577,10 +688,10 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
                         }}
                       >
                         <div
-                          className={`aspect-square w-[55%] max-w-[2.75rem] rounded-full border border-black/25 sm:w-[58%] sm:max-w-none ${
+                          className={`aspect-square w-[55%] max-w-[2.75rem] rounded-full sm:w-[58%] sm:max-w-none ${
                             dropAnim.seat === 0
-                              ? "bg-gradient-to-b from-sky-300/95 to-blue-700/95 shadow-[0_4px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.22)]"
-                              : "bg-gradient-to-b from-amber-200/95 to-yellow-600/95 shadow-[0_4px_10px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.2)]"
+                              ? "border border-sky-300/25 bg-gradient-to-b from-sky-100 to-blue-800 shadow-[0_3px_8px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.3)]"
+                              : "border border-amber-300/22 bg-gradient-to-b from-amber-50 to-amber-700 shadow-[0_3px_8px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.28)]"
                           }`}
                         />
                       </div>
@@ -596,14 +707,9 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
                         <div
                           key={r}
                           ref={c === 0 && r === 0 ? firstCellRef : undefined}
-                          className="min-w-0 px-0.5"
+                          className="min-w-0 px-px sm:px-0.5"
                         >
-                          <CellDisc
-                            seat={v}
-                            hideDisc={hideDrop}
-                            isWinning={isWin}
-                            pulseWin={isWin}
-                          />
+                          <CellDisc seat={v} hideDisc={hideDrop} isWinning={isWin} />
                         </div>
                       );
                     })}
@@ -612,23 +718,24 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
               );
             })}
           </div>
-          <p className="mt-2 text-center text-[10px] text-zinc-500 sm:hidden">
-            You {myColorLabel} · Opponent {oppColorLabel}
-          </p>
+          </div>
         </div>
 
-        {vm.phase === "playing" && vm.mySeat === vm.turnSeat && !vm.mustRespondDouble ? (
-          <div className="flex flex-wrap gap-2">
-            {vm.canOfferDouble ? (
-              <button type="button" disabled={busy} className={BTN_ACCENT} onClick={() => void offerDouble()}>
-                Increase table stake
-              </button>
-            ) : null}
+        {vm.phase === "playing" && vm.mySeat === vm.turnSeat && !vm.mustRespondDouble && vm.canOfferDouble ? (
+          <div className="shrink-0">
+            <button
+              type="button"
+              disabled={busy}
+              className={`${BTN_ACCENT} inline-flex w-full items-center justify-center py-2.5 text-xs font-semibold sm:py-2`}
+              onClick={() => void offerDouble()}
+            >
+              Increase table stake
+            </button>
           </div>
         ) : null}
 
-        <div className="mt-auto flex flex-col gap-1 border-t border-white/[0.06] pt-2 text-[10px] text-zinc-500">
-          <p>
+        <div className="mt-0 flex shrink-0 flex-col gap-0.5 border-t border-white/[0.08] pt-1.5 text-[10px] text-zinc-500">
+          <p className="leading-snug">
             Missed turns: you {vm.mySeat != null ? vm.missedStreakBySeat[vm.mySeat] ?? 0 : "—"} · opponent{" "}
             {vm.mySeat === 0 ? vm.missedStreakBySeat[1] : vm.mySeat === 1 ? vm.missedStreakBySeat[0] : "—"}
           </p>
