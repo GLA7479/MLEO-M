@@ -1,13 +1,11 @@
 /**
  * Goal Duel — canvas presentation only (no physics / RPC changes).
  *
- * ART DIRECTION: “MLEO Park” mini-stadium — sunset arcade, dog-park turf, proper goals,
- * readable tennis ball with fuzz + seam. Both seats use the **same hero-dog build** (fair
- * hitbox); seat 0 = home kit, seat 1 = away kit (cooler + bandana). Tune palettes to your
- * dog’s real coat colors.
+ * PLAYERS: raster dog sprites (`opts.sprite`) are the primary art — assets should face **right**.
+ * Hitbox unchanged: sprite is scaled to match `2*hh` tall and anchored to feet at `py + hh`.
+ * Horizontal mirror uses `anim.facing`. If no sprite loads, a minimal shadow-only fallback draws.
  *
- * REFERENCE COAT: pass `opts.coatImage` (loaded HTMLImageElement / ImageBitmap). Optional
- * static file: place `public/images/goal-duel/mleo-coat.png` — Ov2GoalDuelScreen loads it.
+ * Ball: optional raster `opts.sprite` in `drawGoalDuelTennisBall`; else procedural fallback.
  */
 
 /** @typedef {{
@@ -292,28 +290,83 @@ function drawStadiumGoal(ctx, gx, groundY, goalH, sx, sy, side) {
 }
 
 /**
- * @param {CanvasRenderingContext2D} ctx
- * @param {number} x0
- * @param {number} y0
- * @param {number} x1
- * @param {number} y1
- * @param {number} r
+ * @param {unknown} s
+ * @returns {s is CanvasImageSource}
  */
-function roundRect(ctx, x0, y0, x1, y1, r) {
-  const w = x1 - x0;
-  const h = y1 - y0;
-  const rr = Math.min(r, w / 2, h / 2);
+function isDrawableImage(s) {
+  return (
+    s != null &&
+    typeof s === "object" &&
+    "width" in s &&
+    typeof /** @type {{ width: number }} */ (s).width === "number" &&
+    /** @type {{ width: number }} */ (s).width > 0
+  );
+}
+
+/**
+ * Sprite faces **right**. Feet sit at arena (px, py+hh); scaled to ~2*hh canvas height.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} px
+ * @param {number} py
+ * @param {number} hw
+ * @param {number} hh
+ * @param {number} sx
+ * @param {number} sy
+ * @param {object} anim
+ * @param {CanvasImageSource} img
+ */
+function drawGoalDuelDogSprite(ctx, px, py, hw, hh, sx, sy, anim, img) {
+  const facing = anim.facing >= 0 ? 1 : -1;
+  const bob = anim.running ? Math.sin(anim.runPhase * Math.PI * 2) * 2 * sy : 0;
+  const squash = anim.kicking ? 0.92 : anim.jumping ? 1.03 : 1;
+  const stretchY = anim.jumping ? 0.92 : 1;
+  const tilt = (anim.jumping ? -0.11 : anim.running ? 0.055 : 0) * facing;
+
+  const footX = px * sx;
+  const footY = (py + hh) * sy + bob;
+  const targetH = 2 * hh * sy * 1.02;
+  const iw = /** @type {{ width: number }} */ (img).width;
+  const ih = /** @type {{ height: number }} */ (img).height;
+  const ar = iw / Math.max(ih, 1);
+  const dh = targetH;
+  const dw = dh * ar;
+
+  ctx.fillStyle = "rgba(0,0,0,0.24)";
   ctx.beginPath();
-  ctx.moveTo(x0 + rr, y0);
-  ctx.lineTo(x1 - rr, y0);
-  ctx.quadraticCurveTo(x1, y0, x1, y0 + rr);
-  ctx.lineTo(x1, y1 - rr);
-  ctx.quadraticCurveTo(x1, y1, x1 - rr, y1);
-  ctx.lineTo(x0 + rr, y1);
-  ctx.quadraticCurveTo(x0, y1, x0, y1 - rr);
-  ctx.lineTo(x0, y0 + rr);
-  ctx.quadraticCurveTo(x0, y0, x0 + rr, y0);
-  ctx.closePath();
+  ctx.ellipse(footX, footY + 2 * sy, Math.max(dw * 0.35, hw * sx * 0.95), 4 * Math.min(sx, sy), 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(footX, footY);
+  ctx.rotate(tilt);
+  ctx.scale(facing * squash, stretchY);
+  try {
+    ctx.drawImage(img, -dw / 2, -dh, dw, dh);
+  } catch {
+    /* decode / draw race */
+  }
+  ctx.restore();
+}
+
+/**
+ * No sprite yet: ground shadow only (no placeholder character art).
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} px
+ * @param {number} py
+ * @param {number} hw
+ * @param {number} hh
+ * @param {number} sx
+ * @param {number} sy
+ */
+function drawGoalDuelDogPlaceholder(ctx, px, py, hw, hh, sx, sy) {
+  const footX = px * sx;
+  const footY = (py + hh) * sy;
+  ctx.fillStyle = "rgba(0,0,0,0.14)";
+  ctx.beginPath();
+  ctx.ellipse(footX, footY + 2 * sy, hw * sx * 1.15, 3.5 * Math.min(sx, sy), 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 /**
@@ -324,231 +377,22 @@ function roundRect(ctx, x0, y0, x1, y1, r) {
  * @param {number} hh
  * @param {number} sx
  * @param {number} sy
- * @param {GoalDuelDogPalette} palette
+ * @param {GoalDuelDogPalette} _palette
  * @param {object} anim
  * @param {number} anim.facing
  * @param {boolean} anim.jumping
  * @param {boolean} anim.running
  * @param {boolean} anim.kicking
  * @param {number} anim.runPhase
- * @param {{ variant?: 'star'|'rival', coatImage?: CanvasImageSource|null }} [opts]
+ * @param {{ variant?: 'star'|'rival', sprite?: CanvasImageSource|null, coatImage?: CanvasImageSource|null }} [opts]
  */
-export function drawGoalDuelDog(ctx, px, py, hw, hh, sx, sy, palette, anim, opts = {}) {
-  const variant = opts.variant === "rival" ? "rival" : "star";
-  const coat = opts.coatImage ?? null;
-
-  const cx = px * sx;
-  const cy = py * sy;
-  const w = hw * sx;
-  const h = hh * sy;
-  const facing = anim.facing >= 0 ? 1 : -1;
-  const m = Math.min(sx, sy);
-
-  const squash = anim.kicking ? 0.9 : anim.jumping ? 1.04 : 1;
-  const stretchY = anim.jumping ? 0.9 : 1;
-  const bodyTilt = anim.jumping ? -0.14 : anim.running ? 0.06 : 0;
-  const bob = anim.running ? Math.sin(anim.runPhase * Math.PI * 2) * 2 * sy : 0;
-
-  const legSwing = anim.running ? Math.sin(anim.runPhase * Math.PI * 2) : 0;
-  const kickLift = anim.kicking ? 1 : 0;
-
-  ctx.save();
-  ctx.translate(cx, cy + bob);
-  ctx.rotate(bodyTilt * facing);
-  ctx.scale(facing * squash, stretchY);
-
-  const feetY = h * 0.42;
-  ctx.fillStyle = "rgba(0,0,0,0.2)";
-  ctx.beginPath();
-  ctx.ellipse(0, feetY + 2 * sy, w * 1.1, 4 * sy, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  const bodyOx = -w * 0.08;
-  const bodyOy = -h * 0.02;
-  const bodyRx = w * 0.95;
-  const bodyRy = h * 0.38;
-
-  const backThigh = legSwing * 0.45;
-  const frontThigh = -legSwing * 0.45;
-  const legW = 7 * m;
-  const legLen = h * 0.5;
-
-  function drawLeg(ax, topY, thigh, isFront) {
-    const tuck = anim.jumping ? (isFront ? -0.25 : 0.15) : 0;
-    const kick = isFront && kickLift ? 0.85 : 0;
-    const lx = ax + thigh * w * 0.35;
-    const ly = topY + tuck * h;
-    roundRect(ctx, lx - legW / 2, ly, lx + legW / 2, ly + legLen * (1 - kick * 0.35), legW * 0.35);
-    ctx.fillStyle = palette.bodyDark;
-    ctx.fill();
-    ctx.fillStyle = palette.sock;
-    ctx.globalAlpha = variant === "star" ? 0.92 : 0.8;
-    roundRect(ctx, lx - legW / 2, ly + legLen * 0.58, lx + legW / 2, ly + legLen, legW * 0.3);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = palette.bodyDark;
-    ctx.beginPath();
-    ctx.ellipse(lx, ly + legLen + 1 * sy, legW * 0.55, 3 * m, 0, 0, Math.PI * 2);
-    ctx.fill();
+export function drawGoalDuelDog(ctx, px, py, hw, hh, sx, sy, _palette, anim, opts = {}) {
+  const sprite = opts.sprite ?? opts.coatImage ?? null;
+  if (isDrawableImage(sprite)) {
+    drawGoalDuelDogSprite(ctx, px, py, hw, hh, sx, sy, anim, /** @type {CanvasImageSource} */ (sprite));
+    return;
   }
-
-  const tailWave = anim.jumping ? -0.9 : anim.running ? 0.65 : 0.2;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = palette.bodyDark;
-  ctx.lineWidth = 6 * m;
-  ctx.beginPath();
-  ctx.moveTo(bodyOx - bodyRx * 0.85, bodyOy);
-  ctx.bezierCurveTo(
-    bodyOx - bodyRx * 1.45 - h * tailWave,
-    bodyOy - h * 0.25,
-    bodyOx - bodyRx * 1.2,
-    bodyOy - h * 0.55,
-    bodyOx - bodyRx * 0.75,
-    bodyOy - h * 0.72
-  );
-  ctx.stroke();
-  ctx.strokeStyle = palette.tailTip || "rgba(255,255,255,0.35)";
-  ctx.lineWidth = 3 * m;
-  ctx.beginPath();
-  ctx.moveTo(bodyOx - bodyRx * 0.78, bodyOy - h * 0.02);
-  ctx.quadraticCurveTo(bodyOx - bodyRx * 1.15 - h * tailWave * 0.8, bodyOy - h * 0.35, bodyOx - bodyRx * 0.72, bodyOy - h * 0.58);
-  ctx.stroke();
-
-  const grd = ctx.createLinearGradient(bodyOx - bodyRx, bodyOy - bodyRy, bodyOx + bodyRx * 1.1, bodyOy + bodyRy);
-  grd.addColorStop(0, palette.bodyLight);
-  grd.addColorStop(0.45, palette.body);
-  grd.addColorStop(1, palette.bodyDark);
-  ctx.fillStyle = grd;
-  ctx.beginPath();
-  ctx.ellipse(bodyOx, bodyOy, bodyRx, bodyRy, -0.06, 0, Math.PI * 2);
-  ctx.fill();
-
-  if (coat && typeof coat === "object" && "width" in coat && /** @type {{ width: number }} */ (coat).width > 0) {
-    try {
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(bodyOx, bodyOy, bodyRx * 0.9, bodyRy * 0.88, -0.06, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.globalAlpha = variant === "rival" ? 0.5 : 0.78;
-      ctx.drawImage(/** @type {CanvasImageSource} */ (coat), bodyOx - bodyRx * 1.05, bodyOy - bodyRy * 1.1, bodyRx * 2.2, bodyRy * 2.3);
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    } catch {
-      /* optional */
-    }
-  } else if (palette.brindle) {
-    ctx.strokeStyle = palette.brindle;
-    ctx.lineWidth = 1.2 * m;
-    for (let i = 0; i < 8; i++) {
-      const t = i / 8;
-      ctx.beginPath();
-      ctx.moveTo(bodyOx - bodyRx * 0.7 + t * bodyRx * 0.5, bodyOy - bodyRy * 0.5);
-      ctx.quadraticCurveTo(bodyOx - bodyRx * 0.2 + t * bodyRx * 0.3, bodyOy + bodyRy * 0.1, bodyOx + bodyRx * 0.2, bodyOy + bodyRy * 0.45);
-      ctx.stroke();
-    }
-  }
-
-  ctx.fillStyle = palette.chestBlaze;
-  ctx.beginPath();
-  ctx.ellipse(bodyOx + bodyRx * 0.32, bodyOy + bodyRy * 0.12, bodyRx * 0.42, bodyRy * 0.58, 0.12, 0, Math.PI * 2);
-  ctx.fill();
-
-  const neckX = bodyOx + bodyRx * 0.72;
-  const neckY = bodyOy - bodyRy * 0.35;
-  ctx.fillStyle = palette.body;
-  ctx.beginPath();
-  ctx.ellipse(neckX, neckY, w * 0.22, h * 0.2, 0.35, 0, Math.PI * 2);
-  ctx.fill();
-
-  const hx = bodyOx + bodyRx * 1.05;
-  const hy = bodyOy - bodyRy * 0.35;
-  const headR = h * 0.34;
-
-  ctx.fillStyle = palette.bodyLight;
-  ctx.beginPath();
-  ctx.ellipse(hx, hy, headR * 1.05, headR * 0.95, 0.08, 0, Math.PI * 2);
-  ctx.fill();
-
-  if (palette.muzzleMask) {
-    ctx.fillStyle = palette.muzzleMask;
-    ctx.beginPath();
-    ctx.ellipse(hx + headR * 0.35, hy + headR * 0.12, headR * 0.5, headR * 0.38, 0.1, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.fillStyle = palette.ear;
-  ctx.beginPath();
-  ctx.moveTo(hx - headR * 0.15, hy - headR * 0.65);
-  ctx.bezierCurveTo(hx - headR * 0.75, hy - headR * 1.05, hx - headR * 0.55, hy - headR * 0.15, hx - headR * 0.12, hy - headR * 0.2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(hx + headR * 0.25, hy - headR * 0.55);
-  ctx.bezierCurveTo(hx + headR * 0.72, hy - headR * 0.95, hx + headR * 0.68, hy - headR * 0.2, hx + headR * 0.38, hy - headR * 0.12);
-  ctx.closePath();
-  ctx.fill();
-
-  const snoutX = hx + headR * 0.72;
-  const snoutY = hy + headR * 0.14;
-  ctx.fillStyle = palette.body;
-  ctx.beginPath();
-  ctx.ellipse(snoutX, snoutY, headR * 0.48, headR * 0.32, 0.06, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = palette.nose;
-  ctx.beginPath();
-  ctx.ellipse(snoutX + headR * 0.32, snoutY + headR * 0.04, headR * 0.12, headR * 0.1, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(0,0,0,0.25)";
-  ctx.lineWidth = 0.8 * m;
-  ctx.beginPath();
-  ctx.moveTo(snoutX + headR * 0.15, snoutY + headR * 0.22);
-  ctx.quadraticCurveTo(snoutX, snoutY + headR * 0.32, snoutX - headR * 0.2, snoutY + headR * 0.2);
-  ctx.stroke();
-
-  const eyeGleam = variant === "rival" ? "rgba(180,220,255,0.75)" : "rgba(255,255,255,0.9)";
-  ctx.fillStyle = "rgba(15,10,8,0.92)";
-  ctx.beginPath();
-  ctx.ellipse(hx + headR * 0.32, hy - headR * 0.08, headR * 0.11, headR * 0.13, -0.15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = eyeGleam;
-  ctx.beginPath();
-  ctx.arc(hx + headR * 0.36, hy - headR * 0.11, headR * 0.04, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = "rgba(0,0,0,0.2)";
-  ctx.lineWidth = 1 * m;
-  ctx.beginPath();
-  ctx.moveTo(hx + headR * 0.08, hy - headR * 0.28);
-  ctx.quadraticCurveTo(hx + headR * 0.35, hy - headR * 0.32, hx + headR * 0.55, hy - headR * 0.22);
-  ctx.stroke();
-
-  ctx.fillStyle = palette.collar;
-  const colL = bodyOx + bodyRx * 0.05;
-  const colT = bodyOy - bodyRy * 0.52;
-  roundRect(ctx, colL, colT, colL + w * 0.38, colT + h * 0.09, 4 * m);
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.35)";
-  ctx.beginPath();
-  ctx.arc(bodyOx + bodyRx * 0.28, bodyOy - bodyRy * 0.48, 2 * m, 0, Math.PI * 2);
-  ctx.fill();
-
-  if (variant === "rival" && "bandana" in palette && palette.bandana) {
-    ctx.fillStyle = palette.bandana;
-    ctx.beginPath();
-    ctx.moveTo(hx - headR * 0.1, hy + headR * 0.35);
-    ctx.lineTo(hx + headR * 0.5, hy + headR * 0.42);
-    ctx.lineTo(hx + headR * 0.25, hy + headR * 0.62);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  drawLeg(bodyOx - bodyRx * 0.32, bodyOy + bodyRy * 0.22, backThigh, false);
-  drawLeg(bodyOx + bodyRx * 0.12, bodyOy + bodyRy * 0.3, frontThigh + kickLift * 0.5, true);
-
-  ctx.restore();
+  drawGoalDuelDogPlaceholder(ctx, px, py, hw, hh, sx, sy);
 }
 
 /**
@@ -560,15 +404,54 @@ export function drawGoalDuelDog(ctx, px, py, hw, hh, sx, sy, palette, anim, opts
  * @param {number} sy
  * @param {number} vx
  * @param {number} vy
+ * @param {{ sprite?: CanvasImageSource|null }} [opts]
  */
-export function drawGoalDuelTennisBall(ctx, bx, by, br, sx, sy, vx, vy) {
+export function drawGoalDuelTennisBall(ctx, bx, by, br, sx, sy, vx, vy, opts = {}) {
   const cx = bx * sx;
   const cy = by * sy;
   const r = br * Math.min(sx, sy);
   const speed = Math.hypot(vx, vy);
   const ang = Math.atan2(vy, vx);
-
   const blur = Math.min(1, speed / 180);
+  const sprite = opts.sprite ?? null;
+
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.beginPath();
+  ctx.ellipse(cx + r * 0.14, cy + r * 0.92, r * 1.05, r * 0.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (isDrawableImage(sprite)) {
+    const rot = ang * 0.35 + speed * 0.0012;
+    if (blur > 0.08) {
+      for (let i = 2; i >= 1; i--) {
+        const o = i * r * 0.18 * blur;
+        ctx.fillStyle = `rgba(255,255,220,${0.04 * blur * i})`;
+        ctx.beginPath();
+        ctx.arc(cx - Math.cos(ang) * o * 2.2, cy - Math.sin(ang) * o * 2.2, r * 0.95, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rot);
+    try {
+      ctx.drawImage(/** @type {CanvasImageSource} */ (sprite), -r * 1.08, -r * 1.08, r * 2.16, r * 2.16);
+    } catch {
+      /* decode race */
+    }
+    ctx.restore();
+    if (speed > 40) {
+      ctx.strokeStyle = `rgba(255,255,200,${0.12 + Math.min(0.3, speed / 400)})`;
+      ctx.lineWidth = r * 0.45;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx - Math.cos(ang) * r * 2.2, cy - Math.sin(ang) * r * 2.2);
+      ctx.lineTo(cx - Math.cos(ang) * r * (2.9 + blur * 1.8), cy - Math.sin(ang) * r * (2.9 + blur * 1.8));
+      ctx.stroke();
+    }
+    return;
+  }
+
   if (blur > 0.08) {
     for (let i = 3; i >= 1; i--) {
       const o = i * r * 0.22 * blur;
@@ -579,10 +462,6 @@ export function drawGoalDuelTennisBall(ctx, bx, by, br, sx, sy, vx, vy) {
     }
   }
 
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
-  ctx.beginPath();
-  ctx.ellipse(cx + r * 0.14, cy + r * 0.92, r * 1.05, r * 0.32, 0, 0, Math.PI * 2);
-  ctx.fill();
   ctx.fillStyle = "rgba(0,0,0,0.12)";
   ctx.beginPath();
   ctx.ellipse(cx + r * 0.18, cy + r * 0.95, r * 1.15, r * 0.38, 0, 0, Math.PI * 2);

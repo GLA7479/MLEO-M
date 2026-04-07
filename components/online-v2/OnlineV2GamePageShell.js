@@ -40,6 +40,8 @@ export default function OnlineV2GamePageShell({
    * `ov2_board`: Chess / Checkers — one-row HUD (Hub · vault · title · Info · Menu), tighter gaps, premium system bar.
    */
   chromePreset = "default",
+  /** When true, skip the shell foot ad (game screen renders `OnlineV2ReservedAdSlot` itself). */
+  suppressReservedAdSlot = false,
 }) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -253,10 +255,12 @@ export default function OnlineV2GamePageShell({
             </OnlineV2GameOverlay>
           </div>
 
-          <OnlineV2ReservedAdSlot
-            variant={isC21Flat || isCcFlat ? "subtle" : "default"}
-            className={isCcFlat ? "-mt-1.5 lg:-mt-2.5" : ""}
-          />
+          {!suppressReservedAdSlot ? (
+            <OnlineV2ReservedAdSlot
+              variant={isC21Flat || isCcFlat ? "subtle" : "default"}
+              className={isCcFlat ? "-mt-1.5 lg:-mt-2.5" : ""}
+            />
+          ) : null}
         </div>
       </main>
     </Layout>

@@ -15,11 +15,13 @@ import {
   TEAM_STAR_DOG,
 } from "./ov2GoalDuelCanvasDraw";
 
-/** Reserved height for IAB / adaptive banner (mobile ~90px, desktop strip). */
-const GD_AD_SLOT_CLASS = "h-[90px] min-h-[90px] sm:h-16 sm:min-h-[4rem]";
-
-/** Drop a side-view coat photo here to map onto both dogs (same silhouette). */
-const GD_COAT_IMAGE_PATH = "/images/goal-duel/mleo-coat.png";
+/**
+ * Raster assets — dogs face **right**; ball is centered in a square texture.
+ * @see public/images/online-v2/goal-duel/
+ */
+const GD_SPRITE_HOME = "/images/online-v2/goal-duel/gd-dog-home.png";
+const GD_SPRITE_AWAY = "/images/online-v2/goal-duel/gd-dog-away.png";
+const GD_SPRITE_BALL = "/images/online-v2/goal-duel/gd-ball.png";
 
 const finishDismissStorageKey = sid => `ov2_gd_finish_dismiss_${sid}`;
 
@@ -28,18 +30,19 @@ const BTN_PRIMARY =
 const BTN_SECONDARY =
   "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
-const ARCADE_PANEL =
-  "rounded-2xl border border-amber-400/20 bg-gradient-to-b from-zinc-900/95 to-black/80 p-2 shadow-[0_8px_32px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md";
+/** In-field floating controls: glass, no heavy “deck” chrome */
+const CTRL_FLOAT_CLUSTER =
+  "pointer-events-auto flex touch-manipulation select-none gap-1 rounded-xl border border-white/15 bg-black/45 p-1 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md";
 
-const CTRL_MOVE =
-  "pointer-events-auto flex touch-manipulation select-none items-center justify-center rounded-xl border border-cyan-400/35 bg-gradient-to-b from-cyan-950/90 to-zinc-950/95 text-cyan-50 shadow-[0_4px_0_rgba(8,47,73,0.9),0_8px_24px_rgba(0,0,0,0.4)] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-[0_2px_0_rgba(8,47,73,0.85)] active:brightness-110";
+const CTRL_MOVE_BTN =
+  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-950/55 text-base text-cyan-50 shadow-inner transition-[transform,opacity] active:scale-95 sm:h-9 sm:w-9 sm:text-sm";
 
-const CTRL_ACTION_BASE =
-  "pointer-events-auto flex touch-manipulation select-none flex-col items-center justify-center gap-0.5 rounded-2xl border font-extrabold uppercase tracking-wide shadow-[0_6px_0_rgba(0,0,0,0.35),0_12px_28px_rgba(0,0,0,0.45)] transition-[transform,box-shadow] active:translate-y-1 active:shadow-[0_3px_0_rgba(0,0,0,0.35)]";
+const CTRL_ACTION_BTN =
+  "flex h-10 min-w-[3rem] flex-col items-center justify-center gap-0 rounded-lg border font-bold uppercase leading-none shadow-inner transition-[transform,opacity] active:scale-95 sm:h-9 sm:min-w-[3.25rem]";
 
-const CTRL_JUMP = `${CTRL_ACTION_BASE} border-emerald-400/40 bg-gradient-to-b from-emerald-600/90 to-emerald-950 text-emerald-50`;
+const CTRL_JUMP_BTN = `${CTRL_ACTION_BTN} border-emerald-400/35 bg-emerald-950/55 text-[8px] text-emerald-100`;
 
-const CTRL_KICK = `${CTRL_ACTION_BASE} border-rose-400/45 bg-gradient-to-b from-rose-600/90 to-rose-950 text-rose-50`;
+const CTRL_KICK_BTN = `${CTRL_ACTION_BTN} border-rose-400/35 bg-rose-950/55 text-[8px] text-rose-100`;
 
 /** @param {unknown} m */
 function memberGdRematchRequested(m) {
@@ -87,7 +90,9 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   const kickP1UntilRef = useRef(0);
   const prevScoreRef = useRef(/** @type {[number, number]} */ ([0, 0]));
   const [goalFx, setGoalFx] = useState(/** @type {{ side: "left"|"right" }|null} */ (null));
-  const [coatSource, setCoatSource] = useState(/** @type {CanvasImageSource|null} */ (null));
+  const [spriteHome, setSpriteHome] = useState(/** @type {CanvasImageSource|null} */ (null));
+  const [spriteAway, setSpriteAway] = useState(/** @type {CanvasImageSource|null} */ (null));
+  const [spriteBall, setSpriteBall] = useState(/** @type {CanvasImageSource|null} */ (null));
 
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
@@ -100,17 +105,63 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    const img = new Image();
-    const done = () => {
-      if (img.naturalWidth > 0) setCoatSource(img);
-      else setCoatSource(null);
+    let cancelled = false;
+    /** @type {HTMLImageElement|null} */
+    let away = null;
+    const home = new Image();
+    home.onload = () => {
+      if (cancelled) return;
+      if (home.naturalWidth <= 0) {
+        setSpriteHome(null);
+        setSpriteAway(null);
+        return;
+      }
+      setSpriteHome(home);
+      away = new Image();
+      away.onload = () => {
+        if (cancelled) return;
+        setSpriteAway(away && away.naturalWidth > 0 ? away : home);
+      };
+      away.onerror = () => {
+        if (cancelled) return;
+        setSpriteAway(home);
+      };
+      away.src = GD_SPRITE_AWAY;
     };
-    img.onload = done;
-    img.onerror = () => setCoatSource(null);
-    img.src = GD_COAT_IMAGE_PATH;
+    home.onerror = () => {
+      if (cancelled) return;
+      setSpriteHome(null);
+      setSpriteAway(null);
+    };
+    home.src = GD_SPRITE_HOME;
     return () => {
-      img.onload = null;
-      img.onerror = null;
+      cancelled = true;
+      home.onload = null;
+      home.onerror = null;
+      if (away) {
+        away.onload = null;
+        away.onerror = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    let cancelled = false;
+    const ball = new Image();
+    ball.onload = () => {
+      if (cancelled) return;
+      setSpriteBall(ball.naturalWidth > 0 ? ball : null);
+    };
+    ball.onerror = () => {
+      if (cancelled) return;
+      setSpriteBall(null);
+    };
+    ball.src = GD_SPRITE_BALL;
+    return () => {
+      cancelled = true;
+      ball.onload = null;
+      ball.onerror = null;
     };
   }, []);
 
@@ -362,7 +413,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
           kicking: k0,
           runPhase,
         },
-        { variant: "star", coatImage: coatSource }
+        { variant: "star", sprite: spriteHome }
       );
       drawGoalDuelDog(
         ctx,
@@ -380,10 +431,10 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
           kicking: k1,
           runPhase: runPhase + 0.45,
         },
-        { variant: "rival", coatImage: coatSource }
+        { variant: "rival", sprite: spriteAway }
       );
 
-      drawGoalDuelTennisBall(ctx, bx, by, br, sx, sy, bvx, bvy);
+      drawGoalDuelTennisBall(ctx, bx, by, br, sx, sy, bvx, bvy, { sprite: spriteBall });
 
       motionPrevRef.current = { p0x, p0y, p1x, p1y, bx, by, t: nowMs };
       raf = window.requestAnimationFrame(paint);
@@ -391,46 +442,44 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
     raf = window.requestAnimationFrame(paint);
     return () => window.cancelAnimationFrame(raf);
-  }, [vm.phase, mySeat, inputRef, coatSource]);
+  }, [vm.phase, mySeat, inputRef, spriteHome, spriteAway, spriteBall]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden px-1.5 pb-3 pt-1 sm:gap-3 sm:px-2">
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden px-1.5 pb-1 pt-1 sm:px-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden sm:gap-3">
       {err ? <div className="rounded-lg border border-red-500/30 bg-red-950/35 px-2 py-1.5 text-[11px] text-red-100">{err}</div> : null}
       {vaultClaimBusy ? (
         <div className="rounded-lg border border-zinc-500/20 bg-zinc-900/40 px-2 py-1 text-[10px] text-zinc-400">Updating vault…</div>
       ) : null}
 
       {vm.phase === "playing" && mySeat != null ? (
-        <div className="relative mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-2 sm:gap-3">
-          <div className="relative z-10 shrink-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black px-1 py-2 shadow-[0_0_40px_rgba(251,191,36,0.08),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md sm:px-3 sm:py-2.5">
-            <div className="mb-1.5 flex items-center justify-center gap-2 border-b border-white/5 pb-1.5">
+        <div className="relative mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-1.5 sm:gap-2">
+          <div className="relative z-10 shrink-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black px-1 py-1.5 shadow-[0_0_40px_rgba(251,191,36,0.08),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md sm:px-3 sm:py-2">
+            <div className="mb-1 flex items-center justify-center gap-2 border-b border-white/5 pb-1">
               <span className="text-[8px] font-black uppercase tracking-[0.35em] text-amber-400/90 sm:text-[9px]">MLEO Park</span>
               <span className="h-1 w-1 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" aria-hidden />
               <span className="text-[8px] font-bold uppercase tracking-widest text-zinc-500 sm:text-[9px]">Arcade duel</span>
             </div>
             <div className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-1.5 sm:gap-3">
               <div
-                className={`flex min-w-0 flex-col justify-between rounded-xl border px-2 py-2 transition-[transform,box-shadow] duration-300 sm:px-3 ${
+                className={`flex min-w-0 flex-col justify-between rounded-xl border px-2 py-1.5 transition-[transform,box-shadow] duration-300 sm:px-3 sm:py-2 ${
                   mySeat === 0
                     ? "border-amber-400/40 bg-gradient-to-br from-amber-950/90 to-zinc-950/60 ring-1 ring-amber-500/20"
                     : "border-white/10 bg-black/25"
                 } ${goalFx?.side === "left" ? "scale-[1.02] shadow-[0_0_24px_rgba(251,191,36,0.35)]" : ""}`}
               >
                 <div className="flex items-start justify-between gap-1">
-                  <div className="min-w-0">
-                    <span className="block truncate text-[8px] font-black uppercase tracking-wider text-amber-300/90 sm:text-[9px]">
-                      Home gate
-                    </span>
-                    <span className="text-[9px] text-zinc-500">Same pup · home kit</span>
-                  </div>
+                  <span className="truncate text-[8px] font-black uppercase tracking-wider text-amber-300/90 sm:text-[9px]">
+                    Home
+                  </span>
                   <span className="shrink-0 text-[9px] font-bold text-zinc-500">{mySeat === 0 ? "You" : "Opp"}</span>
                 </div>
-                <span className="mt-1 font-mono text-2xl font-black tabular-nums leading-none text-amber-100 sm:text-3xl">
+                <span className="mt-0.5 font-mono text-2xl font-black tabular-nums leading-none text-amber-100 sm:text-3xl">
                   {vm.score0 ?? 0}
                 </span>
               </div>
 
-              <div className="flex min-w-[4.5rem] flex-col items-center justify-center rounded-xl border border-emerald-500/30 bg-gradient-to-b from-emerald-950/95 to-black/80 px-2 py-1.5 shadow-[inset_0_0_20px_rgba(16,185,129,0.12)] sm:min-w-[5.5rem] sm:px-3 sm:py-2">
+              <div className="flex min-w-[4.25rem] flex-col items-center justify-center rounded-xl border border-emerald-500/30 bg-gradient-to-b from-emerald-950/95 to-black/80 px-2 py-1 shadow-[inset_0_0_20px_rgba(16,185,129,0.12)] sm:min-w-[5.25rem] sm:px-3 sm:py-1.5">
                 <span className="text-[7px] font-bold uppercase tracking-[0.2em] text-emerald-400/80">Time</span>
                 <span className="font-mono text-lg font-black tabular-nums text-emerald-100 sm:text-2xl">
                   {vm.matchTimeLeftSec != null ? `${vm.matchTimeLeftSec}` : "—"}
@@ -439,7 +488,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
               </div>
 
               <div
-                className={`flex min-w-0 flex-col justify-between rounded-xl border px-2 py-2 text-right transition-[transform,box-shadow] duration-300 sm:px-3 ${
+                className={`flex min-w-0 flex-col justify-between rounded-xl border px-2 py-1.5 text-right transition-[transform,box-shadow] duration-300 sm:px-3 sm:py-2 ${
                   mySeat === 1
                     ? "border-sky-400/40 bg-gradient-to-bl from-sky-950/90 to-zinc-950/60 ring-1 ring-sky-500/20"
                     : "border-white/10 bg-black/25"
@@ -447,30 +496,26 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
               >
                 <div className="flex items-start justify-between gap-1">
                   <span className="shrink-0 text-[9px] font-bold text-zinc-500">{mySeat === 1 ? "You" : "Opp"}</span>
-                  <div className="min-w-0 text-right">
-                    <span className="block truncate text-[8px] font-black uppercase tracking-wider text-sky-300/90 sm:text-[9px]">
-                      Away gate
-                    </span>
-                    <span className="text-[9px] text-zinc-500">Same pup · away kit</span>
-                  </div>
+                  <span className="truncate text-[8px] font-black uppercase tracking-wider text-sky-300/90 sm:text-[9px]">
+                    Away
+                  </span>
                 </div>
-                <span className="mt-1 font-mono text-2xl font-black tabular-nums leading-none text-sky-100 sm:text-3xl">
+                <span className="mt-0.5 font-mono text-2xl font-black tabular-nums leading-none text-sky-100 sm:text-3xl">
                   {vm.score1 ?? 0}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="relative mx-auto min-h-0 w-full max-w-[min(100%,36rem)] flex-1 overflow-hidden rounded-2xl border-2 border-amber-900/40 bg-[#0d0818] shadow-[0_20px_50px_rgba(0,0,0,0.65),inset_0_0_60px_rgba(251,146,60,0.04)] ring-1 ring-white/10">
-            <canvas ref={canvasRef} width={800} height={400} className="block h-auto w-full touch-none" />
+          <div className="mx-auto flex w-full max-w-[min(100%,36rem)] shrink-0 flex-col gap-5 sm:gap-6">
+            <div className="relative overflow-hidden rounded-2xl border-2 border-amber-900/40 bg-[#0d0818] shadow-[0_20px_50px_rgba(0,0,0,0.65),inset_0_0_60px_rgba(251,146,60,0.04)] ring-1 ring-white/10">
+              <canvas ref={canvasRef} width={800} height={400} className="block h-auto w-full touch-none" />
+
             {goalFx ? (
               <div
-                className="pointer-events-none absolute inset-0 flex flex-col items-center justify-start gap-2 pt-[6%]"
+                className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-start gap-2 pt-[6%]"
                 key={goalFx.side}
               >
-                <div className="rounded-lg border border-white/20 bg-black/50 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.4em] text-amber-200/90">
-                  Stadium cam
-                </div>
                 <div
                   className={`relative skew-x-[-6deg] rounded-lg border-2 px-8 py-3 shadow-[0_0_40px_rgba(255,255,255,0.25)] sm:px-12 sm:py-4 ${
                     goalFx.side === "left"
@@ -481,46 +526,24 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   <span className="block text-center text-3xl font-black italic tracking-tighter text-white drop-shadow-[0_4px_0_rgba(0,0,0,0.35)] sm:text-5xl">
                     GOOOAL!
                   </span>
-                  <span className="mt-1 block text-center text-[10px] font-bold uppercase tracking-[0.3em] text-white/80">
-                    {goalFx.side === "left" ? "Home lights up" : "Away strikes"}
-                  </span>
                 </div>
               </div>
             ) : null}
             {goalFx ? (
               <div
-                className={`pointer-events-none absolute inset-0 mix-blend-screen ${
+                className={`pointer-events-none absolute inset-0 z-[25] mix-blend-screen ${
                   goalFx.side === "left" ? "bg-amber-400/25" : "bg-cyan-400/20"
                 }`}
               />
             ) : null}
-          </div>
+            </div>
 
-          <aside
-            aria-label="Advertisement slot (reserved)"
-            className={`mx-auto w-full max-w-3xl shrink-0 overflow-hidden rounded-2xl border border-zinc-600/50 bg-gradient-to-b from-zinc-900/80 to-black/60 ${GD_AD_SLOT_CLASS} flex flex-col items-center justify-center gap-1 px-3 text-center shadow-inner ring-1 ring-inset ring-white/5`}
-          >
-            <span className="text-[9px] font-black uppercase tracking-[0.28em] text-zinc-400">Sponsor board</span>
-            <span className="max-w-[20rem] text-[10px] leading-snug text-zinc-500">
-              Reserved IAB slot · target <span className="tabular-nums text-zinc-400">320×90</span> mobile ·{" "}
-              <span className="tabular-nums text-zinc-400">728×90</span> desktop strip
-            </span>
-          </aside>
-
-          <p className="hidden shrink-0 text-center text-[10px] text-zinc-500 sm:block sm:text-[11px]">
-            Desktop: A/D move · W or Space jump · E or K strike
-          </p>
-
-          <div className="flex shrink-0 items-end justify-between gap-2 px-0.5 pb-0.5 sm:justify-center sm:gap-12 sm:px-1">
-            <div className={`${ARCADE_PANEL} flex flex-col gap-1.5`}>
-              <span className="px-0.5 text-center text-[8px] font-black uppercase tracking-[0.25em] text-cyan-300/80">
-                Move
-              </span>
-              <div className="flex gap-2">
+            <div className="flex items-center justify-between gap-2 px-0.5 pt-0.5 sm:px-1 sm:pt-1">
+              <div className={`${CTRL_FLOAT_CLUSTER} items-center`}>
                 <button
                   type="button"
                   aria-label="Move left"
-                  className={`${CTRL_MOVE} h-[3.25rem] w-[3.25rem] text-xl sm:h-12 sm:w-12`}
+                  className={CTRL_MOVE_BTN}
                   onPointerDown={() => setInput({ l: true })}
                   onPointerUp={() => setInput({ l: false })}
                   onPointerCancel={() => setInput({ l: false })}
@@ -531,7 +554,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                 <button
                   type="button"
                   aria-label="Move right"
-                  className={`${CTRL_MOVE} h-[3.25rem] w-[3.25rem] text-xl sm:h-12 sm:w-12`}
+                  className={CTRL_MOVE_BTN}
                   onPointerDown={() => setInput({ r: true })}
                   onPointerUp={() => setInput({ r: false })}
                   onPointerCancel={() => setInput({ r: false })}
@@ -540,40 +563,38 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   ▶
                 </button>
               </div>
-            </div>
-
-            <div className={`${ARCADE_PANEL} flex flex-col gap-2`}>
-              <span className="px-0.5 text-center text-[8px] font-black uppercase tracking-[0.25em] text-emerald-300/80">
-                Actions
-              </span>
-              <div className="flex gap-2">
+              <div className={`${CTRL_FLOAT_CLUSTER} items-center`}>
                 <button
                   type="button"
                   aria-label="Jump"
-                  className={`${CTRL_JUMP} h-[3.25rem] w-[4.5rem] text-[10px] sm:h-12 sm:w-[5rem] sm:text-[11px]`}
+                  className={CTRL_JUMP_BTN}
                   onPointerDown={() => setInput({ j: true })}
                   onPointerUp={() => setInput({ j: false })}
                   onPointerCancel={() => setInput({ j: false })}
                   onPointerLeave={() => setInput({ j: false })}
                 >
-                  <span className="text-xl leading-none sm:text-2xl">▲</span>
-                  Jump
+                  <span className="text-base leading-none sm:text-lg">▲</span>
+                  <span>Jump</span>
                 </button>
                 <button
                   type="button"
                   aria-label="Kick"
-                  className={`${CTRL_KICK} h-[3.25rem] w-[4.5rem] text-[10px] sm:h-12 sm:w-[5rem] sm:text-[11px]`}
+                  className={CTRL_KICK_BTN}
                   onPointerDown={() => setInput({ k: true })}
                   onPointerUp={() => setInput({ k: false })}
                   onPointerCancel={() => setInput({ k: false })}
                   onPointerLeave={() => setInput({ k: false })}
                 >
-                  <span className="text-xl leading-none sm:text-2xl">⚽</span>
-                  Kick
+                  <span className="text-base leading-none sm:text-lg">⚡</span>
+                  <span>Kick</span>
                 </button>
               </div>
             </div>
           </div>
+
+          <p className="hidden shrink-0 text-center text-[10px] text-zinc-500 sm:block sm:text-[11px]">
+            Desktop: A/D move · W or Space jump · E or K strike
+          </p>
         </div>
       ) : null}
 
@@ -647,6 +668,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
           <p className="mt-1">Result dismissed — you can rematch from the lobby or use buttons below if still available.</p>
         </div>
       ) : null}
+      </div>
     </div>
   );
 }
