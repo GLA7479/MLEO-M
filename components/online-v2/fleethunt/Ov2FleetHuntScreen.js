@@ -422,12 +422,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
   const responderSeat = pd != null && pd.responder_seat != null ? Number(pd.responder_seat) : null;
   const proposedMult = pd != null && pd.proposed_mult != null ? Number(pd.proposed_mult) : null;
 
-  const canOfferDouble =
-    vm.phase === "battle" &&
-    !pd &&
-    vm.turnSeat === mySeat &&
-    vm.doublesAccepted < 4 &&
-    vm.stakeMultiplier < 16;
+  const canOfferDouble = vm.canOfferDouble === true;
 
   const sunkEnemyCount = useMemo(
     () => myOutgoing.filter(s => s && String(s.k || "").toLowerCase() === "sunk").length,

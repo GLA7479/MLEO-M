@@ -55,10 +55,11 @@ import { buildOv2BoardPathVM } from "../lib/online-v2/board-path/ov2BoardPathVmB
 import {
   buildOnlineV2EconomyEventKey,
   clampSuggestedOnlineV2Stake,
+  getOv2MaxRoundLiabilityMult,
   ONLINE_V2_GAME_KINDS,
   ONLINE_V2_ROOM_PHASE,
 } from "../lib/online-v2/ov2Economy";
-import { debitOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
+import { debitOnlineV2Vault, peekOnlineV2Vault, readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import { commitOv2RoomStake } from "../lib/online-v2/ov2RoomsApi";
 import {
   normalizeBoardPathHookCaughtError,
@@ -83,7 +84,7 @@ function ov2BoardPathRtDevLog(payload) {
 }
 
 function ov2StakeDebitLocalKey(roomId, matchSeq, participantKey) {
-  return `ov2_bp_stake_debit:${String(roomId)}:${String(Math.floor(Number(matchSeq) || 0))}:${String(participantKey)}`;
+  return `ov2_bp_stake_debit_v2:${String(roomId)}:${String(Math.floor(Number(matchSeq) || 0))}:${String(participantKey)}`;
 }
 
 /**
@@ -961,7 +962,18 @@ export function useOv2BoardPathSession(baseContext) {
     setActionError(null);
     try {
       const stake = clampSuggestedOnlineV2Stake(r.stake_per_seat);
-      const idem = buildOnlineV2EconomyEventKey("commit", rid, pk, r.match_seq, "v1");
+      const liabilityMult = getOv2MaxRoundLiabilityMult(r.product_game_id);
+      const vaultDebit = stake * liabilityMult;
+      await readOnlineV2Vault({ fresh: true }).catch(() => {});
+      const bal = Math.floor(Number(peekOnlineV2Vault().balance) || 0);
+      if (bal < vaultDebit) {
+        setActionError({
+          code: "INSUFFICIENT_BALANCE",
+          message: `Need at least ${Math.floor(vaultDebit).toLocaleString()} coins to commit (have ${bal.toLocaleString()}).`,
+        });
+        return;
+      }
+      const idem = buildOnlineV2EconomyEventKey("commit", rid, pk, r.match_seq, "v2");
       let stakeOut;
       try {
         stakeOut = await commitOv2RoomStake({
@@ -997,7 +1009,7 @@ export function useOv2BoardPathSession(baseContext) {
         typeof window !== "undefined" &&
         window.localStorage.getItem(/** @type {string} */ (debitKey)) === "1";
       if (!debitAlreadyDone) {
-        const debit = await debitOnlineV2Vault(stake, gameId);
+        const debit = await debitOnlineV2Vault(vaultDebit, gameId);
         if (!debit?.ok) {
           setActionError({
             code: "VAULT_DEBIT_FAILED",

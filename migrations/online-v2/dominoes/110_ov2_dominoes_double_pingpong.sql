@@ -1,11 +1,11 @@
--- OV2 FourLine: enforce alternating double offers (ping-pong) + per-seat cap (2 initiations each).
--- Apply after 106_ov2_fourline_shared_integration.sql (or latest fourline migration).
+-- OV2 Dominoes: ping-pong double offers + per-seat initiation caps (align with FourLine 107).
+-- Apply after 101_2_ov2_dominoes_snapshot_expose_result.sql (or latest dominoes migration).
 -- Requires 112_ov2_shared_stake_commit_max_liability.sql (`ov2_shared_require_max_double_liability_for_open_session`).
 
 BEGIN;
 
-CREATE OR REPLACE FUNCTION public.ov2_fourline_build_client_snapshot(
-  p_session public.ov2_fourline_sessions,
+CREATE OR REPLACE FUNCTION public.ov2_dominoes_build_client_snapshot(
+  p_session public.ov2_dominoes_sessions,
   p_participant_key text
 )
 RETURNS jsonb
@@ -20,15 +20,19 @@ DECLARE
   v_turn int;
   v_phase text;
   v_finished boolean;
-  v_cells jsonb;
+  v_line jsonb;
   v_td bigint;
+  v_secrets jsonb;
+  v_hand jsonb;
+  v_opp_hand int;
+  v_bone int;
   v_mult int;
   v_pd jsonb;
-  v_can_offer_dbl boolean := false;
+  v_can_play boolean := false;
   v_can_respond_dbl boolean := false;
+  v_can_offer_dbl boolean := false;
   v_dbl_acc int;
   v_playing boolean;
-  v_lm jsonb;
   v_ic0 int;
   v_ic1 int;
   v_last_init int;
@@ -37,10 +41,7 @@ BEGIN
   v_phase := p_session.phase;
   v_finished := (v_phase = 'finished' OR p_session.winner_seat IS NOT NULL);
   v_playing := (p_session.status = 'live' AND NOT v_finished AND v_phase = 'playing');
-  v_cells := COALESCE(v_board -> 'cells', public.ov2_fl_empty_board());
-  IF jsonb_typeof(v_cells) <> 'array' OR jsonb_array_length(v_cells) < 42 THEN
-    v_cells := public.ov2_fl_empty_board();
-  END IF;
+  v_line := COALESCE(v_board -> 'line', '[]'::jsonb);
   v_turn := NULL;
   BEGIN
     v_turn := (v_board ->> 'turnSeat')::int;
@@ -50,13 +51,43 @@ BEGIN
   END;
 
   SELECT s.seat_index INTO v_my_seat
-  FROM public.ov2_fourline_seats s
+  FROM public.ov2_dominoes_seats s
   WHERE s.session_id = p_session.id AND s.participant_key = v_pk;
 
-  v_mult := public.ov2_fl_parity_stake_mult(p_session.parity_state);
+  SELECT d.payload INTO v_secrets
+  FROM public.ov2_dominoes_secrets d
+  WHERE d.session_id = p_session.id;
+
+  v_hand := '[]'::jsonb;
+  v_opp_hand := 0;
+  v_bone := 0;
+  IF v_secrets IS NOT NULL AND jsonb_typeof(v_secrets) = 'object' THEN
+    IF v_my_seat IS NOT NULL AND v_my_seat IN (0, 1) THEN
+      v_hand := COALESCE(v_secrets -> 'hands' -> (v_my_seat::text), '[]'::jsonb);
+      IF jsonb_typeof(v_hand) <> 'array' THEN
+        v_hand := '[]'::jsonb;
+      END IF;
+      v_opp_hand := COALESCE(
+        jsonb_array_length(COALESCE(v_secrets -> 'hands' -> (CASE WHEN v_my_seat = 0 THEN '1' ELSE '0' END), '[]'::jsonb)),
+        0
+      );
+    ELSE
+      v_opp_hand := 0;
+    END IF;
+    v_bone := COALESCE(jsonb_array_length(COALESCE(v_secrets -> 'boneyard', '[]'::jsonb)), 0);
+  END IF;
+
+  v_mult := public.ov2_dom_parity_stake_mult(p_session.parity_state);
   v_pd := p_session.parity_state -> 'pending_double';
   IF v_pd IS NULL OR jsonb_typeof(v_pd) <> 'object' THEN
     v_pd := NULL;
+  END IF;
+
+  IF v_playing AND v_my_seat IS NOT NULL AND v_turn IN (0, 1) AND v_my_seat = v_turn
+     AND v_pd IS NULL
+     AND jsonb_typeof(v_line) = 'array' THEN
+    v_can_play := public.ov2_dom_hand_has_legal_on_line(v_line, v_hand)
+      OR (public.ov2_dom_line_len(v_line) = 0 AND jsonb_array_length(v_hand) > 0);
   END IF;
 
   IF v_playing AND v_pd IS NOT NULL THEN
@@ -102,11 +133,6 @@ BEGIN
     END;
   END IF;
 
-  v_lm := v_board -> 'lastMove';
-  IF v_lm IS NULL OR jsonb_typeof(v_lm) <> 'object' THEN
-    v_lm := NULL;
-  END IF;
-
   RETURN jsonb_build_object(
     'revision', p_session.revision,
     'sessionId', p_session.id::text,
@@ -116,26 +142,34 @@ BEGIN
     'mySeat', CASE WHEN v_my_seat IS NULL THEN NULL::jsonb ELSE to_jsonb(v_my_seat) END,
     'board', jsonb_build_object(
       'turnSeat', CASE WHEN v_turn IS NULL THEN NULL::jsonb ELSE to_jsonb(v_turn) END,
-      'cells', v_cells,
-      'winner', v_board -> 'winner',
-      'lastMove', COALESCE(to_jsonb(v_lm), 'null'::jsonb)
+      'line', v_line,
+      'winner', v_board -> 'winner'
     ),
     'turnSeat', CASE WHEN v_turn IS NULL THEN NULL::jsonb ELSE to_jsonb(v_turn) END,
-    'cells', v_cells,
-    'lastMove', COALESCE(to_jsonb(v_lm), 'null'::jsonb),
+    'line', v_line,
     'winnerSeat', CASE WHEN p_session.winner_seat IS NULL THEN NULL::jsonb ELSE to_jsonb(p_session.winner_seat) END,
+    'myHand', v_hand,
+    'oppHandCount', to_jsonb(v_opp_hand),
+    'boneyardCount', to_jsonb(v_bone),
     'stakeMultiplier', to_jsonb(v_mult),
     'doublesAccepted', to_jsonb(v_dbl_acc),
     'pendingDouble', COALESCE(to_jsonb(v_pd), 'null'::jsonb),
+    'canClientPlayTiles', v_can_play,
     'canOfferDouble', v_can_offer_dbl,
     'mustRespondDouble', v_can_respond_dbl,
     'turnDeadline', CASE WHEN v_td IS NULL THEN NULL::jsonb ELSE to_jsonb(v_td) END,
-    'missedTurns', COALESCE(p_session.parity_state -> 'missed_turns', jsonb_build_object('0', 0, '1', 0))
+    'missedTurns', COALESCE(p_session.parity_state -> 'missed_turns', jsonb_build_object('0', 0, '1', 0)),
+    'result', (
+      CASE
+        WHEN p_session.phase = 'finished' THEN COALESCE(p_session.parity_state, '{}'::jsonb) -> '__result__'
+        ELSE NULL
+      END
+    )
   );
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.ov2_fourline_offer_double(
+CREATE OR REPLACE FUNCTION public.ov2_dominoes_offer_double(
   p_room_id uuid,
   p_participant_key text,
   p_expected_revision bigint DEFAULT NULL
@@ -148,7 +182,7 @@ AS $$
 DECLARE
   v_room public.ov2_rooms%ROWTYPE;
   v_pk text := trim(COALESCE(p_participant_key, ''));
-  v_sess public.ov2_fourline_sessions%ROWTYPE;
+  v_sess public.ov2_dominoes_sessions%ROWTYPE;
   v_seat int;
   v_board jsonb;
   v_turn int;
@@ -167,14 +201,14 @@ BEGIN
   END IF;
 
   SELECT * INTO v_room FROM public.ov2_rooms WHERE id = p_room_id FOR UPDATE;
-  IF NOT FOUND OR v_room.product_game_id IS DISTINCT FROM 'ov2_fourline' THEN
+  IF NOT FOUND OR v_room.product_game_id IS DISTINCT FROM 'ov2_dominoes' THEN
     RETURN jsonb_build_object('ok', false, 'code', 'ROOM_NOT_FOUND', 'message', 'Room not found');
   END IF;
   IF v_room.active_session_id IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NO_ACTIVE_SESSION', 'message', 'No active session');
   END IF;
 
-  SELECT * INTO v_sess FROM public.ov2_fourline_sessions WHERE id = v_room.active_session_id FOR UPDATE;
+  SELECT * INTO v_sess FROM public.ov2_dominoes_sessions WHERE id = v_room.active_session_id FOR UPDATE;
   IF NOT FOUND OR v_sess.room_id IS DISTINCT FROM p_room_id THEN
     RETURN jsonb_build_object('ok', false, 'code', 'SESSION_NOT_FOUND', 'message', 'Session not found');
   END IF;
@@ -188,7 +222,7 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'code', 'DOUBLE_PENDING', 'message', 'A stake increase is already pending');
   END IF;
 
-  SELECT seat_index INTO v_seat FROM public.ov2_fourline_seats WHERE session_id = v_sess.id AND participant_key = v_pk;
+  SELECT seat_index INTO v_seat FROM public.ov2_dominoes_seats WHERE session_id = v_sess.id AND participant_key = v_pk;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NO_SEAT', 'message', 'No seat for participant');
   END IF;
@@ -200,7 +234,7 @@ BEGIN
   END IF;
 
   v_ps := COALESCE(v_sess.parity_state, '{}'::jsonb);
-  v_mult := public.ov2_fl_parity_stake_mult(v_ps);
+  v_mult := public.ov2_dom_parity_stake_mult(v_ps);
   v_dacc := COALESCE((v_ps ->> 'doubles_accepted')::int, 0);
   IF v_dacc >= 4 OR v_mult >= 16 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NO_MORE_DOUBLES', 'message', 'Maximum stake increases reached');
@@ -260,7 +294,7 @@ BEGIN
     v_ps := jsonb_set(v_ps, '{double_init_1}', to_jsonb(v_ic1 + 1), true);
   END IF;
 
-  UPDATE public.ov2_fourline_sessions
+  UPDATE public.ov2_dominoes_sessions
   SET
     parity_state = v_ps,
     revision = v_sess.revision + 1,
@@ -268,11 +302,11 @@ BEGIN
   WHERE id = v_sess.id
   RETURNING * INTO v_sess;
 
-  RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_fourline_build_client_snapshot(v_sess, v_pk));
+  RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_dominoes_build_client_snapshot(v_sess, v_pk));
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.ov2_fourline_open_session(
+CREATE OR REPLACE FUNCTION public.ov2_dominoes_open_session(
   p_room_id uuid,
   p_participant_key text,
   p_presence_leader_key text
@@ -285,15 +319,21 @@ AS $$
 DECLARE
   v_room public.ov2_rooms%ROWTYPE;
   v_pk text;
-  v_sess public.ov2_fourline_sessions%ROWTYPE;
-  v_existing public.ov2_fourline_sessions%ROWTYPE;
+  v_sess public.ov2_dominoes_sessions%ROWTYPE;
+  v_existing public.ov2_dominoes_sessions%ROWTYPE;
   v_seated_count int;
   v_board jsonb;
   v_is_shared boolean;
   v_entry bigint;
   v_ps jsonb;
+  v_deck jsonb;
   v_first int;
   v_turn int;
+  v_h0 jsonb := '[]'::jsonb;
+  v_h1 jsonb := '[]'::jsonb;
+  v_bone jsonb := '[]'::jsonb;
+  v_i int;
+  v_payload jsonb;
   v_guard jsonb;
 BEGIN
   IF p_room_id IS NULL THEN
@@ -309,8 +349,8 @@ BEGIN
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'code', 'ROOM_NOT_FOUND', 'message', 'Room not found');
   END IF;
-  IF v_room.product_game_id IS DISTINCT FROM 'ov2_fourline' THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'WRONG_PRODUCT', 'message', 'Not a FourLine room');
+  IF v_room.product_game_id IS DISTINCT FROM 'ov2_dominoes' THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'WRONG_PRODUCT', 'message', 'Not a Dominoes room');
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM public.ov2_room_members m
@@ -319,7 +359,7 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'code', 'NOT_MEMBER', 'message', 'Only room members can open a session');
   END IF;
   IF v_room.host_participant_key IS DISTINCT FROM v_pk THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'NOT_HOST', 'message', 'Only room host can open a FourLine session');
+    RETURN jsonb_build_object('ok', false, 'code', 'NOT_HOST', 'message', 'Only room host can open a Dominoes session');
   END IF;
 
   v_is_shared := COALESCE(v_room.shared_schema_version, 0) = 1;
@@ -335,13 +375,13 @@ BEGIN
 
   IF v_room.active_session_id IS NOT NULL THEN
     SELECT * INTO v_existing
-    FROM public.ov2_fourline_sessions
+    FROM public.ov2_dominoes_sessions
     WHERE id = v_room.active_session_id AND room_id = p_room_id;
     IF FOUND AND v_existing.status = 'live' AND v_existing.phase = 'playing' THEN
       RETURN jsonb_build_object(
         'ok', true,
         'idempotent', true,
-        'snapshot', public.ov2_fourline_build_client_snapshot(v_existing, v_pk)
+        'snapshot', public.ov2_dominoes_build_client_snapshot(v_existing, v_pk)
       );
     END IF;
   END IF;
@@ -350,7 +390,7 @@ BEGIN
   FROM public.ov2_room_members m
   WHERE m.room_id = p_room_id AND m.seat_index IS NOT NULL;
   IF v_seated_count IS DISTINCT FROM 2 THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'BAD_SEAT_COUNT', 'message', 'FourLine requires exactly two seated players');
+    RETURN jsonb_build_object('ok', false, 'code', 'BAD_SEAT_COUNT', 'message', 'Dominoes requires exactly two seated players');
   END IF;
   IF EXISTS (
     SELECT 1 FROM public.ov2_room_members m
@@ -364,7 +404,7 @@ BEGIN
     FROM public.ov2_room_members m
     WHERE m.room_id = p_room_id AND m.seat_index IS NOT NULL
   ) IS DISTINCT FROM ARRAY[0, 1]::integer[] THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'BAD_SEAT_ASSIGNMENT', 'message', 'FourLine requires one player in seat 0 and one in seat 1');
+    RETURN jsonb_build_object('ok', false, 'code', 'BAD_SEAT_ASSIGNMENT', 'message', 'Dominoes requires one player in seat 0 and one in seat 1');
   END IF;
   IF EXISTS (
     SELECT 1 FROM public.ov2_room_members m
@@ -380,13 +420,20 @@ BEGIN
     RETURN v_guard;
   END IF;
 
+  v_deck := public.ov2_dom_shuffle_deck(public.ov2_dom_full_deck_jsonb());
+  FOR v_i IN 0..6 LOOP
+    v_h0 := v_h0 || jsonb_build_array(v_deck -> v_i);
+  END LOOP;
+  FOR v_i IN 7..13 LOOP
+    v_h1 := v_h1 || jsonb_build_array(v_deck -> v_i);
+  END LOOP;
+  FOR v_i IN 14..27 LOOP
+    v_bone := v_bone || jsonb_build_array(v_deck -> v_i);
+  END LOOP;
+
   v_first := CASE WHEN random() < 0.5 THEN 0 ELSE 1 END;
   v_turn := v_first;
-  v_board := jsonb_build_object(
-    'turnSeat', v_turn,
-    'cells', public.ov2_fl_empty_board(),
-    'lastMove', NULL
-  );
+  v_board := jsonb_build_object('turnSeat', v_turn, 'line', '[]'::jsonb);
 
   v_entry := COALESCE(v_room.stake_per_seat, 0);
   v_ps := jsonb_build_object(
@@ -401,7 +448,7 @@ BEGIN
     'missed_turns', jsonb_build_object('0', 0, '1', 0)
   );
 
-  INSERT INTO public.ov2_fourline_sessions (
+  INSERT INTO public.ov2_dominoes_sessions (
     room_id, match_seq, status, phase, revision, board, turn_seat, winner_seat, active_seats, parity_state
   ) VALUES (
     p_room_id,
@@ -417,7 +464,14 @@ BEGIN
   )
   RETURNING * INTO v_sess;
 
-  INSERT INTO public.ov2_fourline_seats (session_id, seat_index, participant_key, room_member_id, meta)
+  v_payload := jsonb_build_object(
+    'hands', jsonb_build_object('0', v_h0, '1', v_h1),
+    'boneyard', v_bone
+  );
+  INSERT INTO public.ov2_dominoes_secrets (session_id, payload)
+  VALUES (v_sess.id, v_payload);
+
+  INSERT INTO public.ov2_dominoes_seats (session_id, seat_index, participant_key, room_member_id, meta)
   SELECT
     v_sess.id,
     m.seat_index::int,
@@ -438,18 +492,18 @@ BEGIN
   RETURN jsonb_build_object(
     'ok', true,
     'idempotent', false,
-    'snapshot', public.ov2_fourline_build_client_snapshot(v_sess, v_pk)
+    'snapshot', public.ov2_dominoes_build_client_snapshot(v_sess, v_pk)
   );
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.ov2_fourline_build_client_snapshot(public.ov2_fourline_sessions, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ov2_fourline_build_client_snapshot(public.ov2_fourline_sessions, text) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.ov2_dominoes_build_client_snapshot(public.ov2_dominoes_sessions, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ov2_dominoes_build_client_snapshot(public.ov2_dominoes_sessions, text) TO anon, authenticated, service_role;
 
-REVOKE ALL ON FUNCTION public.ov2_fourline_offer_double(uuid, text, bigint) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ov2_fourline_offer_double(uuid, text, bigint) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.ov2_dominoes_offer_double(uuid, text, bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ov2_dominoes_offer_double(uuid, text, bigint) TO anon, authenticated, service_role;
 
-REVOKE ALL ON FUNCTION public.ov2_fourline_open_session(uuid, text, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ov2_fourline_open_session(uuid, text, text) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.ov2_dominoes_open_session(uuid, text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ov2_dominoes_open_session(uuid, text, text) TO anon, authenticated, service_role;
 
 COMMIT;

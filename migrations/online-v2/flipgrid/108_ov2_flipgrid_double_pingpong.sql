@@ -1,11 +1,11 @@
--- OV2 FourLine: enforce alternating double offers (ping-pong) + per-seat cap (2 initiations each).
--- Apply after 106_ov2_fourline_shared_integration.sql (or latest fourline migration).
+-- OV2 FlipGrid: ping-pong double offers + per-seat initiation caps (align with FourLine 107).
+-- Apply after the latest flipgrid migration (e.g. 115_ov2_flipgrid_rpcs_actions.sql).
 -- Requires 112_ov2_shared_stake_commit_max_liability.sql (`ov2_shared_require_max_double_liability_for_open_session`).
 
 BEGIN;
 
-CREATE OR REPLACE FUNCTION public.ov2_fourline_build_client_snapshot(
-  p_session public.ov2_fourline_sessions,
+CREATE OR REPLACE FUNCTION public.ov2_flipgrid_build_client_snapshot(
+  p_session public.ov2_flipgrid_sessions,
   p_participant_key text
 )
 RETURNS jsonb
@@ -28,7 +28,7 @@ DECLARE
   v_can_respond_dbl boolean := false;
   v_dbl_acc int;
   v_playing boolean;
-  v_lm jsonb;
+  v_legal_n int := 0;
   v_ic0 int;
   v_ic1 int;
   v_last_init int;
@@ -37,9 +37,9 @@ BEGIN
   v_phase := p_session.phase;
   v_finished := (v_phase = 'finished' OR p_session.winner_seat IS NOT NULL);
   v_playing := (p_session.status = 'live' AND NOT v_finished AND v_phase = 'playing');
-  v_cells := COALESCE(v_board -> 'cells', public.ov2_fl_empty_board());
-  IF jsonb_typeof(v_cells) <> 'array' OR jsonb_array_length(v_cells) < 42 THEN
-    v_cells := public.ov2_fl_empty_board();
+  v_cells := COALESCE(v_board -> 'cells', public.ov2_fg_empty_cells());
+  IF jsonb_typeof(v_cells) <> 'array' OR jsonb_array_length(v_cells) < 64 THEN
+    v_cells := public.ov2_fg_empty_cells();
   END IF;
   v_turn := NULL;
   BEGIN
@@ -50,10 +50,14 @@ BEGIN
   END;
 
   SELECT s.seat_index INTO v_my_seat
-  FROM public.ov2_fourline_seats s
+  FROM public.ov2_flipgrid_seats s
   WHERE s.session_id = p_session.id AND s.participant_key = v_pk;
 
-  v_mult := public.ov2_fl_parity_stake_mult(p_session.parity_state);
+  IF v_playing AND v_turn IN (0, 1) THEN
+    v_legal_n := public.ov2_flipgrid_legal_move_count(v_cells, v_turn);
+  END IF;
+
+  v_mult := public.ov2_fg_parity_stake_mult(p_session.parity_state);
   v_pd := p_session.parity_state -> 'pending_double';
   IF v_pd IS NULL OR jsonb_typeof(v_pd) <> 'object' THEN
     v_pd := NULL;
@@ -102,11 +106,6 @@ BEGIN
     END;
   END IF;
 
-  v_lm := v_board -> 'lastMove';
-  IF v_lm IS NULL OR jsonb_typeof(v_lm) <> 'object' THEN
-    v_lm := NULL;
-  END IF;
-
   RETURN jsonb_build_object(
     'revision', p_session.revision,
     'sessionId', p_session.id::text,
@@ -117,12 +116,15 @@ BEGIN
     'board', jsonb_build_object(
       'turnSeat', CASE WHEN v_turn IS NULL THEN NULL::jsonb ELSE to_jsonb(v_turn) END,
       'cells', v_cells,
-      'winner', v_board -> 'winner',
-      'lastMove', COALESCE(to_jsonb(v_lm), 'null'::jsonb)
+      'winner', v_board -> 'winner'
     ),
     'turnSeat', CASE WHEN v_turn IS NULL THEN NULL::jsonb ELSE to_jsonb(v_turn) END,
     'cells', v_cells,
-    'lastMove', COALESCE(to_jsonb(v_lm), 'null'::jsonb),
+    'discCounts', jsonb_build_object(
+      '0', public.ov2_fg_disc_count(v_cells, 0),
+      '1', public.ov2_fg_disc_count(v_cells, 1)
+    ),
+    'turnHolderLegalMoveCount', to_jsonb(v_legal_n),
     'winnerSeat', CASE WHEN p_session.winner_seat IS NULL THEN NULL::jsonb ELSE to_jsonb(p_session.winner_seat) END,
     'stakeMultiplier', to_jsonb(v_mult),
     'doublesAccepted', to_jsonb(v_dbl_acc),
@@ -135,7 +137,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.ov2_fourline_offer_double(
+CREATE OR REPLACE FUNCTION public.ov2_flipgrid_offer_double(
   p_room_id uuid,
   p_participant_key text,
   p_expected_revision bigint DEFAULT NULL
@@ -148,7 +150,7 @@ AS $$
 DECLARE
   v_room public.ov2_rooms%ROWTYPE;
   v_pk text := trim(COALESCE(p_participant_key, ''));
-  v_sess public.ov2_fourline_sessions%ROWTYPE;
+  v_sess public.ov2_flipgrid_sessions%ROWTYPE;
   v_seat int;
   v_board jsonb;
   v_turn int;
@@ -167,14 +169,14 @@ BEGIN
   END IF;
 
   SELECT * INTO v_room FROM public.ov2_rooms WHERE id = p_room_id FOR UPDATE;
-  IF NOT FOUND OR v_room.product_game_id IS DISTINCT FROM 'ov2_fourline' THEN
+  IF NOT FOUND OR v_room.product_game_id IS DISTINCT FROM 'ov2_flipgrid' THEN
     RETURN jsonb_build_object('ok', false, 'code', 'ROOM_NOT_FOUND', 'message', 'Room not found');
   END IF;
   IF v_room.active_session_id IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NO_ACTIVE_SESSION', 'message', 'No active session');
   END IF;
 
-  SELECT * INTO v_sess FROM public.ov2_fourline_sessions WHERE id = v_room.active_session_id FOR UPDATE;
+  SELECT * INTO v_sess FROM public.ov2_flipgrid_sessions WHERE id = v_room.active_session_id FOR UPDATE;
   IF NOT FOUND OR v_sess.room_id IS DISTINCT FROM p_room_id THEN
     RETURN jsonb_build_object('ok', false, 'code', 'SESSION_NOT_FOUND', 'message', 'Session not found');
   END IF;
@@ -188,7 +190,7 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'code', 'DOUBLE_PENDING', 'message', 'A stake increase is already pending');
   END IF;
 
-  SELECT seat_index INTO v_seat FROM public.ov2_fourline_seats WHERE session_id = v_sess.id AND participant_key = v_pk;
+  SELECT seat_index INTO v_seat FROM public.ov2_flipgrid_seats WHERE session_id = v_sess.id AND participant_key = v_pk;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NO_SEAT', 'message', 'No seat for participant');
   END IF;
@@ -200,7 +202,7 @@ BEGIN
   END IF;
 
   v_ps := COALESCE(v_sess.parity_state, '{}'::jsonb);
-  v_mult := public.ov2_fl_parity_stake_mult(v_ps);
+  v_mult := public.ov2_fg_parity_stake_mult(v_ps);
   v_dacc := COALESCE((v_ps ->> 'doubles_accepted')::int, 0);
   IF v_dacc >= 4 OR v_mult >= 16 THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NO_MORE_DOUBLES', 'message', 'Maximum stake increases reached');
@@ -260,7 +262,7 @@ BEGIN
     v_ps := jsonb_set(v_ps, '{double_init_1}', to_jsonb(v_ic1 + 1), true);
   END IF;
 
-  UPDATE public.ov2_fourline_sessions
+  UPDATE public.ov2_flipgrid_sessions
   SET
     parity_state = v_ps,
     revision = v_sess.revision + 1,
@@ -268,11 +270,11 @@ BEGIN
   WHERE id = v_sess.id
   RETURNING * INTO v_sess;
 
-  RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_fourline_build_client_snapshot(v_sess, v_pk));
+  RETURN jsonb_build_object('ok', true, 'snapshot', public.ov2_flipgrid_build_client_snapshot(v_sess, v_pk));
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.ov2_fourline_open_session(
+CREATE OR REPLACE FUNCTION public.ov2_flipgrid_open_session(
   p_room_id uuid,
   p_participant_key text,
   p_presence_leader_key text
@@ -285,15 +287,21 @@ AS $$
 DECLARE
   v_room public.ov2_rooms%ROWTYPE;
   v_pk text;
-  v_sess public.ov2_fourline_sessions%ROWTYPE;
-  v_existing public.ov2_fourline_sessions%ROWTYPE;
+  v_sess public.ov2_flipgrid_sessions%ROWTYPE;
+  v_existing public.ov2_flipgrid_sessions%ROWTYPE;
   v_seated_count int;
   v_board jsonb;
   v_is_shared boolean;
   v_entry bigint;
   v_ps jsonb;
   v_first int;
-  v_turn int;
+  v_cells jsonb;
+  v_fin_board jsonb;
+  v_fin_parity jsonb;
+  v_fin_turn int;
+  v_fin_done boolean;
+  v_fin_w int;
+  v_mult bigint;
   v_guard jsonb;
 BEGIN
   IF p_room_id IS NULL THEN
@@ -309,8 +317,8 @@ BEGIN
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'code', 'ROOM_NOT_FOUND', 'message', 'Room not found');
   END IF;
-  IF v_room.product_game_id IS DISTINCT FROM 'ov2_fourline' THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'WRONG_PRODUCT', 'message', 'Not a FourLine room');
+  IF v_room.product_game_id IS DISTINCT FROM 'ov2_flipgrid' THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'WRONG_PRODUCT', 'message', 'Not a FlipGrid room');
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM public.ov2_room_members m
@@ -319,7 +327,7 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'code', 'NOT_MEMBER', 'message', 'Only room members can open a session');
   END IF;
   IF v_room.host_participant_key IS DISTINCT FROM v_pk THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'NOT_HOST', 'message', 'Only room host can open a FourLine session');
+    RETURN jsonb_build_object('ok', false, 'code', 'NOT_HOST', 'message', 'Only room host can open a FlipGrid session');
   END IF;
 
   v_is_shared := COALESCE(v_room.shared_schema_version, 0) = 1;
@@ -335,13 +343,13 @@ BEGIN
 
   IF v_room.active_session_id IS NOT NULL THEN
     SELECT * INTO v_existing
-    FROM public.ov2_fourline_sessions
+    FROM public.ov2_flipgrid_sessions
     WHERE id = v_room.active_session_id AND room_id = p_room_id;
     IF FOUND AND v_existing.status = 'live' AND v_existing.phase = 'playing' THEN
       RETURN jsonb_build_object(
         'ok', true,
         'idempotent', true,
-        'snapshot', public.ov2_fourline_build_client_snapshot(v_existing, v_pk)
+        'snapshot', public.ov2_flipgrid_build_client_snapshot(v_existing, v_pk)
       );
     END IF;
   END IF;
@@ -350,7 +358,7 @@ BEGIN
   FROM public.ov2_room_members m
   WHERE m.room_id = p_room_id AND m.seat_index IS NOT NULL;
   IF v_seated_count IS DISTINCT FROM 2 THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'BAD_SEAT_COUNT', 'message', 'FourLine requires exactly two seated players');
+    RETURN jsonb_build_object('ok', false, 'code', 'BAD_SEAT_COUNT', 'message', 'FlipGrid requires exactly two seated players');
   END IF;
   IF EXISTS (
     SELECT 1 FROM public.ov2_room_members m
@@ -364,7 +372,7 @@ BEGIN
     FROM public.ov2_room_members m
     WHERE m.room_id = p_room_id AND m.seat_index IS NOT NULL
   ) IS DISTINCT FROM ARRAY[0, 1]::integer[] THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'BAD_SEAT_ASSIGNMENT', 'message', 'FourLine requires one player in seat 0 and one in seat 1');
+    RETURN jsonb_build_object('ok', false, 'code', 'BAD_SEAT_ASSIGNMENT', 'message', 'FlipGrid requires one player in seat 0 and one in seat 1');
   END IF;
   IF EXISTS (
     SELECT 1 FROM public.ov2_room_members m
@@ -381,11 +389,10 @@ BEGIN
   END IF;
 
   v_first := CASE WHEN random() < 0.5 THEN 0 ELSE 1 END;
-  v_turn := v_first;
+  v_cells := public.ov2_fg_initial_cells();
   v_board := jsonb_build_object(
-    'turnSeat', v_turn,
-    'cells', public.ov2_fl_empty_board(),
-    'lastMove', NULL
+    'turnSeat', v_first,
+    'cells', v_cells
   );
 
   v_entry := COALESCE(v_room.stake_per_seat, 0);
@@ -397,27 +404,87 @@ BEGIN
     'double_init_0', 0,
     'double_init_1', 0,
     'turn_deadline_at', (extract(epoch from now()) * 1000)::bigint + 30000,
-    'turn_deadline_seat', to_jsonb(v_turn),
+    'turn_deadline_seat', to_jsonb(v_first),
     'missed_turns', jsonb_build_object('0', 0, '1', 0)
   );
 
-  INSERT INTO public.ov2_fourline_sessions (
-    room_id, match_seq, status, phase, revision, board, turn_seat, winner_seat, active_seats, parity_state
-  ) VALUES (
-    p_room_id,
-    v_room.match_seq,
-    'live',
-    'playing',
-    0,
-    v_board,
-    v_turn,
-    NULL,
-    ARRAY[0, 1]::integer[],
-    v_ps
-  )
-  RETURNING * INTO v_sess;
+  SELECT f.o_board, f.o_parity, f.o_turn, f.o_finished, f.o_winner
+  INTO v_fin_board, v_fin_parity, v_fin_turn, v_fin_done, v_fin_w
+  FROM public.ov2_flipgrid_finalize_turn_state(v_board, v_ps, NULL) AS f;
 
-  INSERT INTO public.ov2_fourline_seats (session_id, seat_index, participant_key, room_member_id, meta)
+  IF v_fin_done THEN
+    v_mult := public.ov2_fg_parity_stake_mult(v_fin_parity);
+    IF v_fin_w IS NULL THEN
+      v_fin_parity := jsonb_set(
+        v_fin_parity,
+        '{__result__}',
+        jsonb_build_object(
+          'draw', true,
+          'discDraw', true,
+          'refundPerSeat', v_entry * v_mult,
+          'stakeMultiplier', v_mult,
+          'discCounts', jsonb_build_object(
+            '0', public.ov2_fg_disc_count(v_fin_board -> 'cells', 0),
+            '1', public.ov2_fg_disc_count(v_fin_board -> 'cells', 1)
+          ),
+          'timestamp', (extract(epoch from now()) * 1000)::bigint
+        ),
+        true
+      );
+    ELSE
+      v_fin_parity := jsonb_set(
+        v_fin_parity,
+        '{__result__}',
+        jsonb_build_object(
+          'winner', v_fin_w,
+          'prize', v_entry * 2 * v_mult,
+          'lossPerSeat', v_entry * v_mult,
+          'stakeMultiplier', v_mult,
+          'discCounts', jsonb_build_object(
+            '0', public.ov2_fg_disc_count(v_fin_board -> 'cells', 0),
+            '1', public.ov2_fg_disc_count(v_fin_board -> 'cells', 1)
+          ),
+          'timestamp', (extract(epoch from now()) * 1000)::bigint
+        ),
+        true
+      );
+      v_fin_board := jsonb_set(v_fin_board, '{winner}', to_jsonb(v_fin_w), true);
+    END IF;
+
+    INSERT INTO public.ov2_flipgrid_sessions (
+      room_id, match_seq, status, phase, revision, board, turn_seat, winner_seat, active_seats, parity_state
+    ) VALUES (
+      p_room_id,
+      v_room.match_seq,
+      'live',
+      'finished',
+      0,
+      v_fin_board,
+      v_fin_turn,
+      v_fin_w,
+      ARRAY[0, 1]::integer[],
+      v_fin_parity
+    )
+    RETURNING * INTO v_sess;
+  ELSE
+    INSERT INTO public.ov2_flipgrid_sessions (
+      room_id, match_seq, status, phase, revision, board, turn_seat, winner_seat, active_seats, parity_state
+    ) VALUES (
+      p_room_id,
+      v_room.match_seq,
+      'live',
+      'playing',
+      0,
+      v_fin_board,
+      v_fin_turn,
+      NULL,
+      ARRAY[0, 1]::integer[],
+      v_fin_parity
+    )
+    RETURNING * INTO v_sess;
+  END IF;
+
+  INSERT INTO public.ov2_flipgrid_seats (session_id, seat_index, participant_key, room_member_id, meta)
   SELECT
     v_sess.id,
     m.seat_index::int,
@@ -438,18 +505,18 @@ BEGIN
   RETURN jsonb_build_object(
     'ok', true,
     'idempotent', false,
-    'snapshot', public.ov2_fourline_build_client_snapshot(v_sess, v_pk)
+    'snapshot', public.ov2_flipgrid_build_client_snapshot(v_sess, v_pk)
   );
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.ov2_fourline_build_client_snapshot(public.ov2_fourline_sessions, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ov2_fourline_build_client_snapshot(public.ov2_fourline_sessions, text) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.ov2_flipgrid_build_client_snapshot(public.ov2_flipgrid_sessions, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ov2_flipgrid_build_client_snapshot(public.ov2_flipgrid_sessions, text) TO anon, authenticated, service_role;
 
-REVOKE ALL ON FUNCTION public.ov2_fourline_offer_double(uuid, text, bigint) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ov2_fourline_offer_double(uuid, text, bigint) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.ov2_flipgrid_offer_double(uuid, text, bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ov2_flipgrid_offer_double(uuid, text, bigint) TO anon, authenticated, service_role;
 
-REVOKE ALL ON FUNCTION public.ov2_fourline_open_session(uuid, text, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ov2_fourline_open_session(uuid, text, text) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.ov2_flipgrid_open_session(uuid, text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ov2_flipgrid_open_session(uuid, text, text) TO anon, authenticated, service_role;
 
 COMMIT;

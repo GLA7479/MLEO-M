@@ -405,6 +405,8 @@ export function useOv2FleetHuntSession(baseContext) {
       stakeMultiplier: snap?.stakeMultiplier ?? 1,
       doublesAccepted: snap?.doublesAccepted ?? 0,
       pendingDouble: snap?.pendingDouble ?? null,
+      canOfferDouble: snap?.canOfferDouble === true,
+      mustRespondDouble: snap?.mustRespondDouble === true,
       result: snap?.result ?? null,
     };
   }, [snap, nowMs]);

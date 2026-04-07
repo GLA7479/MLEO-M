@@ -75,6 +75,7 @@ import {
 import {
   buildOnlineV2EconomyEventKey,
   clampSuggestedOnlineV2Stake,
+  getOv2MaxRoundLiabilityMult,
   ONLINE_V2_GAME_KINDS,
 } from "../../../lib/online-v2/ov2Economy";
 import { debitOnlineV2Vault, peekOnlineV2Vault, readOnlineV2Vault } from "../../../lib/online-v2/onlineV2VaultBridge";
@@ -88,7 +89,7 @@ import { isOv2QuickMatchRoom, parseOv2QuickMatchLobbyDeadlineIso } from "../../.
 import Ov2SharedSeatGrid from "./Ov2SharedSeatGrid";
 
 function ov2StakeDebitLocalKey(roomId, matchSeq, participantKey) {
-  return `ov2_stake_debit_v1:${roomId}:${matchSeq}:${participantKey}`;
+  return `ov2_stake_debit_v2:${roomId}:${matchSeq}:${participantKey}`;
 }
 
 function fmtStake(n) {
@@ -604,10 +605,16 @@ export default function Ov2SharedRoomScreen({
     onExitRoom();
   }, [room, loading, onExitRoom]);
 
-  async function ensureBalanceForStake(stake) {
+  /**
+   * @param {unknown} stakeRaw `stake_per_seat`
+   * @param {string|null|undefined} productGameId `ov2_rooms.product_game_id`
+   */
+  async function ensureBalanceForStake(stakeRaw, productGameId) {
     await readOnlineV2Vault({ fresh: true }).catch(() => {});
     const bal = Math.floor(Number(peekOnlineV2Vault().balance) || 0);
-    const need = clampSuggestedOnlineV2Stake(stake);
+    const stake = clampSuggestedOnlineV2Stake(stakeRaw);
+    const mult = getOv2MaxRoundLiabilityMult(productGameId);
+    const need = stake * mult;
     if (bal < need) {
       return { ok: false, error: `Need at least ${fmtStake(need)} coins (have ${fmtStake(bal)}).` };
     }
@@ -629,9 +636,11 @@ export default function Ov2SharedRoomScreen({
       /* not in lobby */
     }
     const stake = clampSuggestedOnlineV2Stake(canonRow.stake_per_seat);
-    const bal = await ensureBalanceForStake(canonRow.stake_per_seat);
+    const liabilityMult = getOv2MaxRoundLiabilityMult(canonRow.product_game_id);
+    const vaultDebit = stake * liabilityMult;
+    const bal = await ensureBalanceForStake(canonRow.stake_per_seat, canonRow.product_game_id);
     if (!bal.ok) return { ok: false, error: bal.error };
-    const idem = buildOnlineV2EconomyEventKey("commit", roomId, pk, canonRow.match_seq, "v1");
+    const idem = buildOnlineV2EconomyEventKey("commit", roomId, pk, canonRow.match_seq, "v2");
     const stakeOut = await commitOv2RoomStake({
       room_id: roomId,
       participant_key: pk,
@@ -643,7 +652,7 @@ export default function Ov2SharedRoomScreen({
       typeof window !== "undefined" ? ov2StakeDebitLocalKey(roomId, rAfter.match_seq, pk) : null;
     const debitAlreadyDone = debitKey && window.localStorage.getItem(debitKey) === "1";
     if (!debitAlreadyDone) {
-      const debit = await debitOnlineV2Vault(stake, rAfter.product_game_id);
+      const debit = await debitOnlineV2Vault(vaultDebit, rAfter.product_game_id);
       if (!debit?.ok) {
         await refreshSharedEconomySnapshot();
         await reload();
