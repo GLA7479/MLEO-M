@@ -367,9 +367,43 @@ export default function Ov2FleetHuntLiveShell() {
       title="Fleet Hunt"
       showSubtitle={false}
       chromePreset="ov2_board"
+      suppressReservedAdSlot
       infoPanel={
         <>
           <div className="space-y-0 text-[11px] leading-relaxed text-zinc-400">
+            <section className="border-b border-white/[0.05] py-2.5 first:pt-0 last:border-b-0 last:pb-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Board legend</p>
+              <ul className="mt-1.5 space-y-1 text-zinc-400/95">
+                <li>
+                  <span className="text-sky-300/90" aria-hidden>
+                    ○
+                  </span>{" "}
+                  Miss — empty ocean on your radar
+                </li>
+                <li>
+                  <span className="text-rose-300/90" aria-hidden>
+                    ●
+                  </span>{" "}
+                  Hit — you struck a ship cell
+                </li>
+                <li>
+                  <span className="text-amber-200/90" aria-hidden>
+                    ⊗
+                  </span>{" "}
+                  Sunk — a full enemy ship is destroyed
+                </li>
+                <li>
+                  <span className="text-slate-300/90" aria-hidden>
+                    ■
+                  </span>{" "}
+                  Your ships (defense board only)
+                </li>
+              </ul>
+              <p className="mt-2 text-[10px] text-zinc-500">
+                Radar shows your outgoing shots. Fleet shows incoming fire on your layout — you never see the
+                opponent&apos;s ship positions.
+              </p>
+            </section>
             <section className="border-b border-white/[0.05] py-2.5 first:pt-0 last:border-b-0 last:pb-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Rules</p>
               <p className="mt-1.5 text-zinc-400/95">
