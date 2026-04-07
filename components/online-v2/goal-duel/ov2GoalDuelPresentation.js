@@ -16,18 +16,66 @@ const HW = 14;
 const HH = 22;
 
 /** Large error → snap local player to authority (world px). Stale or fresh — safety only. */
-const PLAYER_SNAP_DIST = 125;
+const PLAYER_SNAP_DIST = 105;
 /** No soft correction below this (fresh auth only). */
 const LOCAL_DEAD_ZONE = 4;
-/** Soft catch-up strength toward authority when a new snapshot revision arrives (per second). */
-const LOCAL_CORRECT_RATE = 4.2;
+/**
+ * Soft catch-up toward authority when a new snapshot revision arrives.
+ * NOTE: This is applied only on fresh authoritative updates, so it is tuned *per update* (not per second).
+ */
+const LOCAL_CORRECT_BASE = 0.045;
+const LOCAL_CORRECT_PER_PX = 0.00135;
 /** Caps blend factor for one correction tick (fresh auth). */
-const LOCAL_CORRECT_MAX_STEP = 0.28;
+const LOCAL_CORRECT_MAX_STEP = 0.32;
 /** While steering, allow limited x-correction if drift is large (prevents long-lived lead). */
 const LOCAL_STEER_DRIFT_X = 26;
 const LOCAL_STEER_X_CORRECT_SCALE = 0.22;
 /** Remote player smoothing (higher = snappier follow of snapshots). */
 const REMOTE_SMOOTH_RATE = 14;
+
+/**
+ * Fresh-auth velocity reconciliation for the local player.
+ *
+ * Prevents stale local velocity from integrating away from authority (notably under mirrored seat-1 snapshots),
+ * while preserving responsive steering/jump feel.
+ *
+ * @param {GdVecBody} p
+ * @param {GdVecBody} auth
+ * @param {{ steerX: boolean, jumpHeld: boolean }} opts
+ * @returns {{ vxSynced: boolean, vySynced: boolean, dvx: number, dvy: number }}
+ */
+function reconcileLocalVelocity(p, auth, opts) {
+  const dvx = auth.vx - p.vx;
+  const dvy = auth.vy - p.vy;
+
+  let vxSynced = false;
+  let vySynced = false;
+
+  // Horizontal velocity: if not actively steering, match authority exactly.
+  if (!opts.steerX) {
+    p.vx = auth.vx;
+    vxSynced = true;
+  } else {
+    // While steering, do not fully overwrite vx unless divergence is severe.
+    const s0 = Math.sign(p.vx);
+    const s1 = Math.sign(auth.vx);
+    const signMismatchX = s0 !== 0 && s1 !== 0 && s0 !== s1;
+    const largeVelErrorX = Math.abs(dvx) >= 90;
+    if (signMismatchX || largeVelErrorX) {
+      // Strong blend; still not a full overwrite.
+      p.vx += dvx * 0.45;
+      vxSynced = true;
+    }
+  }
+
+  // Vertical velocity: if jump is not held, match authority exactly.
+  if (!opts.jumpHeld) {
+    p.vy = auth.vy;
+    vySynced = true;
+  }
+
+  return { vxSynced, vySynced, dvx, dvy };
+}
 
 /** Ball-only: snap presentation to authority if drift exceeds this (world px). */
 const BALL_SNAP_DIST = 78;
@@ -194,11 +242,37 @@ function softCorrectLocalPlayer(p, auth, dt, opts) {
     p.vy = auth.vy;
     return;
   }
+  const neutral = !opts.steerX && !opts.jumpHeld;
+
+  // Neutral drift guard (runs every frame, even when authority is not fresh).
+  // Goal: avoid long-lived idle drift (notably for seat 1 mirrored snapshots) without opposing active control.
+  if (neutral) {
+    p.vx = auth.vx;
+    p.vy = auth.vy;
+
+    const adx = Math.abs(dx);
+    if (adx >= 48) p.x = auth.x;
+    else if (adx >= 18) p.x += dx * 0.18;
+
+    const ady = Math.abs(dy);
+    if (ady >= 18) p.y = auth.y;
+    else if (ady >= 6) p.y += dy * 0.25;
+  }
+
   if (!opts.freshAuth) return;
 
-  if (d < LOCAL_DEAD_ZONE) return;
+  // Always reconcile velocity on fresh auth, even when position error is tiny.
+  const vel = reconcileLocalVelocity(p, auth, { steerX: opts.steerX, jumpHeld: opts.jumpHeld });
 
-  const t = Math.min(LOCAL_CORRECT_MAX_STEP, 0.035 + d * 0.00065) * Math.min(1, LOCAL_CORRECT_RATE * dt);
+  if (d < LOCAL_DEAD_ZONE) {
+    p.__vxSynced = vel.vxSynced;
+    p.__vySynced = vel.vySynced;
+    p.__dvx = vel.dvx;
+    p.__dvy = vel.dvy;
+    return;
+  }
+
+  const t = Math.min(LOCAL_CORRECT_MAX_STEP, LOCAL_CORRECT_BASE + d * LOCAL_CORRECT_PER_PX);
   /**
    * Production rule: while the player is actively controlling an axis, do not apply soft correction that can
    * feel like opposing force. Authority will still be enforced via: (a) snap on large desync, (b) settle when neutral.
@@ -212,6 +286,12 @@ function softCorrectLocalPlayer(p, auth, dt, opts) {
   const hy = opts.jumpHeld ? 0 : 1;
   if (hx !== 0) p.x += dx * t * hx;
   if (hy !== 0) p.y += dy * t;
+
+  // Expose to optional dev logging in `gdAdvancePresentation`.
+  p.__vxSynced = vel.vxSynced;
+  p.__vySynced = vel.vySynced;
+  p.__dvx = vel.dvx;
+  p.__dvy = vel.dvy;
 }
 
 /**
@@ -307,7 +387,6 @@ export function gdSeatWorldInput(inp) {
 export function gdAdvancePresentation(st, authPub, inp, mySeat, dtSec, meta) {
   const dt = Math.min(0.09, Math.max(0.001, dtSec));
   const authRevision = Number(meta.revision ?? 0);
-  const arena = readArena(authPub);
   const p0a = authPub.p0 && typeof authPub.p0 === "object" ? /** @type {Record<string, unknown>} */ (authPub.p0) : {};
   const p1a = authPub.p1 && typeof authPub.p1 === "object" ? /** @type {Record<string, unknown>} */ (authPub.p1) : {};
   const ba = authPub.ball && typeof authPub.ball === "object" ? /** @type {Record<string, unknown>} */ (authPub.ball) : {};
@@ -363,11 +442,18 @@ export function gdAdvancePresentation(st, authPub, inp, mySeat, dtSec, meta) {
     typeof window !== "undefined" &&
     window.localStorage?.getItem("ov2_gd_debug") === "1";
 
-  stepPlayerPhysics(local, sin, dt, arena);
+  // TODO(goal-duel): remove this temporary authority-follow fallback once both seats share
+  // a stable local prediction/reconciliation path again.
+  // Temporary parity/stability mode:
+  // keep both seats on the same local-player render path so neither side is "worse".
+  // The local player follows authority directly on both seats until we return for a deeper fix.
+  syncPlayerFromAuth(local, authLocal);
   if (dbgOn) {
     const dx = authLocal.x - local.x;
     const dy = authLocal.y - local.y;
     const dist = Math.hypot(dx, dy);
+    const dvx = Number(local.__dvx ?? 0);
+    const dvy = Number(local.__dvy ?? 0);
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();
     const last = Number(st.__dbgLastMs ?? 0);
     if ((dist >= 18 || Math.abs(dx) >= 18) && now - last > 160) {
@@ -376,20 +462,19 @@ export function gdAdvancePresentation(st, authPub, inp, mySeat, dtSec, meta) {
       console.info("[ov2/gd][pres]", {
         rev: authRevision,
         freshAuth,
+        neutral: !(sin.l !== sin.r) && !Boolean(sin.j),
         steerX: sin.l !== sin.r,
         jumpHeld: Boolean(sin.j),
-        auth: { x: authLocal.x, vx: authLocal.vx },
-        pres: { x: local.x, vx: local.vx },
+        auth: { x: authLocal.x, vx: authLocal.vx, vy: authLocal.vy },
+        pres: { x: local.x, vx: local.vx, vy: local.vy },
         dx,
         dist,
+        dvx,
+        dvy,
+        velSync: { vx: Boolean(local.__vxSynced), vy: Boolean(local.__vySynced) },
       });
     }
   }
-  softCorrectLocalPlayer(local, authLocal, dt, {
-    freshAuth,
-    steerX: sin.l !== sin.r,
-    jumpHeld: sin.j,
-  });
 
   smoothTowardVec(remote, authRemote, dt);
 

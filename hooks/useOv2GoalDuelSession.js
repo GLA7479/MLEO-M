@@ -160,12 +160,14 @@ export function useOv2GoalDuelSession(baseContext) {
      *   enabled: boolean,
      *   lastStepSendMs: number,
      *   lastSnapshotReceiveMs: number,
+     *   lastSnapshotSource: string,
      *   lastSend: { l: boolean, r: boolean, j: boolean, k: boolean }|null,
      *   lastRecv: { revision: number, mySeat: 0|1|null, p0x: number, p0y: number, p1x: number, p1y: number, bx: number, by: number }|null,
      * }} */ ({
       enabled: false,
       lastStepSendMs: 0,
       lastSnapshotReceiveMs: 0,
+      lastSnapshotSource: "",
       lastSend: null,
       lastRecv: null,
     })
@@ -206,6 +208,12 @@ export function useOv2GoalDuelSession(baseContext) {
           console.info("[ov2/gd][drop-snap]", { source, reason: "older_revision", curSid, nextSid, curRev, nextRev });
         }
         return prev;
+      }
+
+      if (gdDebugRef.current.enabled) {
+        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        gdDebugRef.current.lastSnapshotReceiveMs = now;
+        gdDebugRef.current.lastSnapshotSource = String(source);
       }
       return nextSnap;
     });
@@ -256,7 +264,6 @@ export function useOv2GoalDuelSession(baseContext) {
           const p0 = pub.p0 && typeof pub.p0 === "object" ? pub.p0 : {};
           const p1 = pub.p1 && typeof pub.p1 === "object" ? pub.p1 : {};
           const ball = pub.ball && typeof pub.ball === "object" ? pub.ball : {};
-          gdDebugRef.current.lastSnapshotReceiveMs = now;
           gdDebugRef.current.lastRecv = {
             revision: Number(s.revision ?? 0) || 0,
             mySeat: s.mySeat === 0 || s.mySeat === 1 ? s.mySeat : null,

@@ -892,15 +892,35 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
         const dy = Number.isFinite(ay) ? ay - (mySeat === 0 ? p0y : p1y) : NaN;
         const dist = Number.isFinite(dx) && Number.isFinite(dy) ? Math.hypot(dx, dy) : NaN;
 
+        const authVx = Number(authLocal.vx ?? NaN);
+        const authVy = Number(authLocal.vy ?? NaN);
+        const lastRecvMs = Number(gdDebugStats?.lastSnapshotReceiveMs || 0);
+        const authAgeMs = lastRecvMs > 0 ? Math.max(0, nowMs - lastRecvMs) : NaN;
+        const authAgeSec = Number.isFinite(authAgeMs) ? authAgeMs / 1000 : NaN;
+        const hwLocal = mySeat === 0 ? hw0 : hw1;
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+        const projectedXRaw =
+          Number.isFinite(ax) && Number.isFinite(authVx) && Number.isFinite(authAgeSec) ? ax + authVx * authAgeSec : NaN;
+        const projectedX =
+          Number.isFinite(projectedXRaw) && Number.isFinite(hwLocal) ? clamp(projectedXRaw, hwLocal, aw - hwLocal) : NaN;
+        // dx is defined as authX - presX; compare against (authX - projectedX) for a projected-present diagnostic.
+        const expectedLeadX = Number.isFinite(ax) && Number.isFinite(projectedX) ? ax - projectedX : NaN;
+        const leadErrorX = Number.isFinite(dx) && Number.isFinite(expectedLeadX) ? dx - expectedLeadX : NaN;
+
         const lines = [
           `GD_DEBUG mode=${gdMode || "presentation"} seat=${String(mySeat)} rev=${String(live.revision ?? "")}`,
           `screen intent: L=${scr.l} R=${scr.r} J=${scr.j} K=${scr.k}  jTap=${Boolean(inp.jTap)} kTap=${Boolean(inp.kTap)}`,
           `world(send): ${world ? `L=${world.l} R=${world.r} J=${world.j} K=${world.k}` : "(no send yet)"}`,
-          `timing: lastSend=${Math.round(Number(gdDebugStats?.lastStepSendMs || 0))}ms lastRecv=${Math.round(
-            Number(gdDebugStats?.lastSnapshotReceiveMs || 0)
+          `authAgeMs=${Number.isFinite(authAgeMs) ? Math.round(authAgeMs) : "?"} src=${String(gdDebugStats?.lastSnapshotSource || "?")}  lastSend=${Math.round(
+            Number(gdDebugStats?.lastStepSendMs || 0)
           )}ms`,
           `local authΔ: dx=${Number.isFinite(dx) ? dx.toFixed(1) : "?"} dy=${Number.isFinite(dy) ? dy.toFixed(1) : "?"} dist=${
             Number.isFinite(dist) ? dist.toFixed(1) : "?"
+          }`,
+          `authLocal v=(${Number.isFinite(authVx) ? authVx.toFixed(1) : "?"},${Number.isFinite(authVy) ? authVy.toFixed(1) : "?"}) projX=${
+            Number.isFinite(projectedX) ? projectedX.toFixed(1) : "?"
+          } expLeadX=${Number.isFinite(expectedLeadX) ? expectedLeadX.toFixed(1) : "?"} leadErrX=${
+            Number.isFinite(leadErrorX) ? leadErrorX.toFixed(1) : "?"
           }`,
           `auth p0=(${Number(p0Auth.x ?? 0).toFixed(1)},${Number(p0Auth.y ?? 0).toFixed(1)}) p1=(${Number(p1Auth.x ?? 0).toFixed(
             1
