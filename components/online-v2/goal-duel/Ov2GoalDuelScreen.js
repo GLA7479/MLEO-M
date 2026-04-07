@@ -23,6 +23,9 @@ const GD_SPRITE_HOME = "/images/online-v2/goal-duel/gd-dog-home.png";
 const GD_SPRITE_AWAY = "/images/online-v2/goal-duel/gd-dog-away.png";
 const GD_SPRITE_BALL = "/images/online-v2/goal-duel/gd-ball.png";
 
+/** Canvas-only scale for dogs + ball; server snapshot coords unchanged. Py offset keeps feet on ground. */
+const GD_VISUAL_ENTITY_SCALE = 1.32;
+
 const finishDismissStorageKey = sid => `ov2_gd_finish_dismiss_${sid}`;
 
 const BTN_PRIMARY =
@@ -30,19 +33,18 @@ const BTN_PRIMARY =
 const BTN_SECONDARY =
   "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
-/** In-field floating controls: glass, no heavy “deck” chrome */
-const CTRL_FLOAT_CLUSTER =
-  "pointer-events-auto flex touch-manipulation select-none gap-1 rounded-xl border border-white/15 bg-zinc-900/55 p-1 shadow-[0_4px_20px_rgba(0,0,0,0.45)] backdrop-blur-md";
+/** Floating controls — no cluster chrome; soft shadow only */
+const CTRL_FLOAT_CLUSTER = "pointer-events-auto flex touch-manipulation select-none items-center gap-2";
 
 const CTRL_MOVE_BTN =
-  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-cyan-400/30 bg-cyan-950/55 text-base text-cyan-50 shadow-inner transition-[transform,opacity] active:scale-95 sm:h-9 sm:w-9 sm:text-sm";
+  "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-cyan-400/55 bg-gradient-to-b from-cyan-400/50 via-cyan-600/45 to-cyan-950/88 text-xl text-cyan-50 shadow-[0_8px_32px_rgba(6,182,212,0.22),0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.22)] backdrop-blur-md transition-[transform,opacity] active:scale-[0.96] sm:h-12 sm:w-12 sm:text-lg";
 
 const CTRL_ACTION_BTN =
-  "flex h-10 min-w-[3rem] flex-col items-center justify-center gap-0 rounded-lg border font-bold uppercase leading-none shadow-inner transition-[transform,opacity] active:scale-95 sm:h-9 sm:min-w-[3.25rem]";
+  "flex h-14 min-w-[4.35rem] flex-col items-center justify-center gap-0.5 rounded-2xl font-bold uppercase leading-none backdrop-blur-md transition-[transform,opacity] active:scale-[0.96] sm:h-12 sm:min-w-[4.6rem]";
 
-const CTRL_JUMP_BTN = `${CTRL_ACTION_BTN} border-emerald-400/35 bg-emerald-950/55 text-[8px] text-emerald-100`;
+const CTRL_JUMP_BTN = `${CTRL_ACTION_BTN} border-2 border-emerald-400/55 bg-gradient-to-b from-emerald-400/48 via-emerald-600/42 to-emerald-950/90 text-[10px] text-emerald-50 sm:text-[11px] shadow-[0_8px_32px_rgba(52,211,153,0.2),0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)]`;
 
-const CTRL_KICK_BTN = `${CTRL_ACTION_BTN} border-rose-400/35 bg-rose-950/55 text-[8px] text-rose-100`;
+const CTRL_KICK_BTN = `${CTRL_ACTION_BTN} border-2 border-red-500/65 bg-gradient-to-b from-red-500/58 via-red-600/45 to-red-950/92 text-[10px] text-red-50 sm:text-[11px] shadow-[0_8px_32px_rgba(248,113,113,0.35),0_8px_28px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)]`;
 
 /** @param {unknown} m */
 function memberGdRematchRequested(m) {
@@ -369,6 +371,15 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       const by = Number(ball.y ?? 220);
       const br = Number(ball.r ?? 11);
 
+      const vs = GD_VISUAL_ENTITY_SCALE;
+      const hw0d = hw0 * vs;
+      const hh0d = hh0 * vs;
+      const p0yDraw = p0y - hh0 * (vs - 1);
+      const hw1d = hw1 * vs;
+      const hh1d = hh1 * vs;
+      const p1yDraw = p1y - hh1 * (vs - 1);
+      const brd = br * vs;
+
       const prev = motionPrevRef.current;
       const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
       const dtSec = prev && prev.t > 0 ? Math.min(0.08, (nowMs - prev.t) / 1000) : 0.016;
@@ -402,9 +413,9 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       drawGoalDuelDog(
         ctx,
         p0x,
-        p0y,
-        hw0,
-        hh0,
+        p0yDraw,
+        hw0d,
+        hh0d,
         sx,
         sy,
         TEAM_STAR_DOG,
@@ -420,9 +431,9 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       drawGoalDuelDog(
         ctx,
         p1x,
-        p1y,
-        hw1,
-        hh1,
+        p1yDraw,
+        hw1d,
+        hh1d,
         sx,
         sy,
         TEAM_RIVAL_DOG,
@@ -436,7 +447,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
         { variant: "rival", sprite: spriteAway }
       );
 
-      drawGoalDuelTennisBall(ctx, bx, by, br, sx, sy, bvx, bvy, { sprite: spriteBall });
+      drawGoalDuelTennisBall(ctx, bx, by, brd, sx, sy, bvx, bvy, { sprite: spriteBall });
 
       motionPrevRef.current = { p0x, p0y, p1x, p1y, bx, by, t: nowMs };
       raf = window.requestAnimationFrame(paint);
@@ -447,14 +458,14 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   }, [vm.phase, mySeat, inputRef, spriteHome, spriteAway, spriteBall]);
 
   return (
-    <div className="flex min-h-0 w-full flex-col gap-2 overflow-visible px-1.5 pb-1 pt-1 sm:gap-3 sm:px-2">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-2 overflow-visible px-1.5 pb-1 pt-1 sm:gap-3 sm:px-2">
       {err ? <div className="rounded-lg border border-red-500/30 bg-red-950/35 px-2 py-1.5 text-[11px] text-red-100">{err}</div> : null}
       {vaultClaimBusy ? (
         <div className="rounded-lg border border-zinc-500/20 bg-zinc-900/40 px-2 py-1 text-[10px] text-zinc-400">Updating vault…</div>
       ) : null}
 
       {vm.phase === "playing" && mySeat != null ? (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="relative z-10 mx-auto w-full max-w-3xl shrink-0 overflow-hidden rounded-2xl border border-amber-500/25 bg-gradient-to-b from-zinc-900/95 via-zinc-900 to-zinc-950/95 px-1 py-1.5 shadow-[0_0_24px_rgba(251,191,36,0.06),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-md sm:px-3 sm:py-2">
             <div className="mb-1 flex items-center justify-center gap-2 border-b border-white/5 pb-1">
               <span className="text-[8px] font-black uppercase tracking-[0.35em] text-amber-400/90 sm:text-[9px]">MLEO Park</span>
@@ -538,8 +549,8 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
             ) : null}
           </div>
 
-          <div className="mx-auto flex w-full max-w-[min(100%,36rem)] shrink-0 items-center justify-between gap-2 px-0.5 pt-0.5 sm:px-1 sm:pt-1">
-              <div className={`${CTRL_FLOAT_CLUSTER} items-center`}>
+          <div className="mx-auto mt-10 flex w-full max-w-[min(100%,36rem)] shrink-0 items-center justify-between gap-4 px-0.5 pt-0.5 sm:mt-3 sm:gap-5 sm:px-1 sm:pt-1">
+              <div className={CTRL_FLOAT_CLUSTER}>
                 <button
                   type="button"
                   aria-label="Move left"
@@ -563,7 +574,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   ▶
                 </button>
               </div>
-              <div className={`${CTRL_FLOAT_CLUSTER} items-center`}>
+              <div className={CTRL_FLOAT_CLUSTER}>
                 <button
                   type="button"
                   aria-label="Jump"
@@ -573,7 +584,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   onPointerCancel={() => setInput({ j: false })}
                   onPointerLeave={() => setInput({ j: false })}
                 >
-                  <span className="text-base leading-none sm:text-lg">▲</span>
+                  <span className="text-xl leading-none sm:text-2xl">▲</span>
                   <span>Jump</span>
                 </button>
                 <button
@@ -585,14 +596,18 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
                   onPointerCancel={() => setInput({ k: false })}
                   onPointerLeave={() => setInput({ k: false })}
                 >
-                  <span className="text-base leading-none sm:text-lg">⚡</span>
+                  <span className="text-xl leading-none sm:text-2xl">⚡</span>
                   <span>Kick</span>
                 </button>
               </div>
             </div>
 
+          <p className="hidden shrink-0 text-center text-[10px] text-zinc-500 sm:block sm:text-[11px]">
+            Desktop: A/D move · W or Space jump · E or K strike
+          </p>
+
           {roomId && pk ? (
-            <div className="mx-auto flex w-full max-w-[min(100%,36rem)] shrink-0 flex-col items-end gap-0.5 px-0.5 pt-1 sm:px-1">
+            <div className="mx-auto mt-auto flex w-full max-w-[min(100%,36rem)] shrink-0 flex-col items-end gap-1 px-0.5 pt-8 pb-1 sm:px-1 sm:pt-10">
               <button
                 type="button"
                 title="Leave the match — counts as forfeit; opponent wins."
@@ -605,11 +620,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
               {exitErr && !onLeaveToLobby ? <span className="max-w-full text-right text-[9px] text-red-300/95">{exitErr}</span> : null}
             </div>
           ) : null}
-
-          <p className="hidden shrink-0 text-center text-[10px] text-zinc-500 sm:block sm:text-[11px]">
-            Desktop: A/D move · W or Space jump · E or K strike
-          </p>
-        </>
+        </div>
       ) : null}
 
       {!session.snapshot && room?.active_session_id ? (
