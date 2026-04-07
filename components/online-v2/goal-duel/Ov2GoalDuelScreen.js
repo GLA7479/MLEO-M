@@ -632,6 +632,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
           sessionId: String(live.sessionId ?? ""),
           score0: Number(live.score0) || 0,
           score1: Number(live.score1) || 0,
+          revision: Number(live.revision ?? 0),
           localKickEdge: kickEdge,
         });
         const pr = presentationRef.current;

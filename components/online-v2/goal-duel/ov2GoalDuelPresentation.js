@@ -15,12 +15,14 @@ const JUMP_V = 680;
 const HW = 14;
 const HH = 22;
 
-/** Large error → snap to authority (pixels, world space) — players. */
-const SNAP_DIST = 110;
-/** Below this, skip micro correction (reduces jitter). */
-const CORRECT_EPS = 0.35;
-/** Local blend toward authority per frame (scaled by dt). */
-const LOCAL_CORRECT_RATE = 10;
+/** Large error → snap local player to authority (world px). Stale or fresh — safety only. */
+const PLAYER_SNAP_DIST = 125;
+/** No soft correction below this (fresh auth only). */
+const LOCAL_DEAD_ZONE = 4;
+/** Soft catch-up strength toward authority when a new snapshot revision arrives (per second). */
+const LOCAL_CORRECT_RATE = 4.2;
+/** Caps blend factor for one correction tick (fresh auth). */
+const LOCAL_CORRECT_MAX_STEP = 0.28;
 /** Remote player smoothing (higher = snappier follow of snapshots). */
 const REMOTE_SMOOTH_RATE = 14;
 
@@ -62,6 +64,7 @@ export function gdBallSmoothRateForSpeed(authSpeed, dt) {
  *   lastSessionId: string,
  *   lastScore0: number,
  *   lastScore1: number,
+ *   lastAuthRevisionFrame: number,
  * }}
  */
 export function gdCreatePresentationState() {
@@ -75,6 +78,8 @@ export function gdCreatePresentationState() {
     lastSessionId: "",
     lastScore0: 0,
     lastScore1: 0,
+    /** Previous frame snapshot revision — when unchanged, authoritative positions are stale vs sim. */
+    lastAuthRevisionFrame: NaN,
   };
 }
 
@@ -164,25 +169,36 @@ function stepPlayerPhysics(p, sin, dt, arena) {
 }
 
 /**
+ * Reconcile local predicted player toward authority.
+ * Soft correction runs only on frames where `authRevision` changed (new server snapshot).
+ * Between snapshots the player is not pulled toward stale targets (avoids rubber-band).
+ * While steering or holding jump, correction is weakened so input is not opposed.
+ *
  * @param {GdVecBody} p
  * @param {GdVecBody} auth
  * @param {number} dt
+ * @param {{ freshAuth: boolean, steerX: boolean, jumpHeld: boolean }} opts
  */
-function softCorrectTowardAuth(p, auth, dt) {
+function softCorrectLocalPlayer(p, auth, dt, opts) {
   const dx = auth.x - p.x;
   const dy = auth.y - p.y;
   const d = Math.hypot(dx, dy);
-  if (d > SNAP_DIST) {
+  if (d > PLAYER_SNAP_DIST) {
     p.x = auth.x;
     p.y = auth.y;
     p.vx = auth.vx;
     p.vy = auth.vy;
     return;
   }
-  if (d < CORRECT_EPS) return;
-  const t = Math.min(0.45, 0.08 + d * 0.0012) * Math.min(1, LOCAL_CORRECT_RATE * dt);
-  p.x += dx * t;
-  p.y += dy * t;
+  if (!opts.freshAuth) return;
+
+  if (d < LOCAL_DEAD_ZONE) return;
+
+  const t = Math.min(LOCAL_CORRECT_MAX_STEP, 0.035 + d * 0.00065) * Math.min(1, LOCAL_CORRECT_RATE * dt);
+  const hx = opts.steerX ? 0.22 : 1;
+  const hy = opts.jumpHeld ? 0.42 : 1;
+  p.x += dx * t * hx;
+  p.y += dy * t * hy;
 }
 
 /**
@@ -273,10 +289,11 @@ export function gdSeatWorldInput(inp) {
  * @param {{ l: boolean, r: boolean, j: boolean, k: boolean }} inp
  * @param {0|1|null} mySeat
  * @param {number} dtSec
- * @param {{ sessionId: string, score0: number, score1: number, localKickEdge?: boolean }} meta
+ * @param {{ sessionId: string, score0: number, score1: number, revision?: number, localKickEdge?: boolean }} meta
  */
 export function gdAdvancePresentation(st, authPub, inp, mySeat, dtSec, meta) {
   const dt = Math.min(0.09, Math.max(0.001, dtSec));
+  const authRevision = Number(meta.revision ?? 0);
   const arena = readArena(authPub);
   const p0a = authPub.p0 && typeof authPub.p0 === "object" ? /** @type {Record<string, unknown>} */ (authPub.p0) : {};
   const p1a = authPub.p1 && typeof authPub.p1 === "object" ? /** @type {Record<string, unknown>} */ (authPub.p1) : {};
@@ -303,11 +320,13 @@ export function gdAdvancePresentation(st, authPub, inp, mySeat, dtSec, meta) {
     st.lastSessionId = meta.sessionId;
     st.lastScore0 = meta.score0;
     st.lastScore1 = meta.score1;
+    st.lastAuthRevisionFrame = authRevision;
     return;
   }
 
   if (mySeat !== 0 && mySeat !== 1) {
     gdHardSyncPresentationFromAuthoritative(st, authPub);
+    st.lastAuthRevisionFrame = authRevision;
     return;
   }
 
@@ -319,8 +338,16 @@ export function gdAdvancePresentation(st, authPub, inp, mySeat, dtSec, meta) {
   const authRemote = remoteKey === "p0" ? authP0 : authP1;
 
   const sin = gdSeatWorldInput(inp);
+  const freshAuth =
+    !Number.isFinite(st.lastAuthRevisionFrame) || authRevision !== st.lastAuthRevisionFrame;
+  st.lastAuthRevisionFrame = authRevision;
+
   stepPlayerPhysics(local, sin, dt, arena);
-  softCorrectTowardAuth(local, authLocal, dt);
+  softCorrectLocalPlayer(local, authLocal, dt, {
+    freshAuth,
+    steerX: sin.l !== sin.r,
+    jumpHeld: sin.j,
+  });
 
   smoothTowardVec(remote, authRemote, dt);
 
