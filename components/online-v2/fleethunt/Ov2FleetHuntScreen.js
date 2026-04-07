@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import {
@@ -16,6 +16,9 @@ import {
 import { useOv2FleetHuntSession } from "../../../hooks/useOv2FleetHuntSession";
 
 const finishDismissStorageKey = sid => `ov2_fh_finish_dismiss_${sid}`;
+
+/** Delay after turn change before auto-follow switches boards (lets hit/miss/sunk read). */
+const OV2_FH_AUTO_FOLLOW_DELAY_MS = 1100;
 
 const BTN_PRIMARY =
   "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
@@ -130,6 +133,12 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
   const [draftShips, setDraftShips] = useState(/** @type {{ cells: { r: number, c: number }[] }[]} */ ([]));
   const [mobileBattleTab, setMobileBattleTab] = useState(/** @type {"offense" | "defense"} */ ("offense"));
   const [desktopBattleMode, setDesktopBattleMode] = useState(/** @type {"split" | "offense" | "defense"} */ ("split"));
+  /** When ON, switch visible board on turn change only (local UX; default OFF). */
+  const [autoFollowTurn, setAutoFollowTurn] = useState(false);
+  const prevBattleTurnSeatRef = useRef(/** @type {number|null} */ (null));
+  const autoFollowTimeoutRef = useRef(/** @type {ReturnType<typeof setTimeout>|null} */ (null));
+  const desktopBattleModeRef = useRef(desktopBattleMode);
+  desktopBattleModeRef.current = desktopBattleMode;
 
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
@@ -146,6 +155,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
     if (vm.phase === "battle") {
       setMobileBattleTab("offense");
       setDesktopBattleMode("split");
+      prevBattleTurnSeatRef.current = null;
     }
   }, [vm.phase, vm.sessionId]);
 
@@ -254,6 +264,58 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
 
   const mySeat = vm.mySeat;
   const oppSeat = mySeat === 0 ? 1 : mySeat === 1 ? 0 : null;
+
+  useEffect(() => {
+    const clearAutoFollowTimer = () => {
+      if (autoFollowTimeoutRef.current != null) {
+        clearTimeout(autoFollowTimeoutRef.current);
+        autoFollowTimeoutRef.current = null;
+      }
+    };
+
+    if (vm.phase !== "battle") {
+      clearAutoFollowTimer();
+      prevBattleTurnSeatRef.current = null;
+      return;
+    }
+    if (mySeat !== 0 && mySeat !== 1) {
+      clearAutoFollowTimer();
+      return;
+    }
+    const ts = vm.turnSeat;
+    if (ts !== 0 && ts !== 1) {
+      clearAutoFollowTimer();
+      prevBattleTurnSeatRef.current = null;
+      return;
+    }
+
+    const prev = prevBattleTurnSeatRef.current;
+    const changed = prev !== null && prev !== ts;
+    prevBattleTurnSeatRef.current = ts;
+
+    if (!autoFollowTurn || !changed) {
+      if (!autoFollowTurn) clearAutoFollowTimer();
+      return;
+    }
+
+    clearAutoFollowTimer();
+    autoFollowTimeoutRef.current = setTimeout(() => {
+      autoFollowTimeoutRef.current = null;
+      if (ts === mySeat) {
+        setMobileBattleTab("offense");
+        if (desktopBattleModeRef.current !== "split") {
+          setDesktopBattleMode("offense");
+        }
+      } else {
+        setMobileBattleTab("defense");
+        if (desktopBattleModeRef.current !== "split") {
+          setDesktopBattleMode("defense");
+        }
+      }
+    }, OV2_FH_AUTO_FOLLOW_DELAY_MS);
+
+    return () => clearAutoFollowTimer();
+  }, [vm.phase, vm.turnSeat, mySeat, autoFollowTurn]);
   const myOutgoing = mySeat === 0 ? vm.shots0 : mySeat === 1 ? vm.shots1 : [];
   const incomingOnMe = mySeat === 0 ? vm.shots1 : mySeat === 1 ? vm.shots0 : [];
 
@@ -708,19 +770,42 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
                 {I.lock} Double pending
               </span>
             ) : null}
-            <button
-              type="button"
-              className={[
-                "ml-auto min-h-[20px] min-w-[3.75rem] shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold transition-opacity sm:min-h-[22px] sm:min-w-[4rem] sm:px-2 sm:py-1 sm:text-[10px]",
-                canOfferDouble && !busy
-                  ? "cursor-pointer border-emerald-500/35 bg-gradient-to-b from-emerald-800/55 to-emerald-950 text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] hover:from-emerald-700/50 hover:to-emerald-950"
-                  : "cursor-not-allowed border-emerald-800/20 bg-emerald-950/40 text-emerald-600/55 opacity-80",
-              ].join(" ")}
-              disabled={!canOfferDouble || busy}
-              onClick={() => void offerDouble()}
-            >
-              Double
-            </button>
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                className={[
+                  "flex min-h-[32px] min-w-[3.75rem] shrink-0 items-center justify-center rounded-md border px-1 py-0 text-[10px] font-semibold leading-none transition-opacity sm:min-h-[34px] sm:min-w-[4rem] sm:px-1.5 sm:py-0.5 sm:text-[11px]",
+                  canOfferDouble && !busy
+                    ? "cursor-pointer border-emerald-500/35 bg-gradient-to-b from-emerald-800/55 to-emerald-950 text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] hover:from-emerald-700/50 hover:to-emerald-950"
+                    : "cursor-not-allowed border-emerald-800/20 bg-emerald-950/40 text-emerald-600/55 opacity-80",
+                ].join(" ")}
+                disabled={!canOfferDouble || busy}
+                onClick={() => void offerDouble()}
+              >
+                Double
+              </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoFollowTurn}
+                aria-label={autoFollowTurn ? "Auto follow on" : "Auto follow off"}
+                title="When on, switch boards after turn changes (split view unchanged)."
+                onClick={() => setAutoFollowTurn(v => !v)}
+                className={[
+                  "flex min-h-[32px] min-w-[2.75rem] shrink-0 flex-col items-center justify-center gap-0 rounded-md border px-0.5 py-0 transition sm:min-h-[34px] sm:min-w-[3rem] sm:px-1 sm:py-0.5",
+                  autoFollowTurn
+                    ? "border-sky-500/45 bg-sky-950/40 text-sky-100 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.25)]"
+                    : "border-zinc-600/40 bg-zinc-900/50 text-zinc-400 hover:border-zinc-500/45 hover:text-zinc-300",
+                ].join(" ")}
+              >
+                <span className="inline-flex w-[2.125rem] shrink-0 justify-center text-[9px] font-semibold uppercase leading-none tracking-wide sm:w-[2.25rem] sm:text-[10px]">
+                  AUTO
+                </span>
+                <span className="mt-px inline-flex w-[2.125rem] shrink-0 justify-center text-[8px] font-bold uppercase leading-none sm:w-[2.25rem] sm:text-[9px]">
+                  {autoFollowTurn ? "ON" : "OFF"}
+                </span>
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-shrink-0 flex-wrap gap-1 text-[9px] text-zinc-500 sm:text-[10px]">
