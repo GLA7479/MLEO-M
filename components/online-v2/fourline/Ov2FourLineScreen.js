@@ -541,6 +541,12 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
 
   const hasSession = Boolean(vm.sessionId && String(vm.sessionId).trim() !== "");
 
+  const canOfferDoubleNow =
+    vm.phase === "playing" &&
+    vm.mySeat === vm.turnSeat &&
+    vm.mustRespondDouble !== true &&
+    vm.canOfferDouble === true;
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden bg-zinc-950 px-1 pb-1 sm:min-h-0 sm:gap-1 sm:px-2 sm:pb-1.5">
       <div className="flex shrink-0 flex-col gap-0.5 sm:gap-0.5">
@@ -714,33 +720,32 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
           </div>
         </div>
 
-        {vm.phase === "playing" && vm.mySeat === vm.turnSeat && !vm.mustRespondDouble && vm.canOfferDouble ? (
-          <div className="shrink-0">
-            <button
-              type="button"
-              disabled={busy}
-              className={`${BTN_ACCENT} inline-flex w-full items-center justify-center py-2.5 text-xs font-semibold sm:py-1.5`}
-              onClick={() => void offerDouble()}
-            >
-              Increase table stake
-            </button>
-          </div>
-        ) : null}
-
         <div className="mt-0 flex shrink-0 flex-col gap-0.5 border-t border-white/[0.08] pt-1.5 text-[10px] text-zinc-500 sm:pt-1">
           <p className="leading-snug">
             Missed turns: you {vm.mySeat != null ? vm.missedStreakBySeat[vm.mySeat] ?? 0 : "—"} · opponent{" "}
             {vm.mySeat === 0 ? vm.missedStreakBySeat[1] : vm.mySeat === 1 ? vm.missedStreakBySeat[0] : "—"}
           </p>
-          <button
-            type="button"
-            disabled={exitBusy || !pk}
-            className="w-fit text-sky-300 underline disabled:opacity-45"
-            onClick={() => void onExitToLobby()}
-          >
-            {exitBusy ? "Leaving…" : "Leave table"}
-          </button>
-          {exitErr ? <span className="text-red-300">{exitErr}</span> : null}
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <button
+              type="button"
+              disabled={busy || !canOfferDoubleNow}
+              className={`${BTN_ACCENT} inline-flex w-full min-w-0 shrink items-center justify-center py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-[2.875rem] sm:flex-1 sm:px-4 sm:py-2.5 sm:text-sm`}
+              onClick={() => void offerDouble()}
+            >
+              Increase table stake
+            </button>
+            <div className="flex w-full shrink-0 flex-col gap-0.5 sm:w-auto sm:items-stretch sm:justify-center sm:pl-1">
+              <button
+                type="button"
+                disabled={exitBusy || !pk}
+                className={`${BTN_DANGER} inline-flex w-full min-w-[10rem] items-center justify-center self-start px-3.5 py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[2.875rem] sm:w-auto sm:min-w-[11.5rem] sm:self-auto sm:px-5 sm:py-2.5 sm:text-[15px]`}
+                onClick={() => void onExitToLobby()}
+              >
+                {exitBusy ? "Leaving…" : "Leave table"}
+              </button>
+              {exitErr ? <span className="text-red-300 sm:text-right">{exitErr}</span> : null}
+            </div>
+          </div>
         </div>
       </div>
 
