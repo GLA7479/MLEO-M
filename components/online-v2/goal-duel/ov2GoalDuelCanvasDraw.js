@@ -572,10 +572,12 @@ export function inferDogJumping(px, py, hh, groundY) {
  * @param {number} dtSec
  */
 export function inferDogMotion(prev, px, py, seat, dtSec) {
-  if (!prev || dtSec <= 0) return { facing: 1, running: false, vx: 0 };
+  /** p0 default faces +x (right); p1 default faces −x (left toward play). Must match server `face` at rest. */
+  const idleFacing = seat === "p1" ? -1 : 1;
+  if (!prev || dtSec <= 0) return { facing: idleFacing, running: false, vx: 0 };
   const opx = seat === "p0" ? prev.p0x : prev.p1x;
   const vx = (px - opx) / dtSec;
   const running = Math.abs(vx) > 8;
-  const facing = Math.abs(vx) < 2 ? 1 : vx >= 0 ? 1 : -1;
+  const facing = Math.abs(vx) < 2 ? idleFacing : vx >= 0 ? 1 : -1;
   return { facing, running, vx };
 }

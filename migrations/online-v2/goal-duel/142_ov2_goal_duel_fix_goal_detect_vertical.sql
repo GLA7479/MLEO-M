@@ -1,5 +1,6 @@
 -- Fix: ground-line goals were not detected (ball y≈349 vs old cap y<=300).
--- Apply after 141 (or any env that already ran 138 without this fix).
+-- Forward patch only: run on DBs that already applied 138 before this change.
+-- Do not re-run 138 on those environments; this file replaces ov2_gd_detect_goal_event in place.
 
 BEGIN;
 
