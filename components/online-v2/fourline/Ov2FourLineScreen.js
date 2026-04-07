@@ -119,9 +119,9 @@ function FourLinePlayerHeader({ seat0Label, seat1Label, mySeat, indicatorSeat, p
   const active0 = playing && indicatorSeat === 0;
   const active1 = playing && indicatorSeat === 1;
   return (
-    <div className="grid w-full grid-cols-2 gap-1.5 sm:gap-2">
+    <div className="grid w-full shrink-0 grid-cols-2 gap-1.5 sm:gap-1">
       <div
-        className={`min-w-0 rounded-lg border px-2 py-1.5 sm:px-2.5 sm:py-2 ${
+        className={`min-w-0 rounded-lg border px-2 py-1.5 sm:px-2.5 sm:py-1.5 ${
           active0
             ? "border-sky-400/45 bg-gradient-to-br from-sky-950/55 to-zinc-900/90 shadow-[0_0_0_1px_rgba(56,189,248,0.2)]"
             : "border-white/[0.1] bg-zinc-900/55"
@@ -155,7 +155,7 @@ function FourLinePlayerHeader({ seat0Label, seat1Label, mySeat, indicatorSeat, p
         </div>
       </div>
       <div
-        className={`min-w-0 rounded-lg border px-2 py-1.5 sm:px-2.5 sm:py-2 ${
+        className={`min-w-0 rounded-lg border px-2 py-1.5 sm:px-2.5 sm:py-1.5 ${
           active1
             ? "border-amber-400/45 bg-gradient-to-br from-amber-950/45 to-zinc-900/90 shadow-[0_0_0_1px_rgba(251,191,36,0.2)]"
             : "border-white/[0.1] bg-zinc-900/55"
@@ -346,6 +346,32 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
   const didIWin = vm.mySeat != null && vm.winnerSeat != null && vm.winnerSeat === vm.mySeat;
   const isDraw = finished && vm.winnerSeat == null;
 
+  const dismissFinishModal = useCallback(() => {
+    if (!finishSessionId) return;
+    setFinishModalDismissedSessionId(finishSessionId);
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(finishDismissStorageKey(finishSessionId), "1");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [finishSessionId]);
+
+  const finishOutcome = useMemo(() => {
+    if (!finished) return "unknown";
+    if (isDraw) return "draw";
+    if (didIWin) return "win";
+    return "loss";
+  }, [finished, isDraw, didIWin]);
+
+  const finishTitle = useMemo(() => {
+    if (!finished) return "";
+    if (isDraw) return "Draw";
+    if (didIWin) return "Victory";
+    return "Defeat";
+  }, [finished, isDraw, didIWin]);
+
   const canPickColumn =
     vm.phase === "playing" &&
     vm.mySeat === vm.turnSeat &&
@@ -495,22 +521,6 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
           : "shadow-[0_0_0_1px_rgba(251,191,36,0.2),0_0_18px_rgba(245,158,11,0.06)]"
         : "";
 
-  const finishedActions = (
-    <div className="flex flex-wrap justify-center gap-1.5">
-      <button type="button" disabled={rematchBusy} onClick={() => void onRematch()} className={BTN_PRIMARY}>
-        {rematchBusy ? "…" : "Rematch"}
-      </button>
-      <button type="button" onClick={() => void cancelRematch()} className={BTN_SECONDARY}>
-        Cancel rematch
-      </button>
-      {isHost ? (
-        <button type="button" disabled={startNextBusy} onClick={() => void onStartNext()} className={BTN_ACCENT}>
-          {startNextBusy ? "…" : "Start next (host)"}
-        </button>
-      ) : null}
-    </div>
-  );
-
   const finishReasonLine = useMemo(() => {
     if (!finished) return "";
     if (isDraw) return "Board full — stakes refunded";
@@ -532,9 +542,9 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
   const hasSession = Boolean(vm.sessionId && String(vm.sessionId).trim() !== "");
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden bg-zinc-950 px-1 pb-1 sm:gap-1 sm:px-2 sm:pb-1.5">
-      <div className="flex shrink-0 flex-col gap-0.5">
-        <div className="rounded-lg border border-white/[0.1] bg-zinc-900/70 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+    <div className="relative flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden bg-zinc-950 px-1 pb-1 sm:min-h-0 sm:gap-1 sm:px-2 sm:pb-1.5">
+      <div className="flex shrink-0 flex-col gap-0.5 sm:gap-0.5">
+        <div className="rounded-lg border border-white/[0.1] bg-zinc-900/70 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:py-1 sm:px-2">
           <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
             <div
               className={`flex items-center rounded-md border px-2 py-0.5 tabular-nums ${
@@ -576,24 +586,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
         ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden overscroll-contain">
-        {vm.phase === "playing" && vm.mustRespondDouble && vm.pendingDouble ? (
-          <div className="shrink-0 rounded-lg border border-amber-500/28 bg-amber-950/30 p-2">
-            <p className="text-[11px] leading-snug text-amber-100/92">
-              Opponent proposes table ×{String(vm.pendingDouble.proposed_mult ?? "")}. Declining or timing out ends the round at
-              the current ×{vm.stakeMultiplier}.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button type="button" disabled={busy} className={BTN_PRIMARY} onClick={() => void respondDouble(true)}>
-                Accept ×{String(vm.pendingDouble.proposed_mult ?? "")}
-              </button>
-              <button type="button" disabled={busy} className={BTN_DANGER} onClick={() => void respondDouble(false)}>
-                Decline
-              </button>
-            </div>
-          </div>
-        ) : null}
-
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-x-hidden overscroll-contain max-sm:overflow-y-auto sm:min-h-0 sm:overflow-y-hidden sm:gap-1">
         {hasSession ? (
           <FourLinePlayerHeader
             seat0Label={seat0Label}
@@ -605,13 +598,13 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
           />
         ) : null}
 
-        <div className="flex min-h-0 min-w-0 shrink-0 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-col max-sm:shrink-0 sm:min-h-0 sm:flex-1 sm:justify-center">
           <div
-            className={`relative mx-auto w-full max-w-lg rounded-2xl border border-zinc-600/25 bg-gradient-to-b from-zinc-800/55 to-zinc-900/90 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-[transform,opacity,box-shadow] duration-200 sm:max-w-xl sm:p-2.5 md:max-w-2xl ${turnBoardGlow} ${
+            className={`relative mx-auto w-full max-w-lg rounded-2xl border border-zinc-600/25 bg-gradient-to-b from-zinc-800/55 to-zinc-900/90 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)] transition-[transform,opacity,box-shadow] duration-200 sm:min-h-0 sm:w-full sm:max-w-[min(100%,min(42rem,65dvh))] sm:p-2 ${turnBoardGlow} ${
               winFreeze ? "scale-[0.998] opacity-[0.97]" : "scale-100 opacity-100"
             }`}
           >
-            <p className="mb-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400 sm:mb-2">
+            <p className="mb-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400 sm:mb-1">
               <span
                 className={`mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full border border-zinc-700/80 align-middle shadow-sm ${
                   indicatorSeat === 0
@@ -625,7 +618,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
               Playfield
               <span className="font-normal normal-case tracking-normal text-zinc-500"> · connect four</span>
             </p>
-            <div className="grid grid-cols-7 gap-0.5 sm:gap-1.5 md:gap-2">
+            <div className="grid grid-cols-7 gap-0.5 sm:gap-1 md:gap-1.5">
             {Array.from({ length: OV2_FOURLINE_COLS }, (_, c) => {
               const playable = canPickColumn && fourLineColumnPlayable(c, cells);
               const showGhost =
@@ -650,7 +643,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
                 <div
                   key={c}
                   data-fl-col
-                  className={`relative flex min-w-0 flex-col gap-0.5 overflow-visible rounded-md transition-[background-color] duration-150 sm:gap-1 ${colTint}`}
+                  className={`relative flex min-w-0 flex-col gap-0.5 overflow-visible rounded-md transition-[background-color] duration-150 sm:gap-0.5 md:gap-1 ${colTint}`}
                   onPointerEnter={() => {
                     if (vm.phase !== "playing" || vm.mustRespondDouble) return;
                     setHoverCol(c);
@@ -662,7 +655,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
                     disabled={!playable}
                     aria-label={`Play column ${c + 1}`}
                     onClick={() => void onColumn(c)}
-                    className={`relative z-10 flex h-8 min-h-[2rem] items-center justify-center rounded-md border text-[11px] font-bold transition sm:h-10 ${
+                    className={`relative z-10 flex h-8 min-h-[2rem] items-center justify-center rounded-md border text-[11px] font-bold transition sm:h-9 ${
                       playable
                         ? "border-sky-500/40 bg-sky-950/50 text-sky-100 shadow-sm active:scale-[0.97]"
                         : "cursor-not-allowed border-white/[0.08] bg-zinc-950/50 text-zinc-500 opacity-55"
@@ -670,7 +663,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
                   >
                     ▼
                   </button>
-                  <div className="relative flex min-h-0 flex-col gap-0.5 overflow-visible sm:gap-1" data-fl-cells>
+                  <div className="relative flex min-h-0 flex-col gap-0.5 overflow-visible sm:gap-0.5 md:gap-1" data-fl-cells>
                     {showGhost ? (
                       <div className="pointer-events-none absolute left-0 right-0 top-0 z-[15] flex justify-center overflow-visible">
                         <GhostOrMiniDisc seat={ghostSeat} />
@@ -726,7 +719,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
             <button
               type="button"
               disabled={busy}
-              className={`${BTN_ACCENT} inline-flex w-full items-center justify-center py-2.5 text-xs font-semibold sm:py-2`}
+              className={`${BTN_ACCENT} inline-flex w-full items-center justify-center py-2.5 text-xs font-semibold sm:py-1.5`}
               onClick={() => void offerDouble()}
             >
               Increase table stake
@@ -734,7 +727,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
           </div>
         ) : null}
 
-        <div className="mt-0 flex shrink-0 flex-col gap-0.5 border-t border-white/[0.08] pt-1.5 text-[10px] text-zinc-500">
+        <div className="mt-0 flex shrink-0 flex-col gap-0.5 border-t border-white/[0.08] pt-1.5 text-[10px] text-zinc-500 sm:pt-1">
           <p className="leading-snug">
             Missed turns: you {vm.mySeat != null ? vm.missedStreakBySeat[vm.mySeat] ?? 0 : "—"} · opponent{" "}
             {vm.mySeat === 0 ? vm.missedStreakBySeat[1] : vm.mySeat === 1 ? vm.missedStreakBySeat[0] : "—"}
@@ -751,37 +744,135 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
         </div>
       </div>
 
-      {showResultModal ? (
-        <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/55 p-2 sm:items-center">
+      {vm.phase === "playing" && vm.mustRespondDouble && vm.pendingDouble ? (
+        <div className="fixed inset-0 z-40 flex max-h-[100dvh] items-center justify-center bg-black/70 p-3 backdrop-blur-[2px]">
           <div
-            className="w-full max-w-[min(100%,17.5rem)] rounded-xl border border-white/[0.08] bg-zinc-950/96 p-3 shadow-2xl backdrop-blur-sm"
+            className="w-full max-w-sm rounded-2xl border border-amber-500/35 bg-gradient-to-b from-amber-950/95 to-zinc-950 p-4 shadow-2xl shadow-black/40"
             role="dialog"
             aria-modal="true"
+            aria-labelledby="ov2-fl-double-prompt"
           >
-            <p className="text-center text-base font-bold tracking-tight text-zinc-50">
-              {isDraw ? "Draw" : didIWin ? "You won" : "You lost"}
-            </p>
-            <p className="mt-1 text-center text-[10px] font-medium text-zinc-500">Table ×{vm.stakeMultiplier}</p>
-            <p className={`mt-2 text-center text-lg ${finishAmountLine.className}`}>{finishAmountLine.text}</p>
-            <p className="mt-1 text-center text-[10px] leading-snug text-zinc-400">{finishReasonLine}</p>
-            <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
-              {vaultClaimBusy ? "Sending results to your balance…" : "Round complete — rematch, then host starts next."}
-            </p>
-            <div className="mt-3">{finishedActions}</div>
-            <button
-              type="button"
-              className="mt-2 w-full rounded-lg border border-white/10 py-1.5 text-[11px] text-zinc-300"
-              onClick={() => {
-                setFinishModalDismissedSessionId(finishSessionId);
-                try {
-                  window.sessionStorage.setItem(finishDismissStorageKey(finishSessionId), "1");
-                } catch {
-                  /* ignore */
-                }
-              }}
+            <p
+              id="ov2-fl-double-prompt"
+              className="text-[11px] leading-snug text-amber-100/92"
             >
-              Dismiss
-            </button>
+              Opponent proposes table ×{String(vm.pendingDouble.proposed_mult ?? "")}. Declining or timing out ends the round at
+              the current ×{vm.stakeMultiplier}.
+            </p>
+            <div className="mt-3 flex flex-col gap-2">
+              <button type="button" disabled={busy} className={BTN_PRIMARY + " w-full"} onClick={() => void respondDouble(true)}>
+                Accept ×{String(vm.pendingDouble.proposed_mult ?? "")}
+              </button>
+              <button type="button" disabled={busy} className={BTN_DANGER + " w-full"} onClick={() => void respondDouble(false)}>
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showResultModal ? (
+        <div className="fixed inset-0 z-50 flex max-h-[100dvh] items-end justify-center bg-black/80 p-3 backdrop-blur-[2px] sm:items-center">
+          <div
+            className="max-h-[min(92dvh,640px)] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-2xl border border-white/12 bg-gradient-to-b from-zinc-900/98 to-zinc-950 shadow-2xl shadow-black/50"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ov2-fl-finish-title"
+          >
+            <div
+              className={[
+                "border-b px-4 pb-3 pt-4",
+                finishOutcome === "win"
+                  ? "border-emerald-500/20 bg-gradient-to-br from-emerald-950/45 to-zinc-950/80"
+                  : finishOutcome === "loss"
+                    ? "border-rose-500/20 bg-gradient-to-br from-rose-950/40 to-zinc-950/80"
+                    : "border-white/[0.07] bg-zinc-950/60",
+              ].join(" ")}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className={[
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl shadow-inner",
+                    finishOutcome === "win" && "border-emerald-500/45 bg-emerald-950/60 text-emerald-200",
+                    finishOutcome === "loss" && "border-rose-500/45 bg-rose-950/55 text-rose-200",
+                    (finishOutcome === "draw" || finishOutcome === "unknown") && "border-white/10 bg-zinc-900/80 text-zinc-200",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-hidden
+                >
+                  {finishOutcome === "win" ? "🏆" : finishOutcome === "loss" ? "✕" : "⎔"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Round result</p>
+                  <h2
+                    id="ov2-fl-finish-title"
+                    className={[
+                      "mt-0.5 text-2xl font-extrabold leading-tight tracking-tight",
+                      finishOutcome === "win" && "text-emerald-400",
+                      finishOutcome === "loss" && "text-rose-400",
+                      finishOutcome === "draw" && "text-sky-300",
+                      finishOutcome === "unknown" && "text-zinc-100",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {finishTitle}
+                  </h2>
+                  <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Table multiplier</p>
+                  <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">×{vm.stakeMultiplier}</p>
+                  <div className="mt-3 rounded-lg border border-white/[0.1] bg-black/25 px-2.5 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Settlement</p>
+                    <p className={`mt-2 text-center text-xl font-bold tabular-nums leading-tight sm:text-2xl ${finishAmountLine.className}`}>
+                      {finishAmountLine.text}
+                    </p>
+                  </div>
+                  <p className="mt-3 text-center text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
+                  <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
+                    {vaultClaimBusy ? "Sending results to your balance…" : "Round complete — rematch, then host starts next."}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 px-4 py-4">
+              <button type="button" className={BTN_PRIMARY} disabled={rematchBusy} onClick={() => void onRematch()}>
+                {rematchBusy ? "Requesting…" : "Request rematch"}
+              </button>
+              <button type="button" className={BTN_SECONDARY} disabled={rematchBusy} onClick={() => void cancelRematch()}>
+                Cancel rematch
+              </button>
+              {isHost ? (
+                <div className="w-full overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-950/15 pt-2">
+                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">
+                    Host only
+                  </p>
+                  <button
+                    type="button"
+                    className={BTN_PRIMARY + " w-full rounded-none"}
+                    disabled={startNextBusy}
+                    onClick={() => void onStartNext()}
+                  >
+                    {startNextBusy ? "Starting…" : "Start next (host)"}
+                  </button>
+                </div>
+              ) : (
+                <p className="rounded-lg border border-white/[0.06] bg-zinc-950/35 px-2 py-1.5 text-center text-[11px] text-zinc-500">
+                  Host starts the next match when both players rematch.
+                </p>
+              )}
+              <button type="button" className={BTN_SECONDARY} onClick={dismissFinishModal}>
+                Dismiss
+              </button>
+              <button
+                type="button"
+                className={BTN_DANGER + " w-full"}
+                disabled={exitBusy || !pk}
+                onClick={() => void onExitToLobby()}
+              >
+                {exitBusy ? "Leaving…" : "Leave table"}
+              </button>
+              {exitErr ? <p className="text-center text-[11px] text-red-300">{exitErr}</p> : null}
+            </div>
           </div>
         </div>
       ) : null}

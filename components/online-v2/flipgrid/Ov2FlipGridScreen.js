@@ -280,6 +280,22 @@ export default function Ov2FlipGridScreen({ contextInput = null, onSessionRefres
           </div>
         ) : null}
 
+        {vm.phase === "playing" && vm.mySeat === vm.turnSeat && !vm.mustRespondDouble && vm.canOfferDouble ? (
+          <div className="mx-auto w-full max-w-[min(100%,22rem)] shrink-0 rounded-xl border border-sky-400/35 bg-gradient-to-b from-sky-950/55 to-zinc-950/90 p-2.5 shadow-[0_4px_20px_rgba(14,165,233,0.12),inset_0_1px_0_rgba(255,255,255,0.06)] sm:max-w-md sm:p-3 md:max-w-lg">
+            <p className="mb-2 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-sky-100/95">
+              Table stake
+            </p>
+            <button
+              type="button"
+              disabled={busy}
+              className={BTN_ACCENT + " w-full py-2.5 text-xs font-semibold"}
+              onClick={() => void offerDouble()}
+            >
+              Increase table stake
+            </button>
+          </div>
+        ) : null}
+
         <div className="mx-auto w-full max-w-[min(100%,22rem)] rounded-xl border border-white/[0.08] bg-zinc-900/50 p-1.5 sm:max-w-md sm:p-3 md:max-w-lg">
           <p className="mb-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-500 sm:mb-2">
             8×8 grid
@@ -315,16 +331,6 @@ export default function Ov2FlipGridScreen({ contextInput = null, onSessionRefres
             You {myColorLabel} · Opponent {oppColorLabel}
           </p>
         </div>
-
-        {vm.phase === "playing" && vm.mySeat === vm.turnSeat && !vm.mustRespondDouble ? (
-          <div className="flex flex-wrap gap-2">
-            {vm.canOfferDouble ? (
-              <button type="button" disabled={busy} className={BTN_ACCENT} onClick={() => void offerDouble()}>
-                Increase table stake
-              </button>
-            ) : null}
-          </div>
-        ) : null}
 
         <div className="mt-auto flex flex-col gap-1 border-t border-white/[0.06] pt-2 text-[10px] text-zinc-500">
           <p>

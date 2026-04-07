@@ -26,6 +26,8 @@ const BTN_PRIMARY =
   "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_SECONDARY =
   "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+const BTN_DANGER =
+  "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
 /** Consistent Fleet Hunt chrome icons (unicode; no extra deps). */
 const I = {
@@ -1162,11 +1164,13 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
                 Cancel rematch
               </button>
               {isHost ? (
-                <div className="rounded-xl border border-emerald-500/20 bg-emerald-950/15 p-2">
-                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">Host only</p>
+                <div className="w-full overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-950/15 pt-2">
+                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">
+                    Host only
+                  </p>
                   <button
                     type="button"
-                    className={BTN_PRIMARY + " w-full"}
+                    className={BTN_PRIMARY + " w-full rounded-none"}
                     disabled={startNextBusy || rematchCounts.ready < 2}
                     onClick={() => void onStartNext()}
                   >
@@ -1183,7 +1187,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               </button>
               <button
                 type="button"
-                className="mt-0.5 text-[11px] text-zinc-500 underline decoration-zinc-600 underline-offset-2 transition hover:text-zinc-400"
+                className={BTN_DANGER + " w-full"}
                 disabled={exitBusy}
                 onClick={() => void onExitToLobby()}
               >
