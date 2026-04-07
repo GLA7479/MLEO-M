@@ -419,8 +419,6 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
   }, [finishResultObj, finishIsDraw, finishOutcome]);
 
   const pd = vm.pendingDouble && typeof vm.pendingDouble === "object" ? /** @type {Record<string, unknown>} */ (vm.pendingDouble) : null;
-  const responderSeat = pd != null && pd.responder_seat != null ? Number(pd.responder_seat) : null;
-  const proposedMult = pd != null && pd.proposed_mult != null ? Number(pd.proposed_mult) : null;
 
   const canOfferDouble = vm.canOfferDouble === true;
 
@@ -645,20 +643,26 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
 
       {vm.phase === "placement" && mySeat != null ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-x-hidden overflow-y-auto rounded-xl border border-white/[0.06] bg-zinc-950/50 p-1.5 max-sm:py-1.5 sm:gap-2 sm:p-3">
-          <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[10px] text-zinc-300 sm:text-[11px]">
-            <span className="font-medium">
+          <div className="flex min-h-[2.375rem] flex-shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[10px] text-zinc-300 sm:min-h-[2.5rem] sm:text-[11px]">
+            <span className="flex min-w-0 items-center font-medium">
               {I.fleet} Placement — {myLocked ? `${I.lock} Locked` : "Arrange your fleet"}
-              {vm.placementTimeLeftSec != null && !myLocked ? (
-                <span className="ml-1.5 text-amber-200/90 sm:ml-2">
-                  {I.timer} {vm.placementTimeLeftSec}s
-                </span>
-              ) : null}
+              <span className="ml-1.5 inline-flex min-w-[3.25rem] tabular-nums sm:ml-2 sm:min-w-[3.5rem]">
+                {vm.placementTimeLeftSec != null && !myLocked ? (
+                  <span className="text-amber-200/90">
+                    {I.timer} {vm.placementTimeLeftSec}s
+                  </span>
+                ) : (
+                  <span className="invisible select-none" aria-hidden>
+                    {I.timer} 99s
+                  </span>
+                )}
+              </span>
             </span>
-            <span className="text-zinc-500">
+            <span className="shrink-0 tabular-nums text-zinc-500">
               Opp {oppLocked ? `${I.lock} locked` : "open"} · miss {vm.placementMissStreakBySeat[oppSeat ?? 0] ?? 0}/3
             </span>
           </div>
-          <div className="flex flex-shrink-0 flex-wrap gap-1 rounded-lg border border-white/[0.05] bg-zinc-950/40 px-1.5 py-1 text-[9px] text-zinc-400 sm:text-[10px]">
+          <div className="flex min-h-[2.5rem] flex-shrink-0 flex-wrap items-center gap-1 rounded-lg border border-white/[0.05] bg-zinc-950/40 px-1.5 py-1 text-[9px] text-zinc-400 sm:min-h-[2.625rem] sm:text-[10px]">
             <span className="inline-flex items-center gap-0.5 rounded-md border border-zinc-600/35 bg-zinc-900/50 px-1.5 py-0.5 text-zinc-300">
               {I.shipsRow} Ships left: {remaining.length}/5
             </span>
@@ -667,32 +671,36 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
             </span>
           </div>
           {!myLocked ? (
-            <>
-              <div className="flex flex-wrap gap-1.5">
-                <span className="w-full text-[10px] text-zinc-500">Ship length (tap to arm):</span>
-                {remaining.length === 0 ? (
-                  <span className="text-[11px] text-emerald-200/90">All ships placed — save & lock</span>
-                ) : (
-                  remaining.map((len, idx) => (
-                    <button
-                      key={`${len}-${idx}`}
-                      type="button"
-                      onClick={() => setPickLen(len)}
-                      className={[
-                        "min-h-[32px] min-w-[2.25rem] rounded-lg border px-2.5 py-1.5 text-[11px] font-bold tabular-nums transition-colors",
-                        activePickLen === len
-                          ? "border-emerald-500/55 bg-emerald-950/55 text-emerald-50 shadow-[inset_0_0_0_2px_rgba(52,211,153,0.35)]"
-                          : "border-zinc-600/45 bg-zinc-900/65 text-zinc-300 hover:border-zinc-500/55",
-                      ].join(" ")}
-                    >
-                      {len}
-                    </button>
-                  ))
-                )}
+            <div className="flex shrink-0 flex-col gap-2 sm:gap-2.5">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] text-zinc-500">Ship length (tap to arm):</span>
+                <div className="flex min-h-[2.5rem] flex-wrap content-center items-center gap-1.5 sm:min-h-[2.625rem]">
+                  {remaining.length === 0 ? (
+                    <span className="flex min-h-[2rem] items-center text-[11px] leading-snug text-emerald-200/90">
+                      All ships placed — save & lock
+                    </span>
+                  ) : (
+                    remaining.map((len, idx) => (
+                      <button
+                        key={`${len}-${idx}`}
+                        type="button"
+                        onClick={() => setPickLen(len)}
+                        className={[
+                          "h-8 min-h-[2rem] min-w-[2.25rem] shrink-0 rounded-lg border px-2.5 py-1.5 text-[11px] font-bold tabular-nums transition-colors",
+                          activePickLen === len
+                            ? "border-emerald-500/55 bg-emerald-950/55 text-emerald-50 shadow-[inset_0_0_0_2px_rgba(52,211,153,0.35)]"
+                            : "border-zinc-600/45 bg-zinc-900/65 text-zinc-300 hover:border-zinc-500/55",
+                        ].join(" ")}
+                      >
+                        {len}
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
-              <div className="mb-1 flex flex-shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 sm:mb-1.5">
-                <span className="w-full text-[10px] text-zinc-500 sm:w-auto">{I.target} Orientation:</span>
-                <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:w-auto sm:gap-2">
+              <div className="mb-1 flex min-h-[2.875rem] flex-shrink-0 flex-col gap-1.5 sm:mb-1.5 sm:min-h-[2.75rem] sm:flex-row sm:items-center sm:gap-x-2">
+                <span className="shrink-0 text-[10px] text-zinc-500 sm:pt-px">{I.target} Orientation:</span>
+                <div className="flex min-h-[2.25rem] min-w-0 flex-1 flex-row flex-wrap items-center gap-1.5 sm:min-h-0 sm:gap-2">
                   <button
                     type="button"
                     className={BTN_SECONDARY + (orientationH ? " shadow-[inset_0_0_0_2px_rgba(56,189,248,0.35)]" : "")}
@@ -709,9 +717,9 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
                   </button>
                 </div>
               </div>
-            </>
+            </div>
           ) : null}
-          <div className="mx-auto flex min-h-0 min-w-0 flex-1 items-center justify-center py-0.5 sm:py-0">
+          <div className="mx-auto flex min-h-0 min-w-0 flex-1 basis-0 items-center justify-center py-0.5 sm:py-0">
             {renderGrid("defense", {
               onCell: !myLocked ? onPlacementCell : null,
               shipsCells: draftShips.map(s => s.cells),
@@ -722,10 +730,10 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
             })}
           </div>
           {!myLocked ? (
-            <div className="grid w-full min-w-0 shrink-0 grid-cols-6 gap-x-1.5 gap-y-2 pt-1 sm:gap-x-2 sm:gap-y-2 sm:pt-1.5">
+            <div className="grid w-full min-w-0 shrink-0 grid-cols-6 grid-rows-2 gap-x-1.5 gap-y-2 pt-1 sm:gap-x-2 sm:gap-y-2 sm:pt-1.5">
               <button
                 type="button"
-                className={`col-span-2 ${BTN_SECONDARY} w-full min-w-0 px-2 !text-xs leading-tight sm:!text-sm`}
+                className={`col-span-2 row-start-1 ${BTN_SECONDARY} min-h-[2.5rem] w-full min-w-0 px-2 !text-xs leading-tight sm:min-h-[2.625rem] sm:!text-sm`}
                 disabled={busy || draftShips.length === 0}
                 onClick={() => setDraftShips(prev => prev.slice(0, -1))}
               >
@@ -733,7 +741,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               </button>
               <button
                 type="button"
-                className={`col-span-2 ${BTN_SECONDARY} w-full min-w-0 px-2 !text-xs leading-tight sm:!text-sm`}
+                className={`col-span-2 row-start-1 ${BTN_SECONDARY} min-h-[2.5rem] w-full min-w-0 px-2 !text-xs leading-tight sm:min-h-[2.625rem] sm:!text-sm`}
                 disabled={busy || draftShips.length === 0}
                 onClick={() => setDraftShips([])}
               >
@@ -741,7 +749,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               </button>
               <button
                 type="button"
-                className={`col-span-2 ${BTN_SECONDARY} w-full min-w-0 px-2 !text-xs leading-tight sm:!text-sm`}
+                className={`col-span-2 row-start-1 ${BTN_SECONDARY} min-h-[2.5rem] w-full min-w-0 px-2 !text-xs leading-tight sm:min-h-[2.625rem] sm:!text-sm`}
                 disabled={busy}
                 onClick={() => void randomPlacement()}
               >
@@ -749,7 +757,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               </button>
               <button
                 type="button"
-                className={`col-span-2 col-start-2 ${BTN_PRIMARY} w-full min-w-0 px-2 !text-xs leading-tight sm:!text-sm`}
+                className={`col-span-2 col-start-2 row-start-2 ${BTN_PRIMARY} min-h-[2.5rem] w-full min-w-0 px-2 !text-xs leading-tight sm:min-h-[2.625rem] sm:!text-sm`}
                 disabled={saveDisabled}
                 onClick={() => void submitPlacement(draftShips)}
               >
@@ -757,7 +765,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               </button>
               <button
                 type="button"
-                className={`col-span-2 col-start-4 ${BTN_PRIMARY} w-full min-w-0 px-2 !text-xs leading-tight sm:!text-sm`}
+                className={`col-span-2 col-start-4 row-start-2 ${BTN_PRIMARY} min-h-[2.5rem] w-full min-w-0 px-2 !text-xs leading-tight sm:min-h-[2.625rem] sm:!text-sm`}
                 disabled={lockDisabled}
                 onClick={() => void lockPlacement()}
               >
@@ -765,7 +773,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               </button>
             </div>
           ) : (
-            <p className="text-center text-[11px] text-zinc-500">
+            <p className="flex min-h-[5.75rem] shrink-0 items-center justify-center px-1 text-center text-[11px] leading-snug text-zinc-500 sm:min-h-[6rem]">
               {I.lock} Waiting for opponent to lock…
             </p>
           )}
@@ -874,30 +882,6 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               </button>
             ))}
           </div>
-
-          {pd ? (
-            <div className="flex-shrink-0 rounded-xl border border-amber-500/35 bg-amber-950/30 p-1.5 text-[10px] text-amber-100/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:p-2 sm:text-[11px]">
-              {responderSeat === mySeat ? (
-                <>
-                  <p className="font-semibold">
-                    {I.double} Double offered → ×{proposedMult ?? "?"}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button type="button" className={BTN_PRIMARY} disabled={busy} onClick={() => void respondDouble(true)}>
-                      Accept
-                    </button>
-                    <button type="button" className={BTN_SECONDARY} disabled={busy} onClick={() => void respondDouble(false)}>
-                      Decline (forfeit)
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p>
-                  {I.timer} Waiting for opponent to accept or decline the double…
-                </p>
-              )}
-            </div>
-          ) : null}
 
           <div className="mb-1 flex gap-1 sm:hidden">
             <button
@@ -1066,9 +1050,39 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
         )
       ) : null}
 
+      {/* Double response — center modal (same pattern as Four Line / Flip Grid) */}
+      {vm.phase === "playing" && vm.mustRespondDouble && vm.pendingDouble ? (
+        <div className="fixed inset-0 z-40 flex max-h-[100dvh] items-center justify-center bg-black/70 p-3 backdrop-blur-[2px]">
+          <div
+            className="w-full max-w-sm rounded-2xl border border-amber-500/35 bg-gradient-to-b from-amber-950/95 to-zinc-950 p-4 shadow-2xl shadow-black/40"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ov2-fh-double-prompt"
+          >
+            <p id="ov2-fh-double-prompt" className="text-[11px] leading-snug text-amber-100/92">
+              Opponent proposes table ×{String(vm.pendingDouble?.proposed_mult ?? "")}. Declining or timing out ends the round at
+              the current ×{vm.stakeMultiplier}.
+            </p>
+            <div className="mt-3 flex flex-col gap-2">
+              <button type="button" disabled={busy} className={BTN_PRIMARY + " w-full"} onClick={() => void respondDouble(true)}>
+                Accept ×{String(vm.pendingDouble?.proposed_mult ?? "")}
+              </button>
+              <button type="button" disabled={busy} className={BTN_DANGER + " w-full"} onClick={() => void respondDouble(false)}>
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showResultModal ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-3 backdrop-blur-[2px] sm:items-center">
-          <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-white/12 bg-gradient-to-b from-zinc-900/98 to-zinc-950 shadow-2xl shadow-black/50">
+        <div className="fixed inset-0 z-50 flex max-h-[100dvh] items-end justify-center bg-black/80 p-3 backdrop-blur-[2px] sm:items-center">
+          <div
+            className="max-h-[min(92dvh,640px)] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-2xl border border-white/12 bg-gradient-to-b from-zinc-900/98 to-zinc-950 shadow-2xl shadow-black/50"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ov2-fh-finish-title"
+          >
             <div
               className={[
                 "border-b px-4 pb-3 pt-4",
@@ -1095,6 +1109,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Match result</p>
                   <div
+                    id="ov2-fh-finish-title"
                     className={[
                       "mt-0.5 text-2xl font-extrabold leading-tight tracking-tight",
                       finishOutcome === "win" && "text-emerald-400",
