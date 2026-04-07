@@ -195,10 +195,14 @@ function softCorrectLocalPlayer(p, auth, dt, opts) {
   if (d < LOCAL_DEAD_ZONE) return;
 
   const t = Math.min(LOCAL_CORRECT_MAX_STEP, 0.035 + d * 0.00065) * Math.min(1, LOCAL_CORRECT_RATE * dt);
-  const hx = opts.steerX ? 0.22 : 1;
-  const hy = opts.jumpHeld ? 0.42 : 1;
-  p.x += dx * t * hx;
-  p.y += dy * t * hy;
+  /**
+   * Production rule: while the player is actively controlling an axis, do not apply soft correction that can
+   * feel like opposing force. Authority will still be enforced via: (a) snap on large desync, (b) settle when neutral.
+   */
+  const hx = opts.steerX ? 0 : 1;
+  const hy = opts.jumpHeld ? 0 : 1;
+  if (hx !== 0) p.x += dx * t;
+  if (hy !== 0) p.y += dy * t;
 }
 
 /**
