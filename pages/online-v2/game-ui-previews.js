@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import Layout from "../../components/Layout";
+import OnlineV2ReservedAdSlot from "../../components/online-v2/OnlineV2ReservedAdSlot";
 import { Ov2UiPreviewProvider } from "../../lib/online-v2/dev/Ov2UiPreviewContext";
 import {
   buildOv2UiPreviewMocks,
@@ -59,10 +60,9 @@ export default function Ov2GameUiPreviewsPage() {
         className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white"
         style={{
           paddingTop: "max(8px, env(safe-area-inset-top))",
-          paddingBottom: "max(8px, env(safe-area-inset-bottom))",
         }}
       >
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col gap-2 overflow-hidden px-2 md:max-w-4xl md:px-4">
+        <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden px-2 pt-0 pb-2 md:max-w-4xl md:px-4">
           <header className="shrink-0 space-y-1 rounded-xl border border-amber-500/25 bg-amber-950/20 px-3 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Link
@@ -93,10 +93,10 @@ export default function Ov2GameUiPreviewsPage() {
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-white/10 bg-black/20">
+          <div className="w-full shrink-0 overflow-x-hidden">
             {Screen && ctx ? (
               <Ov2UiPreviewProvider mocks={mocks}>
-                <div className="flex h-full min-h-0 flex-col overflow-hidden">
+                <div className="flex w-full flex-col">
                   <Screen contextInput={ctx} />
                 </div>
               </Ov2UiPreviewProvider>
@@ -104,6 +104,13 @@ export default function Ov2GameUiPreviewsPage() {
               <div className="p-4 text-sm text-zinc-500">Nothing to show.</div>
             )}
           </div>
+        </div>
+
+        <div
+          className="mx-auto w-full max-w-2xl shrink-0 px-2 md:max-w-4xl md:px-4"
+          style={{ paddingBottom: "max(8px, env(safe-area-inset-bottom))" }}
+        >
+          <OnlineV2ReservedAdSlot />
         </div>
       </main>
     </Layout>

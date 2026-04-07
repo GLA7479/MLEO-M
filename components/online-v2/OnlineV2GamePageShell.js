@@ -211,7 +211,7 @@ export default function OnlineV2GamePageShell({
           </header>
 
           <div
-            className={`relative min-h-0 flex-1 overflow-x-hidden overflow-y-hidden ${useAppViewportHeight ? "overscroll-y-contain" : ""}`}
+            className={`relative flex min-h-0 flex-1 flex-col justify-start overflow-x-hidden overflow-y-hidden ${useAppViewportHeight ? "overscroll-y-contain" : ""}`}
           >
             {children}
 
