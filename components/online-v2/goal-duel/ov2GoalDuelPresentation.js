@@ -15,23 +15,40 @@ const JUMP_V = 680;
 const HW = 14;
 const HH = 22;
 
-/** Large error → snap to authority (pixels, world space). */
+/** Large error → snap to authority (pixels, world space) — players. */
 const SNAP_DIST = 110;
 /** Below this, skip micro correction (reduces jitter). */
 const CORRECT_EPS = 0.35;
 /** Local blend toward authority per frame (scaled by dt). */
 const LOCAL_CORRECT_RATE = 10;
-/** Remote / ball smoothing (higher = snappier follow of snapshots). */
+/** Remote player smoothing (higher = snappier follow of snapshots). */
 const REMOTE_SMOOTH_RATE = 14;
-const BALL_SMOOTH_RATE = 12;
+
+/** Ball-only: snap presentation to authority if drift exceeds this (world px). */
+const BALL_SNAP_DIST = 78;
+/** Velocity-aware smoothing: min/max effective rates (per second, scaled by `dt` in `smoothK`). */
+const BALL_SMOOTH_LO = 6.5;
+const BALL_SMOOTH_HI = 23;
+/** Reference speed for lerping between LO and HI (world units/s, order of sprinting ball). */
+const BALL_SMOOTH_SPEED_REF = 420;
+/** Short look-ahead along authoritative velocity (seconds), capped in px. */
+const BALL_EXTRAP_SEC = 0.024;
+const BALL_EXTRAP_MAX = 16;
+/** Local kick nudge: impulse strength (world px equivalent), decay per second. */
+const BALL_KICK_NUDGE_STR = 9;
+const BALL_KICK_NUDGE_MAX_DIST = 56;
+const BALL_NUDGE_DECAY = 16;
 
 /**
- * @param {{ l: boolean, r: boolean, j: boolean, k: boolean }} inp
- * @param {0|1} seat
+ * @param {number} authSpeed
+ * @param {number} dt
+ * @returns {number} blend factor in (0,1], multiply by dt already applied inside
  */
-export function gdSeatWorldInput(inp, seat) {
-  if (seat === 0) return { l: inp.l, r: inp.r, j: inp.j, k: inp.k };
-  return { l: inp.r, r: inp.l, j: inp.j, k: inp.k };
+export function gdBallSmoothRateForSpeed(authSpeed, dt) {
+  const spd = Math.max(0, authSpeed);
+  const t = Math.min(1, spd / BALL_SMOOTH_SPEED_REF);
+  const perSec = BALL_SMOOTH_LO + (BALL_SMOOTH_HI - BALL_SMOOTH_LO) * t;
+  return Math.min(1, perSec * dt);
 }
 
 /**
@@ -39,6 +56,8 @@ export function gdSeatWorldInput(inp, seat) {
  *   p0: GdVecBody,
  *   p1: GdVecBody,
  *   ball: GdBallBody,
+ *   ballNudgeX: number,
+ *   ballNudgeY: number,
  *   init: boolean,
  *   lastSessionId: string,
  *   lastScore0: number,
@@ -50,6 +69,8 @@ export function gdCreatePresentationState() {
     p0: { x: 180, y: 338, vx: 0, vy: 0 },
     p1: { x: 620, y: 338, vx: 0, vy: 0 },
     ball: { x: 400, y: 220, vx: 0, vy: 0, r: 11 },
+    ballNudgeX: 0,
+    ballNudgeY: 0,
     init: false,
     lastSessionId: "",
     lastScore0: 0,
@@ -103,6 +124,8 @@ export function gdHardSyncPresentationFromAuthoritative(st, pub) {
   syncPlayerFromAuth(st.p0, p0);
   syncPlayerFromAuth(st.p1, p1);
   syncBallFromAuth(st.ball, ball);
+  st.ballNudgeX = 0;
+  st.ballNudgeY = 0;
   st.init = true;
 }
 
@@ -176,17 +199,70 @@ function smoothTowardVec(p, auth, dt) {
 }
 
 /**
- * @param {GdBallBody} b
+ * Presentation-only ball: velocity-aware smoothing toward a short extrapolated target, snap on large error,
+ * local kick nudge decay.
+ *
+ * @param {ReturnType<typeof gdCreatePresentationState>} st
  * @param {GdBallBody} auth
  * @param {number} dt
+ * @param {boolean} localKickEdge
+ * @param {GdVecBody} authLocalPlayer
  */
-function smoothTowardBall(b, auth, dt) {
-  const k = Math.min(1, BALL_SMOOTH_RATE * dt);
-  b.x += (auth.x - b.x) * k;
-  b.y += (auth.y - b.y) * k;
+function advanceBallPresentation(st, auth, dt, localKickEdge, authLocalPlayer) {
+  const b = st.ball;
+  const err = Math.hypot(auth.x - b.x, auth.y - b.y);
+  if (err > BALL_SNAP_DIST) {
+    syncBallFromAuth(b, {
+      x: auth.x,
+      y: auth.y,
+      vx: auth.vx,
+      vy: auth.vy,
+      r: auth.r,
+    });
+    st.ballNudgeX = 0;
+    st.ballNudgeY = 0;
+    return;
+  }
+
+  const authSpd = Math.hypot(auth.vx, auth.vy);
+  const k = gdBallSmoothRateForSpeed(authSpd, dt);
+
+  let tx = auth.x + Math.max(-BALL_EXTRAP_MAX, Math.min(BALL_EXTRAP_MAX, auth.vx * BALL_EXTRAP_SEC));
+  let ty = auth.y + Math.max(-BALL_EXTRAP_MAX, Math.min(BALL_EXTRAP_MAX, auth.vy * BALL_EXTRAP_SEC));
+
+  b.x += (tx - b.x) * k;
+  b.y += (ty - b.y) * k;
   b.vx = auth.vx;
   b.vy = auth.vy;
   b.r = auth.r;
+
+  const decay = Math.exp(-BALL_NUDGE_DECAY * dt);
+  st.ballNudgeX *= decay;
+  st.ballNudgeY *= decay;
+  if (localKickEdge) {
+    const dx = auth.x - authLocalPlayer.x;
+    const dy = auth.y - authLocalPlayer.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 0.5 && d < BALL_KICK_NUDGE_MAX_DIST) {
+      const inv = 1 / d;
+      st.ballNudgeX += dx * inv * BALL_KICK_NUDGE_STR;
+      st.ballNudgeY += dy * inv * BALL_KICK_NUDGE_STR * 0.65;
+    }
+  }
+  if (Math.hypot(st.ballNudgeX, st.ballNudgeY) < 0.04) {
+    st.ballNudgeX = 0;
+    st.ballNudgeY = 0;
+  }
+}
+
+/**
+ * UI → sim axes. Server `ov2_gd_sim_step` uses the same world +x for both seats (l = −ax, r = +ax).
+ * `inputRef.l` / `inputRef.r` are always screen-left / screen-right; no seat swap here.
+ *
+ * @param {{ l: boolean, r: boolean, j: boolean, k: boolean }} inp
+ */
+export function gdSeatWorldInput(inp) {
+  return { l: inp.l, r: inp.r, j: inp.j, k: inp.k };
 }
 
 /**
@@ -197,7 +273,7 @@ function smoothTowardBall(b, auth, dt) {
  * @param {{ l: boolean, r: boolean, j: boolean, k: boolean }} inp
  * @param {0|1|null} mySeat
  * @param {number} dtSec
- * @param {{ sessionId: string, score0: number, score1: number }} meta
+ * @param {{ sessionId: string, score0: number, score1: number, localKickEdge?: boolean }} meta
  */
 export function gdAdvancePresentation(st, authPub, inp, mySeat, dtSec, meta) {
   const dt = Math.min(0.09, Math.max(0.001, dtSec));
@@ -242,10 +318,12 @@ export function gdAdvancePresentation(st, authPub, inp, mySeat, dtSec, meta) {
   const authLocal = localKey === "p0" ? authP0 : authP1;
   const authRemote = remoteKey === "p0" ? authP0 : authP1;
 
-  const sin = gdSeatWorldInput(inp, /** @type {0|1} */ (mySeat));
+  const sin = gdSeatWorldInput(inp);
   stepPlayerPhysics(local, sin, dt, arena);
   softCorrectTowardAuth(local, authLocal, dt);
 
   smoothTowardVec(remote, authRemote, dt);
-  smoothTowardBall(st.ball, authBall, dt);
+
+  const localKickEdge = Boolean(meta.localKickEdge);
+  advanceBallPresentation(st, authBall, dt, localKickEdge, authLocal);
 }

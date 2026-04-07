@@ -45,8 +45,9 @@ export function useOv2GoalDuelSession(baseContext) {
       if (pub && typeof pub === "object") {
         const mySeat = Number(preview.snapshot?.mySeat ?? 0);
         const inp = previewInputRef.current;
-        const effL = mySeat === 1 ? inp.r : inp.l;
-        const effR = mySeat === 1 ? inp.l : inp.r;
+        /** Same as server `ov2_gd_sim_step`: l/r are world-x (screen left/right), both seats. */
+        const effL = inp.l;
+        const effR = inp.r;
         const arena = /** @type {Record<string, unknown>} */ (pub.arena || {});
         const aw = Number(arena.w ?? 800) || 800;
         const gy = Number(arena.groundY ?? 360) || 360;
@@ -298,9 +299,9 @@ export function useOv2GoalDuelSession(baseContext) {
     const tick = () => {
       if (cancelled) return;
       const i = inputRef.current;
-      const seat = snapRef.current?.mySeat;
-      const sendL = seat === 1 ? i.r : i.l;
-      const sendR = seat === 1 ? i.l : i.r;
+      /** Server stores p_l/p_r per seat as world axes (same as sim); do not swap by seat. */
+      const sendL = i.l;
+      const sendR = i.r;
       void (async () => {
         const resp = await requestOv2GoalDuelStep(roomId, selfKey, sendL, sendR, i.j, i.k, {
           revision: snapRef.current?.revision,

@@ -615,6 +615,10 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
       const dtSec = prev && prev.t > 0 ? Math.min(0.08, (nowMs - prev.t) / 1000) : 0.016;
 
+      const inp = inputRef.current;
+      const kh = Boolean(inp.k);
+      const kickEdge = kh && !prevKickHeldRef.current;
+
       let p0x;
       let p0y;
       let p1x;
@@ -624,18 +628,19 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       let br;
       if (!isUiPreview && (mySeat === 0 || mySeat === 1)) {
         if (!presentationRef.current) presentationRef.current = gdCreatePresentationState();
-        gdAdvancePresentation(presentationRef.current, pub, inputRef.current, mySeat, dtSec, {
+        gdAdvancePresentation(presentationRef.current, pub, inp, mySeat, dtSec, {
           sessionId: String(live.sessionId ?? ""),
           score0: Number(live.score0) || 0,
           score1: Number(live.score1) || 0,
+          localKickEdge: kickEdge,
         });
         const pr = presentationRef.current;
         p0x = pr.p0.x;
         p0y = pr.p0.y;
         p1x = pr.p1.x;
         p1y = pr.p1.y;
-        bx = pr.ball.x;
-        by = pr.ball.y;
+        bx = pr.ball.x + pr.ballNudgeX;
+        by = pr.ball.y + pr.ballNudgeY;
         br = pr.ball.r;
       } else {
         p0x = Number(p0Auth.x ?? 180);
@@ -667,34 +672,41 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
       const bvx = prev ? (bx - prev.bx) / Math.max(dtSec, 0.001) : 0;
       const bvy = prev ? (by - prev.by) / Math.max(dtSec, 0.001) : 0;
-      const bspeed = Math.hypot(bvx, bvy);
 
-      if (bspeed > 220 && prev) {
-        const d0 = Math.hypot(bx - p0x, by - p0y);
-        const d1 = Math.hypot(bx - p1x, by - p1y);
+      const p0ax = Number(p0Auth.x ?? 180);
+      const p0ay = Number(p0Auth.y ?? 338);
+      const p1ax = Number(p1Auth.x ?? 620);
+      const p1ay = Number(p1Auth.y ?? 338);
+      const authBx = Number(ballAuth.x ?? 400);
+      const authBy = Number(ballAuth.y ?? 220);
+      const authBvx = Number(ballAuth.vx ?? 0);
+      const authBvy = Number(ballAuth.vy ?? 0);
+      const authBspeed = Math.hypot(authBvx, authBvy);
+
+      /** Contact flash: gate + distances use authoritative ball/players so FX aligns with server truth. */
+      if (authBspeed > 220 && prev) {
+        const d0 = Math.hypot(authBx - p0ax, authBy - p0ay);
+        const d1 = Math.hypot(authBx - p1ax, authBy - p1ay);
         if (d0 < 54 && d0 <= d1) {
           kickP0UntilRef.current = nowMs + 160;
           if (nowMs - lastBallKickFxP0Ref.current > 105) {
             lastBallKickFxP0Ref.current = nowMs;
-            kickFlashesRef.current.push({ ax: bx, ay: by, startMs: nowMs, durationMs: 158 });
+            kickFlashesRef.current.push({ ax: authBx, ay: authBy, startMs: nowMs, durationMs: 158 });
             shakePulsesRef.current.push({ start: nowMs, until: nowMs + 128, amp: 1.08 });
           }
         } else if (d1 < 54) {
           kickP1UntilRef.current = nowMs + 160;
           if (nowMs - lastBallKickFxP1Ref.current > 105) {
             lastBallKickFxP1Ref.current = nowMs;
-            kickFlashesRef.current.push({ ax: bx, ay: by, startMs: nowMs, durationMs: 158 });
+            kickFlashesRef.current.push({ ax: authBx, ay: authBy, startMs: nowMs, durationMs: 158 });
             shakePulsesRef.current.push({ start: nowMs, until: nowMs + 128, amp: 1.08 });
           }
         }
       }
 
-      const inp = inputRef.current;
       if (mySeat === 0 && inp.k) kickP0UntilRef.current = nowMs + 110;
       if (mySeat === 1 && inp.k) kickP1UntilRef.current = nowMs + 110;
 
-      const kh = Boolean(inp.k);
-      const kickEdge = kh && !prevKickHeldRef.current;
       prevKickHeldRef.current = kh;
       if (kickEdge && mySeat === 0) {
         kickFlashesRef.current.push({ ax: p0x, ay: p0y - hh0 * 0.42, startMs: nowMs, durationMs: 142 });
