@@ -17,6 +17,7 @@ import {
   TEAM_RIVAL_DOG,
   TEAM_STAR_DOG,
 } from "./ov2GoalDuelCanvasDraw";
+import { gdAdvancePresentation, gdCreatePresentationState } from "./ov2GoalDuelPresentation";
 
 /**
  * Raster assets — dogs face **right**; ball is centered in a square texture.
@@ -141,13 +142,13 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     vaultClaimBusy,
     err,
     setErr,
-    setInput,
     inputRef,
     requestRematch,
     cancelRematch,
     startNextMatch,
     isHost,
     roomMatchSeq,
+    isUiPreview = false,
   } = session;
 
   const [rematchBusy, setRematchBusy] = useState(false);
@@ -155,6 +156,8 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   const [exitBusy, setExitBusy] = useState(false);
   const [exitErr, setExitErr] = useState("");
   const canvasRef = useRef(/** @type {HTMLCanvasElement|null} */ (null));
+  /** Render-only predicted + smoothed positions (authoritative state remains `vm.public` from server). */
+  const presentationRef = useRef(/** @type {ReturnType<typeof gdCreatePresentationState>|null} */ (null));
   /** Root of this screen — `contextmenu` listener scoped here (not `window`). */
   const gdScreenRootRef = useRef(/** @type {HTMLDivElement|null} */ (null));
   const vmRef = useRef(vm);
@@ -183,7 +186,8 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   const resetPadInputAndVisuals = useCallback(() => {
     kbdRef.current = { l: false, r: false, j: false, k: false };
     pointerPadMapRef.current.clear();
-    setInput({ l: false, r: false, j: false, k: false });
+    const cur = inputRef.current;
+    cur.l = cur.r = cur.j = cur.k = false;
     const ui = padUiRef.current;
     const keys = /** @type {const} */ (["l", "r", "j", "k"]);
     for (let i = 0; i < keys.length; i++) {
@@ -191,7 +195,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       ui[key].hit?.classList.remove("gd-pad-down");
       ui[key].face?.classList.remove("gd-pad-face-down");
     }
-  }, [setInput]);
+  }, []);
 
   const computePadInput = useCallback(() => {
     const k = kbdRef.current;
@@ -206,18 +210,16 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       if (v === "jump") jump = true;
       if (v === "kick") kick = true;
     });
-    const next = {
-      l: k.l || left,
-      r: k.r || right,
-      j: k.j || jump,
-      k: k.k || kick,
-    };
-    setInput(next);
+    const cur = inputRef.current;
+    cur.l = k.l || left;
+    cur.r = k.r || right;
+    cur.j = k.j || jump;
+    cur.k = k.k || kick;
     const ui = padUiRef.current;
     const keys = /** @type {const} */ (["l", "r", "j", "k"]);
     for (let i = 0; i < keys.length; i++) {
       const key = keys[i];
-      const down = next[key];
+      const down = cur[key];
       const h = ui[key].hit;
       const f = ui[key].face;
       if (h) {
@@ -229,7 +231,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
         else f.classList.remove("gd-pad-face-down");
       }
     }
-  }, [setInput]);
+  }, []);
 
   /** @param {"left"|"right"|"jump"|"kick"} key */
   const handlePointerDownPad = useCallback(
@@ -556,6 +558,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
   useEffect(() => {
     if (vm.phase !== "playing") {
       motionPrevRef.current = null;
+      presentationRef.current = null;
     }
   }, [vm.phase]);
 
@@ -600,20 +603,49 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       const sx = W / aw;
       const sy = H / ah;
 
-      const p0 = pub.p0 && typeof pub.p0 === "object" ? pub.p0 : {};
-      const p1 = pub.p1 && typeof pub.p1 === "object" ? pub.p1 : {};
-      const ball = pub.ball && typeof pub.ball === "object" ? pub.ball : {};
-      const p0x = Number(p0.x ?? 180);
-      const p0y = Number(p0.y ?? 338);
-      const hw0 = Number(p0.hw ?? 14);
-      const hh0 = Number(p0.hh ?? 22);
-      const p1x = Number(p1.x ?? 620);
-      const p1y = Number(p1.y ?? 338);
-      const hw1 = Number(p1.hw ?? 14);
-      const hh1 = Number(p1.hh ?? 22);
-      const bx = Number(ball.x ?? 400);
-      const by = Number(ball.y ?? 220);
-      const br = Number(ball.r ?? 11);
+      const p0Auth = pub.p0 && typeof pub.p0 === "object" ? pub.p0 : {};
+      const p1Auth = pub.p1 && typeof pub.p1 === "object" ? pub.p1 : {};
+      const ballAuth = pub.ball && typeof pub.ball === "object" ? pub.ball : {};
+      const hw0 = Number(p0Auth.hw ?? 14);
+      const hh0 = Number(p0Auth.hh ?? 22);
+      const hw1 = Number(p1Auth.hw ?? 14);
+      const hh1 = Number(p1Auth.hh ?? 22);
+
+      const prev = motionPrevRef.current;
+      const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const dtSec = prev && prev.t > 0 ? Math.min(0.08, (nowMs - prev.t) / 1000) : 0.016;
+
+      let p0x;
+      let p0y;
+      let p1x;
+      let p1y;
+      let bx;
+      let by;
+      let br;
+      if (!isUiPreview && (mySeat === 0 || mySeat === 1)) {
+        if (!presentationRef.current) presentationRef.current = gdCreatePresentationState();
+        gdAdvancePresentation(presentationRef.current, pub, inputRef.current, mySeat, dtSec, {
+          sessionId: String(live.sessionId ?? ""),
+          score0: Number(live.score0) || 0,
+          score1: Number(live.score1) || 0,
+        });
+        const pr = presentationRef.current;
+        p0x = pr.p0.x;
+        p0y = pr.p0.y;
+        p1x = pr.p1.x;
+        p1y = pr.p1.y;
+        bx = pr.ball.x;
+        by = pr.ball.y;
+        br = pr.ball.r;
+      } else {
+        p0x = Number(p0Auth.x ?? 180);
+        p0y = Number(p0Auth.y ?? 338);
+        p1x = Number(p1Auth.x ?? 620);
+        p1y = Number(p1Auth.y ?? 338);
+        bx = Number(ballAuth.x ?? 400);
+        by = Number(ballAuth.y ?? 220);
+        br = Number(ballAuth.r ?? 11);
+      }
 
       const vs = GD_VISUAL_ENTITY_SCALE;
       const hw0d = hw0 * vs;
@@ -623,10 +655,6 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       const hh1d = hh1 * vs;
       const p1yDraw = p1y - hh1 * (vs - 1);
       const brd = br * vs;
-
-      const prev = motionPrevRef.current;
-      const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
-      const dtSec = prev && prev.t > 0 ? Math.min(0.08, (nowMs - prev.t) / 1000) : 0.016;
 
       shakePulsesRef.current = shakePulsesRef.current.filter(p => nowMs < p.until);
       kickFlashesRef.current = kickFlashesRef.current.filter(f => nowMs < f.startMs + f.durationMs + 24);
@@ -661,7 +689,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
         }
       }
 
-      const inp = inputRef?.current ?? { l: false, r: false, j: false, k: false };
+      const inp = inputRef.current;
       if (mySeat === 0 && inp.k) kickP0UntilRef.current = nowMs + 110;
       if (mySeat === 1 && inp.k) kickP1UntilRef.current = nowMs + 110;
 
@@ -680,8 +708,8 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       const m1 = inferDogMotion(prev, p1x, p1y, "p1", dtSec);
       /** Server sim sets p0.face≈+1 / p1.face≈−1 at rest; inferDogMotion used +1 for both when |vx| is tiny. */
       const signFace = v => (Number(v) >= 0 ? 1 : -1);
-      const f0Srv = signFace(p0.face ?? 1);
-      const f1Srv = signFace(p1.face ?? -1);
+      const f0Srv = signFace(p0Auth.face ?? 1);
+      const f1Srv = signFace(p1Auth.face ?? -1);
       const vxTh = 25;
       const facing0 = Math.abs(m0.vx) > vxTh ? m0.facing : f0Srv;
       const facing1 = Math.abs(m1.vx) > vxTh ? m1.facing : f1Srv;
@@ -750,7 +778,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
     raf = window.requestAnimationFrame(paint);
     return () => window.cancelAnimationFrame(raf);
-  }, [vm.phase, mySeat, inputRef, spriteHome, spriteAway, spriteBall]);
+  }, [vm.phase, mySeat, inputRef, spriteHome, spriteAway, spriteBall, isUiPreview]);
 
   return (
     <>

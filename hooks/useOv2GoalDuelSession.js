@@ -23,7 +23,11 @@ export function useOv2GoalDuelSession(baseContext) {
   /** UI previews: real input ref + local physics so controls and canvas respond (no server). */
   const previewInputRef = useRef({ l: false, r: false, j: false, k: false });
   const previewSetInput = useCallback(partial => {
-    previewInputRef.current = { ...previewInputRef.current, ...partial };
+    const c = previewInputRef.current;
+    if (partial.l !== undefined) c.l = partial.l;
+    if (partial.r !== undefined) c.r = partial.r;
+    if (partial.j !== undefined) c.j = partial.j;
+    if (partial.k !== undefined) c.k = partial.k;
   }, []);
   const previewLivePublicRef = useRef(/** @type {Record<string, unknown>|null} */ (null));
   const previewVyRef = useRef(0);
@@ -120,6 +124,7 @@ export function useOv2GoalDuelSession(baseContext) {
       snapshot: { ...preview.snapshot, public: pub },
       inputRef: previewInputRef,
       setInput: previewSetInput,
+      isUiPreview: true,
     };
   }
 
@@ -146,7 +151,8 @@ export function useOv2GoalDuelSession(baseContext) {
 
   useEffect(() => {
     if (!snap || String(snap.phase || "").toLowerCase() !== "playing") {
-      inputRef.current = { l: false, r: false, j: false, k: false };
+      const c = inputRef.current;
+      c.l = c.r = c.j = c.k = false;
     }
   }, [snap?.phase, snap?.sessionId]);
 
@@ -280,17 +286,22 @@ export function useOv2GoalDuelSession(baseContext) {
     return () => window.clearInterval(id);
   }, [roomId, selfKey, roomProductId, snap?.phase, snap?.sessionId]);
 
+  /**
+   * Authoritative step RPC at a fixed cadence (not every RAF — avoids ~60 RPC/s).
+   * Client render uses local presentation + smoothing; see Ov2GoalDuelScreen + ov2GoalDuelPresentation.js.
+   */
+  const GD_STEP_SEND_MS = 50;
   useEffect(() => {
     if (!roomId || !selfKey || roomProductId !== OV2_GOAL_DUEL_PRODUCT_GAME_ID) return undefined;
     if (!snap || String(snap.phase || "").toLowerCase() !== "playing") return undefined;
     let cancelled = false;
-    const loop = window.setInterval(() => {
+    const tick = () => {
       if (cancelled) return;
       const i = inputRef.current;
+      const seat = snapRef.current?.mySeat;
+      const sendL = seat === 1 ? i.r : i.l;
+      const sendR = seat === 1 ? i.l : i.r;
       void (async () => {
-        const seat = snapRef.current?.mySeat;
-        const sendL = seat === 1 ? i.r : i.l;
-        const sendR = seat === 1 ? i.l : i.r;
         const resp = await requestOv2GoalDuelStep(roomId, selfKey, sendL, sendR, i.j, i.k, {
           revision: snapRef.current?.revision,
         });
@@ -300,15 +311,20 @@ export function useOv2GoalDuelSession(baseContext) {
           if (fresh) setSnap(fresh);
         }
       })();
-    }, 45);
+    };
+    const id = window.setInterval(tick, GD_STEP_SEND_MS);
     return () => {
       cancelled = true;
-      window.clearInterval(loop);
+      window.clearInterval(id);
     };
   }, [roomId, selfKey, roomProductId, snap?.phase, snap?.sessionId]);
 
   const setInput = useCallback(partial => {
-    inputRef.current = { ...inputRef.current, ...partial };
+    const c = inputRef.current;
+    if (partial.l !== undefined) c.l = partial.l;
+    if (partial.r !== undefined) c.r = partial.r;
+    if (partial.j !== undefined) c.j = partial.j;
+    if (partial.k !== undefined) c.k = partial.k;
   }, []);
 
   const requestRematch = useCallback(async () => {
@@ -365,5 +381,6 @@ export function useOv2GoalDuelSession(baseContext) {
     startNextMatch,
     isHost,
     roomMatchSeq: room?.match_seq != null ? Number(room.match_seq) : null,
+    isUiPreview: false,
   };
 }
