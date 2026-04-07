@@ -500,7 +500,7 @@ export default function Ov2FlipGridScreen({ contextInput = null, onSessionRefres
       </div>
 
       {/* Players + board (mobile: stacked; md+: narrow side cards, board centered between) */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden px-2 pb-1 max-md:overflow-y-auto md:min-h-0 md:overflow-y-hidden md:overscroll-contain md:px-4 md:pb-5">
+      <div className="mt-2.5 flex min-h-0 flex-1 flex-col overflow-x-hidden px-2 pb-1 max-md:overflow-y-auto sm:mt-3 md:min-h-0 md:overflow-y-hidden md:overscroll-contain md:px-4 md:pb-5">
         {hasSession && playerPair ? (
           <div
             className="grid min-h-0 w-full min-w-0 grid-cols-2 grid-rows-[auto_auto] gap-x-2 gap-y-5 md:grid-cols-[minmax(0,10.5rem)_minmax(0,1fr)_minmax(0,10.5rem)] md:grid-rows-1 md:items-start md:gap-x-3 md:gap-y-0 md:pt-0 lg:grid-cols-[minmax(0,11.25rem)_minmax(0,1fr)_minmax(0,11.25rem)] lg:gap-x-4"
@@ -518,12 +518,12 @@ export default function Ov2FlipGridScreen({ contextInput = null, onSessionRefres
         )}
 
         {/* Action + utility — separated from board on mobile; centered band on desktop */}
-        <div className="mt-5 shrink-0 border-t border-white/[0.08] pt-4 md:mt-4 md:pt-3 md:pb-2">
+        <div className="mt-5 shrink-0 pt-4 md:mt-4 md:pt-3 md:pb-2">
           <div className="mx-auto flex w-full max-w-2xl min-w-0 flex-row items-stretch gap-2 md:max-w-3xl md:justify-center md:gap-3">
             <button
               type="button"
               disabled={stakeBtnDisabled}
-              className={`${BTN_ACCENT} flex min-h-[2.75rem] min-w-0 flex-[1.65] items-center justify-center px-2 py-2.5 text-center text-[11px] font-semibold leading-tight sm:text-xs md:flex-1 md:max-w-md md:px-4 md:py-2.5`}
+              className={`${BTN_ACCENT} flex min-h-[2.75rem] min-w-0 flex-[1.65] items-center justify-center px-2 py-2.5 text-center !text-xs font-semibold leading-tight sm:!text-sm md:flex-1 md:max-w-md md:px-4 md:py-2.5`}
               onClick={() => void offerDouble()}
             >
               Increase table stake
@@ -531,7 +531,7 @@ export default function Ov2FlipGridScreen({ contextInput = null, onSessionRefres
             <button
               type="button"
               disabled={leaveBtnDisabled}
-              className={`${BTN_DANGER} flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-center px-2 py-2.5 text-center text-[11px] font-semibold leading-tight sm:text-xs md:max-w-[12.5rem] md:flex-none md:shrink-0 md:px-4 md:py-2.5`}
+              className={`${BTN_DANGER} flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-center px-2 py-2.5 text-center !text-xs font-semibold leading-tight sm:!text-sm md:max-w-[12.5rem] md:flex-none md:shrink-0 md:px-4 md:py-2.5`}
               onClick={handleLeaveToLobby}
             >
               {leaveToLobbyBusy ? "Leaving…" : "Leave table"}

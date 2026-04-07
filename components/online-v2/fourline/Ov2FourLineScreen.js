@@ -104,6 +104,8 @@ function GhostOrMiniDisc({ seat, className = "" }) {
   );
 }
 
+const OV2_FL_MISSED_STRIKE_MAX = 3;
+
 /**
  * @param {{
  *   seat0Label: string,
@@ -112,14 +114,41 @@ function GhostOrMiniDisc({ seat, className = "" }) {
  *   indicatorSeat: null|0|1,
  *   phase: string,
  *   mustRespondDouble: boolean,
+ *   missedStreakBySeat: { 0: number, 1: number },
  * }} props
  */
-function FourLinePlayerHeader({ seat0Label, seat1Label, mySeat, indicatorSeat, phase, mustRespondDouble }) {
+function FourLinePlayerHeader({
+  seat0Label,
+  seat1Label,
+  mySeat,
+  indicatorSeat,
+  phase,
+  mustRespondDouble,
+  missedStreakBySeat,
+}) {
   const playing = phase === "playing";
   const active0 = playing && indicatorSeat === 0;
   const active1 = playing && indicatorSeat === 1;
+
+  const lineForSeat = seat => {
+    if (phase === "finished") return "Finished";
+    if (!playing) return "";
+    if (mustRespondDouble && Number(seat) === Number(indicatorSeat)) return "Respond";
+    if (indicatorSeat !== seat) {
+      const m = Math.max(
+        0,
+        Math.min(OV2_FL_MISSED_STRIKE_MAX, Number(missedStreakBySeat?.[seat] ?? 0) || 0)
+      );
+      return `Waiting · ${m}/${OV2_FL_MISSED_STRIKE_MAX}`;
+    }
+    return "Turn";
+  };
+
+  const line0 = lineForSeat(0);
+  const line1 = lineForSeat(1);
+
   return (
-    <div className="grid w-full shrink-0 grid-cols-2 gap-1.5 sm:gap-1">
+    <div className="mb-2.5 grid w-full shrink-0 grid-cols-2 gap-1.5 sm:mb-3 sm:gap-1">
       <div
         className={`min-w-0 rounded-lg border px-2 py-1.5 sm:px-2.5 sm:py-1.5 ${
           active0
@@ -147,9 +176,17 @@ function FourLinePlayerHeader({ seat0Label, seat1Label, mySeat, indicatorSeat, p
           </div>
         </div>
         <div className="mt-1 flex min-h-[1.125rem] items-end">
-          {active0 ? (
-            <p className="text-[9px] font-semibold uppercase tracking-wide text-sky-300/95">
-              {mustRespondDouble ? "Respond" : "Turn"}
+          {line0 ? (
+            <p
+              className={`min-w-0 truncate text-[8px] font-semibold uppercase leading-tight tracking-wide tabular-nums sm:text-[9px] ${
+                phase === "finished"
+                  ? "text-zinc-500"
+                  : active0
+                    ? "text-sky-300/95"
+                    : "text-zinc-500"
+              }`}
+            >
+              {line0}
             </p>
           ) : null}
         </div>
@@ -181,9 +218,17 @@ function FourLinePlayerHeader({ seat0Label, seat1Label, mySeat, indicatorSeat, p
           </div>
         </div>
         <div className="mt-1 flex min-h-[1.125rem] items-end">
-          {active1 ? (
-            <p className="text-[9px] font-semibold uppercase tracking-wide text-amber-300/95">
-              {mustRespondDouble ? "Respond" : "Turn"}
+          {line1 ? (
+            <p
+              className={`min-w-0 truncate text-[8px] font-semibold uppercase leading-tight tracking-wide tabular-nums sm:text-[9px] ${
+                phase === "finished"
+                  ? "text-zinc-500"
+                  : active1
+                    ? "text-amber-300/95"
+                    : "text-zinc-500"
+              }`}
+            >
+              {line1}
             </p>
           ) : null}
         </div>
@@ -592,7 +637,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
         ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-x-hidden overscroll-contain max-sm:overflow-y-auto sm:min-h-0 sm:overflow-y-hidden sm:gap-1">
+      <div className="mt-2.5 flex min-h-0 flex-1 flex-col gap-0 overflow-x-hidden overscroll-contain max-sm:overflow-y-auto sm:mt-3 sm:min-h-0 sm:overflow-y-hidden">
         {hasSession ? (
           <FourLinePlayerHeader
             seat0Label={seat0Label}
@@ -601,6 +646,7 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
             indicatorSeat={indicatorSeat}
             phase={vm.phase}
             mustRespondDouble={vm.mustRespondDouble === true}
+            missedStreakBySeat={vm.missedStreakBySeat}
           />
         ) : null}
 
@@ -720,32 +766,27 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
           </div>
         </div>
 
-        <div className="mt-0 flex shrink-0 flex-col gap-0.5 border-t border-white/[0.08] pt-1.5 text-[10px] text-zinc-500 sm:pt-1">
-          <p className="leading-snug">
-            Missed turns: you {vm.mySeat != null ? vm.missedStreakBySeat[vm.mySeat] ?? 0 : "—"} · opponent{" "}
-            {vm.mySeat === 0 ? vm.missedStreakBySeat[1] : vm.mySeat === 1 ? vm.missedStreakBySeat[0] : "—"}
-          </p>
-          <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        {/* Action + utility — same single row as Flip Grid */}
+        <div className="mt-5 shrink-0 pt-4 md:mt-4 md:pt-3 md:pb-2">
+          <div className="mx-auto flex w-full max-w-2xl min-w-0 flex-row items-stretch gap-2 md:max-w-3xl md:justify-center md:gap-3">
             <button
               type="button"
               disabled={busy || !canOfferDoubleNow}
-              className={`${BTN_ACCENT} inline-flex w-full min-w-0 shrink items-center justify-center py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-[2.875rem] sm:flex-1 sm:px-4 sm:py-2.5 sm:text-sm`}
+              className={`${BTN_ACCENT} flex min-h-[2.75rem] min-w-0 flex-[1.65] items-center justify-center px-2 py-2.5 text-center !text-xs font-semibold leading-tight sm:!text-sm disabled:cursor-not-allowed disabled:opacity-40 md:flex-1 md:max-w-md md:px-4 md:py-2.5`}
               onClick={() => void offerDouble()}
             >
               Increase table stake
             </button>
-            <div className="flex w-full shrink-0 flex-col gap-0.5 sm:w-auto sm:items-stretch sm:justify-center sm:pl-1">
-              <button
-                type="button"
-                disabled={exitBusy || !pk}
-                className={`${BTN_DANGER} inline-flex w-full min-w-[10rem] items-center justify-center self-start px-3.5 py-2.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[2.875rem] sm:w-auto sm:min-w-[11.5rem] sm:self-auto sm:px-5 sm:py-2.5 sm:text-[15px]`}
-                onClick={() => void onExitToLobby()}
-              >
-                {exitBusy ? "Leaving…" : "Leave table"}
-              </button>
-              {exitErr ? <span className="text-red-300 sm:text-right">{exitErr}</span> : null}
-            </div>
+            <button
+              type="button"
+              disabled={exitBusy || !pk}
+              className={`${BTN_DANGER} flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-center px-2 py-2.5 text-center !text-xs font-semibold leading-tight sm:!text-sm disabled:cursor-not-allowed disabled:opacity-45 md:max-w-[12.5rem] md:flex-none md:shrink-0 md:px-4 md:py-2.5`}
+              onClick={() => void onExitToLobby()}
+            >
+              {exitBusy ? "Leaving…" : "Leave table"}
+            </button>
           </div>
+          {exitErr ? <p className="mt-2 text-center text-[11px] text-red-300">{exitErr}</p> : null}
         </div>
       </div>
 
