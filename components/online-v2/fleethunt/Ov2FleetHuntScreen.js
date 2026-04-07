@@ -300,8 +300,44 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
     }
   }, [finishSessionId]);
 
-  const winnerLabel =
-    vm.winnerSeat != null && mySeat != null ? (vm.winnerSeat === mySeat ? "You won" : "You lost") : "Match over";
+  const finishResultObj =
+    vm.result && typeof vm.result === "object" ? /** @type {Record<string, unknown>} */ (vm.result) : null;
+  const finishIsDraw = Boolean(finishResultObj?.draw);
+  const finishOutcome =
+    finishIsDraw
+      ? "draw"
+      : vm.winnerSeat != null && mySeat != null
+        ? vm.winnerSeat === mySeat
+          ? "win"
+          : "loss"
+        : "unknown";
+  const finishHeadline =
+    finishOutcome === "win" ? "Victory" : finishOutcome === "loss" ? "Defeat" : finishIsDraw ? "Draw" : "Match over";
+
+  /** Net vault-style settlement from `parity_state.__result__` (see Fleet Hunt migrations). */
+  const finishSettlement = useMemo(() => {
+    const r = finishResultObj;
+    const lossPer = r != null && r.lossPerSeat != null ? Number(r.lossPerSeat) : NaN;
+    const refundPer = r != null && r.refundPerSeat != null ? Number(r.refundPerSeat) : NaN;
+    if (finishIsDraw) {
+      return {
+        kind: "draw",
+        youText: "+0",
+        oppText: "+0",
+        refundPerSeat: Number.isFinite(refundPer) && refundPer >= 0 ? Math.round(refundPer) : null,
+      };
+    }
+    if ((finishOutcome === "win" || finishOutcome === "loss") && Number.isFinite(lossPer) && lossPer >= 0) {
+      const n = Math.round(lossPer);
+      const youWin = finishOutcome === "win";
+      return {
+        kind: "decisive",
+        youText: youWin ? `+${n}` : `-${n}`,
+        oppText: youWin ? `-${n}` : `+${n}`,
+      };
+    }
+    return null;
+  }, [finishResultObj, finishIsDraw, finishOutcome]);
 
   const pd = vm.pendingDouble && typeof vm.pendingDouble === "object" ? /** @type {Record<string, unknown>} */ (vm.pendingDouble) : null;
   const responderSeat = pd != null && pd.responder_seat != null ? Number(pd.responder_seat) : null;
@@ -895,26 +931,94 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
       {showResultModal ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-3 backdrop-blur-[2px] sm:items-center">
           <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-white/12 bg-gradient-to-b from-zinc-900/98 to-zinc-950 shadow-2xl shadow-black/50">
-            <div className="border-b border-white/[0.07] bg-zinc-950/60 px-4 pb-3 pt-4">
+            <div
+              className={[
+                "border-b px-4 pb-3 pt-4",
+                finishOutcome === "win"
+                  ? "border-emerald-500/20 bg-gradient-to-br from-emerald-950/45 to-zinc-950/80"
+                  : finishOutcome === "loss"
+                    ? "border-rose-500/20 bg-gradient-to-br from-rose-950/40 to-zinc-950/80"
+                    : "border-white/[0.07] bg-zinc-950/60",
+              ].join(" ")}
+            >
               <div className="flex items-start gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-zinc-900/80 text-xl shadow-inner">
-                  {vm.winnerSeat != null && mySeat != null && vm.winnerSeat === mySeat ? I.trophy : I.cross}
+                <span
+                  className={[
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl shadow-inner",
+                    finishOutcome === "win" && "border-emerald-500/45 bg-emerald-950/60 text-emerald-200",
+                    finishOutcome === "loss" && "border-rose-500/45 bg-rose-950/55 text-rose-200",
+                    (finishOutcome === "draw" || finishOutcome === "unknown") && "border-white/10 bg-zinc-900/80 text-zinc-200",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {finishOutcome === "win" ? I.trophy : finishOutcome === "loss" ? I.cross : "⎔"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Match result</p>
-                  <div className="mt-0.5 text-xl font-bold leading-tight text-white">{winnerLabel}</div>
-                  {vm.result && typeof vm.result === "object" ? (
-                    <div className="mt-3 rounded-lg border border-white/[0.08] bg-zinc-950/50 px-2.5 py-2">
-                      <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">Stake multiplier</p>
-                      <p className="mt-0.5 text-lg font-semibold tabular-nums text-emerald-200/95">
-                        ×{String(vm.result.stakeMultiplier ?? vm.stakeMultiplier ?? 1)}
-                      </p>
+                  <div
+                    className={[
+                      "mt-0.5 text-2xl font-extrabold leading-tight tracking-tight",
+                      finishOutcome === "win" && "text-emerald-400",
+                      finishOutcome === "loss" && "text-rose-400",
+                      finishOutcome === "draw" && "text-sky-300",
+                      finishOutcome === "unknown" && "text-zinc-100",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {finishHeadline}
+                  </div>
+                  {finishSettlement ? (
+                    <div className="mt-3 rounded-lg border border-white/[0.1] bg-black/25 px-2.5 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Settlement</p>
+                      <div className="mt-2 flex items-baseline justify-between gap-2">
+                        <span className="text-[12px] font-medium text-zinc-400">You</span>
+                        <span
+                          className={[
+                            "text-lg font-bold tabular-nums",
+                            finishSettlement.kind === "decisive" && finishOutcome === "win" && "text-emerald-400",
+                            finishSettlement.kind === "decisive" && finishOutcome === "loss" && "text-rose-400",
+                            finishSettlement.kind === "draw" && "text-zinc-200",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {finishSettlement.youText}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-baseline justify-between gap-2">
+                        <span className="text-[12px] font-medium text-zinc-400">Opponent</span>
+                        <span
+                          className={[
+                            "text-lg font-bold tabular-nums",
+                            finishSettlement.kind === "decisive" && finishOutcome === "loss" && "text-emerald-400",
+                            finishSettlement.kind === "decisive" && finishOutcome === "win" && "text-rose-400",
+                            finishSettlement.kind === "draw" && "text-zinc-200",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          {finishSettlement.oppText}
+                        </span>
+                      </div>
+                      {finishSettlement.kind === "draw" && finishSettlement.refundPerSeat != null ? (
+                        <p className="mt-2 text-[10px] leading-snug text-zinc-500">
+                          Even — stakes returned ({finishSettlement.refundPerSeat} each)
+                        </p>
+                      ) : finishSettlement.kind === "draw" ? (
+                        <p className="mt-2 text-[10px] leading-snug text-zinc-500">Even — no net gain or loss</p>
+                      ) : null}
                     </div>
-                  ) : (
-                    <p className="mt-2 text-[12px] text-zinc-500">
-                      ×{String(vm.stakeMultiplier ?? 1)} current table multiplier
+                  ) : finishOutcome === "win" || finishOutcome === "loss" ? (
+                    <p className="mt-2 text-[11px] text-zinc-500">Net settlement not included in this snapshot.</p>
+                  ) : null}
+                  <div className="mt-2 rounded-lg border border-white/[0.06] bg-zinc-950/40 px-2.5 py-1.5">
+                    <p className="text-[9px] font-medium uppercase tracking-wide text-zinc-500">Stake multiplier</p>
+                    <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">
+                      ×{String(finishResultObj?.stakeMultiplier ?? vm.stakeMultiplier ?? 1)}
                     </p>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -964,7 +1068,19 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
 
       {finished && !showResultModal ? (
         <div className="rounded-xl border border-white/[0.06] bg-zinc-950/40 p-3 text-[11px] text-zinc-400">
-          <p className="font-semibold text-zinc-200">{winnerLabel}</p>
+          <p
+            className={[
+              "font-semibold",
+              finishOutcome === "win" && "text-emerald-400",
+              finishOutcome === "loss" && "text-rose-400",
+              finishOutcome === "draw" && "text-sky-300",
+              finishOutcome === "unknown" && "text-zinc-200",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {finishHeadline}
+          </p>
           <p className="mt-1">Result dismissed — you can rematch from the lobby or use buttons below if still available.</p>
         </div>
       ) : null}
