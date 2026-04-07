@@ -569,7 +569,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
 
       const m0 = inferDogMotion(prev, p0x, p0y, "p0", dtSec);
       const m1 = inferDogMotion(prev, p1x, p1y, "p1", dtSec);
-      /** Blend server face at low inferred speed; inferDogMotion idle defaults match p0/p1 rest orientation. */
+      /** Server sim sets p0.face≈+1 / p1.face≈−1 at rest; inferDogMotion used +1 for both when |vx| is tiny. */
       const signFace = v => (Number(v) >= 0 ? 1 : -1);
       const f0Srv = signFace(p0.face ?? 1);
       const f1Srv = signFace(p1.face ?? -1);
@@ -595,7 +595,8 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
         sy,
         TEAM_STAR_DOG,
         {
-          facing: facing0,
+          /** Home (star) sprite is authored facing opposite arena convention; flip draw only for p0. */
+          facing: -facing0,
           jumping: j0,
           running: m0.running && !j0,
           kicking: k0,
