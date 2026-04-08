@@ -44,6 +44,9 @@ import {
 } from "../tokens/ov2DuelPairUiTokens";
 
 const finishDismissStorageKey = sid => `ov2_mm_finish_dismiss_${sid}`;
+/** Replace files in `public/card-backs/` anytime — keep these paths or update here */
+const MM_CARD_BACK_SRC = "/card-backs/poker-back.jpg";
+const MM_CARD_FACE_SRC = "/card-backs/poker-front.jpg";
 const MM_SUIT_SYMBOL = ["♠", "♥", "♦", "♣"];
 const MM_SUIT_TEXT = ["Spades", "Hearts", "Diamonds", "Clubs"];
 const MM_RANK_TEXT = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -67,27 +70,77 @@ function mmCardUi(cardId) {
  */
 function MmCardFace({ cardId, large = false }) {
   if (cardId == null) {
-    return (
-      <div className="flex h-full w-full items-center justify-center text-zinc-500">
-        —
-      </div>
-    );
+    return <div className="flex h-full w-full items-center justify-center text-zinc-500">—</div>;
   }
+
   const ui = mmCardUi(cardId);
+  const pip = ui.suit;
+  const pipColor = ui.red ? "text-rose-600" : "text-zinc-900";
+
   return (
     <div
-      className={`flex h-full w-full flex-col rounded-[1rem] border border-zinc-400/70 bg-[linear-gradient(165deg,#ffffff_0%,#f7f3ea_52%,#ece7dc_100%)] px-2 py-1 text-zinc-900 shadow-[0_12px_24px_rgba(0,0,0,0.35)] ${large ? "min-h-[5.8rem] min-w-[4rem] sm:min-h-[7rem] sm:min-w-[4.7rem]" : ""}`}
+      className={`relative flex h-full w-full overflow-hidden rounded-[0.78rem] border-0 bg-zinc-100 text-zinc-900 shadow-[0_8px_16px_rgba(0,0,0,0.24)] ${large ? "min-h-[6rem] min-w-[4.15rem] sm:min-h-[7rem] sm:min-w-[4.9rem]" : ""}`}
       title={`${ui.rank} of ${ui.suitName}`}
       aria-label={`${ui.rank} of ${ui.suitName}`}
     >
-      <span className={`flex w-full items-start justify-between text-[clamp(11px,2.8vw,14px)] font-bold ${ui.red ? "text-rose-600" : "text-zinc-900"}`}>
-        <span>{ui.rank}</span>
-        <span className="opacity-80">{ui.suit}</span>
+      <img
+        src={MM_CARD_FACE_SRC}
+        alt=""
+        className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
+        draggable={false}
+      />
+      <div className={`absolute left-1.5 top-1.5 z-[1] flex flex-col items-center leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}>
+        <span className="text-[14px] font-black">{ui.rank}</span>
+        <span className="mt-[1px] text-[15px]">{pip}</span>
+      </div>
+
+      <div className={`absolute bottom-1.5 right-1.5 z-[1] flex rotate-180 flex-col items-center leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}>
+        <span className="text-[14px] font-black">{ui.rank}</span>
+        <span className="mt-[1px] text-[15px]">{pip}</span>
+      </div>
+
+      <div className="relative z-[1] flex h-full w-full items-center justify-center">
+        <span
+          className={`${pipColor} text-[29px] leading-none [text-shadow:0_0_3px_rgba(255,255,255,0.95),0_2px_4px_rgba(0,0,0,0.35)] ${large ? "sm:text-[44px]" : ""}`}
+        >
+          {pip}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function MmCardFaceCompact({ cardId }) {
+  if (cardId == null) {
+    return <div className="flex h-full w-full items-center justify-center text-zinc-500">—</div>;
+  }
+
+  const ui = mmCardUi(cardId);
+  const pipColor = ui.red ? "text-rose-600" : "text-zinc-900";
+
+  return (
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[0.55rem] border-0 bg-zinc-100 shadow-[0_4px_10px_rgba(0,0,0,0.25)]">
+      <img
+        src={MM_CARD_FACE_SRC}
+        alt=""
+        className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
+        draggable={false}
+      />
+      <span
+        className={`absolute left-[2px] top-[2px] z-[1] text-[11px] font-black leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}
+      >
+        {ui.rank}
       </span>
-      <span className={`mt-1.5 block text-center text-[clamp(21px,5.5vw,34px)] leading-none ${ui.red ? "text-rose-600" : "text-zinc-900"}`}>
+      <span
+        className={`absolute right-[2px] bottom-[2px] z-[1] rotate-180 text-[11px] font-black leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}
+      >
+        {ui.rank}
+      </span>
+      <span
+        className={`relative z-[1] ${pipColor} text-[24px] leading-none [text-shadow:0_0_3px_rgba(255,255,255,0.95),0_2px_4px_rgba(0,0,0,0.35)]`}
+      >
         {ui.suit}
       </span>
-      <span className={`mt-auto text-left text-[11px] font-semibold ${ui.red ? "text-rose-500" : "text-zinc-700"}`}>{ui.rank}</span>
     </div>
   );
 }
@@ -469,8 +522,26 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
   const myMissedTurns = vm.mySeat != null ? vm.missedStreakBySeat[vm.mySeat] ?? 0 : 0;
   const opponentMissedTurns = vm.mySeat === 0 ? vm.missedStreakBySeat[1] ?? 0 : vm.mySeat === 1 ? vm.missedStreakBySeat[0] ?? 0 : 0;
   const handCount = Math.max(1, vm.myHand.length);
-  const handCardWidth = `min(74px, max(40px, calc((100vw - 22px) / ${handCount} + 10px)))`;
-  const handOverlap = `max(-12px, calc(-1 * (${handCount} - 7) * 1.2px))`;
+
+  const mobileHandCardWidth =
+    handCount <= 7 ? 54 :
+    handCount === 8 ? 52 :
+    handCount === 9 ? 50 :
+    handCount === 10 ? 48 :
+    46;
+
+  const desktopHandCardWidth =
+    handCount <= 7 ? 102 : handCount === 8 ? 94 : handCount === 9 ? 86 : handCount === 10 ? 80 : 74;
+
+  const mobileOverlap =
+    handCount <= 7 ? -7 :
+    handCount === 8 ? -10 :
+    handCount === 9 ? -13 :
+    handCount === 10 ? -16 :
+    -18;
+
+  const desktopOverlap =
+    handCount <= 7 ? -5 : handCount === 8 ? -9 : handCount === 9 ? -12 : handCount === 10 ? -15 : -18;
   return (
     <div className="relative flex h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_52%,rgba(45,212,191,0.23),rgba(15,23,42,0.34)_42%,rgba(6,11,22,0.95)_76%),radial-gradient(circle_at_50%_20%,rgba(125,211,252,0.13),transparent_40%),linear-gradient(180deg,#162235_0%,#0c1626_55%,#070f1e_100%)] px-1 pb-[max(6px,env(safe-area-inset-bottom))] pt-[max(4px,env(safe-area-inset-top))] sm:h-full sm:px-2 sm:pb-2 sm:pt-2">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_38%),radial-gradient(circle_at_50%_50%,transparent_58%,rgba(3,7,16,0.55)_100%)]" />
@@ -513,7 +584,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           >
             <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">Opponent</p>
             <p className="mt-0.5 truncate text-sm font-semibold text-slate-50">{opponentDisplayName} · {vm.opponentHandCount ?? "—"} cards</p>
-            <p className="mt-1 text-[10px] text-slate-200/85">{!myTurn && (vm.phase === "playing" || vm.phase === "layoff") ? "Active" : ""}</p>
+            <p className="mt-1 text-[10px] text-slate-200/85">{!myTurn && (vm.phase === "playing" || vm.phase === "layoff") ? "Active" : " "}</p>
             <p className="mt-0.5 text-[10px] text-slate-300/70">Hand {vm.opponentHandCount ?? "—"} · Missed {opponentMissedTurns} · {oppColorLabel}</p>
           </div>
           <div
@@ -525,7 +596,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           >
             <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">You</p>
             <p className="mt-0.5 truncate text-sm font-semibold text-slate-50">Seat {vm.mySeat != null ? vm.mySeat + 1 : "—"}</p>
-            <p className="mt-1 text-[10px] text-slate-100">{myTurn ? "Active" : ""}</p>
+            <p className="mt-1 text-[10px] text-slate-100">{myTurn ? "Active" : " "}</p>
             <p className="mt-0.5 text-[10px] text-slate-300/70">{myColorLabel} · Missed {myMissedTurns} · Table ×{vm.stakeMultiplier}</p>
           </div>
         </div>
@@ -539,27 +610,35 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           </div>
         ) : null}
 
-        <div className="relative min-h-0 flex-1 rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_50%_44%,rgba(45,212,191,0.28),rgba(8,17,33,0.18)_36%,rgba(4,10,20,0.78)_82%),linear-gradient(180deg,rgba(19,34,56,0.5)_0%,rgba(6,12,24,0.82)_100%)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-16px_60px_rgba(0,0,0,0.28),0_24px_40px_rgba(0,0,0,0.35)] sm:p-3">
+        <div className="relative min-h-0 flex-1 rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_50%_44%,rgba(45,212,191,0.28),rgba(8,17,33,0.18)_36%,rgba(4,10,20,0.78)_82%),linear-gradient(180deg,rgba(19,34,56,0.5)_0%,rgba(6,12,24,0.82)_100%)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-16px_60px_rgba(0,0,0,0.28),0_24px_40px_rgba(0,0,0,0.35)] sm:p-3">
           <div className="flex h-full flex-col justify-between gap-2">
             <div className="rounded-2xl bg-zinc-900/18 p-2">
               <p className="text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">Top discard</p>
-              <div className="mt-8 flex min-h-[10.5rem] w-full items-center justify-center gap-2 sm:mt-4 sm:min-h-[8.2rem] sm:gap-4">
+              <div className="mt-6 flex min-h-[10.25rem] w-full items-center justify-center gap-2 sm:mt-4 sm:min-h-[8.2rem] sm:gap-4">
                 <button
                   type="button"
                   disabled={!drawPhaseMyTurn || busy || vm.stockCount <= 0}
                   onClick={() => void draw("stock")}
-                  className="inline-flex h-[5.2rem] w-[3.45rem] flex-col items-center justify-center rounded-2xl border border-slate-200/25 bg-gradient-to-b from-slate-700/95 to-slate-900 text-[10px] font-semibold text-slate-100 opacity-85 shadow-[0_8px_14px_rgba(0,0,0,0.33)] transition enabled:hover:-translate-y-1 enabled:hover:brightness-110 disabled:opacity-70 sm:h-[6.2rem] sm:w-[4.1rem]"
+                  className="inline-flex h-[5rem] w-[3.2rem] flex-col items-center justify-center overflow-hidden rounded-2xl border-0 bg-slate-900/50 text-[10px] font-semibold text-slate-100 opacity-78 shadow-[0_6px_12px_rgba(0,0,0,0.28)] transition enabled:hover:-translate-y-1 enabled:hover:brightness-110 disabled:opacity-60 sm:h-[6.2rem] sm:w-[4.1rem]"
                 >
-                  <span>Stock</span>
-                  <span className="mt-1 text-[11px] text-zinc-200">{vm.stockCount}</span>
+                  <span className="relative mb-0.5 flex h-[2.65rem] w-full shrink-0 overflow-hidden rounded-lg border-0 sm:h-[4.1rem]">
+                    <img
+                      src={MM_CARD_BACK_SRC}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      draggable={false}
+                    />
+                  </span>
+                  <span className="leading-tight">Stock</span>
+                  <span className="mt-0.5 text-[11px] text-zinc-200">{vm.stockCount}</span>
                 </button>
                 <button
                   type="button"
                   disabled={!drawPhaseMyTurn || busy || vm.discardTop == null}
                   onClick={() => void draw("discard")}
-                  className={`${OV2_DUEL_TOP_CARD_AURA} inline-flex rounded-2xl transition enabled:hover:-translate-y-1 disabled:opacity-70`}
+                  className={`${OV2_DUEL_TOP_CARD_AURA} inline-flex rounded-[1.35rem] transition enabled:hover:-translate-y-1 disabled:opacity-70 ${topCardPulse ? "scale-[1.06]" : "scale-100"}`}
                 >
-                  <div className={`${OV2_DUEL_TOP_CARD_FACE} rounded-[1.05rem] border border-zinc-300/50 bg-transparent p-0 font-semibold text-zinc-900 [text-shadow:none] ${topCardPulse ? "ring-2 ring-emerald-300/55 shadow-[0_0_34px_rgba(45,212,191,0.45),0_10px_18px_rgba(0,0,0,0.34)]" : "shadow-[0_10px_18px_rgba(0,0,0,0.34)]"}`}>
+                  <div className={`${OV2_DUEL_TOP_CARD_FACE} !border-0 rounded-[1.2rem] bg-transparent p-0 font-semibold text-zinc-900 [text-shadow:none] backdrop-blur-none ${topCardPulse ? "ring-2 ring-emerald-300/60 shadow-[0_0_30px_rgba(45,212,191,0.30),0_14px_26px_rgba(0,0,0,0.34)]" : "shadow-[0_12px_22px_rgba(0,0,0,0.30)]"}`}>
                     <MmCardFace cardId={vm.discardTop ?? null} large />
                   </div>
                 </button>
@@ -581,13 +660,15 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           </div>
         </div>
 
-        <div className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? `${OV2_DUEL_PANEL_HAND_ACTIVE} ring-1 ring-emerald-300/35 shadow-[0_0_30px_rgba(16,185,129,0.2)]` : ""} shrink-0 rounded-3xl border-white/12 bg-[linear-gradient(180deg,rgba(17,27,45,0.62)_0%,rgba(8,14,27,0.86)_100%)] p-2 sm:p-3 md:py-2 md:max-h-[10.25rem]`}>
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-200">Your hand</p>
-            <p className="text-[10px] text-zinc-400">{vm.myHand.length} cards</p>
+        <div className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? `${OV2_DUEL_PANEL_HAND_ACTIVE} shadow-[0_0_30px_rgba(16,185,129,0.2)]` : ""} max-sm:-mx-1 shrink-0 rounded-[1.5rem] !border-0 bg-[linear-gradient(180deg,rgba(15,24,40,0.74)_0%,rgba(7,12,24,0.94)_100%)] px-0 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_-16px_40px_rgba(0,0,0,0.22)_inset,0_12px_28px_rgba(0,0,0,0.28)] sm:mx-0 sm:rounded-[1.75rem] sm:p-3 md:py-2 md:max-h-[10.25rem]`}>
+          <div className="mb-1 flex items-center justify-between gap-2 px-2 sm:px-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-200">Your hand</p>
+            <p className="text-[9px] text-zinc-400">{vm.myHand.length} cards</p>
           </div>
-          {drawPhaseMyTurn ? <p className="mb-1 text-center text-[11px] font-medium text-emerald-100">Tap stock or discard to draw</p> : null}
-          <div className="flex h-[7.8rem] items-end justify-center gap-0 overflow-hidden px-0.5 pb-1 sm:h-[8.2rem] md:h-[7.1rem]">
+          <p className="mb-1 min-h-[0.85rem] px-2 text-center text-[9px] font-medium leading-none text-emerald-100/90 sm:min-h-[1rem] sm:px-0 sm:text-[11px]">
+            {drawPhaseMyTurn ? "Tap stock or discard to draw" : discardPhaseMyTurn ? "Tap card, tap again to discard" : " "}
+          </p>
+          <div className="flex h-[5rem] w-full items-end justify-center overflow-hidden px-0 pb-0.5 sm:h-[8.9rem] sm:px-1 md:h-[7.4rem]">
             {vm.myHand.map((c, idx) => {
               const hid = `h-${idx}-${c}-${vm.revision}`;
               const showingHit = handCardHitKey === hid;
@@ -602,6 +683,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                 onClick={() => {
                   if (coarsePointer && canInteractHand) {
                     if (selectedHandCardKey !== hid) {
+                      setErr("");
                       setSelectedHandCardKey(hid);
                       return;
                     }
@@ -633,22 +715,34 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                     })();
                   }
                 }}
-                className={`${OV2_DUEL_HAND_PILL_BASE} first:ml-0 min-h-[max(62px,14vw)] md:min-h-[72px] rounded-[0.95rem] border border-zinc-400/65 bg-[linear-gradient(165deg,#ffffff_0%,#f7f3ea_52%,#ece7dc_100%)] px-1.5 py-1 md:py-0.5 text-zinc-900 shadow-[0_16px_28px_rgba(0,0,0,0.5)] transition-transform duration-150 hover:-translate-y-2 hover:scale-[1.05] active:scale-[0.98] ${selected ? "-translate-y-3 scale-[1.05] ring-2 ring-sky-300/55 shadow-[0_20px_32px_rgba(0,0,0,0.54)]" : ""} ${showingHit ? `${OV2_DUEL_HAND_HIT} -translate-y-2 scale-[1.04]` : ""} ${
+                className={`${OV2_DUEL_HAND_PILL_BASE} !border-0 first:ml-0 shrink-0 sm:[width:auto] sm:[min-width:auto] rounded-[0.78rem] bg-transparent px-0.5 py-0.5 text-zinc-900 shadow-[0_10px_16px_rgba(0,0,0,0.36)] transition-[transform,box-shadow,filter] duration-150 sm:px-1.5 sm:py-1 md:py-0.5 ${selected ? "!-translate-y-1 !scale-[1.04] ring-2 ring-sky-300/60 shadow-[0_18px_28px_rgba(0,0,0,0.50)]" : ""} ${showingHit ? `${OV2_DUEL_HAND_HIT} !-translate-y-0.5 !scale-[1.02]` : ""} ${
                   canInteractHand || (vm.phase === "layoff" && vm.turnSeat === vm.mySeat)
-                    ? "ring-1 ring-sky-400/30"
-                    : "opacity-75"
-                } ${map?.kind === "meld" ? "ring-2 ring-emerald-400/55" : map?.kind === "deadwood" ? "ring-2 ring-amber-400/55" : ""}`}
+                    ? "ring-0"
+                    : "opacity-78"
+                } ${map?.kind === "meld" ? "!ring-2 !ring-emerald-400/55" : map?.kind === "deadwood" ? "!ring-2 !ring-amber-400/55" : ""}`}
                 style={{
-                  width: handCardWidth,
-                  marginLeft: idx === 0 ? "0px" : handOverlap,
-                  transform: `${selected ? "translateY(-10px) " : ""}translateY(${Math.abs(idx - (vm.myHand.length - 1) / 2) * 0.32}px) rotate(${(idx - (vm.myHand.length - 1) / 2) * 0.55}deg)`,
+                  width: `${coarsePointer ? mobileHandCardWidth : desktopHandCardWidth}px`,
+                  minWidth: `${coarsePointer ? mobileHandCardWidth : desktopHandCardWidth}px`,
+                  height: `${coarsePointer ? 78 : 92}px`,
+                  minHeight: `${coarsePointer ? 78 : 92}px`,
+                  marginLeft: idx === 0 ? "0px" : `${coarsePointer ? mobileOverlap : desktopOverlap}px`,
+                  zIndex: selected ? 40 : idx + 1,
+                  transform: `${selected ? "translateY(-4px) scale(1.04)" : ""} translateY(${Math.abs(idx - (vm.myHand.length - 1) / 2) * (coarsePointer ? 0.1 : 0.3)}px) rotate(${(idx - (vm.myHand.length - 1) / 2) * (coarsePointer ? 0.26 : 0.65)}deg)`,
                 }}
                 title={`${ui.rank} of ${ui.suitName}`}
                 aria-label={`${ui.rank} of ${ui.suitName}`}
               >
-                <MmCardFace cardId={c} />
-                {map?.kind === "meld" ? <span className="mt-0.5 block text-center text-[8px] font-semibold uppercase tracking-wide text-emerald-700">Meld {map.group}</span> : null}
-                {map?.kind === "deadwood" ? <span className="mt-0.5 block text-center text-[8px] font-semibold uppercase tracking-wide text-amber-700">Deadwood</span> : null}
+                {coarsePointer ? <MmCardFaceCompact cardId={c} /> : <MmCardFace cardId={c} />}
+                {!coarsePointer && map?.kind === "meld" ? (
+                  <span className="mt-0.5 block text-center text-[8px] font-semibold uppercase tracking-wide text-emerald-700">
+                    Meld {map.group}
+                  </span>
+                ) : null}
+                {!coarsePointer && map?.kind === "deadwood" ? (
+                  <span className="mt-0.5 block text-center text-[8px] font-semibold uppercase tracking-wide text-amber-700">
+                    Deadwood
+                  </span>
+                ) : null}
               </button>
             );
             })}
