@@ -13,6 +13,7 @@ import {
   ccStableCardKey,
 } from "../../../lib/online-v2/colorclash/ov2ColorClashCards";
 import { useOv2ColorClashSession } from "../../../hooks/useOv2ColorClashSession";
+import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 
 const finishDismissStorageKey = sid => `ov2_cc_finish_dismiss_${sid}`;
 
@@ -532,9 +533,9 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
       </div>
 
       {showResultModal ? (
-        <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/70 p-3 sm:items-center">
-          <div className="w-full max-w-sm rounded-xl border border-white/15 bg-zinc-950 p-4 shadow-xl">
-            <p className="text-center text-sm font-bold text-white">
+        <Ov2SharedFinishModalFrame titleId="ov2-cc-finish-title">
+          <div className="p-4">
+            <p id="ov2-cc-finish-title" className="text-center text-sm font-bold text-white">
               {isDraw ? "Round drawn" : didIWin ? "You won" : `${winnerDisplayName || "Winner"} won`}
             </p>
             {vm.result?.prize != null && !isDraw ? (
@@ -576,7 +577,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
               Dismiss
             </button>
           </div>
-        </div>
+        </Ov2SharedFinishModalFrame>
       ) : null}
 
       <div className="shrink-0 border-t border-white/[0.06] pt-2">

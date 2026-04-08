@@ -13,6 +13,7 @@ import {
   ov2CheckersViewToServerIdx,
 } from "../../../lib/online-v2/checkers/ov2CheckersClientLegality";
 import { useOv2CheckersSession } from "../../../hooks/useOv2CheckersSession";
+import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 
 const finishDismissStorageKey = sid => `ov2_ck_finish_dismiss_${sid}`;
 
@@ -420,10 +421,11 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
       </div>
 
       {showResultModal ? (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/[0.68] p-3 backdrop-blur-[4px]">
-          <div className="w-full max-w-sm rounded-2xl border border-white/[0.12] bg-gradient-to-b from-zinc-900/96 to-zinc-950/98 p-5 text-center shadow-[0_20px_52px_rgba(0,0,0,0.58),0_0_0_1px_rgba(0,0,0,0.26),inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-10px_22px_rgba(0,0,0,0.26)] sm:max-w-md">
+        <Ov2SharedFinishModalFrame titleId="ov2-ck-finish-title">
+          <div className="p-4 text-center">
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Match result</p>
             <p
+              id="ov2-ck-finish-title"
               className={`mt-2 text-lg font-semibold tracking-tight sm:text-xl ${
                 didIWin ? "text-emerald-200/88" : vm.mySeat != null ? "text-rose-200/85" : "text-zinc-50"
               }`}
@@ -455,7 +457,7 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
               Continue
             </button>
           </div>
-        </div>
+        </Ov2SharedFinishModalFrame>
       ) : null}
 
       {finished && !showResultModal ? (

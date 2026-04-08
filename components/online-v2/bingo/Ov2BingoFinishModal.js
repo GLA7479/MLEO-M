@@ -1,6 +1,7 @@
 "use client";
 
 import { BINGO_PRIZE_KEYS } from "../../../lib/online-v2/bingo/ov2BingoEngine";
+import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 
 /**
  * @param {{
@@ -30,14 +31,8 @@ export default function Ov2BingoFinishModal({
   const isWalkover = walkoverAmt > 0;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center" role="presentation">
-      <button type="button" className="absolute inset-0 bg-black/70" aria-label="Close summary" onClick={onClose} />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="ov2-bingo-finish-title"
-        className="relative z-10 m-auto flex max-h-[min(85dvh,520px)] w-[min(94vw,22rem)] flex-col rounded-xl border border-white/15 bg-zinc-950 shadow-xl sm:w-[min(90vw,24rem)]"
-      >
+    <Ov2SharedFinishModalFrame titleId="ov2-bingo-finish-title">
+      <div className="flex max-h-[min(85dvh,520px)] flex-col">
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
           <h2 id="ov2-bingo-finish-title" className="text-sm font-extrabold text-white">
             Match finished
@@ -94,6 +89,6 @@ export default function Ov2BingoFinishModal({
           </ul>
         </div>
       </div>
-    </div>
+    </Ov2SharedFinishModalFrame>
   );
 }

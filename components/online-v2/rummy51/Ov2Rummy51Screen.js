@@ -16,6 +16,14 @@ import Ov2SeatStrip from "../shared/Ov2SeatStrip";
 import Ov2Rummy51Hand from "./Ov2Rummy51Hand";
 import Ov2Rummy51TableMelds from "./Ov2Rummy51TableMelds";
 import { formatCompactNumber } from "../../../lib/solo-v2/formatCompactNumber";
+import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
+
+const finishDismissStorageKey = sid => `ov2_r51_finish_dismiss_${sid}`;
+
+const BTN_PRIMARY =
+  "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+const BTN_SECONDARY =
+  "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98]";
 
 /**
  * @typedef {import("../../../lib/online-v2/rummy51/ov2Rummy51Engine").Rummy51Card} Rummy51Card
@@ -250,6 +258,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
   const [targetMeldId, setTargetMeldId] = useState(/** @type {string|null} */ (null));
   /** @type {{ title: string, lines: string[] }|null} */
   const [roundBanner, setRoundBanner] = useState(null);
+  const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
 
   /** Brief highlight on card(s) just drawn from stock or discard (revision diff). */
   const [drawHighlightIds, setDrawHighlightIds] = useState(() => new Set());
@@ -309,6 +318,94 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     if (me) return { win: false, loss: true, neutral: false };
     return { win: false, loss: false, neutral: true };
   }, [isFinished, snapshot, selfKey]);
+
+  const finishSessionId = useMemo(() => {
+    if (!isFinished || !snapshot || String(snapshot.phase) !== "finished") return "";
+    const rid = room && typeof room === "object" && room.id != null ? String(room.id).trim() : "";
+    const rn = snapshot.roundNumber != null ? String(snapshot.roundNumber) : "";
+    if (!rid && !rn) return "";
+    return `${rid}|${rn}|finished`;
+  }, [isFinished, snapshot, room]);
+
+  const finishModalDismissed =
+    finishSessionId.length > 0 &&
+    (finishModalDismissedSessionId === finishSessionId ||
+      (typeof window !== "undefined" &&
+        (() => {
+          try {
+            return window.sessionStorage.getItem(finishDismissStorageKey(finishSessionId)) === "1";
+          } catch {
+            return false;
+          }
+        })()));
+
+  const showFinishModal = isFinished && !finishModalDismissed;
+
+  const dismissFinishModal = useCallback(() => {
+    if (!finishSessionId) return;
+    setFinishModalDismissedSessionId(finishSessionId);
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(finishDismissStorageKey(finishSessionId), "1");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [finishSessionId]);
+
+  const finishOutcome = useMemo(() => {
+    if (!isFinished || !snapshot || String(snapshot.phase) !== "finished") return "unknown";
+    if (r51FinishOutcome.win) return "win";
+    if (r51FinishOutcome.loss) return "loss";
+    return "unknown";
+  }, [isFinished, snapshot, r51FinishOutcome]);
+
+  const finishTitle = useMemo(() => {
+    if (finishOutcome === "win") return "Victory";
+    if (finishOutcome === "loss") return "Defeat";
+    if (finishOutcome === "unknown") return "Match finished";
+    return "Match finished";
+  }, [finishOutcome]);
+
+  const finishReasonLine = useMemo(() => {
+    if (!snapshot || String(snapshot.phase) !== "finished") return "";
+    const name = snapshot.winnerName || snapshot.winnerParticipantKey?.slice(0, 12) || "—";
+    return `Winner: ${name}`;
+  }, [snapshot]);
+
+  const finishAmountLine = useMemo(() => {
+    if (!isFinished || !snapshot || String(snapshot.phase) !== "finished") {
+      return { text: "—", className: "text-zinc-500" };
+    }
+    if (r51FinishOutcome.win && finishedPotTotalUnits != null) {
+      return {
+        text: `+${formatCompactNumber(finishedPotTotalUnits)} MLEO`,
+        className: "font-semibold tabular-nums text-amber-200/95",
+      };
+    }
+    if (r51FinishOutcome.loss && finishedPotLabel) {
+      return {
+        text: `Settlement · ${finishedPotLabel}`,
+        className: "font-semibold tabular-nums text-rose-300/95 text-[11px] leading-snug sm:text-sm",
+      };
+    }
+    if (finishedPotTotalUnits != null) {
+      return {
+        text: `Pot ${formatCompactNumber(finishedPotTotalUnits)}`,
+        className: "font-semibold tabular-nums text-zinc-300",
+      };
+    }
+    return { text: "—", className: "text-zinc-500" };
+  }, [isFinished, snapshot, r51FinishOutcome, finishedPotTotalUnits, finishedPotLabel]);
+
+  const tablePoolSubtitle = useMemo(() => {
+    const m = snapshot?.matchMeta && typeof snapshot.matchMeta === "object" ? snapshot.matchMeta : null;
+    if (!m) return "—";
+    const stake = m.stakePerSeat != null ? Number(m.stakePerSeat) : 0;
+    const seats = m.seatCount != null ? Number(m.seatCount) : 0;
+    if (!Number.isFinite(stake) || !Number.isFinite(seats) || stake <= 0 || seats <= 0) return "—";
+    return `${stake} × ${seats} seats`;
+  }, [snapshot]);
 
   const myHandRaw = useMemo(() => {
     if (!snapshot?.hands || !selfKey) return [];
@@ -1019,66 +1116,6 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
             onSelectTargetMeld={setTargetMeldId}
             disabled={busy || !isMyTurn || !isPlaying}
           />
-          {isFinished ? (
-            <div
-              lang="en"
-              dir="ltr"
-              className="pointer-events-none absolute inset-0 z-[28] flex items-start justify-center pt-2 sm:pt-3"
-              aria-live="polite"
-              role="status"
-              aria-label={
-                r51FinishOutcome.win
-                  ? "Match over. You won."
-                  : r51FinishOutcome.loss
-                    ? "Match over. You lost."
-                    : "Match over."
-              }
-            >
-              <div
-                className={`mx-2 w-full max-w-sm rounded-2xl border px-3 py-2.5 text-center shadow-[0_12px_40px_rgba(0,0,0,0.55)] ring-1 ring-black/40 backdrop-blur-md sm:px-4 sm:py-3 ${
-                  r51FinishOutcome.win
-                    ? "border-emerald-400/55 bg-emerald-950/92"
-                    : r51FinishOutcome.loss
-                      ? "border-red-500/50 bg-red-950/90"
-                      : "border-zinc-500/45 bg-zinc-900/92"
-                }`}
-              >
-                <p
-                  className={`text-base font-extrabold leading-tight sm:text-lg ${
-                    r51FinishOutcome.win
-                      ? "text-emerald-200"
-                      : r51FinishOutcome.loss
-                        ? "text-red-200"
-                        : "text-zinc-100"
-                  }`}
-                >
-                  {r51FinishOutcome.win ? "You won" : r51FinishOutcome.loss ? "You lost" : "Finished match"}
-                </p>
-                <p
-                  className={`mt-1 text-[10px] font-semibold leading-snug sm:text-[11px] ${
-                    r51FinishOutcome.win
-                      ? "text-emerald-100/90"
-                      : r51FinishOutcome.loss
-                        ? "text-red-100/88"
-                        : "text-zinc-300"
-                  }`}
-                >
-                  Winner:{" "}
-                  {snapshot.winnerName || snapshot.winnerParticipantKey?.slice(0, 12) || "—"}
-                </p>
-                {r51FinishOutcome.win && finishedPotTotalUnits != null ? (
-                  <p className="mt-1 text-[10px] font-bold text-emerald-300/95 sm:text-[11px]">
-                    Pot {formatCompactNumber(finishedPotTotalUnits)}
-                  </p>
-                ) : null}
-                {r51FinishOutcome.loss && finishedPotLabel ? (
-                  <p className="mt-1 text-[10px] text-red-200/85 sm:text-[11px]">
-                    Table pool: {finishedPotLabel}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
           <div className="pointer-events-none absolute bottom-1 right-1 z-20 flex flex-row items-end gap-1 sm:bottom-1.5 sm:right-1.5 sm:gap-1.5">
             {pendingDraw === "discard" && isMyTurn && isPlaying ? (
               <DiscardUndoIconButton disabled={busy} onClick={() => void onUndoDiscardDraw()} />
@@ -1104,27 +1141,6 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
           </div>
         ) : null}
 
-        {isFinished ? (
-          <div
-            lang="en"
-            dir="ltr"
-            className="shrink-0 rounded-md border border-zinc-600/40 bg-zinc-950/80 p-1.5 text-[8px] text-zinc-300"
-          >
-            <p className="text-center text-[7px] leading-snug text-zinc-500">
-              Result recorded · vault updates when settlement loads
-            </p>
-            {onLeaveToLobby ? (
-              <button
-                type="button"
-                disabled={leaveToLobbyBusy}
-                onClick={() => void onLeaveToLobby()}
-                className="mt-1.5 min-h-[36px] w-full rounded-md border border-emerald-500/45 bg-emerald-950/40 py-1.5 text-[10px] font-semibold text-emerald-100 disabled:opacity-40"
-              >
-                {leaveToLobbyBusy ? "Leaving…" : "Back to lobby"}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
 
         <div className="shrink-0 truncate pb-0.5 text-[7px] text-zinc-600 sm:text-[8px]">
           {hasOpenedThisHand ? <span className="text-emerald-600/90">Opened · </span> : null}
@@ -1253,6 +1269,80 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
           </div>
         ) : null}
       </div>
+
+      {showFinishModal ? (
+        <Ov2SharedFinishModalFrame titleId="ov2-r51-finish-title">
+          <div
+            className={[
+              "border-b px-4 pb-3 pt-4",
+              finishOutcome === "win"
+                ? "border-emerald-500/20 bg-gradient-to-br from-emerald-950/45 to-zinc-950/80"
+                : finishOutcome === "loss"
+                  ? "border-rose-500/20 bg-gradient-to-br from-rose-950/40 to-zinc-950/80"
+                  : "border-white/[0.07] bg-zinc-950/60",
+            ].join(" ")}
+          >
+            <div className="flex items-start gap-3" lang="en" dir="ltr">
+              <span
+                className={[
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl shadow-inner",
+                  finishOutcome === "win" && "border-emerald-500/45 bg-emerald-950/60 text-emerald-200",
+                  finishOutcome === "loss" && "border-rose-500/45 bg-rose-950/55 text-rose-200",
+                  finishOutcome === "unknown" && "border-white/10 bg-zinc-900/80 text-zinc-200",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-hidden
+              >
+                {finishOutcome === "win" ? "🏆" : finishOutcome === "loss" ? "✕" : "⎔"}
+              </span>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Round result</p>
+                <h2
+                  id="ov2-r51-finish-title"
+                  className={[
+                    "mt-0.5 text-2xl font-extrabold leading-tight tracking-tight",
+                    finishOutcome === "win" && "text-emerald-400",
+                    finishOutcome === "loss" && "text-rose-400",
+                    finishOutcome === "unknown" && "text-sky-300",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {finishTitle}
+                </h2>
+                <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Table pool</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">{tablePoolSubtitle}</p>
+                <div className="mt-3 rounded-lg border border-white/[0.1] bg-black/25 px-2.5 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Settlement</p>
+                  <p className={`mt-2 text-center text-xl font-bold tabular-nums leading-tight sm:text-2xl ${finishAmountLine.className}`}>
+                    {finishAmountLine.text}
+                  </p>
+                </div>
+                <p className="mt-3 text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
+                <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
+                  Result recorded · vault updates when settlement loads
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 px-4 py-4">
+            {onLeaveToLobby ? (
+              <button
+                type="button"
+                disabled={leaveToLobbyBusy}
+                className={BTN_PRIMARY + " w-full"}
+                onClick={() => void onLeaveToLobby()}
+              >
+                {leaveToLobbyBusy ? "Leaving…" : "Back to lobby"}
+              </button>
+            ) : null}
+            <button type="button" className={BTN_SECONDARY + " w-full"} onClick={dismissFinishModal}>
+              Dismiss
+            </button>
+          </div>
+        </Ov2SharedFinishModalFrame>
+      ) : null}
     </div>
   );
 }

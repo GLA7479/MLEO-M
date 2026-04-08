@@ -14,6 +14,7 @@ import {
 } from "../../../lib/online-v2/chess/ov2ChessBoardView";
 import { requestOv2ChessLegalTos } from "../../../lib/online-v2/chess/ov2ChessSessionAdapter";
 import { useOv2ChessSession } from "../../../hooks/useOv2ChessSession";
+import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 
 /** Shared premium button language (Chess + Checkers product family). */
 const BTN_PRIMARY =
@@ -429,30 +430,34 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
       </div>
 
       {finished ? (
-        <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.11] bg-zinc-900/78 p-3 text-[11px] text-zinc-200/88 shadow-[0_12px_32px_rgba(0,0,0,0.42),0_0_0_1px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.055),inset_0_-8px_18px_rgba(0,0,0,0.24)]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Result</p>
-          <p className="mt-1 text-sm font-semibold text-zinc-50">Match finished</p>
-          {rkNorm === "checkmate" ? (
-            <p className="mt-1 text-zinc-400/90">Checkmate.</p>
-          ) : rkNorm === "stalemate" ? (
-            <p className="mt-1 text-zinc-400/90">Draw by stalemate.</p>
-          ) : vm.winnerSeat != null && vm.mySeat != null ? (
-            <p className="mt-1 text-zinc-400/90">{vm.winnerSeat === vm.mySeat ? "You won." : "You lost."}</p>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.1] pt-3">
-            <button type="button" disabled={rematchBusy} onClick={() => void onRematch()} className={BTN_PRIMARY}>
-              {rematchBusy ? "…" : "Rematch"}
-            </button>
-            <button type="button" onClick={() => void cancelRematch()} className={BTN_SECONDARY}>
-              Cancel rematch
-            </button>
-            {isHost ? (
-              <button type="button" disabled={startNextBusy} onClick={() => void onStartNext()} className={BTN_ACCENT}>
-                {startNextBusy ? "…" : "Start next (host)"}
-              </button>
+        <Ov2SharedFinishModalFrame titleId="ov2-chess-finish-title">
+          <div className="space-y-2 p-4 text-[11px] text-zinc-200/88">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Result</p>
+            <p id="ov2-chess-finish-title" className="mt-1 text-sm font-semibold text-zinc-50">
+              Match finished
+            </p>
+            {rkNorm === "checkmate" ? (
+              <p className="mt-1 text-zinc-400/90">Checkmate.</p>
+            ) : rkNorm === "stalemate" ? (
+              <p className="mt-1 text-zinc-400/90">Draw by stalemate.</p>
+            ) : vm.winnerSeat != null && vm.mySeat != null ? (
+              <p className="mt-1 text-zinc-400/90">{vm.winnerSeat === vm.mySeat ? "You won." : "You lost."}</p>
             ) : null}
+            <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.1] pt-3">
+              <button type="button" disabled={rematchBusy} onClick={() => void onRematch()} className={BTN_PRIMARY}>
+                {rematchBusy ? "…" : "Rematch"}
+              </button>
+              <button type="button" onClick={() => void cancelRematch()} className={BTN_SECONDARY}>
+                Cancel rematch
+              </button>
+              {isHost ? (
+                <button type="button" disabled={startNextBusy} onClick={() => void onStartNext()} className={BTN_ACCENT}>
+                  {startNextBusy ? "…" : "Start next (host)"}
+                </button>
+              ) : null}
+            </div>
           </div>
-        </div>
+        </Ov2SharedFinishModalFrame>
       ) : null}
 
       <div className="shrink-0 rounded-lg border border-white/[0.09] bg-zinc-900/42 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_8px_rgba(0,0,0,0.16)]">

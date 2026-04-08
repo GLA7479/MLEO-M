@@ -14,6 +14,8 @@ import {
   fhTryPlaceShip,
 } from "../../../lib/online-v2/fleethunt/ov2FleetHuntBoard";
 import { useOv2FleetHuntSession } from "../../../hooks/useOv2FleetHuntSession";
+import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
+import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
 
 const finishDismissStorageKey = sid => `ov2_fh_finish_dismiss_${sid}`;
 
@@ -1050,39 +1052,17 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
         )
       ) : null}
 
-      {/* Double response — center modal (same pattern as Four Line / Flip Grid) */}
-      {vm.phase === "playing" && vm.mustRespondDouble && vm.pendingDouble ? (
-        <div className="fixed inset-0 z-40 flex max-h-[100dvh] items-center justify-center bg-black/70 p-3 backdrop-blur-[2px]">
-          <div
-            className="w-full max-w-sm rounded-2xl border border-amber-500/35 bg-gradient-to-b from-amber-950/95 to-zinc-950 p-4 shadow-2xl shadow-black/40"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="ov2-fh-double-prompt"
-          >
-            <p id="ov2-fh-double-prompt" className="text-[11px] leading-snug text-amber-100/92">
-              Opponent proposes table ×{String(vm.pendingDouble?.proposed_mult ?? "")}. Declining or timing out ends the round at
-              the current ×{vm.stakeMultiplier}.
-            </p>
-            <div className="mt-3 flex flex-col gap-2">
-              <button type="button" disabled={busy} className={BTN_PRIMARY + " w-full"} onClick={() => void respondDouble(true)}>
-                Accept ×{String(vm.pendingDouble?.proposed_mult ?? "")}
-              </button>
-              <button type="button" disabled={busy} className={BTN_DANGER + " w-full"} onClick={() => void respondDouble(false)}>
-                Decline
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <Ov2SharedStakeDoubleModal
+        open={vm.phase === "playing" && vm.mustRespondDouble && vm.pendingDouble}
+        proposedMult={vm.pendingDouble?.proposed_mult}
+        stakeMultiplier={vm.stakeMultiplier}
+        busy={busy}
+        onAccept={() => void respondDouble(true)}
+        onDecline={() => void respondDouble(false)}
+      />
 
       {showResultModal ? (
-        <div className="fixed inset-0 z-50 flex max-h-[100dvh] items-end justify-center bg-black/80 p-3 backdrop-blur-[2px] sm:items-center">
-          <div
-            className="max-h-[min(92dvh,640px)] w-full max-w-sm overflow-y-auto overflow-x-hidden rounded-2xl border border-white/12 bg-gradient-to-b from-zinc-900/98 to-zinc-950 shadow-2xl shadow-black/50"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="ov2-fh-finish-title"
-          >
+        <Ov2SharedFinishModalFrame titleId="ov2-fh-finish-title">
             <div
               className={[
                 "border-b px-4 pb-3 pt-4",
@@ -1217,8 +1197,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
               </button>
               {exitErr ? <p className="text-[11px] text-red-300">{exitErr}</p> : null}
             </div>
-          </div>
-        </div>
+        </Ov2SharedFinishModalFrame>
       ) : null}
 
       {finished && !showResultModal ? (

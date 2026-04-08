@@ -858,6 +858,8 @@ export function useOv2LudoSession(baseContext) {
       strikeDisplayMap,
       eliminatedSeats,
       statusLine,
+      /** Active authoritative session id (for finish dismiss / UI keys). */
+      sessionId: authoritativeSnapshot?.sessionId != null ? String(authoritativeSnapshot.sessionId).trim() : "",
     },
     rollDicePreview,
     onPieceClick,

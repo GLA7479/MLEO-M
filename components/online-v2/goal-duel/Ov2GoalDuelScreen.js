@@ -18,6 +18,7 @@ import {
   TEAM_STAR_DOG,
 } from "./ov2GoalDuelCanvasDraw";
 import { gdAdvancePresentation, gdCreatePresentationState } from "./ov2GoalDuelPresentation";
+import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 
 /**
  * Raster assets — dogs face **right**; ball is centered in a square texture.
@@ -1353,10 +1354,11 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       ) : null}
 
       {showResultModal ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-3 backdrop-blur-sm sm:items-center">
-          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-gradient-to-b from-zinc-900/95 to-zinc-950 p-4 shadow-2xl ring-1 ring-amber-500/10">
+        <Ov2SharedFinishModalFrame titleId="ov2-gd-finish-title">
+          <div className="p-4">
             <div className="text-center text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Match result</div>
             <div
+              id="ov2-gd-finish-title"
               className={`mt-2 text-center text-2xl font-black ${
                 isDrawResult ? "text-zinc-200" : vm.winnerSeat === mySeat ? "text-emerald-300" : "text-rose-300"
               }`}
@@ -1422,7 +1424,7 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
               {exitErr ? <p className="text-[11px] text-red-300">{exitErr}</p> : null}
             </div>
           </div>
-        </div>
+        </Ov2SharedFinishModalFrame>
       ) : null}
       </div>
     </>

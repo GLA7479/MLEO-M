@@ -6,6 +6,8 @@ import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { mmFormatCard, mmSuggestFinishFromHand11 } from "../../../lib/online-v2/meldmatch/ov2MeldMatchCards";
 import { useOv2MeldMatchSession } from "../../../hooks/useOv2MeldMatchSession";
+import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
+import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
 
 const finishDismissStorageKey = sid => `ov2_mm_finish_dismiss_${sid}`;
 
@@ -295,23 +297,6 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-        {vm.phase === "playing" && vm.mustRespondDouble && vm.pendingDouble ? (
-          <div className="rounded-lg border border-amber-500/25 bg-amber-950/25 p-2">
-            <p className="text-[11px] text-amber-100/90">
-              Opponent proposes table ×{String(vm.pendingDouble.proposed_mult ?? "")}. Declining or timing out ends the round at
-              the current ×{vm.stakeMultiplier}.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button type="button" disabled={busy} className={BTN_PRIMARY} onClick={() => void respondDouble(true)}>
-                Accept ×{String(vm.pendingDouble.proposed_mult ?? "")}
-              </button>
-              <button type="button" disabled={busy} className={BTN_DANGER} onClick={() => void respondDouble(false)}>
-                Decline
-              </button>
-            </div>
-          </div>
-        ) : null}
-
         {vm.phase === "playing" && vm.discardTop != null && vm.turnPhase === "draw" ? (
           <p className="text-center text-[10px] text-zinc-500">
             Top discard: <span className="font-mono text-zinc-200">{mmFormatCard(vm.discardTop)}</span>
@@ -471,13 +456,11 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
       </div>
 
       {finishPanelOpen && finishSuggestion ? (
-        <div className="absolute inset-0 z-30 flex items-end justify-center bg-black/60 p-2 sm:items-center">
-          <div
-            className="w-full max-w-sm rounded-xl border border-white/[0.1] bg-zinc-950/95 p-4 shadow-2xl backdrop-blur-sm"
-            role="dialog"
-            aria-modal="true"
-          >
-            <p className="text-sm font-semibold text-zinc-100">Finish hand</p>
+        <Ov2SharedFinishModalFrame variant="center" titleId="ov2-mm-finish-hand-title">
+          <div className="p-4">
+            <p id="ov2-mm-finish-hand-title" className="text-sm font-semibold text-zinc-100">
+              Finish hand
+            </p>
             <p className="mt-1 text-[11px] text-zinc-400">
               Suggested {finishSuggestion.kind === "gin" ? "perfect finish" : "early finish"} — discard{" "}
               <span className="font-mono text-zinc-200">{mmFormatCard(finishSuggestion.discard)}</span>, deadwood pts{" "}
@@ -503,17 +486,22 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
               </button>
             </div>
           </div>
-        </div>
+        </Ov2SharedFinishModalFrame>
       ) : null}
 
+      <Ov2SharedStakeDoubleModal
+        open={vm.phase === "playing" && vm.mustRespondDouble && vm.pendingDouble}
+        proposedMult={vm.pendingDouble?.proposed_mult}
+        stakeMultiplier={vm.stakeMultiplier}
+        busy={busy}
+        onAccept={() => void respondDouble(true)}
+        onDecline={() => void respondDouble(false)}
+      />
+
       {showResultModal ? (
-        <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/55 p-2 sm:items-center">
-          <div
-            className="w-full max-w-sm rounded-xl border border-white/[0.1] bg-zinc-950/95 p-4 shadow-2xl backdrop-blur-sm"
-            role="dialog"
-            aria-modal="true"
-          >
-            <p className="text-center text-sm font-semibold text-zinc-100">
+        <Ov2SharedFinishModalFrame titleId="ov2-mm-finish-title">
+          <div className="p-4">
+            <p id="ov2-mm-finish-title" className="text-center text-sm font-semibold text-zinc-100">
               {isDraw ? "Draw — entries returned" : didIWin ? "You won" : `${winnerDisplayName} won`}
             </p>
             {!isDraw && vm.result && vm.result.knockFinish ? (
@@ -541,7 +529,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
               Dismiss
             </button>
           </div>
-        </div>
+        </Ov2SharedFinishModalFrame>
       ) : null}
     </div>
   );

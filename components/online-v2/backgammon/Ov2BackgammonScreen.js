@@ -15,6 +15,7 @@ import {
   ov2BgReplayDraftSteps,
 } from "../../../lib/online-v2/backgammon/ov2BackgammonDraftTurn";
 import { useOv2BackgammonSession } from "../../../hooks/useOv2BackgammonSession";
+import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 
 const AUTO_ROLL_STORAGE_KEY = "ov2_bg_auto_roll";
 const finishDismissStorageKey = sid => `ov2_bg_finish_dismiss_${sid}`;
@@ -1281,9 +1282,10 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
 
       {isFinished ? (
         showResultModal ? (
-          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 p-3 backdrop-blur-[2px]">
-            <div className="w-full max-w-sm rounded-xl border border-white/20 bg-zinc-900/95 p-4 text-center shadow-2xl sm:max-w-md">
+          <Ov2SharedFinishModalFrame titleId="ov2-bg-finish-title">
+            <div className="p-4 text-center">
               <p
+                id="ov2-bg-finish-title"
                 className={`text-lg font-bold uppercase tracking-wide sm:text-xl ${
                   didIWin ? "text-emerald-200" : vm.mySeat != null ? "text-red-300" : "text-white"
                 }`}
@@ -1328,7 +1330,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
                 Continue
               </button>
             </div>
-          </div>
+          </Ov2SharedFinishModalFrame>
         ) : (
           <div className="shrink-0 rounded-xl border border-white/15 bg-black/40 p-3">{finishedPanel}</div>
         )
