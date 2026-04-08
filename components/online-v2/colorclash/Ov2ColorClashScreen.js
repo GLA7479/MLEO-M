@@ -678,19 +678,19 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                 {err ? (
                   <button
                     type="button"
-                    className="pointer-events-auto flex min-h-[4.25rem] w-full flex-col justify-center rounded-md border border-rose-500/25 bg-zinc-950/82 px-1.5 py-2 text-left text-[8px] leading-snug text-rose-200/95 shadow-lg backdrop-blur-[2px] sm:min-h-[4.75rem] sm:text-[9px]"
+                    className="pointer-events-auto flex min-h-[5.85rem] w-full flex-col justify-center rounded-md border border-rose-500/25 bg-zinc-950/82 px-1.5 py-3 text-left text-[10px] font-medium leading-normal text-rose-200/95 shadow-lg backdrop-blur-[2px] sm:min-h-[6.5rem] sm:text-[11px]"
                     title="Tap to clear"
                     onClick={() => setErr("")}
                   >
-                    <span className="line-clamp-6">{err}</span>
+                    <span className="line-clamp-8">{err}</span>
                   </button>
                 ) : turnGuidance ? (
-                  <p className="flex min-h-[4.25rem] flex-col justify-center rounded-md border border-white/10 bg-zinc-950/78 px-1.5 py-2 text-left text-[8px] font-medium leading-snug text-zinc-100/92 shadow-lg backdrop-blur-[2px] sm:min-h-[4.75rem] sm:text-[9px]">
-                    <span className="line-clamp-6">{turnGuidance}</span>
+                  <p className="flex min-h-[5.85rem] flex-col justify-center rounded-md border border-white/10 bg-zinc-950/78 px-1.5 py-3 text-left text-[10px] font-medium leading-normal text-zinc-100/92 shadow-lg backdrop-blur-[2px] sm:min-h-[6.5rem] sm:text-[11px]">
+                    <span className="line-clamp-8">{turnGuidance}</span>
                   </p>
                 ) : stockEmptyHint ? (
-                  <p className="flex min-h-[4.25rem] flex-col justify-center rounded-md border border-amber-500/20 bg-zinc-950/78 px-1.5 py-2 text-left text-[8px] leading-snug text-amber-200/90 shadow-lg backdrop-blur-[2px] sm:min-h-[4.75rem] sm:text-[9px]">
-                    <span className="line-clamp-6">Stock empty — play from hand; timer advances if nothing matches.</span>
+                  <p className="flex min-h-[5.85rem] flex-col justify-center rounded-md border border-amber-500/20 bg-zinc-950/78 px-1.5 py-3 text-left text-[10px] font-medium leading-normal text-amber-200/90 shadow-lg backdrop-blur-[2px] sm:min-h-[6.5rem] sm:text-[11px]">
+                    <span className="line-clamp-8">Stock empty — play from hand; timer advances if nothing matches.</span>
                   </p>
                 ) : null}
               </div>
