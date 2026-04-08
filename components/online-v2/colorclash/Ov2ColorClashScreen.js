@@ -667,38 +667,38 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
       <div className="flex min-h-0 w-full flex-1 flex-col gap-0.5 overflow-hidden sm:gap-0.5">
         <div className={`${OV2_DUEL_ACTION_GROUP} flex min-h-0 flex-1 flex-col`}>
           <div className={`${OV2_DUEL_PANEL_TOP} relative flex min-h-0 flex-1 flex-col p-2 sm:p-3`}>
-            <div className="relative z-10 mb-1 shrink-0 pr-[7.35rem] sm:pr-[8rem]">
+            <div className="relative z-10 mb-1 shrink-0 pr-[6.2rem] sm:pr-[6.85rem]">
               <p className={`text-left text-[10px] leading-tight sm:text-center ${OV2_DUEL_PANEL_LABEL}`}>
                 Top discard (match this card)
               </p>
             </div>
             {/* err / turn / stock hints — floated left so the card area keeps full height */}
             {err || turnGuidance || stockEmptyHint ? (
-              <div className="pointer-events-none absolute left-2 top-1/2 z-30 max-w-[9.25rem] -translate-y-1/2 sm:left-3 sm:max-w-[10.5rem]">
+              <div className="pointer-events-none absolute bottom-2 left-2 z-30 w-[7.35rem] max-w-[7.35rem] sm:bottom-3 sm:left-3 sm:w-[7.85rem] sm:max-w-[7.85rem]">
                 {err ? (
                   <button
                     type="button"
-                    className="pointer-events-auto w-full rounded-md border border-rose-500/25 bg-zinc-950/82 px-1.5 py-1 text-left text-[8px] leading-snug text-rose-200/95 shadow-lg backdrop-blur-[2px] sm:text-[9px]"
+                    className="pointer-events-auto flex min-h-[4.25rem] w-full flex-col justify-center rounded-md border border-rose-500/25 bg-zinc-950/82 px-1.5 py-2 text-left text-[8px] leading-snug text-rose-200/95 shadow-lg backdrop-blur-[2px] sm:min-h-[4.75rem] sm:text-[9px]"
                     title="Tap to clear"
                     onClick={() => setErr("")}
                   >
-                    <span className="line-clamp-4">{err}</span>
+                    <span className="line-clamp-6">{err}</span>
                   </button>
                 ) : turnGuidance ? (
-                  <p className="rounded-md border border-white/10 bg-zinc-950/78 px-1.5 py-1 text-left text-[8px] font-medium leading-snug text-zinc-100/92 shadow-lg backdrop-blur-[2px] sm:text-[9px]">
-                    <span className="line-clamp-4">{turnGuidance}</span>
+                  <p className="flex min-h-[4.25rem] flex-col justify-center rounded-md border border-white/10 bg-zinc-950/78 px-1.5 py-2 text-left text-[8px] font-medium leading-snug text-zinc-100/92 shadow-lg backdrop-blur-[2px] sm:min-h-[4.75rem] sm:text-[9px]">
+                    <span className="line-clamp-6">{turnGuidance}</span>
                   </p>
                 ) : stockEmptyHint ? (
-                  <p className="rounded-md border border-amber-500/20 bg-zinc-950/78 px-1.5 py-1 text-left text-[8px] leading-snug text-amber-200/90 shadow-lg backdrop-blur-[2px] sm:text-[9px]">
-                    <span className="line-clamp-4">Stock empty — play from hand; timer advances if nothing matches.</span>
+                  <p className="flex min-h-[4.25rem] flex-col justify-center rounded-md border border-amber-500/20 bg-zinc-950/78 px-1.5 py-2 text-left text-[8px] leading-snug text-amber-200/90 shadow-lg backdrop-blur-[2px] sm:min-h-[4.75rem] sm:text-[9px]">
+                    <span className="line-clamp-6">Stock empty — play from hand; timer advances if nothing matches.</span>
                   </p>
                 ) : null}
               </div>
             ) : null}
             {/* Timer + draw/surge: out of document flow so the discard card stays vertically centered */}
-            <div className="pointer-events-auto absolute right-2 top-2 z-20 flex w-[7.1rem] flex-col items-stretch gap-1 sm:right-3 sm:top-3 sm:w-[7.85rem]">
+            <div className="pointer-events-auto absolute right-2 top-2 z-20 flex w-[5.95rem] flex-col items-stretch gap-1 sm:right-3 sm:top-3 sm:w-[6.55rem]">
               <div
-                className={`w-full justify-center rounded-md border px-2 py-0.5 text-center text-[10px] tabular-nums sm:text-[11px] !animate-none !transition-none duration-0 will-change-auto ${
+                className={`w-full justify-center rounded-md border px-1 py-0.5 text-center text-[11px] tabular-nums sm:text-[12px] !animate-none !transition-none duration-0 will-change-auto ${
                   vm.phase === "playing" && vm.turnSeat === vm.mySeat ? OV2_DUEL_TIMER_ACTIVE : OV2_DUEL_TIMER_IDLE
                 }`}
               >
@@ -721,7 +721,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                       ? "Stock is empty — play from your hand"
                       : `Draw from stock (${vm.stockCount ?? 0} left)`
                 }
-                className={`${OV2_BTN_PRIMARY} w-full justify-center px-2 py-1 text-[9px] shadow-lg sm:px-2.5 sm:text-[10px]`}
+                className={`${OV2_BTN_PRIMARY} w-full justify-center !px-1 py-1 !text-[11px] shadow-lg sm:!px-1.5 sm:!text-xs`}
                 onClick={() => {
                   if (!drawActionEnabled) return;
                   setSurgeTwoTapMode(false);
@@ -745,7 +745,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                 }
                 className={`${
                   surgeTwoTapMode && topStripDrawSurgeContext && vm.surgeAvailableForMe ? OV2_BTN_ACCENT : OV2_BTN_SECONDARY
-                } w-full justify-center px-2 py-1 text-[9px] shadow-lg sm:px-2.5 sm:text-[10px]`}
+                } w-full justify-center !px-1 py-1 !text-[11px] shadow-lg sm:!px-1.5 sm:!text-xs`}
                 onClick={() => {
                   if (!surgeActionEnabled) return;
                   setErr("");
@@ -765,7 +765,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                       ? "Pass the turn"
                       : "Available after you draw — play a drawn card or pass"
                 }
-                className={`${OV2_BTN_SECONDARY} w-full justify-center px-2 py-1 text-[9px] shadow-lg sm:px-2.5 sm:text-[10px]`}
+                className={`${OV2_BTN_SECONDARY} w-full justify-center !px-1 py-1 !text-[11px] shadow-lg sm:!px-1.5 sm:!text-xs`}
                 onClick={() => {
                   if (!passActionEnabled) return;
                   void passAfterDraw();
@@ -777,7 +777,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                 type="button"
                 disabled={!surgeCancelEnabled}
                 title="Clear first Surge tap"
-                className={`${OV2_BTN_SECONDARY} min-h-[1.75rem] w-full justify-center px-2 py-1 text-[9px] shadow-lg sm:min-h-[1.85rem] sm:px-2.5 sm:text-[10px] ${
+                className={`${OV2_BTN_SECONDARY} min-h-[1.85rem] w-full justify-center !px-1 py-1 !text-[11px] shadow-lg sm:min-h-[2rem] sm:!px-1.5 sm:!text-xs ${
                   surgeCancelArmed ? "" : "pointer-events-none invisible"
                 }`}
                 onClick={() => {
