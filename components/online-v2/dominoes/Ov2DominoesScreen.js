@@ -21,7 +21,8 @@ const DOM_HAND_BASE_W_REM = 2.8;
 const DOM_HAND_BASE_H_REM = 4.4;
 const DOM_HAND_GAP_PX = 4;
 const DOM_BOARD_VERT_H_OVER_W = DOM_HAND_BASE_H_REM / DOM_HAND_BASE_W_REM;
-const DOM_BOARD_GAP_PX = 4;
+/** Along-row (X) and after-bridge spacing between segment blocks (see placeMixedSnake). */
+const DOM_BOARD_GAP_PX = 0;
 /** Guess for greedy H-run length (long side along X). */
 const DOM_BOARD_PACK_HORIZ_W_PX = 52;
 /** Max lying domino long-side (X) on board. */
@@ -30,14 +31,18 @@ const DOM_BOARD_HORIZ_W_CAP_PX = 54;
 const DOM_BOARD_MAX_HORIZ_PER_ROW = 5;
 /** Standing bridge tiles between horizontal runs (1–2 like photo). */
 const DOM_BOARD_VERT_BRIDGE_TILES = 2;
-/** Gap between lying row bottom and first standing tile (0 = flush join). */
+/** Gap between lying row bottom and first standing tile. */
 const DOM_BOARD_H_TO_V_GAP_PX = 0;
 /** Gap between stacked standing bridge tiles. */
-const DOM_BOARD_V_STACK_GAP_PX = 2;
-/** Standing bridge nudge after a **LTR** lying row (corner on the right). */
-const DOM_BOARD_BRIDGE_NUDGE_AFTER_LTR_PX = 3;
-/** Standing bridge nudge after a **RTL** lying row (corner on the left). */
-const DOM_BOARD_BRIDGE_NUDGE_AFTER_RTL_PX = -3;
+const DOM_BOARD_V_STACK_GAP_PX = 0;
+/** Center bridge column on the corner domino (no sideways nudge → clean H↔V join). */
+const DOM_BOARD_BRIDGE_NUDGE_AFTER_LTR_PX = 0;
+const DOM_BOARD_BRIDGE_NUDGE_AFTER_RTL_PX = 0;
+/**
+ * Where the standing column meets the last lying tile on X: 0 = tile center (old behavior),
+ * 1 = full short-end corner; ~0.3 keeps a slight corner without jumping all the way to the edge.
+ */
+const DOM_BOARD_BRIDGE_JOINT_PULL = 0.32;
 
 /**
  * Alternate horizontal runs and vertical bridges until all tiles are consumed.
@@ -69,8 +74,8 @@ function computeMixedSegments(totalN, innerW, gapPx, maxPerRow, vertBridge, hori
  * @param {number} innerH board inner height — first lying row starts near vertical center
  * @param {number} hW lying tile width (long, X)
  * @param {number} hH lying tile height (short, Y)
- * @param {number} vW standing tile width (short, X)
- * @param {number} vH standing tile height (long, Y)
+ * @param {number} vW standing tile width (short side on screen — same as lying `hH`)
+ * @param {number} vH standing tile height (long side on screen — same as lying `hW`)
  * @param {number} gap between lying tiles along a row / after a bridge block
  * @param {number} hToVGap gap under lying row before first standing tile
  * @param {number} vStackGap between stacked standing tiles
@@ -123,7 +128,12 @@ function placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToVGap,
       const prevLtr = prevRow % 2 === 0;
       const lastHLeft = prevLtr ? anchorLeft[prevRow] + (kPrev - 1) * hStep : anchorLeft[prevRow] - (kPrev - 1) * hStep;
       const nudgeX = prevLtr ? DOM_BOARD_BRIDGE_NUDGE_AFTER_LTR_PX : DOM_BOARD_BRIDGE_NUDGE_AFTER_RTL_PX;
-      const bridgeLeft = lastHLeft + hW / 2 - vW / 2 + nudgeX;
+      const half = hW / 2;
+      const pull = Math.min(1, Math.max(0, DOM_BOARD_BRIDGE_JOINT_PULL));
+      const jointX = prevLtr
+        ? lastHLeft + half + half * pull
+        : lastHLeft + half - half * pull;
+      const bridgeLeft = jointX - vW / 2 + nudgeX;
       const vTopStart = yBelowLastHoriz + hToVGap;
       const vCount = seg.count;
       for (let j = 0; j < vCount; j++) {
@@ -173,7 +183,7 @@ function PipDots({ n, pipSize = "hand" }) {
     pipSize === "line"
       ? "h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12"
       : pipSize === "board"
-        ? "h-[1.15rem] w-[1.15rem] sm:h-5 sm:w-5"
+        ? "h-[1.45rem] w-[1.45rem] sm:h-6 sm:w-6 md:h-7 md:w-7"
         : "h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11";
   const patterns = {
     0: [],
@@ -210,11 +220,12 @@ function PipDots({ n, pipSize = "hand" }) {
     ],
   };
   const pts = patterns[v] || [];
+  const pr = pipSize === "board" ? "0.082" : "0.07";
   return (
     <svg viewBox="0 0 1 1" className={`shrink-0 text-zinc-900 ${dim}`}>
       <rect x="0.04" y="0.04" width="0.92" height="0.92" rx="0.06" fill="currentColor" className="text-[#f5f0e8]" />
       {pts.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r="0.07" className="fill-zinc-900/88" />
+        <circle key={i} cx={x} cy={y} r={pr} className="fill-zinc-900/88" />
       ))}
     </svg>
   );
@@ -229,7 +240,7 @@ function DominoFace({ a, b, vertical, flipHoriz, pipSize: pipSizeProp }) {
       <div
         className={
           boardLine
-            ? "flex max-h-full max-w-full flex-col items-center justify-center gap-px rounded-md border border-black/20 bg-[#faf6ef] px-0.5 py-0.5 shadow-inner"
+            ? "flex h-full min-h-0 w-full min-w-0 max-h-full max-w-full flex-col items-center justify-center gap-px rounded-md border border-black/20 bg-[#faf6ef] px-0.5 py-0.5 shadow-inner"
             : "flex flex-col items-center justify-center gap-0.5 rounded-md border border-black/20 bg-[#faf6ef] px-1 py-1 shadow-inner sm:gap-1 sm:px-1.5 sm:py-1.5"
         }
       >
@@ -241,6 +252,16 @@ function DominoFace({ a, b, vertical, flipHoriz, pipSize: pipSizeProp }) {
   }
   const leftPip = flipHoriz ? b : a;
   const rightPip = flipHoriz ? a : b;
+  if (pip === "board") {
+    /** Same outer padding/gap as standing board tile so long↔long sizes match when cells are hW×hH vs hH×hW. */
+    return (
+      <div className="flex h-full min-h-0 w-full min-w-0 max-h-full max-w-full flex-row items-center justify-center gap-px rounded-md border border-black/20 bg-[#faf6ef] px-0.5 py-0.5 shadow-inner">
+        <PipDots n={leftPip} pipSize={pip} />
+        <div className="h-[82%] w-px shrink-0 bg-black/25" />
+        <PipDots n={rightPip} pipSize={pip} />
+      </div>
+    );
+  }
   return (
     <div className="flex flex-row items-center justify-center gap-1 rounded-md border border-black/20 bg-[#faf6ef] px-1 py-1 shadow-inner sm:gap-1.5 sm:px-1.5 sm:py-1.5">
       <PipDots n={leftPip} pipSize={pip} />
@@ -895,6 +916,19 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
       guard++;
     }
 
+    const maxSpanH = Math.max(0, innerH - 2 * padFit);
+    let guardV = 0;
+    while (geom.maxB - geom.minT > maxSpanH && maxSpanH > 0 && hW > 18 && guardV < 14) {
+      hW = Math.max(18, hW * (maxSpanH / (geom.maxB - geom.minT)) * 0.99);
+      hH = hW / DOM_BOARD_VERT_H_OVER_W;
+      vW = hH;
+      vH = hW;
+      geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
+      spanW = geom.contentW;
+      spanH = geom.contentH;
+      guardV++;
+    }
+
     /** Keep chain anchored from center — nudge only so bbox stays inside (no full re-center). */
     const pad = 2;
     let shiftX = pad - geom.minL;
@@ -960,7 +994,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
                     return (
                       <div
                         key={`t-${i}`}
-                        className="absolute flex items-center justify-center overflow-visible"
+                        className="absolute box-border overflow-visible"
                         style={{
                           left: p.left,
                           top: p.top,
@@ -968,7 +1002,9 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
                           height: p.h,
                         }}
                       >
-                        <DominoFace a={lo} b={hi} vertical={p.vertical} flipHoriz={Boolean(p.flipHoriz)} pipSize="board" />
+                        <div className="flex h-full min-h-0 w-full min-w-0 items-stretch justify-stretch [&>*]:h-full [&>*]:w-full [&>*]:min-h-0 [&>*]:min-w-0 [&>*]:max-h-full [&>*]:max-w-full">
+                          <DominoFace a={lo} b={hi} vertical={p.vertical} flipHoriz={Boolean(p.flipHoriz)} pipSize="board" />
+                        </div>
                       </div>
                     );
                   })}
