@@ -30,6 +30,14 @@ const DOM_BOARD_HORIZ_W_CAP_PX = 54;
 const DOM_BOARD_MAX_HORIZ_PER_ROW = 5;
 /** Standing bridge tiles between horizontal runs (1–2 like photo). */
 const DOM_BOARD_VERT_BRIDGE_TILES = 2;
+/** Gap between lying row bottom and first standing tile (0 = flush join). */
+const DOM_BOARD_H_TO_V_GAP_PX = 0;
+/** Gap between stacked standing bridge tiles. */
+const DOM_BOARD_V_STACK_GAP_PX = 2;
+/** Standing bridge nudge after a **LTR** lying row (corner on the right). */
+const DOM_BOARD_BRIDGE_NUDGE_AFTER_LTR_PX = 3;
+/** Standing bridge nudge after a **RTL** lying row (corner on the left). */
+const DOM_BOARD_BRIDGE_NUDGE_AFTER_RTL_PX = -3;
 
 /**
  * Alternate horizontal runs and vertical bridges until all tiles are consumed.
@@ -58,28 +66,30 @@ function computeMixedSegments(totalN, innerW, gapPx, maxPerRow, vertBridge, hori
 /**
  * @param {{ kind: 'h' | 'v'; count: number }[]} segments
  * @param {number} innerW
+ * @param {number} innerH board inner height — first lying row starts near vertical center
  * @param {number} hW lying tile width (long, X)
  * @param {number} hH lying tile height (short, Y)
  * @param {number} vW standing tile width (short, X)
  * @param {number} vH standing tile height (long, Y)
- * @param {number} gap
- * @returns {{ placements: { left: number; top: number; w: number; h: number; vertical: boolean }[]; minL: number; maxR: number; minT: number; maxB: number; contentW: number; contentH: number }}
+ * @param {number} gap between lying tiles along a row / after a bridge block
+ * @param {number} hToVGap gap under lying row before first standing tile
+ * @param {number} vStackGap between stacked standing tiles
  */
-function placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap) {
-  const horizLens = segments.filter(s => s.kind === "h").map(s => s.count);
-  const R = horizLens.length;
+function placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToVGap, vStackGap) {
   const hStep = hW + gap;
   const totalTiles = segments.reduce((a, s) => a + s.count, 0);
-  const placements = /** @type {{ left: number; top: number; w: number; h: number; vertical: boolean }[]} */ (
+  const placements = /** @type {{ left: number; top: number; w: number; h: number; vertical: boolean; flipHoriz?: boolean }[]} */ (
     new Array(totalTiles)
   );
   if (totalTiles === 0) return { placements: [], minL: 0, maxR: 0, minT: 0, maxB: 0, contentW: 0, contentH: 0 };
 
+  const horizLens = segments.filter(s => s.kind === "h").map(s => s.count);
+  const R = horizLens.length;
+
+  /** Serpentine anchors: row zig-zags so the line folds **inward** instead of drifting one way off-screen. */
   const anchorLeft = /** @type {number[]} */ (new Array(R));
   if (R > 0) {
-    const k0 = horizLens[0];
-    const row0W = k0 * hW + (k0 - 1) * gap;
-    anchorLeft[0] = (innerW - row0W) / 2;
+    anchorLeft[0] = innerW / 2 - hW / 2;
     for (let r = 1; r < R; r++) {
       const kPrev = horizLens[r - 1];
       const prevLtr = (r - 1) % 2 === 0;
@@ -89,7 +99,8 @@ function placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap) {
 
   let idx = 0;
   let hr = 0;
-  let yNext = 0;
+  let yBelowLastHoriz = Math.max(2, innerH / 2 - hH / 2);
+  let yNext = yBelowLastHoriz;
 
   for (const seg of segments) {
     if (seg.kind === "h") {
@@ -97,29 +108,34 @@ function placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap) {
       const r = hr;
       const ltr = r % 2 === 0;
       const top = yNext;
+      /** RTL row: chain runs physical R→L, so “previous” neighbor is on the right — swap/halves vs LTR (lo left, hi right). */
+      const flipHoriz = !ltr;
       for (let j = 0; j < k; j++) {
         const left = ltr ? anchorLeft[r] + j * hStep : anchorLeft[r] - j * hStep;
-        placements[idx++] = { left, top, w: hW, h: hH, vertical: false };
+        placements[idx++] = { left, top, w: hW, h: hH, vertical: false, flipHoriz };
       }
-      yNext = top + hH + gap;
+      yBelowLastHoriz = top + hH;
+      yNext = yBelowLastHoriz + gap;
       hr++;
     } else {
       const prevRow = hr - 1;
       const kPrev = horizLens[prevRow];
       const prevLtr = prevRow % 2 === 0;
-      const cornerLeft = prevLtr ? anchorLeft[prevRow] + (kPrev - 1) * hStep : anchorLeft[prevRow] - (kPrev - 1) * hStep;
-      const vTopStart = yNext;
+      const lastHLeft = prevLtr ? anchorLeft[prevRow] + (kPrev - 1) * hStep : anchorLeft[prevRow] - (kPrev - 1) * hStep;
+      const nudgeX = prevLtr ? DOM_BOARD_BRIDGE_NUDGE_AFTER_LTR_PX : DOM_BOARD_BRIDGE_NUDGE_AFTER_RTL_PX;
+      const bridgeLeft = lastHLeft + hW / 2 - vW / 2 + nudgeX;
+      const vTopStart = yBelowLastHoriz + hToVGap;
       const vCount = seg.count;
       for (let j = 0; j < vCount; j++) {
         placements[idx++] = {
-          left: cornerLeft,
-          top: vTopStart + j * (vH + gap),
+          left: bridgeLeft,
+          top: vTopStart + j * (vH + vStackGap),
           w: vW,
           h: vH,
           vertical: true,
         };
       }
-      yNext = vTopStart + vCount * vH + (vCount > 0 ? (vCount - 1) * gap : 0) + gap;
+      yNext = vTopStart + vCount * vH + (vCount > 0 ? (vCount - 1) * vStackGap : 0) + gap;
     }
   }
 
@@ -204,8 +220,8 @@ function PipDots({ n, pipSize = "hand" }) {
   );
 }
 
-/** @param {{ a: unknown, b: unknown, vertical?: boolean, pipSize?: "hand" | "line" | "board" }} props */
-function DominoFace({ a, b, vertical, pipSize: pipSizeProp }) {
+/** @param {{ a: unknown, b: unknown, vertical?: boolean, flipHoriz?: boolean, pipSize?: "hand" | "line" | "board" }} props */
+function DominoFace({ a, b, vertical, flipHoriz, pipSize: pipSizeProp }) {
   const pip = pipSizeProp ?? (vertical ? "hand" : "line");
   if (vertical) {
     const boardLine = pip === "board";
@@ -223,11 +239,13 @@ function DominoFace({ a, b, vertical, pipSize: pipSizeProp }) {
       </div>
     );
   }
+  const leftPip = flipHoriz ? b : a;
+  const rightPip = flipHoriz ? a : b;
   return (
     <div className="flex flex-row items-center justify-center gap-1 rounded-md border border-black/20 bg-[#faf6ef] px-1 py-1 shadow-inner sm:gap-1.5 sm:px-1.5 sm:py-1.5">
-      <PipDots n={a} pipSize={pip} />
+      <PipDots n={leftPip} pipSize={pip} />
       <div className="h-[70%] w-px bg-black/25" />
-      <PipDots n={b} pipSize={pip} />
+      <PipDots n={rightPip} pipSize={pip} />
     </div>
   );
 }
@@ -797,7 +815,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
       const hH = hW / DOM_BOARD_VERT_H_OVER_W;
       return {
         segments: /** @type {{ kind: 'h' | 'v'; count: number }[]} */ ([]),
-        placements: /** @type {{ left: number; top: number; w: number; h: number; vertical: boolean }[]} */ ([]),
+        placements: /** @type {{ left: number; top: number; w: number; h: number; vertical: boolean; flipHoriz?: boolean }[]} */ ([]),
         singleHorizRun: true,
         contentW: 0,
         contentH: 0,
@@ -823,7 +841,10 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
     let vW = hH;
     let vH = hW;
 
-    let geom = placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap);
+    const hToV = DOM_BOARD_H_TO_V_GAP_PX;
+    const vStack = DOM_BOARD_V_STACK_GAP_PX;
+
+    let geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
     let spanW = geom.contentW;
     let spanH = geom.contentH;
 
@@ -833,7 +854,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
       hH = hW / DOM_BOARD_VERT_H_OVER_W;
       vW = hH;
       vH = hW;
-      geom = placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap);
+      geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
       spanW = geom.contentW;
       spanH = geom.contentH;
     }
@@ -844,7 +865,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
       hH = hW / DOM_BOARD_VERT_H_OVER_W;
       vW = hH;
       vH = hW;
-      geom = placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap);
+      geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
       spanW = geom.contentW;
       spanH = geom.contentH;
       if (spanW > innerW * 0.97 && spanW > 0) {
@@ -853,20 +874,40 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
         hH = hW / DOM_BOARD_VERT_H_OVER_W;
         vW = hH;
         vH = hW;
-        geom = placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap);
+        geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
         spanW = geom.contentW;
         spanH = geom.contentH;
       }
     }
 
-    const shiftX = spanW > 0 ? (innerW - spanW) / 2 - geom.minL : 0;
-    const shiftY = 2 - geom.minT;
+    /** Serpentine can still measure wider than innerW — shrink until the snake fits **inside** the field. */
+    const padFit = 2;
+    const maxSpan = Math.max(0, innerW - 2 * padFit);
+    let guard = 0;
+    while (geom.maxR - geom.minL > maxSpan && maxSpan > 0 && hW > 18 && guard < 14) {
+      hW = Math.max(18, hW * (maxSpan / (geom.maxR - geom.minL)) * 0.99);
+      hH = hW / DOM_BOARD_VERT_H_OVER_W;
+      vW = hH;
+      vH = hW;
+      geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
+      spanW = geom.contentW;
+      spanH = geom.contentH;
+      guard++;
+    }
+
+    /** Keep chain anchored from center — nudge only so bbox stays inside (no full re-center). */
+    const pad = 2;
+    let shiftX = pad - geom.minL;
+    if (geom.maxR + shiftX > innerW - pad) shiftX = innerW - pad - geom.maxR;
+    let shiftY = pad - geom.minT;
+    if (geom.maxB + shiftY > innerH - pad) shiftY = innerH - pad - geom.maxB;
     const placements = geom.placements.map(p => ({
       left: Math.round(p.left + shiftX),
       top: Math.round(p.top + shiftY),
       w: p.w,
       h: p.h,
       vertical: p.vertical,
+      ...(p.flipHoriz ? { flipHoriz: true } : {}),
     }));
 
     const singleHorizRun = segments.length === 1 && segments[0].kind === "h";
@@ -927,7 +968,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
                           height: p.h,
                         }}
                       >
-                        <DominoFace a={lo} b={hi} vertical={p.vertical} pipSize="board" />
+                        <DominoFace a={lo} b={hi} vertical={p.vertical} flipHoriz={Boolean(p.flipHoriz)} pipSize="board" />
                       </div>
                     );
                   })}
