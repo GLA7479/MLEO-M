@@ -336,7 +336,10 @@ export default function Ov2SharedRoomScreen({
     const run = async () => {
       try {
         const r = await ov2QuickMatchAutoStartDeadline({ room_id: roomId, participant_key: participantId });
-        await applyOv2SharedStakeRefundHintFromRpc(r);
+        const refundApply = await applyOv2SharedStakeRefundHintFromRpc(r);
+        if (refundApply?.ok === false && refundApply.error) {
+          console.warn("[OV2] Quick match stake refund vault sync failed:", refundApply.error);
+        }
         const code = String(r?.code || "");
         if (code === "CANCELLED") {
           await reload();
@@ -653,7 +656,7 @@ export default function Ov2SharedRoomScreen({
     const debitAlreadyDone = debitKey && window.localStorage.getItem(debitKey) === "1";
     if (!debitAlreadyDone) {
       const debit = await debitOnlineV2Vault(vaultDebit, rAfter.product_game_id);
-      if (!debit?.ok) {
+      if (!debit?.ok || debit?.synced !== true) {
         await refreshSharedEconomySnapshot();
         await reload();
         return {
@@ -805,8 +808,11 @@ export default function Ov2SharedRoomScreen({
     setBusy(true);
     setMsg("");
     try {
-      await releaseOv2Seat({ room_id: roomId, participant_key: participantId });
+      const rel = await releaseOv2Seat({ room_id: roomId, participant_key: participantId });
       await reload();
+      if (rel?.stake_refund_vault_apply_error) {
+        setMsg(String(rel.stake_refund_vault_apply_error));
+      }
     } catch (e) {
       setMsg(e?.message || String(e));
     } finally {
@@ -823,11 +829,14 @@ export default function Ov2SharedRoomScreen({
       const canon =
         canonicalRoom ||
         (await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId }).catch(() => null));
-      await leaveOv2RoomWithForfeitRetry({
+      const leaveOut = await leaveOv2RoomWithForfeitRetry({
         room: canon || room,
         room_id: roomId,
         participant_key: participantId,
       });
+      if (leaveOut?.stakeRefundVaultApplyError) {
+        setMsg(String(leaveOut.stakeRefundVaultApplyError));
+      }
       onExitRoom();
     } catch (e) {
       setMsg(e?.message || String(e));

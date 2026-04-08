@@ -1010,7 +1010,7 @@ export function useOv2BoardPathSession(baseContext) {
         window.localStorage.getItem(/** @type {string} */ (debitKey)) === "1";
       if (!debitAlreadyDone) {
         const debit = await debitOnlineV2Vault(vaultDebit, gameId);
-        if (!debit?.ok) {
+        if (!debit?.ok || debit?.synced !== true) {
           setActionError({
             code: "VAULT_DEBIT_FAILED",
             message:
