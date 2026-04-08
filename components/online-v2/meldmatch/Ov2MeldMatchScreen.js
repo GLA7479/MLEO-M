@@ -134,19 +134,6 @@ function MmCardFace({ cardId, large = false }) {
         <span className={`font-black ${large ? "text-[15px] sm:text-[16px]" : "text-[14px]"}`}>{ui.rank}</span>
         <span className={`mt-[1px] ${large ? "text-[16px] sm:text-[17px]" : "text-[15px]"}`}>{pip}</span>
       </div>
-
-      <div className={`absolute bottom-1.5 right-1.5 z-[1] flex rotate-180 flex-col items-center leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}>
-        <span className={`font-black ${large ? "text-[15px] sm:text-[16px]" : "text-[14px]"}`}>{ui.rank}</span>
-        <span className={`mt-[1px] ${large ? "text-[16px] sm:text-[17px]" : "text-[15px]"}`}>{pip}</span>
-      </div>
-
-      <div className="relative z-[1] flex h-full w-full items-center justify-center">
-        <span
-          className={`${pipColor} leading-none [text-shadow:0_0_3px_rgba(255,255,255,0.95),0_2px_4px_rgba(0,0,0,0.35)] ${large ? "text-[32px] sm:text-[48px]" : "text-[29px]"}`}
-        >
-          {pip}
-        </span>
-      </div>
     </div>
   );
 }
@@ -160,28 +147,19 @@ function MmCardFaceCompact({ cardId }) {
   const pipColor = ui.red ? "text-rose-600" : "text-zinc-900";
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[0.55rem] border-0 bg-zinc-100 shadow-[0_4px_10px_rgba(0,0,0,0.25)]">
+    <div className="relative flex h-full w-full overflow-hidden rounded-[0.55rem] border-0 bg-zinc-100 shadow-[0_4px_10px_rgba(0,0,0,0.25)]">
       <img
         src={MM_CARD_FACE_SRC}
         alt=""
         className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
         draggable={false}
       />
-      <span
-        className={`absolute left-[2px] top-[2px] z-[1] text-[11px] font-black leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}
+      <div
+        className={`absolute left-[2px] top-[2px] z-[1] flex flex-col items-center leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}
       >
-        {ui.rank}
-      </span>
-      <span
-        className={`absolute right-[2px] bottom-[2px] z-[1] rotate-180 text-[11px] font-black leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}
-      >
-        {ui.rank}
-      </span>
-      <span
-        className={`relative z-[1] ${pipColor} text-[24px] leading-none [text-shadow:0_0_3px_rgba(255,255,255,0.95),0_2px_4px_rgba(0,0,0,0.35)]`}
-      >
-        {ui.suit}
-      </span>
+        <span className="text-[11px] font-black">{ui.rank}</span>
+        <span className="mt-[0.5px] text-[12px]">{ui.suit}</span>
+      </div>
     </div>
   );
 }
