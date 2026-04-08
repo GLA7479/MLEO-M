@@ -35,7 +35,6 @@ import {
   OV2_DUEL_PANEL_HAND_ACTIVE,
   OV2_DUEL_PANEL_LABEL,
   OV2_DUEL_PANEL_TOP,
-  OV2_DUEL_TOP_CARD_AURA,
   OV2_DUEL_TOP_CARD_FACE,
   OV2_DUEL_SETTLEMENT_BADGE,
   OV2_DUEL_TIMER_ACTIVE,
@@ -79,7 +78,7 @@ function MmCardFace({ cardId, large = false }) {
 
   return (
     <div
-      className={`relative flex h-full w-full overflow-hidden rounded-[0.78rem] border-0 bg-zinc-100 text-zinc-900 shadow-[0_8px_16px_rgba(0,0,0,0.24)] ${large ? "min-h-[6rem] min-w-[4.15rem] sm:min-h-[7rem] sm:min-w-[4.9rem]" : ""}`}
+      className={`relative flex h-full w-full overflow-hidden rounded-[0.78rem] border-0 bg-zinc-100 text-zinc-900 shadow-[0_8px_16px_rgba(0,0,0,0.24)] ${large ? "min-h-[6.6rem] min-w-[4.57rem] sm:min-h-[7.7rem] sm:min-w-[5.4rem]" : ""}`}
       title={`${ui.rank} of ${ui.suitName}`}
       aria-label={`${ui.rank} of ${ui.suitName}`}
     >
@@ -90,18 +89,18 @@ function MmCardFace({ cardId, large = false }) {
         draggable={false}
       />
       <div className={`absolute left-1.5 top-1.5 z-[1] flex flex-col items-center leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}>
-        <span className="text-[14px] font-black">{ui.rank}</span>
-        <span className="mt-[1px] text-[15px]">{pip}</span>
+        <span className={`font-black ${large ? "text-[15px] sm:text-[16px]" : "text-[14px]"}`}>{ui.rank}</span>
+        <span className={`mt-[1px] ${large ? "text-[16px] sm:text-[17px]" : "text-[15px]"}`}>{pip}</span>
       </div>
 
       <div className={`absolute bottom-1.5 right-1.5 z-[1] flex rotate-180 flex-col items-center leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}>
-        <span className="text-[14px] font-black">{ui.rank}</span>
-        <span className="mt-[1px] text-[15px]">{pip}</span>
+        <span className={`font-black ${large ? "text-[15px] sm:text-[16px]" : "text-[14px]"}`}>{ui.rank}</span>
+        <span className={`mt-[1px] ${large ? "text-[16px] sm:text-[17px]" : "text-[15px]"}`}>{pip}</span>
       </div>
 
       <div className="relative z-[1] flex h-full w-full items-center justify-center">
         <span
-          className={`${pipColor} text-[29px] leading-none [text-shadow:0_0_3px_rgba(255,255,255,0.95),0_2px_4px_rgba(0,0,0,0.35)] ${large ? "sm:text-[44px]" : ""}`}
+          className={`${pipColor} leading-none [text-shadow:0_0_3px_rgba(255,255,255,0.95),0_2px_4px_rgba(0,0,0,0.35)] ${large ? "text-[32px] sm:text-[48px]" : "text-[29px]"}`}
         >
           {pip}
         </span>
@@ -503,7 +502,6 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     });
     return out;
   }, [finishSuggestion]);
-  const topCardPulse = drawPhaseMyTurn || discardPhaseMyTurn;
   const compactActionLine =
     vm.phase === "playing" && vm.turnPhase === "draw"
       ? "Draw from stock or top discard"
@@ -614,31 +612,35 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           <div className="flex h-full flex-col justify-between gap-2">
             <div className="rounded-2xl bg-zinc-900/18 p-2">
               <p className="text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">Top discard</p>
-              <div className="mt-6 flex min-h-[10.25rem] w-full items-center justify-center gap-2 sm:mt-4 sm:min-h-[8.2rem] sm:gap-4">
+              <div className="mt-6 flex min-h-[11.3rem] w-full items-center justify-center gap-2 sm:mt-4 sm:min-h-[9rem] sm:gap-4">
                 <button
                   type="button"
                   disabled={!drawPhaseMyTurn || busy || vm.stockCount <= 0}
                   onClick={() => void draw("stock")}
-                  className="inline-flex h-[5rem] w-[3.2rem] flex-col items-center justify-center overflow-hidden rounded-2xl border-0 bg-slate-900/50 text-[10px] font-semibold text-slate-100 opacity-78 shadow-[0_6px_12px_rgba(0,0,0,0.28)] transition enabled:hover:-translate-y-1 enabled:hover:brightness-110 disabled:opacity-60 sm:h-[6.2rem] sm:w-[4.1rem]"
+                  className="inline-flex h-[5.5rem] min-w-0 flex-row items-stretch gap-1.5 overflow-hidden rounded-2xl border-0 bg-slate-900/50 px-1 py-0.5 text-left text-[10px] font-semibold text-slate-100 opacity-78 shadow-[0_6px_12px_rgba(0,0,0,0.28)] transition enabled:hover:-translate-y-1 enabled:hover:brightness-110 disabled:opacity-60 sm:h-[6.85rem] sm:gap-2 sm:px-1.5"
                 >
-                  <span className="relative mb-0.5 flex h-[2.65rem] w-full shrink-0 overflow-hidden rounded-lg border-0 sm:h-[4.1rem]">
+                  <span className="flex min-w-0 flex-col items-start justify-center gap-0.5 self-center pl-0.5 leading-none sm:pl-1">
+                    <span className="leading-tight">Stock</span>
+                    <span className="text-[11px] font-semibold tabular-nums text-zinc-200">{vm.stockCount}</span>
+                  </span>
+                  <span className="relative h-full w-auto shrink-0 overflow-hidden rounded-lg border-0 aspect-[5/7] max-h-full">
                     <img
                       src={MM_CARD_BACK_SRC}
                       alt=""
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-cover object-center"
                       draggable={false}
                     />
                   </span>
-                  <span className="leading-tight">Stock</span>
-                  <span className="mt-0.5 text-[11px] text-zinc-200">{vm.stockCount}</span>
                 </button>
                 <button
                   type="button"
                   disabled={!drawPhaseMyTurn || busy || vm.discardTop == null}
                   onClick={() => void draw("discard")}
-                  className={`${OV2_DUEL_TOP_CARD_AURA} inline-flex rounded-[1.35rem] transition enabled:hover:-translate-y-1 disabled:opacity-70 ${topCardPulse ? "scale-[1.06]" : "scale-100"}`}
+                  className="inline-flex rounded-[1.35rem] disabled:opacity-70"
                 >
-                  <div className={`${OV2_DUEL_TOP_CARD_FACE} !border-0 rounded-[1.2rem] bg-transparent p-0 font-semibold text-zinc-900 [text-shadow:none] backdrop-blur-none ${topCardPulse ? "ring-2 ring-emerald-300/60 shadow-[0_0_30px_rgba(45,212,191,0.30),0_14px_26px_rgba(0,0,0,0.34)]" : "shadow-[0_12px_22px_rgba(0,0,0,0.30)]"}`}>
+                  <div
+                    className={`${OV2_DUEL_TOP_CARD_FACE} !min-h-0 !min-w-0 !max-w-none w-max !animate-none !border-0 !transition-none hover:!brightness-100 rounded-[1.2rem] bg-transparent p-0 font-semibold text-zinc-900 !will-change-auto [text-shadow:none] shadow-[0_12px_22px_rgba(0,0,0,0.28)] backdrop-blur-none`}
+                  >
                     <MmCardFace cardId={vm.discardTop ?? null} large />
                   </div>
                 </button>
