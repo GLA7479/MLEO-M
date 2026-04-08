@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { mmFormatCard, mmSuggestFinishFromHand11 } from "../../../lib/online-v2/meldmatch/ov2MeldMatchCards";
@@ -46,6 +46,48 @@ const finishDismissStorageKey = sid => `ov2_mm_finish_dismiss_${sid}`;
 /** Replace files in `public/card-backs/` anytime — keep these paths or update here */
 const MM_CARD_BACK_SRC = "/card-backs/poker-back.jpg";
 const MM_CARD_FACE_SRC = "/card-backs/poker-front.jpg";
+/** Tailwind `sm` breakpoint — hand fan fills row width only below this */
+const MM_HAND_NARROW_MAX_PX = 639;
+
+/**
+ * @param {number} rowWidthPx
+ * @param {number} cardCount
+ * @returns {{ cardW: number, overlap: number }}
+ */
+function computeNarrowMobileHandLayout(rowWidthPx, cardCount) {
+  const n = Math.max(1, cardCount);
+  const W = Math.max(64, rowWidthPx);
+  const MIN_W = 37;
+  const MAX_W = 56;
+
+  if (n === 1) {
+    const w = Math.min(MAX_W, Math.max(MIN_W, W));
+    return { cardW: w, overlap: 0 };
+  }
+
+  const denom = n - 0.45 * (n - 1);
+  let w = W / denom;
+  w = Math.min(MAX_W, Math.max(MIN_W, w));
+  let o = (W - n * w) / (n - 1);
+
+  if (o > -1) {
+    o = -Math.max(2, w * 0.28);
+    w = (W - (n - 1) * o) / n;
+    w = Math.min(MAX_W, Math.max(MIN_W, w));
+    o = (W - n * w) / (n - 1);
+  }
+
+  const maxNeg = -0.9 * w;
+  if (o < maxNeg) {
+    o = maxNeg;
+    w = (W - (n - 1) * o) / n;
+    w = Math.min(MAX_W, Math.max(MIN_W, w));
+    o = (W - n * w) / (n - 1);
+  }
+
+  return { cardW: Math.round(w), overlap: Math.round(o) };
+}
+
 const MM_SUIT_SYMBOL = ["♠", "♥", "♦", "♣"];
 const MM_SUIT_TEXT = ["Spades", "Hearts", "Diamonds", "Clubs"];
 const MM_RANK_TEXT = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
@@ -194,6 +236,9 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
   /** Mobile-first: first tap selects, second tap confirms discard */
   const [selectedHandCardKey, setSelectedHandCardKey] = useState(/** @type {string|null} */ (null));
   const [coarsePointer, setCoarsePointer] = useState(false);
+  const handRowRef = useRef(/** @type {HTMLDivElement|null} */ (null));
+  const [handTrackWidth, setHandTrackWidth] = useState(0);
+  const [isNarrowHandViewport, setIsNarrowHandViewport] = useState(false);
 
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
@@ -221,6 +266,33 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     mq.addListener(sync);
     return () => mq.removeListener(sync);
   }, []);
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia(`(max-width: ${MM_HAND_NARROW_MAX_PX}px)`);
+    const sync = () => setIsNarrowHandViewport(mq.matches);
+    sync();
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", sync);
+      return () => mq.removeEventListener("change", sync);
+    }
+    mq.addListener(sync);
+    return () => mq.removeListener(sync);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isNarrowHandViewport || typeof ResizeObserver === "undefined") {
+      setHandTrackWidth(0);
+      return;
+    }
+    const el = handRowRef.current;
+    if (!el) return;
+    const apply = () => setHandTrackWidth(Math.max(0, Math.floor(el.getBoundingClientRect().width)));
+    const ro = new ResizeObserver(() => apply());
+    ro.observe(el);
+    apply();
+    return () => ro.disconnect();
+  }, [isNarrowHandViewport, vm.myHand.length, vm.sessionId, vm.revision]);
 
   useEffect(() => {
     if (vm.phase !== "layoff") setLayoffAssignments([]);
@@ -540,6 +612,12 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
 
   const desktopOverlap =
     handCount <= 7 ? -5 : handCount === 8 ? -9 : handCount === 9 ? -12 : handCount === 10 ? -15 : -18;
+
+  const narrowMobileHandLayout = useMemo(() => {
+    if (!isNarrowHandViewport || handTrackWidth <= 0) return null;
+    return computeNarrowMobileHandLayout(handTrackWidth, vm.myHand.length);
+  }, [isNarrowHandViewport, handTrackWidth, vm.myHand.length]);
+
   return (
     <div className="relative flex h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_52%,rgba(45,212,191,0.23),rgba(15,23,42,0.34)_42%,rgba(6,11,22,0.95)_76%),radial-gradient(circle_at_50%_20%,rgba(125,211,252,0.13),transparent_40%),linear-gradient(180deg,#162235_0%,#0c1626_55%,#070f1e_100%)] px-1 pb-[max(6px,env(safe-area-inset-bottom))] pt-[max(4px,env(safe-area-inset-top))] sm:h-full sm:px-2 sm:pb-2 sm:pt-2">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_38%),radial-gradient(circle_at_50%_50%,transparent_58%,rgba(3,7,16,0.55)_100%)]" />
@@ -670,7 +748,10 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           <p className="mb-1 min-h-[0.85rem] px-2 text-center text-[9px] font-medium leading-none text-emerald-100/90 sm:min-h-[1rem] sm:px-0 sm:text-[11px]">
             {drawPhaseMyTurn ? "Tap stock or discard to draw" : discardPhaseMyTurn ? "Tap card, tap again to discard" : " "}
           </p>
-          <div className="flex h-[5rem] w-full items-end justify-center overflow-hidden px-0 pb-0.5 sm:h-[8.9rem] sm:px-1 md:h-[7.4rem]">
+          <div
+            ref={handRowRef}
+            className="flex h-[5rem] w-full items-end justify-center overflow-hidden px-0 pb-0.5 sm:h-[8.9rem] sm:px-1 md:h-[7.4rem]"
+          >
             {vm.myHand.map((c, idx) => {
               const hid = `h-${idx}-${c}-${vm.revision}`;
               const showingHit = handCardHitKey === hid;
@@ -723,11 +804,32 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                     : "opacity-78"
                 } ${map?.kind === "meld" ? "!ring-2 !ring-emerald-400/55" : map?.kind === "deadwood" ? "!ring-2 !ring-amber-400/55" : ""}`}
                 style={{
-                  width: `${coarsePointer ? mobileHandCardWidth : desktopHandCardWidth}px`,
-                  minWidth: `${coarsePointer ? mobileHandCardWidth : desktopHandCardWidth}px`,
+                  width: `${
+                    narrowMobileHandLayout
+                      ? narrowMobileHandLayout.cardW
+                      : coarsePointer
+                        ? mobileHandCardWidth
+                        : desktopHandCardWidth
+                  }px`,
+                  minWidth: `${
+                    narrowMobileHandLayout
+                      ? narrowMobileHandLayout.cardW
+                      : coarsePointer
+                        ? mobileHandCardWidth
+                        : desktopHandCardWidth
+                  }px`,
                   height: `${coarsePointer ? 78 : 92}px`,
                   minHeight: `${coarsePointer ? 78 : 92}px`,
-                  marginLeft: idx === 0 ? "0px" : `${coarsePointer ? mobileOverlap : desktopOverlap}px`,
+                  marginLeft:
+                    idx === 0
+                      ? "0px"
+                      : `${
+                          narrowMobileHandLayout
+                            ? narrowMobileHandLayout.overlap
+                            : coarsePointer
+                              ? mobileOverlap
+                              : desktopOverlap
+                        }px`,
                   zIndex: selected ? 40 : idx + 1,
                   transform: `${selected ? "translateY(-4px) scale(1.04)" : ""} translateY(${Math.abs(idx - (vm.myHand.length - 1) / 2) * (coarsePointer ? 0.1 : 0.3)}px) rotate(${(idx - (vm.myHand.length - 1) / 2) * (coarsePointer ? 0.26 : 0.65)}deg)`,
                 }}
