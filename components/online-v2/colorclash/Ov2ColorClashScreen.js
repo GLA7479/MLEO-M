@@ -27,24 +27,16 @@ import {
   OV2_BTN_DANGER,
   OV2_BTN_PRIMARY,
   OV2_BTN_SECONDARY,
-  OV2_CALLOUT_VIOLET,
   OV2_DUEL_CHIP_METRIC,
   OV2_DUEL_HAND_PILL_BASE,
   OV2_DUEL_HAND_PILL_DISABLED,
   OV2_DUEL_HAND_PILL_ENABLED,
-  OV2_DUEL_HAND_FLASH_SUCCESS,
-  OV2_DUEL_HAND_HIT,
-  OV2_DUEL_HAND_PILL_HIGHLIGHT_PENDING,
-  OV2_DUEL_HAND_PILL_HIGHLIGHT_SUCCESS,
   OV2_DUEL_HUD_BAR,
   OV2_DUEL_ACTION_GROUP,
-  OV2_DUEL_ACTION_STRIP,
   OV2_DUEL_PANEL_HAND,
   OV2_DUEL_PANEL_HAND_ACTIVE,
   OV2_DUEL_PANEL_LABEL,
   OV2_DUEL_PANEL_TOP,
-  OV2_DUEL_TOP_CARD_AURA,
-  OV2_DUEL_TOP_CARD_FACE,
   OV2_DUEL_SETTLEMENT_BADGE,
   OV2_DUEL_TIMER_ACTIVE,
   OV2_DUEL_TIMER_IDLE,
@@ -85,6 +77,40 @@ function ccCardPresentation(card) {
   if (t === "r") return { label: "REVERSE", sub: "Turn flip", wild: false };
   if (t === "d") return { label: "+2", sub: "Draw two", wild: false };
   return { label, sub: "Number card", wild: !hasColor };
+}
+
+/** Same face layout as hand pills — modestly larger than hand, compact so the hand stays visible */
+function CcTopDiscardCardFace({ card }) {
+  if (card == null || typeof card !== "object") {
+    return (
+      <div className="relative z-[1] inline-flex min-h-[5.65rem] min-w-[4.05rem] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/55 text-center font-mono text-xs font-semibold text-zinc-500 sm:min-h-[6.75rem] sm:min-w-[4.85rem] sm:text-sm">
+        —
+      </div>
+    );
+  }
+  const p = ccCardPresentation(card);
+  const ci = Number(card?.c);
+  const colorBg = Number.isInteger(ci) && ci >= 0 && ci <= 3 ? CC_COLOR_CARD_BG[ci] : null;
+  const ring = Number.isInteger(ci) && ci >= 0 && ci <= 3 ? CC_COLOR_CARD_RING[ci] : "ring-fuchsia-300/40";
+  const gradientClass = colorBg ? `bg-gradient-to-b ${colorBg}` : "bg-gradient-to-b from-fuchsia-500 to-indigo-700";
+  return (
+    <div
+      className={`relative z-[1] inline-flex min-h-[5.65rem] min-w-[4.05rem] flex-col rounded-xl border border-white/35 px-0.5 py-0.5 sm:min-h-[6.75rem] sm:min-w-[4.85rem] sm:px-1 sm:py-0.5 ${gradientClass}`}
+    >
+      <span
+        className={`flex h-full min-h-[4.55rem] w-full flex-col justify-between rounded-lg border border-white/30 bg-black/20 px-0.5 py-0.5 text-white ring-1 sm:min-h-[5.6rem] sm:px-1 sm:py-0.5 ${ring}`}
+      >
+        <span className="flex items-start justify-between text-[10px] font-bold leading-none sm:text-[11px]">
+          <span className="min-w-0 truncate">{p.label}</span>
+          <span className="shrink-0">{p.wild ? "★" : "●"}</span>
+        </span>
+        <span className="px-0.5 text-center text-lg font-black leading-none sm:text-xl">{p.label}</span>
+        <span className="text-center text-[9px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-[10px]">
+          {p.sub}
+        </span>
+      </span>
+    </div>
+  );
 }
 
 /**
@@ -231,9 +257,10 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
     [vm.eliminated]
   );
 
-  const opponentSeats = useMemo(() => {
-    return vm.activeSeats.filter(s => vm.mySeat == null || s !== vm.mySeat);
-  }, [vm.activeSeats, vm.mySeat]);
+  /** All seated players in seat order (includes you) — four seats in a 4-player match. */
+  const playerStripSeats = useMemo(() => {
+    return [...vm.activeSeats].sort((a, b) => a - b);
+  }, [vm.activeSeats]);
 
   const rematchCounts = useMemo(() => {
     let ready = 0;
@@ -394,7 +421,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
   const turnGuidance = useMemo(() => {
     if (vm.phase === "finished") return "Round complete";
     if (vm.phase !== "playing") return "Waiting for round to start";
-    if (vm.mySeat == null || vm.turnSeat !== vm.mySeat) return `Waiting for ${seatDisplayName(vm.turnSeat)}`;
+    if (vm.mySeat == null || vm.turnSeat !== vm.mySeat) return "";
     if (myTurnPostDraw) {
       return Array.isArray(vm.pendingDrawForYou) && vm.pendingDrawForYou.length > 1
         ? "You drew cards. Play one highlighted card or pass."
@@ -402,7 +429,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
     }
     if (wildForCard) return "Choose a color for your wild card";
     if (vm.wildLockAppliesToMe && vm.lockedColor != null) return `Locked to ${ccColorName(vm.lockedColor)} this turn`;
-    return "Your turn: play a matching color or symbol, or draw.";
+    return "";
   }, [vm, seatDisplayName, myTurnPostDraw, wildForCard]);
 
   const tryPlay = useCallback(
@@ -492,12 +519,12 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
     [wildForCard, busy, tryPlay, setErr]
   );
 
-  const ccTopTurnActions =
-    handBoardActive && vm.phase === "playing" ? (
-      <div className="mt-1.5 rounded-lg border border-sky-500/35 bg-zinc-900/70 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-        {myTurnPostDraw ? (
-          <div className="flex flex-col gap-1.5">
-            <p className="text-center text-[10px] text-violet-200/90">
+  const ccPlayingActionSlotInner =
+    vm.phase === "playing" && vm.mySeat != null ? (
+      handBoardActive ? (
+        myTurnPostDraw ? (
+          <div className="flex min-h-[4.25rem] flex-col justify-center gap-1.5">
+            <p className="text-center text-[10px] leading-snug text-violet-200/90">
               Play a highlighted card from your draw, or pass the turn.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
@@ -506,224 +533,248 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
               </button>
             </div>
           </div>
-        ) : null}
-        {myTurnPlaying && wildForCard ? (
-          <p className="text-center text-[10px] text-sky-200/90">Tap a color below for your wild card (or Cancel there).</p>
-        ) : null}
-        {myTurnPlaying && !wildForCard ? (
-          <div className={OV2_DUEL_ACTION_STRIP}>
-            <p className="mb-1.5 text-center text-[9px] font-medium text-zinc-500 sm:text-[10px]">Your turn — draw or play a card</p>
-            <div className="flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                disabled={busy || vm.stockCount <= 0}
-                title={vm.stockCount <= 0 ? "Stock is empty — play from your hand" : "Draw from stock"}
-                className={OV2_BTN_PRIMARY}
-                onClick={() => {
-                  setSurgeTwoTapMode(false);
-                  setSurgeArmCard(null);
-                  void drawCard();
-                }}
-              >
-                Draw card{vm.stockCount != null && vm.stockCount > 0 ? ` (${vm.stockCount})` : ""}
-              </button>
-              {vm.surgeAvailableForMe ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  className={surgeTwoTapMode ? OV2_BTN_ACCENT : OV2_BTN_SECONDARY}
-                  onClick={() => {
-                    setErr("");
-                    setSurgeArmCard(null);
-                    setSurgeTwoTapMode(s => !s);
-                  }}
-                >
-                  Surge {surgeTwoTapMode ? "on" : "off"}
-                </button>
-              ) : null}
-              {surgeTwoTapMode && surgeArmCard ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  className={OV2_BTN_SECONDARY}
-                  onClick={() => {
-                    setSurgeArmCard(null);
-                  }}
-                >
-                  Cancel 1st
-                </button>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
-        {myTurnPlaying && !wildForCard && vm.stockCount <= 0 ? (
-          <p className="mt-1.5 text-center text-[10px] leading-snug text-amber-200/88">
-            Stock is empty — you must play from your hand. If nothing matches, the turn timer will advance.
+        ) : myTurnPlaying && wildForCard ? (
+          <p className="flex min-h-[4.25rem] items-center text-center text-[10px] leading-snug text-sky-200/90">
+            Tap a color below for your wild card (or Cancel there).
           </p>
-        ) : null}
-      </div>
+        ) : null
+      ) : null
     ) : null;
 
   return (
-    <div className="relative flex w-full min-h-min flex-col gap-1.5 overflow-x-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
-      <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
-        <div className="rounded-lg border border-cyan-400/25 bg-cyan-950/25 px-2 py-1.5 text-center text-[10px] font-medium text-cyan-100/90">
+    <div className="relative flex h-full min-h-0 w-full max-w-full flex-1 flex-col gap-0.5 overflow-hidden bg-zinc-950 px-1 pb-1 sm:gap-1 sm:px-2 sm:pb-1.5">
+      <div className="flex shrink-0 flex-col justify-center gap-1">
+        <div className="flex min-h-[2.5rem] items-center justify-center rounded-lg border border-cyan-400/25 bg-cyan-950/25 px-2 py-1 text-center text-[10px] font-medium leading-snug text-cyan-100/90 sm:min-h-[2.75rem] sm:py-1.5">
           {goalStrip}
         </div>
-        <div className={OV2_DUEL_HUD_BAR}>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
-            <div
-              className={
-                vm.phase === "playing" && vm.turnSeat === vm.mySeat ? OV2_DUEL_TIMER_ACTIVE : OV2_DUEL_TIMER_IDLE
-              }
-            >
-              {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
-                <span>
-                  <span className="font-medium uppercase text-zinc-500">Timer</span>{" "}
-                  <span className="font-semibold text-zinc-100">~{vm.turnTimeLeftSec}s</span>
+        <div className="flex flex-col gap-0.5">
+          <div className={`${OV2_DUEL_HUD_BAR} !py-1 sm:!py-1.5`}>
+            <div className="flex min-h-[2.25rem] flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[10px] text-zinc-400 sm:min-h-[2.35rem] sm:text-[11px]">
+              <div className="flex flex-1 flex-wrap gap-1.5 sm:gap-2">
+                <span className={OV2_DUEL_CHIP_METRIC}>
+                  Stock {vm.stockCount} · Pile {vm.discardCount}
                 </span>
-              ) : (
-                <span>—</span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <span className={OV2_DUEL_CHIP_METRIC}>
-                Stock {vm.stockCount} · Pile {vm.discardCount}
-              </span>
-              <span className="rounded border border-amber-500/25 px-2 py-0.5 text-amber-100/90 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.08)]" title="Clash stack">
-                Clash {vm.clashCount ?? 0}
-              </span>
-              {vm.wildLockAppliesToMe && vm.lockedColor != null ? (
-                <span className="rounded border border-fuchsia-500/25 px-2 py-0.5 text-fuchsia-100/88" title="Wild lock">
-                  Lock {ccColorName(vm.lockedColor)}
+                <span className="rounded border border-amber-500/25 px-2 py-0.5 text-amber-100/90 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.08)]" title="Clash stack">
+                  Clash {vm.clashCount ?? 0}
+                </span>
+                {vm.wildLockAppliesToMe && vm.lockedColor != null ? (
+                  <span className="rounded border border-fuchsia-500/25 px-2 py-0.5 text-fuchsia-100/88" title="Wild lock">
+                    Lock {ccColorName(vm.lockedColor)}
+                  </span>
+                ) : null}
+                {vm.mySeat != null ? (
+                  <span
+                    className={`rounded border px-2 py-0.5 ${
+                      vm.surgeUsedForMe ? "border-zinc-600 text-zinc-500" : "border-emerald-500/25 text-emerald-100/85"
+                    }`}
+                    title="Surge (once per match)"
+                  >
+                    Surge {vm.surgeUsedForMe ? "used" : "ready"}
+                  </span>
+                ) : null}
+                {vm.currentColor != null ? (
+                  <span className={`${OV2_DUEL_CHIP_METRIC} text-zinc-200`}>
+                    Match color: {ccColorName(vm.currentColor)}
+                  </span>
+                ) : null}
+              </div>
+              {vaultClaimBusy ? (
+                <span className={OV2_DUEL_SETTLEMENT_BADGE}>
+                  Settlement…
                 </span>
               ) : null}
-              {vm.mySeat != null ? (
-                <span
-                  className={`rounded border px-2 py-0.5 ${
-                    vm.surgeUsedForMe ? "border-zinc-600 text-zinc-500" : "border-emerald-500/25 text-emerald-100/85"
-                  }`}
-                  title="Surge (once per match)"
+            </div>
+          </div>
+          <div className="flex w-full shrink-0 flex-row flex-nowrap gap-1 sm:gap-1.5">
+            {playerStripSeats.map(seat => {
+              const isMe = vm.mySeat != null && seat === vm.mySeat;
+              const cardCount = isMe
+                ? vm.myHand.length
+                : Math.max(
+                    0,
+                    Math.floor(Number(vm.handCounts[String(seat)] ?? vm.handCounts[seat] ?? 0) || 0)
+                  );
+              const missed = vm.missedStreakBySeat[seat] ?? 0;
+              const out = isEliminated(seat);
+              const isTurn = vm.turnSeat === seat;
+              return (
+                <div
+                  key={`seat-strip-${seat}`}
+                  title={`${seatDisplayName(seat)} — ${cardCount} cards · missed ${missed}/3`}
+                  className={`${OV2_OPP_PANEL_BASE} ${
+                    isTurn ? OV2_OPP_PANEL_ACTIVE : OV2_OPP_PANEL_IDLE
+                  } ${isMe ? "!opacity-100" : ""} flex min-h-[2.5rem] min-w-0 flex-1 basis-0 flex-row flex-nowrap items-center gap-x-1 px-1.5 py-1 sm:min-h-[2.75rem] sm:px-2 sm:py-2`}
                 >
-                  Surge {vm.surgeUsedForMe ? "used" : "ready"}
-                </span>
-              ) : null}
-              {vm.currentColor != null ? (
-                <span className={`${OV2_DUEL_CHIP_METRIC} text-zinc-200`}>
-                  Match color: {ccColorName(vm.currentColor)}
-                </span>
-              ) : null}
-            </div>
-            {vaultClaimBusy ? (
-              <span className={OV2_DUEL_SETTLEMENT_BADGE}>
-                Settlement…
-              </span>
-            ) : null}
+                  {isMe ? (
+                    <span className="shrink-0 rounded border border-emerald-400/35 bg-emerald-500/12 px-0.5 py-0.5 text-[6px] font-bold uppercase leading-none text-emerald-100 sm:py-0.5 sm:text-[7px]">
+                      You
+                    </span>
+                  ) : null}
+                  <span className="min-w-0 flex-1 truncate text-[9px] font-semibold leading-snug sm:text-[10px]">
+                    {seatDisplayName(seat)}
+                  </span>
+                  {isTurn ? (
+                    <span className="shrink-0 rounded border border-amber-400/40 bg-amber-500/15 px-0.5 py-0.5 text-[6px] font-bold uppercase leading-none text-amber-100 sm:py-0.5 sm:text-[7px]">
+                      Turn
+                    </span>
+                  ) : null}
+                  <span
+                    className={`shrink-0 whitespace-nowrap text-[8px] leading-none tabular-nums sm:text-[9px] ${
+                      isTurn ? "text-amber-100/78" : "text-zinc-400"
+                    }`}
+                  >
+                    C{cardCount}
+                    <span className={isTurn ? "text-amber-200/45" : "text-zinc-600"}>·</span>
+                    M{missed}/3
+                    {out ? <span className="font-semibold text-rose-300/90">·Out</span> : null}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
-        {err ? (
-          <div className="rounded-md border border-red-500/20 bg-red-950/20 px-2 py-1.5 text-[11px] text-red-200/95">
-            <span>{err}</span>{" "}
-            <button type="button" className="text-red-300 underline" onClick={() => setErr("")}>
-              Dismiss
-            </button>
+      </div>
+
+      <div className="flex min-h-0 w-full flex-1 flex-col gap-0.5 overflow-hidden sm:gap-0.5">
+        <div className={`${OV2_DUEL_ACTION_GROUP} flex min-h-0 flex-1 flex-col`}>
+          <div className={`${OV2_DUEL_PANEL_TOP} flex min-h-0 flex-1 flex-col p-2 sm:p-3`}>
+            <div className="mb-1 flex shrink-0 items-start justify-between gap-2 sm:items-center">
+              <p className={`min-w-0 flex-1 text-left text-[10px] leading-tight sm:text-center ${OV2_DUEL_PANEL_LABEL}`}>
+                Top discard (match this card)
+              </p>
+              <div
+                className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] tabular-nums sm:text-[11px] ${
+                  vm.phase === "playing" && vm.turnSeat === vm.mySeat ? OV2_DUEL_TIMER_ACTIVE : OV2_DUEL_TIMER_IDLE
+                }`}
+              >
+                {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
+                  <span>
+                    <span className="font-medium uppercase text-zinc-500">Timer</span>{" "}
+                    <span className="font-semibold text-zinc-100">~{vm.turnTimeLeftSec}s</span>
+                  </span>
+                ) : (
+                  <span className="text-zinc-600">—</span>
+                )}
+              </div>
+            </div>
+            {vm.phase === "playing" && vm.mySeat != null && handBoardActive && myTurnPlaying && !wildForCard ? (
+              <div className="mb-2 flex w-full flex-shrink-0 flex-col items-stretch gap-1.5 px-0.5 sm:mb-2 sm:px-1">
+                <p className="text-center text-[8px] font-medium leading-tight text-zinc-500 sm:text-[9px]">
+                  Your turn — draw or play a card
+                </p>
+                <div className="mx-auto flex w-full max-w-[13rem] flex-col gap-1.5">
+                  <button
+                    type="button"
+                    disabled={busy || vm.stockCount <= 0}
+                    title={vm.stockCount <= 0 ? "Stock is empty — play from your hand" : "Draw from stock"}
+                    className={`${OV2_BTN_PRIMARY} w-full justify-center`}
+                    onClick={() => {
+                      setSurgeTwoTapMode(false);
+                      setSurgeArmCard(null);
+                      void drawCard();
+                    }}
+                  >
+                    Draw card{vm.stockCount != null && vm.stockCount > 0 ? ` (${vm.stockCount})` : ""}
+                  </button>
+                  {vm.surgeAvailableForMe ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      className={`${surgeTwoTapMode ? OV2_BTN_ACCENT : OV2_BTN_SECONDARY} w-full justify-center`}
+                      onClick={() => {
+                        setErr("");
+                        setSurgeArmCard(null);
+                        setSurgeTwoTapMode(s => !s);
+                      }}
+                    >
+                      Surge {surgeTwoTapMode ? "on" : "off"}
+                    </button>
+                  ) : null}
+                  {surgeTwoTapMode && surgeArmCard ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      className={`${OV2_BTN_SECONDARY} w-full justify-center`}
+                      onClick={() => {
+                        setSurgeArmCard(null);
+                      }}
+                    >
+                      Cancel 1st
+                    </button>
+                  ) : null}
+                </div>
+                <p
+                  className={`min-h-[1.5rem] text-center text-[9px] leading-snug sm:text-[10px] ${
+                    vm.stockCount <= 0 ? "text-amber-200/88" : "text-transparent"
+                  }`}
+                >
+                  {vm.stockCount <= 0
+                    ? "Stock is empty — play from your hand. If nothing matches, the turn timer will advance."
+                    : "\u00a0"}
+                </p>
+              </div>
+            ) : null}
+            <div className="mt-1 flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden sm:mt-2">
+              <CcTopDiscardCardFace card={vm.topDiscard && typeof vm.topDiscard === "object" ? vm.topDiscard : null} />
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`shrink-0 rounded-md text-[10px] leading-snug sm:text-[11px] ${
+            err
+              ? "min-h-[2.75rem] border border-red-500/20 bg-red-950/20 px-2 py-1.5 text-red-200/95"
+              : "pointer-events-none min-h-0 border-0 bg-transparent p-0 text-transparent [&>button]:hidden"
+          }`}
+        >
+          {err ? (
+            <>
+              <span className="text-red-200/95">{err}</span>{" "}
+              <button type="button" className="text-red-300 underline" onClick={() => setErr("")}>
+                Dismiss
+              </button>
+            </>
+          ) : null}
+        </div>
+        {turnGuidance ? (
+          <div className="flex min-h-[2.75rem] shrink-0 items-center justify-center rounded-md border border-white/10 bg-zinc-900/45 px-2 py-1 text-center text-[10px] font-medium leading-snug text-zinc-100 sm:min-h-[2.5rem] sm:py-1.5 sm:text-[11px]">
+            {turnGuidance}
           </div>
         ) : null}
-        <div className="rounded-md border border-white/10 bg-zinc-900/45 px-2 py-1 text-center text-[11px] font-medium text-zinc-100">
-          {turnGuidance}
-        </div>
-        {ccTopTurnActions}
-      </div>
-
-      <div className="grid shrink-0 grid-cols-2 gap-1.5 sm:grid-cols-2 md:grid-cols-3">
-        {opponentSeats.map(seat => (
-          <div
-            key={`opp-${seat}`}
-            className={`${OV2_OPP_PANEL_BASE} ${
-              vm.turnSeat === seat ? OV2_OPP_PANEL_ACTIVE : OV2_OPP_PANEL_IDLE
-            }`}
-          >
-            <div className="font-semibold text-zinc-100">{seatDisplayName(seat)}</div>
-            {vm.turnSeat === seat ? (
-              <div className="mt-0.5 inline-flex rounded border border-amber-400/40 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-amber-100">
-                Current turn
-              </div>
-            ) : null}
-            <div className="mt-0.5 text-zinc-400">
-              Cards: {Math.max(0, Math.floor(Number(vm.handCounts[String(seat)] ?? vm.handCounts[seat] ?? 0) || 0))}
-            </div>
-            {isEliminated(seat) ? <div className="mt-0.5 text-rose-300/90">Out</div> : null}
-            <div className="mt-0.5 text-zinc-500">Missed: {vm.missedStreakBySeat[seat] ?? 0}/3</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex w-full min-h-min flex-col gap-2">
-        <div className={OV2_DUEL_ACTION_GROUP}>
-          <div className={`${OV2_DUEL_PANEL_TOP} p-3`}>
-            <p className={`text-center ${OV2_DUEL_PANEL_LABEL}`}>Top discard (match this card)</p>
-            <div className="mt-2 flex flex-col items-center gap-2">
-              <div className={OV2_DUEL_TOP_CARD_AURA}>
-                <div className={OV2_DUEL_TOP_CARD_FACE}>
-                  {vm.topDiscard ? ccFormatCard(vm.topDiscard) : "—"}
-                </div>
-              </div>
-              {vm.currentColor != null ? (
-                <div
-                  className={`h-3 w-full max-w-[12rem] rounded-md border ${COLOR_SWATCH[vm.currentColor] ?? "bg-zinc-700"}`}
-                  title={ccColorName(vm.currentColor)}
-                />
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        {vm.phase === "playing" && myTurnPostDraw ? (
-          <div className={`flex flex-col items-center gap-2 p-2 ${OV2_CALLOUT_VIOLET}`}>
-            <p className="text-center text-[11px] text-violet-100/90">
-              {Array.isArray(vm.pendingDrawForYou) && vm.pendingDrawForYou.length > 1
-                ? `You drew ${vm.pendingDrawForYou.length} cards. Highlighted cards are playable now, or pass.`
-                : "You drew a card. Play the highlighted card if it matches, or pass."}
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              <button type="button" disabled={busy} className={OV2_BTN_SECONDARY} onClick={() => void passAfterDraw()}>
-                Pass
-              </button>
-            </div>
+        {vm.phase === "playing" && vm.mySeat != null && ccPlayingActionSlotInner ? (
+          <div className="flex min-h-0 shrink-0 flex-col gap-1 px-0.5">
+            {ccPlayingActionSlotInner}
           </div>
         ) : null}
 
         {wildForCard ? (
-          <div className="rounded-xl border border-sky-400/35 bg-gradient-to-b from-sky-950/45 to-indigo-950/40 p-3 shadow-[0_10px_30px_rgba(14,116,144,0.28)]">
-            <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-sky-200/90">Wild color choice</p>
-            <p className="mt-1 text-center text-[11px] text-sky-100/90">Choose a color for this wild card.</p>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="shrink-0 rounded-lg border border-sky-400/35 bg-gradient-to-b from-sky-950/45 to-indigo-950/40 p-2 shadow-[0_8px_24px_rgba(14,116,144,0.22)] sm:rounded-xl sm:p-2.5">
+            <p className="text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/90 sm:text-xs">Wild color choice</p>
+            <p className="mt-0.5 text-center text-[10px] text-sky-100/90 sm:text-[11px]">Choose a color for this wild card.</p>
+            <div className="mt-1.5 grid grid-cols-4 gap-1 sm:mt-2 sm:gap-2">
               {[0, 1, 2, 3].map(ci => (
                 <button
                   key={ci}
                   type="button"
                   disabled={busy}
-                  className={`rounded-lg border px-2 py-2 text-[10px] font-semibold text-white transition-[transform,opacity,filter,box-shadow] duration-150 ease-out enabled:hover:-translate-y-px enabled:hover:brightness-110 active:scale-[0.97] active:shadow-none disabled:pointer-events-none disabled:opacity-40 ${COLOR_SWATCH[ci]}`}
+                  className={`rounded-md border px-1 py-1.5 text-[9px] font-semibold text-white transition-[transform,opacity,filter,box-shadow] duration-150 ease-out enabled:hover:-translate-y-px enabled:hover:brightness-110 active:scale-[0.97] active:shadow-none disabled:pointer-events-none disabled:opacity-40 sm:rounded-lg sm:px-2 sm:py-2 sm:text-[10px] ${COLOR_SWATCH[ci]}`}
                   onClick={() => void onPickWildColor(ci)}
                 >
                   {ccColorName(ci)}
                 </button>
               ))}
             </div>
-            <button type="button" className="mt-2 w-full text-[10px] text-zinc-500 underline" onClick={() => setWildForCard(null)}>
+            <button type="button" className="mt-1.5 w-full text-[10px] text-zinc-500 underline sm:mt-2" onClick={() => setWildForCard(null)}>
               Cancel
             </button>
           </div>
         ) : null}
 
         <div
-          className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? OV2_DUEL_PANEL_HAND_ACTIVE : ""} p-2 sm:p-3`}
+          className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? OV2_DUEL_PANEL_HAND_ACTIVE : ""} flex min-h-[11rem] shrink-0 flex-1 flex-col overflow-hidden p-1.5 sm:min-h-[15rem] sm:p-2 md:p-3`}
         >
-          <p className={`mb-2 text-center ${OV2_DUEL_PANEL_LABEL}`}>Your hand</p>
-          {handBoardActive && myTurnPlaying && !myTurnPostDraw ? (
-            <p className="mb-1.5 text-center text-[9px] text-cyan-200/65">Cyan ring = legal play on the pile (incl. wilds).</p>
-          ) : null}
-          <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
+          <p className={`mb-0.5 shrink-0 text-center text-[10px] ${OV2_DUEL_PANEL_LABEL}`}>Your hand</p>
+          <div className="flex min-h-[7.35rem] flex-1 flex-wrap content-center justify-center gap-1 overflow-x-hidden overflow-y-auto overscroll-y-contain sm:min-h-[11.25rem] sm:gap-2">
             {vm.myHand.map((card, idx) => {
               const key = `${idx}-${ccStableCardKey(card)}`;
               const showingHit = handCardHitKey === key;
@@ -777,23 +828,23 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                       }
                     })();
                   }}
-                  className={`${OV2_DUEL_HAND_PILL_BASE} min-h-[4.1rem] min-w-[2.72rem] rounded-xl border border-white/35 px-1 py-0.5 shadow-[0_8px_18px_rgba(0,0,0,0.35)] sm:min-h-[5rem] sm:min-w-[3.25rem] sm:px-1.5 sm:py-1 ${
+                  className={`${OV2_DUEL_HAND_PILL_BASE} min-h-[3.35rem] min-w-[2.35rem] rounded-lg border border-white/35 px-0.5 py-0.5 text-[10px] sm:min-h-[5rem] sm:min-w-[3.25rem] sm:rounded-xl sm:px-1.5 sm:py-1 sm:text-[11px] !animate-none !transition-none duration-0 will-change-auto enabled:hover:!translate-y-0 enabled:hover:!scale-100 enabled:hover:!brightness-100 enabled:hover:!shadow-none enabled:hover:!bg-top active:!scale-100 active:!brightness-100 ${
                     (() => {
                       const ci = Number(card?.c);
                       const colorBg = Number.isInteger(ci) && ci >= 0 && ci <= 3 ? CC_COLOR_CARD_BG[ci] : null;
                       return colorBg ? `bg-gradient-to-b ${colorBg}` : "bg-gradient-to-b from-fuchsia-500 to-indigo-700";
                     })()
-                  } ${showingHit ? OV2_DUEL_HAND_HIT : ""} ${
-                    handCardFlash?.id === key ? OV2_DUEL_HAND_FLASH_SUCCESS : ""
+                  } ${showingHit ? "ring-2 ring-white/35" : ""} ${
+                    handCardFlash?.id === key ? "ring-2 ring-emerald-400/55" : ""
                   } ${
                     surgeHighlight
-                      ? OV2_DUEL_HAND_PILL_HIGHLIGHT_SUCCESS
+                      ? "scale-100 border-emerald-400/65 bg-emerald-950/40 text-emerald-50 ring-2 ring-emerald-400/45"
                       : highlightPostDrawEff
-                        ? OV2_DUEL_HAND_PILL_HIGHLIGHT_PENDING
+                        ? "scale-100 border-violet-400/65 bg-violet-950/40 text-violet-50 ring-2 ring-violet-400/45"
                         : canTry
                           ? OV2_DUEL_HAND_PILL_ENABLED
                           : OV2_DUEL_HAND_PILL_DISABLED
-                  } ${showPlayableRing ? "ring-2 ring-cyan-400/55 shadow-[0_0_14px_rgba(34,211,238,0.22)]" : ""}`}
+                  } ${showPlayableRing ? "ring-2 ring-cyan-400/55" : ""}`}
                 >
                   {(() => {
                     const p = ccCardPresentation(card);
@@ -805,7 +856,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                           <span>{p.label}</span>
                           <span>{p.wild ? "★" : "●"}</span>
                         </span>
-                        <span className="mt-1 text-center text-lg font-black leading-none">{p.label}</span>
+                        <span className="mt-0.5 text-center text-sm font-black leading-none sm:mt-1 sm:text-lg">{p.label}</span>
                         <span className="mt-auto text-center text-[8px] font-semibold uppercase tracking-wide text-white/85">{p.sub}</span>
                       </span>
                     );

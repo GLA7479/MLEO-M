@@ -761,119 +761,174 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
   }, [isNarrowHandViewport, handTrackWidth, displayedHand.length]);
 
   return (
-    <div className="relative flex w-full min-h-min flex-col overflow-x-hidden bg-[radial-gradient(circle_at_50%_52%,rgba(45,212,191,0.23),rgba(15,23,42,0.34)_42%,rgba(6,11,22,0.95)_76%),radial-gradient(circle_at_50%_20%,rgba(125,211,252,0.13),transparent_40%),linear-gradient(180deg,#162235_0%,#0c1626_55%,#070f1e_100%)] px-1 pb-[max(6px,env(safe-area-inset-bottom))] pt-[max(4px,env(safe-area-inset-top))] sm:px-2 sm:pb-2 sm:pt-2">
+    <div className="relative flex h-full min-h-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_52%,rgba(45,212,191,0.23),rgba(15,23,42,0.34)_42%,rgba(6,11,22,0.95)_76%),radial-gradient(circle_at_50%_20%,rgba(125,211,252,0.13),transparent_40%),linear-gradient(180deg,#162235_0%,#0c1626_55%,#070f1e_100%)] px-1 pb-1 pt-[max(4px,env(safe-area-inset-top))] sm:px-2 sm:pb-2 sm:pt-2">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_38%),radial-gradient(circle_at_50%_50%,transparent_58%,rgba(3,7,16,0.55)_100%)]" />
-      <div className="relative z-[1] flex w-full min-h-min flex-col gap-2">
-        <div className="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-white/12 bg-zinc-900/45 px-2 py-1.5 text-[10px] text-zinc-300">
-          <div
-            className={
-              (vm.phase === "playing" || vm.phase === "layoff") &&
-              (vm.turnSeat === vm.mySeat || (vm.mustRespondDouble && Number(vm.pendingDouble?.responder_seat) === vm.mySeat))
-                ? OV2_DUEL_TIMER_ACTIVE
-                : OV2_DUEL_TIMER_IDLE
-            }
-          >
-            {(vm.phase === "playing" || vm.phase === "layoff") && vm.turnTimeLeftSec != null ? (
-              <span className="font-semibold text-zinc-100">~{vm.turnTimeLeftSec}s</span>
-            ) : (
-              <span>—</span>
-            )}
+      <div className="relative z-[1] flex h-full min-h-0 w-full max-w-full flex-col gap-1 overflow-hidden sm:gap-2">
+        <div className="flex min-h-[2.65rem] shrink-0 items-center justify-between gap-1.5 rounded-xl border border-white/12 bg-zinc-900/45 px-2 py-1 text-[10px] text-zinc-300 sm:min-h-[2.6rem] sm:gap-2 sm:py-1.5">
+          <p className="line-clamp-2 min-h-[2.25rem] max-w-[56%] flex-1 text-left text-[10px] font-medium leading-snug text-zinc-100 sm:max-w-none sm:line-clamp-none sm:min-h-0 sm:text-center">
+            {compactActionLine}
+          </p>
+          <div className="flex shrink-0 flex-col items-end justify-center gap-0.5">
+            <div className="flex items-center gap-1 whitespace-nowrap text-[9px] text-zinc-400 tabular-nums">
+              <span>Stock {vm.stockCount}</span>
+              <span aria-hidden>·</span>
+              <span>Disc {vm.discardCount}</span>
+            </div>
+            {vaultClaimBusy ? <span className={OV2_DUEL_SETTLEMENT_BADGE}>Settlement…</span> : null}
           </div>
-          <p className="truncate text-center text-[10px] font-medium text-zinc-100">{compactActionLine}</p>
-          <div className="flex items-center gap-1 text-[9px] text-zinc-400">
-            <span>Stock {vm.stockCount}</span>
-            <span>·</span>
-            <span>Discard {vm.discardCount}</span>
-          </div>
-          {vaultClaimBusy ? <span className={OV2_DUEL_SETTLEMENT_BADGE}>Settlement…</span> : null}
         </div>
 
-        <div className="shrink-0 rounded-xl border border-cyan-300/30 bg-cyan-900/20 px-2 py-1 text-center text-[10px] font-medium text-cyan-100/90">
+        <div className="flex min-h-[2.6rem] shrink-0 items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-900/20 px-2 py-1 text-center text-[10px] font-medium leading-snug text-cyan-100/90">
           {goalStrip}
         </div>
 
-        <div className="grid shrink-0 grid-cols-2 gap-2">
+        <div className="flex w-full shrink-0 flex-row flex-nowrap gap-1.5 sm:gap-2">
           <div
-            className={`rounded-2xl border px-2.5 py-1.5 backdrop-blur-[2px] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_20px_rgba(0,0,0,0.28)] ${
+            className={`flex min-h-[2.5rem] min-w-0 flex-1 basis-0 flex-row flex-nowrap items-center gap-1.5 rounded-2xl border px-2 py-2 backdrop-blur-[2px] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_20px_rgba(0,0,0,0.28)] sm:min-h-[2.75rem] sm:px-2.5 sm:py-3 ${
               !myTurn && (vm.phase === "playing" || vm.phase === "layoff")
                 ? "border-amber-200/45 bg-gradient-to-b from-amber-200/18 to-amber-900/18 ring-1 ring-amber-200/30"
                 : "border-white/12 bg-gradient-to-b from-slate-200/12 to-slate-900/20"
             }`}
           >
-            <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">
-              <span>Opp</span>
-              {vm.phase === "playing" || vm.phase === "layoff" ? (
-                <span className="ml-1.5 font-normal normal-case tracking-normal text-slate-200/85">
-                  · {!myTurn ? "Active" : "Waiting"}
-                </span>
-              ) : null}
-            </p>
-            <p className="mt-0.5 truncate text-sm font-semibold text-slate-50">{opponentDisplayName} · {vm.opponentHandCount ?? "—"} cards</p>
-            <p className="mt-0.5 text-[10px] text-slate-300/70">Hand {vm.opponentHandCount ?? "—"} · Missed {opponentMissedTurns}</p>
+            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-slate-300/90 sm:text-[10px]">
+              Opp
+            </span>
+            {vm.phase === "playing" || vm.phase === "layoff" ? (
+              <span
+                className={`shrink-0 whitespace-nowrap rounded border px-1 py-0.5 text-[8px] font-semibold sm:text-[9px] ${
+                  !myTurn ? "border-amber-300/35 text-amber-100" : "border-white/15 text-slate-400"
+                }`}
+              >
+                {!myTurn ? "Active" : "Wait"}
+              </span>
+            ) : null}
+            <span className="min-w-0 flex-1 truncate text-[10px] font-semibold leading-snug text-slate-50 sm:text-xs">
+              {opponentDisplayName}
+            </span>
+            <span className="shrink-0 whitespace-nowrap text-[9px] tabular-nums text-slate-300/80 sm:text-[10px]">
+              C{vm.opponentHandCount ?? "—"}·M{opponentMissedTurns}
+            </span>
           </div>
           <div
-            className={`rounded-2xl border px-2.5 py-1.5 backdrop-blur-[2px] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_20px_rgba(0,0,0,0.28)] ${
+            className={`flex min-h-[2.5rem] min-w-0 flex-1 basis-0 flex-row flex-nowrap items-center gap-1.5 rounded-2xl border px-2 py-2 backdrop-blur-[2px] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_20px_rgba(0,0,0,0.28)] sm:min-h-[2.75rem] sm:px-2.5 sm:py-3 ${
               myTurn && (vm.phase === "playing" || vm.phase === "layoff")
                 ? "border-emerald-200/45 bg-gradient-to-b from-emerald-200/20 to-emerald-900/16 ring-1 ring-emerald-200/30"
                 : "border-white/12 bg-gradient-to-b from-slate-200/12 to-slate-900/20"
             }`}
           >
-            <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">
-              <span>You</span>
-              {vm.phase === "playing" || vm.phase === "layoff" ? (
-                <span className="ml-1.5 font-normal normal-case tracking-normal text-slate-100">
-                  · {myTurn ? "Active" : "Waiting"}
-                </span>
-              ) : null}
-            </p>
-            <p className="mt-0.5 truncate text-sm font-semibold text-slate-50">
-              {myDisplayName} · {vm.myHand.length} cards
-            </p>
-            <p className="mt-0.5 text-[10px] text-slate-300/70">Missed {myMissedTurns} · Table ×{vm.stakeMultiplier}</p>
+            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-slate-300/90 sm:text-[10px]">
+              You
+            </span>
+            {vm.phase === "playing" || vm.phase === "layoff" ? (
+              <span
+                className={`shrink-0 whitespace-nowrap rounded border px-1 py-0.5 text-[8px] font-semibold sm:text-[9px] ${
+                  myTurn ? "border-emerald-300/35 text-emerald-100" : "border-white/15 text-slate-400"
+                }`}
+              >
+                {myTurn ? "Active" : "Wait"}
+              </span>
+            ) : null}
+            <span className="min-w-0 flex-1 truncate text-[10px] font-semibold leading-snug text-slate-50 sm:text-xs">
+              {myDisplayName}
+            </span>
+            <span className="shrink-0 whitespace-nowrap text-[9px] tabular-nums text-slate-300/80 sm:text-[10px]">
+              C{vm.myHand.length}·M{myMissedTurns}·×{vm.stakeMultiplier}
+            </span>
           </div>
         </div>
 
-        {err ? (
-          <div className="shrink-0 rounded-md border border-red-500/25 bg-red-950/30 px-2 py-1 text-[11px] text-red-200">
-            <span>{err}</span>{" "}
-            <button type="button" className="text-red-300 underline" onClick={() => setErr("")}>
-              Dismiss
-            </button>
+        <div
+          className={`min-h-[2.75rem] shrink-0 rounded-md border px-2 py-1 text-[10px] leading-snug sm:text-[11px] ${
+            err
+              ? "border-red-500/25 bg-red-950/30 text-red-200"
+              : "border-transparent bg-transparent text-transparent [&>button]:invisible"
+          }`}
+        >
+          {err ? (
+            <>
+              <span className="text-red-200">{err}</span>{" "}
+              <button type="button" className="text-red-300 underline" onClick={() => setErr("")}>
+                Dismiss
+              </button>
+            </>
+          ) : (
+            <span className="select-none" aria-hidden>
+              &nbsp;
+            </span>
+          )}
+        </div>
+
+        {vm.phase === "playing" && myTurn && !vm.mustRespondDouble ? (
+          <div
+            className={`${OV2_DUEL_ACTION_STRIP} flex min-h-[5.25rem] shrink-0 flex-col justify-center rounded-lg border border-emerald-500/25 bg-emerald-950/20 px-2 py-2 sm:min-h-[4.75rem]`}
+          >
+            {drawPhaseMyTurn ? (
+              <>
+                <p className="mb-1.5 min-h-[1rem] text-center text-[10px] leading-snug text-emerald-100/88">
+                  Draw step — use the buttons or tap stock / discard below.
+                </p>
+                <div className="flex min-h-[2.5rem] flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busy || vm.stockCount <= 0}
+                    title={vm.stockCount <= 0 ? "Stock is empty" : "Draw from stock"}
+                    className={OV2_BTN_PRIMARY}
+                    onClick={() => void draw("stock")}
+                  >
+                    Draw from stock{typeof vm.stockCount === "number" && vm.stockCount > 0 ? ` (${vm.stockCount})` : ""}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || vm.discardTop == null}
+                    className={OV2_BTN_SECONDARY}
+                    onClick={() => void draw("discard")}
+                  >
+                    Take discard
+                  </button>
+                </div>
+              </>
+            ) : discardPhaseMyTurn ? (
+              <div className="flex min-h-[4.25rem] flex-col justify-center px-1">
+                <p className="text-center text-[10px] leading-snug text-zinc-400">
+                  Discard step — select a card in your hand. On touch screens, tap the same card again to confirm.
+                </p>
+              </div>
+            ) : (
+              <div className="flex min-h-[4.25rem] items-center justify-center px-1 text-center text-[10px] leading-snug text-zinc-500">
+                Turn updating…
+              </div>
+            )}
           </div>
         ) : null}
 
-        {vm.phase === "playing" && drawPhaseMyTurn ? (
-          <div className={`${OV2_DUEL_ACTION_STRIP} shrink-0 rounded-lg border border-emerald-500/25 bg-emerald-950/20 px-2 py-2`}>
-            <p className="mb-1.5 text-center text-[10px] text-emerald-100/88">
-              Draw step — use the buttons or tap the stock / discard on the table.
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                disabled={busy || vm.stockCount <= 0}
-                title={vm.stockCount <= 0 ? "Stock is empty" : "Draw from stock"}
-                className={OV2_BTN_PRIMARY}
-                onClick={() => void draw("stock")}
-              >
-                Draw from stock{typeof vm.stockCount === "number" && vm.stockCount > 0 ? ` (${vm.stockCount})` : ""}
-              </button>
-              <button
-                type="button"
-                disabled={busy || vm.discardTop == null}
-                className={OV2_BTN_SECONDARY}
-                onClick={() => void draw("discard")}
-              >
-                Take discard
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="relative w-full shrink-0 min-h-[min(42dvh,17rem)] rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_50%_44%,rgba(45,212,191,0.28),rgba(8,17,33,0.18)_36%,rgba(4,10,20,0.78)_82%),linear-gradient(180deg,rgba(19,34,56,0.5)_0%,rgba(6,12,24,0.82)_100%)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-16px_60px_rgba(0,0,0,0.28),0_24px_40px_rgba(0,0,0,0.35)] sm:min-h-[min(44dvh,18.5rem)] sm:p-3">
-          <div className="flex min-h-[min(40dvh,16rem)] flex-col justify-between gap-2 sm:min-h-[min(42dvh,17.5rem)]">
-            <div className="flex min-h-[min(36dvh,14rem)] flex-col rounded-2xl bg-transparent p-2 sm:min-h-[min(38dvh,15rem)]">
-              <p className="shrink-0 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">Top discard</p>
-              <div className="mt-3 flex min-h-[min(28dvh,10.5rem)] flex-1 items-center justify-center sm:mt-4 sm:min-h-[min(30dvh,11rem)]">
+        <div className="flex min-h-0 w-full flex-1 flex-col gap-1 overflow-hidden sm:gap-2">
+        <div className="relative w-full shrink-0 rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_50%_44%,rgba(45,212,191,0.28),rgba(8,17,33,0.18)_36%,rgba(4,10,20,0.78)_82%),linear-gradient(180deg,rgba(19,34,56,0.5)_0%,rgba(6,12,24,0.82)_100%)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-16px_60px_rgba(0,0,0,0.28),0_24px_40px_rgba(0,0,0,0.35)] sm:rounded-3xl sm:p-3 min-h-[10.5rem] sm:min-h-[12rem] md:min-h-[12.75rem]">
+          <div className="flex h-full min-h-[9.75rem] flex-col justify-between gap-1 sm:min-h-[11.25rem] md:min-h-[11.75rem]">
+            <div className="flex min-h-[9rem] flex-1 flex-col rounded-2xl bg-transparent p-1.5 sm:min-h-[10.5rem] sm:p-2 md:min-h-[11rem]">
+              <div className="flex shrink-0 items-start justify-between gap-2 sm:items-center">
+                <p className="min-w-0 flex-1 text-left text-[10px] font-semibold uppercase leading-tight tracking-[0.14em] text-zinc-300 sm:text-center">
+                  Top discard
+                </p>
+                <div
+                  className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] tabular-nums sm:px-2 sm:text-[11px] ${
+                    (vm.phase === "playing" || vm.phase === "layoff") &&
+                    (vm.turnSeat === vm.mySeat ||
+                      (vm.mustRespondDouble && Number(vm.pendingDouble?.responder_seat) === vm.mySeat))
+                      ? OV2_DUEL_TIMER_ACTIVE
+                      : OV2_DUEL_TIMER_IDLE
+                  }`}
+                >
+                  {(vm.phase === "playing" || vm.phase === "layoff") && vm.turnTimeLeftSec != null ? (
+                    <span>
+                      <span className="font-medium uppercase text-zinc-500">Timer</span>{" "}
+                      <span className="font-semibold text-zinc-100">~{vm.turnTimeLeftSec}s</span>
+                    </span>
+                  ) : (
+                    <span className="text-zinc-600">—</span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-1 flex min-h-[7.25rem] flex-1 items-center justify-center sm:mt-2 sm:min-h-[8.5rem] md:min-h-[9rem]">
                 <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-4">
                   <button
                     type="button"
@@ -887,7 +942,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                         <span className="block text-[11px] font-semibold tabular-nums text-zinc-200">{vm.stockCount}</span>
                       </span>
                     </span>
-                    <span className="relative aspect-[5/7] h-[min(26dvh,6.5rem)] w-auto max-h-[6.5rem] shrink-0 overflow-hidden rounded-lg border-0 bg-transparent sm:h-[9.15rem] sm:max-h-none sm:min-w-[6.55rem]">
+                    <span className="relative aspect-[5/7] h-[5.85rem] w-auto max-h-[6rem] shrink-0 overflow-hidden rounded-lg border-0 bg-transparent sm:h-[9.15rem] sm:max-h-none sm:min-w-[6.55rem]">
                       <img
                         src={MM_CARD_BACK_SRC}
                         alt=""
@@ -912,17 +967,17 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           </div>
         </div>
 
-        <div className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? `${OV2_DUEL_PANEL_HAND_ACTIVE} shadow-[0_0_30px_rgba(16,185,129,0.2)]` : ""} max-sm:-mx-1 shrink-0 rounded-[1.5rem] !border-0 bg-[linear-gradient(180deg,rgba(15,24,40,0.74)_0%,rgba(7,12,24,0.94)_100%)] px-0 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_-16px_40px_rgba(0,0,0,0.22)_inset,0_12px_28px_rgba(0,0,0,0.28)] sm:mx-0 sm:rounded-[1.75rem] sm:p-3 md:py-2`}>
+        <div className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? `${OV2_DUEL_PANEL_HAND_ACTIVE} shadow-[0_0_30px_rgba(16,185,129,0.2)]` : ""} flex min-h-0 flex-1 flex-col overflow-hidden max-sm:-mx-1 rounded-[1.5rem] !border-0 bg-[linear-gradient(180deg,rgba(15,24,40,0.74)_0%,rgba(7,12,24,0.94)_100%)] px-0 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_-16px_40px_rgba(0,0,0,0.22)_inset,0_12px_28px_rgba(0,0,0,0.28)] sm:mx-0 sm:rounded-[1.75rem] sm:py-2 sm:p-3 md:py-2`}>
           <div className="mb-1 flex items-center justify-between gap-2 px-2 sm:px-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-200">Your hand</p>
             <p className="text-[9px] text-zinc-400">{vm.myHand.length} cards</p>
           </div>
-          <p className="mb-1 min-h-[0.85rem] px-2 text-center text-[9px] font-medium leading-none text-emerald-100/90 sm:min-h-[1rem] sm:px-0 sm:text-[11px]">
-            {drawPhaseMyTurn ? "Tap stock or discard to draw" : discardPhaseMyTurn ? "Tap card, tap again to discard" : " "}
+          <p className="mb-1 min-h-[1.35rem] px-2 text-center text-[9px] font-medium leading-snug text-emerald-100/90 sm:min-h-[1.15rem] sm:px-0 sm:text-[11px]">
+            {drawPhaseMyTurn ? "Tap stock or discard to draw" : discardPhaseMyTurn ? "Tap card, tap again to discard" : "\u00a0"}
           </p>
           <div
             ref={handRowRef}
-            className="flex h-[min(5rem,26dvh)] w-full max-h-[5.25rem] items-end justify-center overflow-x-hidden overflow-y-visible px-0 pb-0.5 sm:h-[min(8.9rem,34dvh)] sm:max-h-[8.9rem] sm:px-1 md:h-[7.4rem] md:max-h-[7.4rem]"
+            className="flex h-[4.75rem] w-full max-h-[5.1rem] shrink-0 items-end justify-center overflow-x-hidden overflow-y-hidden px-0 pb-0.5 sm:h-[8.35rem] sm:max-h-[8.75rem] sm:px-1 md:h-[7.15rem] md:max-h-[7.35rem]"
           >
             {displayedHand.map((c, idx) => {
               const hid = `h-${idx}-${c}-${vm.revision}`;
@@ -1076,6 +1131,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           {handAnalysisText ? (
             <p className="mt-1 px-2 text-center text-[9px] leading-tight text-zinc-400 sm:px-0 sm:text-[10px]">{handAnalysisText}</p>
           ) : null}
+        </div>
         </div>
 
         {vm.phase === "layoff" && vm.turnSeat === vm.mySeat ? (
