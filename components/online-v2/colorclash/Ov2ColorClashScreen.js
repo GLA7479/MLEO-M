@@ -89,16 +89,16 @@ function CcSharedCardFaceInner({ card, variant }) {
   const ring = Number.isInteger(ci) && ci >= 0 && ci <= 3 ? CC_COLOR_CARD_RING[ci] : "ring-fuchsia-300/40";
   const isTop = variant === "top";
   const innerClass = isTop
-    ? `flex h-full min-h-[5.35rem] w-full flex-col justify-between rounded-lg border border-white/30 bg-black/20 px-0.5 py-0.5 text-white ring-1 sm:min-h-[6.6rem] sm:px-1 sm:py-0.5 ${ring}`
+    ? `flex h-full min-h-[6.75rem] w-full flex-col justify-between rounded-lg border border-white/30 bg-black/20 px-0.5 py-0.5 text-white ring-1 sm:min-h-[8.35rem] sm:px-1 sm:py-0.5 ${ring}`
     : `flex min-h-0 w-full flex-1 flex-col justify-between rounded-md border border-white/25 bg-black/25 p-px text-white ring-1 sm:rounded-lg sm:p-0.5 ${ring}`;
   const cornerClass = isTop
-    ? "flex items-start justify-between text-[11px] font-bold leading-none sm:text-xs"
+    ? "flex items-start justify-between text-sm font-bold leading-none sm:text-base"
     : "flex items-start justify-between text-[9px] font-bold leading-none sm:text-[10px]";
   const mainClass = isTop
-    ? "px-0.5 text-center text-xl font-black leading-none sm:text-2xl"
+    ? "px-0.5 text-center text-3xl font-black leading-none sm:text-4xl"
     : "px-px text-center text-base font-black leading-none sm:text-xl";
   const subClass = isTop
-    ? "text-center text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-[11px]"
+    ? "text-center text-xs font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-sm"
     : "text-center text-[8px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-[9px]";
 
   return (
@@ -117,7 +117,7 @@ function CcSharedCardFaceInner({ card, variant }) {
 function CcTopDiscardCardFace({ card }) {
   if (card == null || typeof card !== "object") {
     return (
-      <div className="relative z-[1] inline-flex min-h-[6.65rem] min-w-[4.75rem] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/55 text-center font-mono text-sm font-semibold text-zinc-500 sm:min-h-[8rem] sm:min-w-[5.7rem] sm:text-base">
+      <div className="relative z-[1] inline-flex min-h-[8.4rem] min-w-[6rem] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/55 text-center font-mono text-lg font-semibold text-zinc-500 sm:min-h-[10.15rem] sm:min-w-[7.15rem] sm:text-xl">
         —
       </div>
     );
@@ -127,7 +127,7 @@ function CcTopDiscardCardFace({ card }) {
   const gradientClass = colorBg ? `bg-gradient-to-b ${colorBg}` : "bg-gradient-to-b from-fuchsia-500 to-indigo-700";
   return (
     <div
-      className={`relative z-[1] inline-flex min-h-[6.65rem] min-w-[4.75rem] flex-col rounded-xl border border-white/35 px-0.5 py-0.5 sm:min-h-[8rem] sm:min-w-[5.7rem] sm:px-1 sm:py-0.5 ${gradientClass}`}
+      className={`relative z-[1] inline-flex min-h-[8.4rem] min-w-[6rem] flex-col rounded-xl border border-white/35 px-0.5 py-0.5 sm:min-h-[10.15rem] sm:min-w-[7.15rem] sm:px-1 sm:py-0.5 ${gradientClass}`}
     >
       <CcSharedCardFaceInner card={card} variant="top" />
     </div>
@@ -671,14 +671,30 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
               <p className={`text-left text-[10px] leading-tight sm:text-center ${OV2_DUEL_PANEL_LABEL}`}>
                 Top discard (match this card)
               </p>
-              <p
-                className={`min-h-[1.35rem] w-full text-center text-[8px] leading-snug sm:min-h-[1.25rem] sm:text-[9px] ${
-                  stockEmptyHint ? "text-amber-200/88" : "text-transparent"
-                }`}
-              >
-                {stockEmptyHint ? "Stock empty — play from hand; timer advances if nothing matches." : "\u00a0"}
-              </p>
             </div>
+            {/* err / turn / stock hints — floated left so the card area keeps full height */}
+            {err || turnGuidance || stockEmptyHint ? (
+              <div className="pointer-events-none absolute left-2 top-1/2 z-30 max-w-[9.25rem] -translate-y-1/2 sm:left-3 sm:max-w-[10.5rem]">
+                {err ? (
+                  <button
+                    type="button"
+                    className="pointer-events-auto w-full rounded-md border border-rose-500/25 bg-zinc-950/82 px-1.5 py-1 text-left text-[8px] leading-snug text-rose-200/95 shadow-lg backdrop-blur-[2px] sm:text-[9px]"
+                    title="Tap to clear"
+                    onClick={() => setErr("")}
+                  >
+                    <span className="line-clamp-4">{err}</span>
+                  </button>
+                ) : turnGuidance ? (
+                  <p className="rounded-md border border-white/10 bg-zinc-950/78 px-1.5 py-1 text-left text-[8px] font-medium leading-snug text-zinc-100/92 shadow-lg backdrop-blur-[2px] sm:text-[9px]">
+                    <span className="line-clamp-4">{turnGuidance}</span>
+                  </p>
+                ) : stockEmptyHint ? (
+                  <p className="rounded-md border border-amber-500/20 bg-zinc-950/78 px-1.5 py-1 text-left text-[8px] leading-snug text-amber-200/90 shadow-lg backdrop-blur-[2px] sm:text-[9px]">
+                    <span className="line-clamp-4">Stock empty — play from hand; timer advances if nothing matches.</span>
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             {/* Timer + draw/surge: out of document flow so the discard card stays vertically centered */}
             <div className="pointer-events-auto absolute right-2 top-2 z-20 flex w-[7.1rem] flex-col items-stretch gap-1 sm:right-3 sm:top-3 sm:w-[7.85rem]">
               <div
@@ -774,29 +790,6 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
             </div>
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden">
               <CcTopDiscardCardFace card={vm.topDiscard && typeof vm.topDiscard === "object" ? vm.topDiscard : null} />
-            </div>
-            <div className="flex h-[2.75rem] shrink-0 items-center justify-center px-1 sm:h-[3rem] sm:px-2">
-              {err ? (
-                <button
-                  type="button"
-                  className="line-clamp-3 max-w-[18rem] text-center text-[8px] leading-snug text-rose-300/90 sm:text-[9px]"
-                  title="Tap to clear"
-                  onClick={() => setErr("")}
-                >
-                  {err}
-                </button>
-              ) : turnGuidance ? (
-                <p className="line-clamp-3 max-w-[18rem] text-center text-[8px] font-medium leading-snug text-zinc-200/92 sm:text-[9px]">
-                  {turnGuidance}
-                </p>
-              ) : (
-                <span
-                  className="pointer-events-none line-clamp-3 max-w-[18rem] text-center text-[8px] text-transparent sm:text-[9px]"
-                  aria-hidden
-                >
-                  &nbsp;
-                </span>
-              )}
             </div>
           </div>
         </div>
