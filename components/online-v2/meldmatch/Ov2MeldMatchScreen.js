@@ -420,6 +420,12 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     const n = m && typeof m.display_name === "string" ? String(m.display_name).trim() : "";
     return n || `Seat ${oppSeat + 1}`;
   }, [members, vm.mySeat]);
+  const myDisplayName = useMemo(() => {
+    if (vm.mySeat == null) return "You";
+    const m = members.find(x => Number(x?.seat_index) === Number(vm.mySeat));
+    const n = m && typeof m.display_name === "string" ? String(m.display_name).trim() : "";
+    return n || `Seat ${vm.mySeat + 1}`;
+  }, [members, vm.mySeat]);
 
   const finishMultiplier = vm.stakeMultiplier ?? 1;
 
@@ -494,9 +500,6 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
       /* ignore */
     }
   }, [finishSessionId]);
-
-  const myColorLabel = vm.mySeat === 0 ? "Rose" : vm.mySeat === 1 ? "Amber" : "—";
-  const oppColorLabel = vm.mySeat === 0 ? "Amber" : vm.mySeat === 1 ? "Rose" : "—";
 
   const canInteractHand =
     vm.phase === "playing" &&
@@ -636,10 +639,16 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                 : "border-white/12 bg-gradient-to-b from-slate-200/12 to-slate-900/20"
             }`}
           >
-            <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">Opponent</p>
+            <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">
+              <span>Opp</span>
+              {vm.phase === "playing" || vm.phase === "layoff" ? (
+                <span className="ml-1.5 font-normal normal-case tracking-normal text-slate-200/85">
+                  · {!myTurn ? "Active" : "Waiting"}
+                </span>
+              ) : null}
+            </p>
             <p className="mt-0.5 truncate text-sm font-semibold text-slate-50">{opponentDisplayName} · {vm.opponentHandCount ?? "—"} cards</p>
-            <p className="mt-1 text-[10px] text-slate-200/85">{!myTurn && (vm.phase === "playing" || vm.phase === "layoff") ? "Active" : " "}</p>
-            <p className="mt-0.5 text-[10px] text-slate-300/70">Hand {vm.opponentHandCount ?? "—"} · Missed {opponentMissedTurns} · {oppColorLabel}</p>
+            <p className="mt-0.5 text-[10px] text-slate-300/70">Hand {vm.opponentHandCount ?? "—"} · Missed {opponentMissedTurns}</p>
           </div>
           <div
             className={`rounded-2xl border px-2.5 py-1.5 backdrop-blur-[2px] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_20px_rgba(0,0,0,0.28)] ${
@@ -648,10 +657,18 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                 : "border-white/12 bg-gradient-to-b from-slate-200/12 to-slate-900/20"
             }`}
           >
-            <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">You</p>
-            <p className="mt-0.5 truncate text-sm font-semibold text-slate-50">Seat {vm.mySeat != null ? vm.mySeat + 1 : "—"}</p>
-            <p className="mt-1 text-[10px] text-slate-100">{myTurn ? "Active" : " "}</p>
-            <p className="mt-0.5 text-[10px] text-slate-300/70">{myColorLabel} · Missed {myMissedTurns} · Table ×{vm.stakeMultiplier}</p>
+            <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">
+              <span>You</span>
+              {vm.phase === "playing" || vm.phase === "layoff" ? (
+                <span className="ml-1.5 font-normal normal-case tracking-normal text-slate-100">
+                  · {myTurn ? "Active" : "Waiting"}
+                </span>
+              ) : null}
+            </p>
+            <p className="mt-0.5 truncate text-sm font-semibold text-slate-50">
+              {myDisplayName} · {vm.myHand.length} cards
+            </p>
+            <p className="mt-0.5 text-[10px] text-slate-300/70">Missed {myMissedTurns} · Table ×{vm.stakeMultiplier}</p>
           </div>
         </div>
 
