@@ -83,7 +83,7 @@ function ccCardPresentation(card) {
 function CcTopDiscardCardFace({ card }) {
   if (card == null || typeof card !== "object") {
     return (
-      <div className="relative z-[1] inline-flex min-h-[5.65rem] min-w-[4.05rem] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/55 text-center font-mono text-xs font-semibold text-zinc-500 sm:min-h-[6.75rem] sm:min-w-[4.85rem] sm:text-sm">
+      <div className="relative z-[1] inline-flex min-h-[6.65rem] min-w-[4.75rem] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/55 text-center font-mono text-sm font-semibold text-zinc-500 sm:min-h-[8rem] sm:min-w-[5.7rem] sm:text-base">
         —
       </div>
     );
@@ -95,17 +95,17 @@ function CcTopDiscardCardFace({ card }) {
   const gradientClass = colorBg ? `bg-gradient-to-b ${colorBg}` : "bg-gradient-to-b from-fuchsia-500 to-indigo-700";
   return (
     <div
-      className={`relative z-[1] inline-flex min-h-[5.65rem] min-w-[4.05rem] flex-col rounded-xl border border-white/35 px-0.5 py-0.5 sm:min-h-[6.75rem] sm:min-w-[4.85rem] sm:px-1 sm:py-0.5 ${gradientClass}`}
+      className={`relative z-[1] inline-flex min-h-[6.65rem] min-w-[4.75rem] flex-col rounded-xl border border-white/35 px-0.5 py-0.5 sm:min-h-[8rem] sm:min-w-[5.7rem] sm:px-1 sm:py-0.5 ${gradientClass}`}
     >
       <span
-        className={`flex h-full min-h-[4.55rem] w-full flex-col justify-between rounded-lg border border-white/30 bg-black/20 px-0.5 py-0.5 text-white ring-1 sm:min-h-[5.6rem] sm:px-1 sm:py-0.5 ${ring}`}
+        className={`flex h-full min-h-[5.35rem] w-full flex-col justify-between rounded-lg border border-white/30 bg-black/20 px-0.5 py-0.5 text-white ring-1 sm:min-h-[6.6rem] sm:px-1 sm:py-0.5 ${ring}`}
       >
-        <span className="flex items-start justify-between text-[10px] font-bold leading-none sm:text-[11px]">
+        <span className="flex items-start justify-between text-[11px] font-bold leading-none sm:text-xs">
           <span className="min-w-0 truncate">{p.label}</span>
           <span className="shrink-0">{p.wild ? "★" : "●"}</span>
         </span>
-        <span className="px-0.5 text-center text-lg font-black leading-none sm:text-xl">{p.label}</span>
-        <span className="text-center text-[9px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-[10px]">
+        <span className="px-0.5 text-center text-xl font-black leading-none sm:text-2xl">{p.label}</span>
+        <span className="text-center text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-[11px]">
           {p.sub}
         </span>
       </span>
@@ -371,6 +371,25 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
     vm.phase === "playing" && vm.mySeat != null && vm.turnSeat === vm.mySeat && vm.turnPhase === "post_draw";
   const handBoardActive = vm.phase === "playing" && vm.mySeat != null && vm.turnSeat === vm.mySeat;
   const goalStrip = "Play a matching color or symbol · Draw if needed · Wild lets you choose color";
+  /** Draw/Surge/Pass/Cancel: floating column is always mounted so layout never jumps. */
+  const topStripDrawSurgeContext =
+    vm.phase === "playing" && vm.mySeat != null && handBoardActive && myTurnPlaying && !wildForCard;
+  const drawActionEnabled =
+    topStripDrawSurgeContext && !busy && !vaultClaimBusy && Number(vm.stockCount) > 0;
+  const surgeActionEnabled =
+    topStripDrawSurgeContext && !busy && !vaultClaimBusy && vm.surgeAvailableForMe === true;
+  const passActionEnabled =
+    vm.phase === "playing" &&
+    vm.mySeat != null &&
+    handBoardActive &&
+    myTurnPostDraw &&
+    !wildForCard &&
+    !busy &&
+    !vaultClaimBusy;
+  const surgeCancelArmed = topStripDrawSurgeContext && surgeTwoTapMode && surgeArmCard != null;
+  const surgeCancelEnabled = surgeCancelArmed && !busy && !vaultClaimBusy;
+  const stockEmptyHint =
+    topStripDrawSurgeContext && Number(vm.stockCount) <= 0;
 
   const wildLockForPlay = useMemo(() => {
     if (vm.wildLockAppliesToMe && vm.lockedColor != null) return vm.lockedColor;
@@ -522,18 +541,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
   const ccPlayingActionSlotInner =
     vm.phase === "playing" && vm.mySeat != null ? (
       handBoardActive ? (
-        myTurnPostDraw ? (
-          <div className="flex min-h-[4.25rem] flex-col justify-center gap-1.5">
-            <p className="text-center text-[10px] leading-snug text-violet-200/90">
-              Play a highlighted card from your draw, or pass the turn.
-            </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              <button type="button" disabled={busy} className={OV2_BTN_PRIMARY} onClick={() => void passAfterDraw()}>
-                Pass turn
-              </button>
-            </div>
-          </div>
-        ) : myTurnPlaying && wildForCard ? (
+        myTurnPlaying && wildForCard ? (
           <p className="flex min-h-[4.25rem] items-center text-center text-[10px] leading-snug text-sky-200/90">
             Tap a color below for your wild card (or Cancel there).
           </p>
@@ -637,105 +645,137 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
 
       <div className="flex min-h-0 w-full flex-1 flex-col gap-0.5 overflow-hidden sm:gap-0.5">
         <div className={`${OV2_DUEL_ACTION_GROUP} flex min-h-0 flex-1 flex-col`}>
-          <div className={`${OV2_DUEL_PANEL_TOP} flex min-h-0 flex-1 flex-col p-2 sm:p-3`}>
-            <div className="mb-1 flex shrink-0 items-start justify-between gap-2 sm:items-center">
-              <p className={`min-w-0 flex-1 text-left text-[10px] leading-tight sm:text-center ${OV2_DUEL_PANEL_LABEL}`}>
+          <div className={`${OV2_DUEL_PANEL_TOP} relative flex min-h-0 flex-1 flex-col p-2 sm:p-3`}>
+            <div className="relative z-10 mb-1 shrink-0 pr-[7.35rem] sm:pr-[8rem]">
+              <p className={`text-left text-[10px] leading-tight sm:text-center ${OV2_DUEL_PANEL_LABEL}`}>
                 Top discard (match this card)
               </p>
+              <p
+                className={`min-h-[1.35rem] w-full text-center text-[8px] leading-snug sm:min-h-[1.25rem] sm:text-[9px] ${
+                  stockEmptyHint ? "text-amber-200/88" : "text-transparent"
+                }`}
+              >
+                {stockEmptyHint ? "Stock empty — play from hand; timer advances if nothing matches." : "\u00a0"}
+              </p>
+            </div>
+            {/* Timer + draw/surge: out of document flow so the discard card stays vertically centered */}
+            <div className="pointer-events-auto absolute right-2 top-2 z-20 flex w-[7.1rem] flex-col items-stretch gap-1 sm:right-3 sm:top-3 sm:w-[7.85rem]">
               <div
-                className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] tabular-nums sm:text-[11px] ${
+                className={`w-full justify-center rounded-md border px-2 py-0.5 text-center text-[10px] tabular-nums sm:text-[11px] !animate-none !transition-none duration-0 will-change-auto ${
                   vm.phase === "playing" && vm.turnSeat === vm.mySeat ? OV2_DUEL_TIMER_ACTIVE : OV2_DUEL_TIMER_IDLE
                 }`}
               >
                 {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
-                  <span>
-                    <span className="font-medium uppercase text-zinc-500">Timer</span>{" "}
+                  <span className="inline-flex flex-col items-center leading-tight">
+                    <span className="font-medium uppercase text-zinc-500">Timer</span>
                     <span className="font-semibold text-zinc-100">~{vm.turnTimeLeftSec}s</span>
                   </span>
                 ) : (
                   <span className="text-zinc-600">—</span>
                 )}
               </div>
+              <button
+                type="button"
+                disabled={!drawActionEnabled}
+                title={
+                  !topStripDrawSurgeContext
+                    ? "Available on your turn (play phase)"
+                    : Number(vm.stockCount) <= 0
+                      ? "Stock is empty — play from your hand"
+                      : `Draw from stock (${vm.stockCount ?? 0} left)`
+                }
+                className={`${OV2_BTN_PRIMARY} w-full justify-center px-2 py-1 text-[9px] shadow-lg sm:px-2.5 sm:text-[10px]`}
+                onClick={() => {
+                  if (!drawActionEnabled) return;
+                  setSurgeTwoTapMode(false);
+                  setSurgeArmCard(null);
+                  void drawCard();
+                }}
+              >
+                Draw{vm.stockCount != null && vm.stockCount > 0 ? ` (${vm.stockCount})` : ""}
+              </button>
+              <button
+                type="button"
+                disabled={!surgeActionEnabled}
+                title={
+                  !topStripDrawSurgeContext
+                    ? "Available on your turn"
+                    : !vm.surgeAvailableForMe
+                      ? "Surge not available"
+                      : surgeTwoTapMode
+                        ? "Surge on — tap two numbers in order"
+                        : "Turn Surge on (two number cards)"
+                }
+                className={`${
+                  surgeTwoTapMode && topStripDrawSurgeContext && vm.surgeAvailableForMe ? OV2_BTN_ACCENT : OV2_BTN_SECONDARY
+                } w-full justify-center px-2 py-1 text-[9px] shadow-lg sm:px-2.5 sm:text-[10px]`}
+                onClick={() => {
+                  if (!surgeActionEnabled) return;
+                  setErr("");
+                  setSurgeArmCard(null);
+                  setSurgeTwoTapMode(s => !s);
+                }}
+              >
+                Surge {surgeTwoTapMode ? "on" : "off"}
+              </button>
+              <button
+                type="button"
+                disabled={!passActionEnabled}
+                title={
+                  passActionEnabled
+                    ? "Pass after drawing if you cannot play a drawn card"
+                    : myTurnPostDraw
+                      ? "Pass the turn"
+                      : "Available after you draw — play a drawn card or pass"
+                }
+                className={`${OV2_BTN_SECONDARY} w-full justify-center px-2 py-1 text-[9px] shadow-lg sm:px-2.5 sm:text-[10px]`}
+                onClick={() => {
+                  if (!passActionEnabled) return;
+                  void passAfterDraw();
+                }}
+              >
+                Pass turn
+              </button>
+              <button
+                type="button"
+                disabled={!surgeCancelEnabled}
+                title="Clear first Surge tap"
+                className={`${OV2_BTN_SECONDARY} min-h-[1.75rem] w-full justify-center px-2 py-1 text-[9px] shadow-lg sm:min-h-[1.85rem] sm:px-2.5 sm:text-[10px] ${
+                  surgeCancelArmed ? "" : "pointer-events-none invisible"
+                }`}
+                onClick={() => {
+                  if (!surgeCancelEnabled) return;
+                  setSurgeArmCard(null);
+                }}
+              >
+                ×1st
+              </button>
             </div>
-            {vm.phase === "playing" && vm.mySeat != null && handBoardActive && myTurnPlaying && !wildForCard ? (
-              <div className="mb-2 flex w-full flex-shrink-0 flex-col items-stretch gap-1.5 px-0.5 sm:mb-2 sm:px-1">
-                <p className="text-center text-[8px] font-medium leading-tight text-zinc-500 sm:text-[9px]">
-                  Your turn — draw or play a card
-                </p>
-                <div className="mx-auto flex w-full max-w-[13rem] flex-col gap-1.5">
-                  <button
-                    type="button"
-                    disabled={busy || vm.stockCount <= 0}
-                    title={vm.stockCount <= 0 ? "Stock is empty — play from your hand" : "Draw from stock"}
-                    className={`${OV2_BTN_PRIMARY} w-full justify-center`}
-                    onClick={() => {
-                      setSurgeTwoTapMode(false);
-                      setSurgeArmCard(null);
-                      void drawCard();
-                    }}
-                  >
-                    Draw card{vm.stockCount != null && vm.stockCount > 0 ? ` (${vm.stockCount})` : ""}
-                  </button>
-                  {vm.surgeAvailableForMe ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className={`${surgeTwoTapMode ? OV2_BTN_ACCENT : OV2_BTN_SECONDARY} w-full justify-center`}
-                      onClick={() => {
-                        setErr("");
-                        setSurgeArmCard(null);
-                        setSurgeTwoTapMode(s => !s);
-                      }}
-                    >
-                      Surge {surgeTwoTapMode ? "on" : "off"}
-                    </button>
-                  ) : null}
-                  {surgeTwoTapMode && surgeArmCard ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className={`${OV2_BTN_SECONDARY} w-full justify-center`}
-                      onClick={() => {
-                        setSurgeArmCard(null);
-                      }}
-                    >
-                      Cancel 1st
-                    </button>
-                  ) : null}
-                </div>
-                <p
-                  className={`min-h-[1.5rem] text-center text-[9px] leading-snug sm:text-[10px] ${
-                    vm.stockCount <= 0 ? "text-amber-200/88" : "text-transparent"
-                  }`}
-                >
-                  {vm.stockCount <= 0
-                    ? "Stock is empty — play from your hand. If nothing matches, the turn timer will advance."
-                    : "\u00a0"}
-                </p>
-              </div>
-            ) : null}
-            <div className="mt-1 flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden sm:mt-2">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden">
               <CcTopDiscardCardFace card={vm.topDiscard && typeof vm.topDiscard === "object" ? vm.topDiscard : null} />
+            </div>
+            <div className="flex h-[2.75rem] shrink-0 items-center justify-center px-1 sm:h-[3rem] sm:px-2">
+              {err ? (
+                <button
+                  type="button"
+                  className="line-clamp-3 max-w-[18rem] text-center text-[8px] leading-snug text-rose-300/90 sm:text-[9px]"
+                  title="Tap to clear"
+                  onClick={() => setErr("")}
+                >
+                  {err}
+                </button>
+              ) : (
+                <span
+                  className="pointer-events-none line-clamp-3 max-w-[18rem] text-center text-[8px] text-transparent sm:text-[9px]"
+                  aria-hidden
+                >
+                  &nbsp;
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        <div
-          className={`shrink-0 rounded-md text-[10px] leading-snug sm:text-[11px] ${
-            err
-              ? "min-h-[2.75rem] border border-red-500/20 bg-red-950/20 px-2 py-1.5 text-red-200/95"
-              : "pointer-events-none min-h-0 border-0 bg-transparent p-0 text-transparent [&>button]:hidden"
-          }`}
-        >
-          {err ? (
-            <>
-              <span className="text-red-200/95">{err}</span>{" "}
-              <button type="button" className="text-red-300 underline" onClick={() => setErr("")}>
-                Dismiss
-              </button>
-            </>
-          ) : null}
-        </div>
         {turnGuidance ? (
           <div className="flex min-h-[2.75rem] shrink-0 items-center justify-center rounded-md border border-white/10 bg-zinc-900/45 px-2 py-1 text-center text-[10px] font-medium leading-snug text-zinc-100 sm:min-h-[2.5rem] sm:py-1.5 sm:text-[11px]">
             {turnGuidance}
@@ -771,10 +811,10 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
         ) : null}
 
         <div
-          className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? OV2_DUEL_PANEL_HAND_ACTIVE : ""} flex min-h-[11rem] shrink-0 flex-1 flex-col overflow-hidden p-1.5 sm:min-h-[15rem] sm:p-2 md:p-3`}
+          className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? OV2_DUEL_PANEL_HAND_ACTIVE : ""} flex min-h-[11rem] flex-1 flex-col overflow-hidden p-1.5 sm:min-h-[15rem] sm:p-2 md:p-3`}
         >
           <p className={`mb-0.5 shrink-0 text-center text-[10px] ${OV2_DUEL_PANEL_LABEL}`}>Your hand</p>
-          <div className="flex min-h-[7.35rem] flex-1 flex-wrap content-center justify-center gap-1 overflow-x-hidden overflow-y-auto overscroll-y-contain sm:min-h-[11.25rem] sm:gap-2">
+          <div className="flex min-h-0 flex-1 flex-wrap content-center justify-center gap-1 overflow-x-hidden overflow-y-auto overscroll-y-contain sm:gap-2">
             {vm.myHand.map((card, idx) => {
               const key = `${idx}-${ccStableCardKey(card)}`;
               const showingHit = handCardHitKey === key;
