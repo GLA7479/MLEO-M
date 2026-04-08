@@ -76,7 +76,7 @@ function MmCardFace({ cardId, large = false }) {
   const ui = mmCardUi(cardId);
   return (
     <div
-      className={`flex h-full w-full flex-col rounded-[1rem] border border-zinc-400/70 bg-[linear-gradient(165deg,#ffffff_0%,#f7f3ea_52%,#ece7dc_100%)] px-2 py-1 text-zinc-900 shadow-[0_12px_24px_rgba(0,0,0,0.35)] ${large ? "min-h-[6.4rem] min-w-[4.4rem] sm:min-h-[7.8rem] sm:min-w-[5.2rem]" : ""}`}
+      className={`flex h-full w-full flex-col rounded-[1rem] border border-zinc-400/70 bg-[linear-gradient(165deg,#ffffff_0%,#f7f3ea_52%,#ece7dc_100%)] px-2 py-1 text-zinc-900 shadow-[0_12px_24px_rgba(0,0,0,0.35)] ${large ? "min-h-[5.8rem] min-w-[4rem] sm:min-h-[7rem] sm:min-w-[4.7rem]" : ""}`}
       title={`${ui.rank} of ${ui.suitName}`}
     >
       <span className={`flex w-full items-start justify-between text-[clamp(11px,2.8vw,14px)] font-bold ${ui.red ? "text-rose-600" : "text-zinc-900"}`}>
@@ -506,6 +506,12 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           </div>
         </div>
 
+        {!myTurn && (vm.phase === "playing" || vm.phase === "layoff") ? (
+          <div className="shrink-0 rounded-lg border border-slate-200/25 bg-slate-100/10 px-2 py-1 text-center text-[10px] font-medium text-slate-100">
+            Waiting for opponent
+          </div>
+        ) : null}
+
         {err ? (
           <div className="shrink-0 rounded-md border border-red-500/25 bg-red-950/30 px-2 py-1 text-[11px] text-red-200">
             <span>{err}</span>{" "}
@@ -519,12 +525,12 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           <div className="flex h-full flex-col justify-between gap-2">
             <div className="rounded-2xl bg-zinc-900/18 p-2">
               <p className="text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">Top discard</p>
-              <div className="mt-2 flex items-center justify-center gap-2 sm:gap-4">
+              <div className="mt-8 flex min-h-[10.5rem] w-full items-center justify-center gap-2 sm:mt-4 sm:min-h-[8.2rem] sm:gap-4">
                 <button
                   type="button"
                   disabled={!drawPhaseMyTurn || busy || vm.stockCount <= 0}
                   onClick={() => void draw("stock")}
-                  className="inline-flex h-[5.4rem] w-[3.6rem] flex-col items-center justify-center rounded-2xl border border-slate-200/25 bg-gradient-to-b from-slate-700/95 to-slate-900 text-[10px] font-semibold text-slate-100 shadow-[0_10px_18px_rgba(0,0,0,0.4)] transition enabled:hover:-translate-y-1 enabled:hover:brightness-110 disabled:opacity-45 sm:h-[6.6rem] sm:w-[4.4rem]"
+                  className="inline-flex h-[5.4rem] w-[3.6rem] flex-col items-center justify-center rounded-2xl border border-slate-200/25 bg-gradient-to-b from-slate-700/95 to-slate-900 text-[10px] font-semibold text-slate-100 shadow-[0_10px_18px_rgba(0,0,0,0.4)] transition enabled:hover:-translate-y-1 enabled:hover:brightness-110 disabled:opacity-70 sm:h-[6.6rem] sm:w-[4.4rem]"
                 >
                   <span>Stock</span>
                   <span className="mt-1 text-[11px] text-zinc-200">{vm.stockCount}</span>
@@ -533,14 +539,13 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                   type="button"
                   disabled={!drawPhaseMyTurn || busy || vm.discardTop == null}
                   onClick={() => void draw("discard")}
-                  className={`${OV2_DUEL_TOP_CARD_AURA} inline-flex rounded-2xl transition enabled:hover:-translate-y-1 disabled:opacity-45`}
+                  className={`${OV2_DUEL_TOP_CARD_AURA} inline-flex rounded-2xl transition enabled:hover:-translate-y-1 disabled:opacity-70`}
                 >
                   <div className={`${OV2_DUEL_TOP_CARD_FACE} rounded-[1.05rem] border border-zinc-300/50 bg-transparent p-0 font-semibold text-zinc-900 [text-shadow:none] ${topCardPulse ? "ring-2 ring-emerald-300/55 shadow-[0_0_34px_rgba(45,212,191,0.45),0_12px_22px_rgba(0,0,0,0.38)]" : "shadow-[0_12px_22px_rgba(0,0,0,0.38)]"}`}>
                     <MmCardFace cardId={vm.discardTop ?? null} large />
                   </div>
                 </button>
               </div>
-              {drawPhaseMyTurn ? <p className="mt-2 text-center text-[11px] font-medium text-emerald-100">Tap stock or discard to draw</p> : null}
             </div>
 
             {discardPhaseMyTurn ? (
@@ -563,6 +568,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-200">Your hand</p>
             <p className="text-[10px] text-zinc-400">{vm.myHand.length} cards</p>
           </div>
+          {drawPhaseMyTurn ? <p className="mb-1 text-center text-[11px] font-medium text-emerald-100">Tap stock or discard to draw</p> : null}
           <div className="flex items-end justify-center gap-0 overflow-hidden px-0.5 pb-1" style={{ "--mm-hand-count": Math.max(1, vm.myHand.length) }}>
             {vm.myHand.map((c, idx) => {
               const hid = `h-${idx}-${c}-${vm.revision}`;
@@ -604,7 +610,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                 className={`${OV2_DUEL_HAND_PILL_BASE} first:ml-0 min-h-[max(62px,14vw)] md:min-h-[72px] rounded-[0.95rem] border border-zinc-400/65 bg-[linear-gradient(165deg,#ffffff_0%,#f7f3ea_52%,#ece7dc_100%)] px-1.5 py-1 md:py-0.5 text-zinc-900 shadow-[0_16px_28px_rgba(0,0,0,0.5)] transition-transform duration-150 hover:-translate-y-2 hover:scale-[1.05] active:scale-[0.98] ${showingHit ? `${OV2_DUEL_HAND_HIT} -translate-y-2 scale-[1.04]` : ""} ${
                   canInteractHand || (vm.phase === "layoff" && vm.turnSeat === vm.mySeat)
                     ? "ring-1 ring-sky-400/30"
-                    : "opacity-45 grayscale"
+                    : "opacity-75"
                 } ${map?.kind === "meld" ? "ring-2 ring-emerald-400/55" : map?.kind === "deadwood" ? "ring-2 ring-amber-400/55" : ""}`}
                 style={{
                   width: `min(72px, max(38px, calc((100vw - 18px) / var(--mm-hand-count) + 9px)))`,
@@ -687,7 +693,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           </div>
         ) : null}
 
-        <div className="mt-1 flex shrink-0 flex-col gap-1 border-t border-white/[0.08] pt-1 text-[9px] text-zinc-500 sm:text-[10px]">
+        <div className="mt-1 flex shrink-0 flex-col gap-1 border-t border-white/[0.12] pt-1 text-[9px] text-zinc-400 sm:text-[10px]">
           <div className="flex items-stretch gap-2">
             <button
               type="button"
