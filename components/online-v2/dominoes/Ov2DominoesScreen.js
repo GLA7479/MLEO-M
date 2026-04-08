@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import {
@@ -15,6 +15,13 @@ import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
 
 const finishDismissStorageKey = sid => `ov2_dom_finish_dismiss_${sid}`;
 
+/** Fit-to-width math: hand tiles (vertical) + board line (horizontal), no scroll */
+const DOM_HAND_BASE_W_REM = 2.8;
+const DOM_HAND_BASE_H_REM = 4.4;
+const DOM_HAND_GAP_PX = 4;
+const DOM_BOARD_TILE_NATURAL_PX = 90;
+const DOM_BOARD_GAP_PX = 4;
+
 /** Same tokens as `Ov2FourLineScreen` — finish modal + rematch actions stay visually aligned with FL. */
 const BTN_PRIMARY =
   "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
@@ -27,8 +34,13 @@ const BTN_DANGER =
 const T_OP = "transition-opacity duration-150 ease-out";
 const T_TF = "transition-[opacity,transform] duration-150 ease-out";
 
-function PipDots({ n, compact }) {
+/** @param {{ n: unknown, pipSize?: "hand" | "line" }} props */
+function PipDots({ n, pipSize = "hand" }) {
   const v = Math.min(6, Math.max(0, Math.floor(Number(n) || 0)));
+  const dim =
+    pipSize === "line"
+      ? "h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12"
+      : "h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11";
   const patterns = {
     0: [],
     1: [[0.5, 0.5]],
@@ -64,9 +76,8 @@ function PipDots({ n, compact }) {
     ],
   };
   const pts = patterns[v] || [];
-  const sz = compact ? 36 : 44;
   return (
-    <svg width={sz} height={sz} viewBox="0 0 1 1" className="shrink-0 text-zinc-900">
+    <svg viewBox="0 0 1 1" className={`shrink-0 text-zinc-900 ${dim}`}>
       <rect x="0.04" y="0.04" width="0.92" height="0.92" rx="0.06" fill="currentColor" className="text-[#f5f0e8]" />
       {pts.map(([x, y], i) => (
         <circle key={i} cx={x} cy={y} r="0.07" className="fill-zinc-900/88" />
@@ -76,20 +87,21 @@ function PipDots({ n, compact }) {
 }
 
 function DominoFace({ a, b, vertical }) {
+  const pip = vertical ? "hand" : "line";
   if (vertical) {
     return (
-      <div className="flex flex-col items-center justify-center gap-0.5 rounded-md border border-black/20 bg-[#faf6ef] px-1 py-1 shadow-inner">
-        <PipDots n={a} compact />
+      <div className="flex flex-col items-center justify-center gap-0.5 rounded-md border border-black/20 bg-[#faf6ef] px-1 py-1 shadow-inner sm:gap-1 sm:px-1.5 sm:py-1.5">
+        <PipDots n={a} pipSize={pip} />
         <div className="h-px w-[80%] bg-black/25" />
-        <PipDots n={b} compact />
+        <PipDots n={b} pipSize={pip} />
       </div>
     );
   }
   return (
-    <div className="flex flex-row items-center justify-center gap-1 rounded-md border border-black/20 bg-[#faf6ef] px-1 py-1 shadow-inner">
-      <PipDots n={a} compact />
+    <div className="flex flex-row items-center justify-center gap-1 rounded-md border border-black/20 bg-[#faf6ef] px-1 py-1 shadow-inner sm:gap-1.5 sm:px-1.5 sm:py-1.5">
+      <PipDots n={a} pipSize={pip} />
       <div className="h-[70%] w-px bg-black/25" />
-      <PipDots n={b} compact />
+      <PipDots n={b} pipSize={pip} />
     </div>
   );
 }
@@ -178,6 +190,9 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
   const [localReaction, setLocalReaction] = useState("");
   const autoStartDoneRef = useRef(/** @type {string} */ (""));
   const doubleAlertPlayedRef = useRef(false);
+  const handRowMeasureRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+  const boardRowMeasureRef = useRef(/** @type {HTMLDivElement | null} */ (null));
+  const [rowWidths, setRowWidths] = useState(/** @type {{ hand: number; board: number }} */ ({ hand: 0, board: 0 }));
 
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
@@ -191,6 +206,27 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
   useEffect(() => {
     setFinishModalDismissedSessionId("");
   }, [vm.sessionId]);
+
+  useLayoutEffect(() => {
+    const handEl = handRowMeasureRef.current;
+    const boardEl = boardRowMeasureRef.current;
+    if (!handEl && !boardEl) return;
+    const ro = new ResizeObserver(entries => {
+      setRowWidths(prev => {
+        let hand = prev.hand;
+        let board = prev.board;
+        for (const e of entries) {
+          const w = e.contentRect.width;
+          if (handEl && e.target === handEl) hand = w;
+          if (boardEl && e.target === boardEl) board = w;
+        }
+        return { hand, board };
+      });
+    });
+    if (handEl) ro.observe(handEl);
+    if (boardEl) ro.observe(boardEl);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     doubleAlertPlayedRef.current = false;
@@ -605,10 +641,41 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
   const showBottomActions =
     vm.phase === "playing" && vm.mySeat === vm.turnSeat && !vm.mustRespondDouble;
 
+  const handTilePx = useMemo(() => {
+    const rem =
+      typeof document !== "undefined" ? Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16 : 16;
+    const baseW = DOM_HAND_BASE_W_REM * rem;
+    const baseH = DOM_HAND_BASE_H_REM * rem;
+    const n = vm.myHand.length;
+    if (n <= 0) return { w: baseW, h: baseH };
+    const wAvail = rowWidths.hand;
+    if (wAvail <= 8) return { w: baseW, h: baseH };
+    const inner = Math.max(0, wAvail - 6);
+    const raw = (inner - (n - 1) * DOM_HAND_GAP_PX) / n;
+    const clampedW = Math.min(baseW, Math.max(18, raw));
+    const h = clampedW * (DOM_HAND_BASE_H_REM / DOM_HAND_BASE_W_REM);
+    return { w: clampedW, h: Math.min(baseH, Math.max(28, h)) };
+  }, [vm.myHand.length, rowWidths.hand]);
+
+  const boardSegPx = useMemo(() => {
+    const n = vm.line.length;
+    if (n <= 0) return { segW: DOM_BOARD_TILE_NATURAL_PX, scale: 1, rowH: 56 };
+    const wAvail = rowWidths.board;
+    if (wAvail <= 8) return { segW: DOM_BOARD_TILE_NATURAL_PX, scale: 1, rowH: 56 };
+    const inner = wAvail * 0.96;
+    const raw = (inner - (n - 1) * DOM_BOARD_GAP_PX) / n;
+    const segW = Math.max(18, Math.min(DOM_BOARD_TILE_NATURAL_PX, raw));
+    const scale = segW / DOM_BOARD_TILE_NATURAL_PX;
+    return { segW, scale, rowH: 56 * scale };
+  }, [vm.line.length, rowWidths.board]);
+
   const passToastVisible = Boolean(passToast.trim());
 
   const renderBoard = () => (
-    <div className="relative flex h-full w-full max-w-full items-center justify-center overflow-hidden px-1">
+    <div
+      ref={boardRowMeasureRef}
+      className="relative flex h-full w-full max-w-full items-center justify-center overflow-hidden px-1"
+    >
       <span
         className={`pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] text-zinc-500 ${T_OP} ${
           vm.line.length === 0 ? "opacity-100" : "opacity-0"
@@ -616,20 +683,27 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
       >
         Empty — first tile sets the line.
       </span>
-      <div className={`relative flex max-h-full max-w-full flex-wrap items-center justify-center gap-1 overflow-hidden ${T_OP} ${vm.line.length === 0 ? "opacity-0" : "opacity-100"}`}>
+      <div className={`relative flex max-h-full min-h-0 w-full max-w-full items-center ${T_OP} ${vm.line.length === 0 ? "opacity-0" : "opacity-100"}`}>
         <div
           className={`pointer-events-none absolute left-0 top-1/2 z-10 h-12 w-2 -translate-y-1/2 rounded-full bg-gradient-to-r from-sky-400/50 to-transparent blur-[1px] animate-ov2-dom-endpoint-glow ${T_OP} ${
             needSidePick && lineOpens && vm.line.length > 0 ? "opacity-100" : "opacity-0"
           }`}
           aria-hidden
         />
-        <div className="flex max-w-full flex-wrap items-center justify-center gap-1">
+        <div
+          className="flex max-h-full min-h-0 w-full min-w-0 max-w-full flex-nowrap items-center justify-center gap-1 overflow-hidden py-0.5"
+          style={{ minHeight: boardSegPx.rowH }}
+        >
           {vm.line.map((seg, i) => {
             const lo = Math.floor(Number(seg?.lo));
             const hi = Math.floor(Number(seg?.hi));
             return (
-              <div key={i} className="flex items-center justify-center">
-                <div className="scale-110">
+              <div
+                key={i}
+                className="flex shrink-0 items-center justify-center overflow-hidden"
+                style={{ width: boardSegPx.segW, height: boardSegPx.rowH }}
+              >
+                <div style={{ transform: `scale(${boardSegPx.scale})`, transformOrigin: "center center" }}>
                   <DominoFace a={lo} b={hi} vertical={false} />
                 </div>
               </div>
@@ -658,7 +732,6 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
         vm.mySeat !== vm.turnSeat ||
         vm.mustRespondDouble ||
         !vm.canClientPlayTiles;
-      const selectable = !disabled && vm.phase === "playing";
       const shake = shakeIdx === idx;
       const place = placeAnimIdx === idx;
       return (
@@ -667,7 +740,8 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
           type="button"
           disabled={disabled}
           onClick={() => void onTileClick(idx)}
-          className={`flex h-[4.4rem] w-[2.8rem] shrink-0 items-center justify-center overflow-visible rounded-sm bg-white p-0 ring-offset-2 ring-offset-[#0b0f14] ${T_TF} ${
+          style={{ width: handTilePx.w, height: handTilePx.h }}
+          className={`flex shrink-0 items-center justify-center overflow-visible rounded-sm bg-white p-0 ring-offset-2 ring-offset-[#0b0f14] ${T_TF} ${
             sel ? "ring-2 ring-sky-500/90" : "ring-0"
           } ${shake ? "animate-ov2-dom-shake" : ""} ${place ? "animate-ov2-dom-place" : ""} disabled:opacity-40`}
         >
@@ -676,33 +750,40 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
       );
     });
 
-  const renderPlayButtons = () => (
-    <>
+  const handActionBtnBase =
+    "inline-flex min-h-0 min-w-0 basis-0 flex-1 items-center justify-center rounded-md border border-white/10 bg-zinc-900 px-1 py-0 text-center text-[10px] font-medium leading-tight tracking-wide text-zinc-200 transition-opacity disabled:opacity-45 sm:rounded-lg sm:px-1.5 sm:text-[11px] h-8 sm:h-9";
+
+  const renderHandActionRow = () => (
+    <div className="flex w-full min-w-0 shrink-0 items-stretch gap-0.5 sm:gap-1">
       <button
         type="button"
         disabled={busy || !needSidePick}
-        className={`flex-1 h-9 rounded-lg border border-white/10 bg-zinc-900 px-2 text-[12px] font-medium tracking-wide text-zinc-200 transition-opacity disabled:opacity-45 ${T_OP} ${
-          needSidePick ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
+        title="Play left"
+        className={handActionBtnBase}
         onClick={() => void playSelected("left")}
       >
-        Play left
+        <span className="block min-w-0 max-w-full truncate">Play left</span>
       </button>
       <button
         type="button"
         disabled={busy || !needSidePick}
-        className={`flex-1 h-9 rounded-lg border border-white/10 bg-zinc-900 px-2 text-[12px] font-medium tracking-wide text-zinc-200 transition-opacity disabled:opacity-45 ${T_OP} ${
-          needSidePick ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
+        title="Play right"
+        className={handActionBtnBase}
         onClick={() => void playSelected("right")}
       >
-        Play right
+        <span className="block min-w-0 max-w-full truncate">Play right</span>
       </button>
-    </>
+      <button type="button" disabled={busy || !showBottomActions} className={handActionBtnBase} onClick={() => void onDrawOne()}>
+        Draw
+      </button>
+      <button type="button" disabled={busy || !showBottomActions} className={handActionBtnBase} onClick={() => void onPassTurn()}>
+        Pass
+      </button>
+    </div>
   );
 
   return (
-    <div className="h-screen w-full flex flex-col overflow-hidden bg-[#0b0f14]">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#0b0f14]">
       <Ov2SharedStakeDoubleModal
         open={doubleModalActive}
         proposedMult={vm.pendingDouble?.proposed_mult}
@@ -712,10 +793,10 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
         onDecline={() => void respondDouble(false)}
       />
 
-      {/* Main layout: no page scroll, no inner scroll */}
+      {/* Main layout: no page scroll; tile size fits row width (ResizeObserver) */}
       <div className={`flex min-h-0 flex-1 flex-col overflow-hidden ${doubleModalActive ? "pointer-events-none select-none" : ""}`}>
-        <div className="shrink-0 px-2 pt-2 pb-1">
-          <div className="relative rounded-xl border border-white/[0.08] bg-zinc-950/50 px-2 py-1.5">
+        <div className="shrink-0 px-2 pb-0 pt-1">
+          <div className="relative rounded-xl border border-white/[0.08] bg-zinc-950/50 px-2 py-1">
             {(() => {
               const time = vm.phase === "playing" && vm.turnTimeLeftSec != null ? Number(vm.turnTimeLeftSec) : null;
               const cls =
@@ -730,7 +811,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
                 <div className={`absolute right-2 top-2 text-[11px] font-semibold tabular-nums ${cls}`}>{time != null ? `${time}s` : "—"}</div>
               );
             })()}
-            <div className="flex min-h-[1.75rem] items-center justify-between gap-1">
+            <div className="flex min-h-[1.5rem] items-center justify-between gap-1">
               <p className="text-[11px] font-bold tracking-tight text-zinc-100">Dominoes</p>
               <div className="flex items-center gap-1">
                 <div className="flex gap-1">
@@ -738,7 +819,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
                     <button
                       key={emoji}
                       type="button"
-                      className="h-7 min-w-[1.75rem] rounded-md border border-white/10 bg-zinc-900/80 text-sm leading-none transition-colors hover:bg-zinc-800"
+                      className="h-6 min-w-[1.625rem] rounded-md border border-white/10 bg-zinc-900/80 text-sm leading-none transition-colors hover:bg-zinc-800 sm:h-7 sm:min-w-[1.75rem]"
                       onClick={() => {
                         setLocalReaction(emoji);
                         window.setTimeout(() => setLocalReaction(""), 1400);
@@ -754,27 +835,27 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
             <div className={`pointer-events-none fixed left-1/2 top-24 z-30 -translate-x-1/2 ${T_OP} ${localReaction ? "opacity-100" : "opacity-0"}`} aria-hidden>
               <span className="animate-ov2-dom-float-up block text-3xl">{localReaction || " "}</span>
             </div>
-            <div className="mt-1 grid grid-cols-2 gap-1">
+            <div className="mt-0.5 grid grid-cols-2 gap-1">
               <div
-                className={`flex min-h-[3.25rem] items-center justify-center rounded-xl border p-1 ${T_TF} ${
+                className={`flex min-h-[2.35rem] items-center justify-center rounded-lg border p-0.5 sm:min-h-[2.65rem] sm:rounded-xl sm:p-1 ${T_TF} ${
                   myTurnPlaying
                     ? "border-amber-400/70 bg-amber-950/50 shadow-[0_0_0_2px_rgba(251,191,36,0.35)] animate-ov2-dom-seat-pulse"
                     : "border-white/[0.12] bg-zinc-950/65 opacity-70"
                 }`}
               >
-                <span className="text-[11px] font-semibold tracking-wide text-zinc-100">YOU</span>
+                <span className="text-[10px] font-semibold tracking-wide text-zinc-100 sm:text-[11px]">YOU</span>
               </div>
               <div
-                className={`flex min-h-[3.25rem] items-center justify-center rounded-xl border p-1 ${T_TF} ${
+                className={`flex min-h-[2.35rem] items-center justify-center rounded-lg border p-0.5 sm:min-h-[2.65rem] sm:rounded-xl sm:p-1 ${T_TF} ${
                   oppTurnPlaying
                     ? "border-amber-400/70 bg-amber-950/50 shadow-[0_0_0_2px_rgba(251,191,36,0.35)] animate-ov2-dom-seat-pulse"
                     : "border-white/[0.12] bg-zinc-950/65 opacity-70"
                 }`}
               >
-                <span className="text-[11px] font-semibold tracking-wide text-zinc-100">OPPONENT</span>
+                <span className="text-[10px] font-semibold tracking-wide text-zinc-100 sm:text-[11px]">OPPONENT</span>
               </div>
             </div>
-            <div className="mt-1 flex items-center justify-between gap-1">
+            <div className="mt-0.5 flex items-center justify-between gap-1">
               <button
                 type="button"
                 disabled={exitBusy || !pk || doubleModalActive}
@@ -788,10 +869,10 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
           </div>
         </div>
 
-        <div className="shrink-0 px-2">
+        <div className={`shrink-0 px-2 ${passToastVisible ? "min-h-0" : "pointer-events-none h-0 overflow-hidden p-0 opacity-0"}`}>
           <div
-            className={`h-8 rounded-lg border px-2 py-1 text-center text-[10px] font-medium leading-tight ${T_OP} ${
-              passToastVisible ? "border-white/20 bg-zinc-900/70 text-zinc-100 opacity-100" : "border-transparent bg-transparent text-transparent opacity-0"
+            className={`rounded-lg border px-2 py-1 text-center text-[10px] font-medium leading-tight ${T_OP} ${
+              passToastVisible ? "min-h-[1.75rem] border-white/20 bg-zinc-900/70 text-zinc-100 opacity-100" : "border-0 bg-transparent py-0 text-transparent"
             }`}
             aria-live="polite"
           >
@@ -799,38 +880,27 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden px-2">
-          <div className="flex h-[110px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10">
+        <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden px-2 pt-0.5">
+          <div className="flex min-h-[9rem] flex-[1.55] basis-0 flex-col items-stretch justify-center overflow-hidden rounded-xl border border-white/10 sm:min-h-[10.5rem] md:min-h-[11.5rem]">
             {renderBoard()}
           </div>
 
-          <div className="flex h-[120px] min-h-0 shrink-0 flex-col justify-between overflow-hidden rounded-xl border border-white/10 p-1">
-            <div className="flex min-h-0 flex-1 flex-wrap items-center justify-center gap-1 overflow-hidden">{renderTiles()}</div>
-            <div className="flex h-9 shrink-0 items-center justify-center gap-1">{renderPlayButtons()}</div>
+          <div className="mt-0.5 flex min-h-[8.25rem] flex-1 basis-0 flex-col justify-between overflow-hidden rounded-xl border border-white/10 p-1 sm:min-h-[9.25rem]">
+            <div
+              ref={handRowMeasureRef}
+              className="flex min-h-0 min-w-0 flex-1 flex-nowrap items-center justify-center gap-1 overflow-hidden py-0.5"
+            >
+              {renderTiles()}
+            </div>
+            {renderHandActionRow()}
           </div>
         </div>
 
-        <div className="flex h-[56px] shrink-0 items-center gap-1 px-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1">
-          <button
-            type="button"
-            disabled={busy || !showBottomActions}
-            className="flex-1 h-9 rounded-lg border border-white/10 bg-zinc-900 px-2 text-[12px] font-medium tracking-wide text-zinc-200 transition-opacity disabled:opacity-45"
-            onClick={() => void onDrawOne()}
-          >
-            Draw
-          </button>
-          <button
-            type="button"
-            disabled={busy || !showBottomActions}
-            className="flex-1 h-9 rounded-lg border border-white/10 bg-zinc-900 px-2 text-[12px] font-medium tracking-wide text-zinc-200 transition-opacity disabled:opacity-45"
-            onClick={() => void onPassTurn()}
-          >
-            Pass
-          </button>
+        <div className="flex min-h-[3.25rem] shrink-0 items-center gap-1 px-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-0.5">
           <button
             type="button"
             disabled={busy || !showBottomActions || !vm.canOfferDouble}
-            className={`flex-1 h-9 rounded-lg border border-white/10 bg-zinc-900 px-2 text-[12px] font-medium tracking-wide text-zinc-200 transition-opacity disabled:opacity-45 ${T_OP} ${
+            className={`w-full max-w-md flex-1 h-9 rounded-lg border border-white/10 bg-zinc-900 px-2 text-[12px] font-medium tracking-wide text-zinc-200 transition-opacity disabled:opacity-45 ${T_OP} ${
               vm.canOfferDouble ? "opacity-100" : "pointer-events-none opacity-40"
             }`}
             onClick={() => void offerDouble()}
