@@ -78,6 +78,7 @@ function MmCardFace({ cardId, large = false }) {
     <div
       className={`flex h-full w-full flex-col rounded-[1rem] border border-zinc-400/70 bg-[linear-gradient(165deg,#ffffff_0%,#f7f3ea_52%,#ece7dc_100%)] px-2 py-1 text-zinc-900 shadow-[0_12px_24px_rgba(0,0,0,0.35)] ${large ? "min-h-[5.8rem] min-w-[4rem] sm:min-h-[7rem] sm:min-w-[4.7rem]" : ""}`}
       title={`${ui.rank} of ${ui.suitName}`}
+      aria-label={`${ui.rank} of ${ui.suitName}`}
     >
       <span className={`flex w-full items-start justify-between text-[clamp(11px,2.8vw,14px)] font-bold ${ui.red ? "text-rose-600" : "text-zinc-900"}`}>
         <span>{ui.rank}</span>
@@ -138,6 +139,9 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
   const [layoffMeldPick, setLayoffMeldPick] = useState(0);
   /** Delayed press + bounce on hand tile (discard / layoff) */
   const [handCardHitKey, setHandCardHitKey] = useState(/** @type {string|null} */ (null));
+  /** Mobile-first: first tap selects, second tap confirms discard */
+  const [selectedHandCardKey, setSelectedHandCardKey] = useState(/** @type {string|null} */ (null));
+  const [coarsePointer, setCoarsePointer] = useState(false);
 
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
@@ -150,7 +154,21 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     setFinishModalDismissedSessionId("");
     setFinishPanelOpen(false);
     setHandCardHitKey(null);
+    setSelectedHandCardKey(null);
   }, [vm.sessionId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(pointer: coarse)");
+    const sync = () => setCoarsePointer(mq.matches);
+    sync();
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", sync);
+      return () => mq.removeEventListener("change", sync);
+    }
+    mq.addListener(sync);
+    return () => mq.removeListener(sync);
+  }, []);
 
   useEffect(() => {
     if (vm.phase !== "layoff") setLayoffAssignments([]);
@@ -385,6 +403,9 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     !vm.mustRespondDouble &&
     !busy &&
     !vaultClaimBusy;
+  useEffect(() => {
+    if (!canInteractHand) setSelectedHandCardKey(null);
+  }, [canInteractHand]);
   const handBoardActive =
     (vm.phase === "playing" && vm.mySeat != null && vm.turnSeat === vm.mySeat) ||
     (vm.phase === "layoff" && vm.mySeat != null && vm.turnSeat === vm.mySeat);
@@ -394,10 +415,10 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     if (vm.phase === "finished") return "Round complete";
     if (vm.mustRespondDouble) return "Opponent asked to increase table stake. Accept or decline.";
     if (vm.phase === "layoff") {
-      return myTurn ? "Add cards to the revealed melds, then confirm scoring." : "Waiting for opponent to finish layoffs.";
+      return myTurn ? "Add cards to the revealed melds, then confirm scoring." : "";
     }
     if (vm.phase !== "playing") return "Waiting for round to start";
-    if (!myTurn) return "Waiting for opponent";
+    if (!myTurn) return "";
     if (vm.turnPhase === "draw") return "Draw from stock or discard.";
     if (vm.turnPhase === "discard") {
       if (vm.myHand.length === 11 && finishSuggestion) return "Your hand is ready. Finish now or discard one card.";
@@ -447,6 +468,9 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     !vaultClaimBusy;
   const myMissedTurns = vm.mySeat != null ? vm.missedStreakBySeat[vm.mySeat] ?? 0 : 0;
   const opponentMissedTurns = vm.mySeat === 0 ? vm.missedStreakBySeat[1] ?? 0 : vm.mySeat === 1 ? vm.missedStreakBySeat[0] ?? 0 : 0;
+  const handCount = Math.max(1, vm.myHand.length);
+  const handCardWidth = `min(74px, max(40px, calc((100vw - 22px) / ${handCount} + 10px)))`;
+  const handOverlap = `max(-12px, calc(-1 * (${handCount} - 7) * 1.2px))`;
   return (
     <div className="relative flex h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_52%,rgba(45,212,191,0.23),rgba(15,23,42,0.34)_42%,rgba(6,11,22,0.95)_76%),radial-gradient(circle_at_50%_20%,rgba(125,211,252,0.13),transparent_40%),linear-gradient(180deg,#162235_0%,#0c1626_55%,#070f1e_100%)] px-1 pb-[max(6px,env(safe-area-inset-bottom))] pt-[max(4px,env(safe-area-inset-top))] sm:h-full sm:px-2 sm:pb-2 sm:pt-2">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_38%),radial-gradient(circle_at_50%_50%,transparent_58%,rgba(3,7,16,0.55)_100%)]" />
@@ -489,7 +513,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           >
             <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">Opponent</p>
             <p className="mt-0.5 truncate text-sm font-semibold text-slate-50">{opponentDisplayName} · {vm.opponentHandCount ?? "—"} cards</p>
-            <p className="mt-1 text-[10px] text-slate-200/85">{!myTurn && (vm.phase === "playing" || vm.phase === "layoff") ? "Active" : "Waiting"}</p>
+            <p className="mt-1 text-[10px] text-slate-200/85">{!myTurn && (vm.phase === "playing" || vm.phase === "layoff") ? "Active" : ""}</p>
             <p className="mt-0.5 text-[10px] text-slate-300/70">Hand {vm.opponentHandCount ?? "—"} · Missed {opponentMissedTurns} · {oppColorLabel}</p>
           </div>
           <div
@@ -501,16 +525,10 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           >
             <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">You</p>
             <p className="mt-0.5 truncate text-sm font-semibold text-slate-50">Seat {vm.mySeat != null ? vm.mySeat + 1 : "—"}</p>
-            <p className="mt-1 text-[10px] text-slate-100">{myTurn ? "Active" : "Waiting"}</p>
+            <p className="mt-1 text-[10px] text-slate-100">{myTurn ? "Active" : ""}</p>
             <p className="mt-0.5 text-[10px] text-slate-300/70">{myColorLabel} · Missed {myMissedTurns} · Table ×{vm.stakeMultiplier}</p>
           </div>
         </div>
-
-        {!myTurn && (vm.phase === "playing" || vm.phase === "layoff") ? (
-          <div className="shrink-0 rounded-lg border border-slate-200/25 bg-slate-100/10 px-2 py-1 text-center text-[10px] font-medium text-slate-100">
-            Waiting for opponent
-          </div>
-        ) : null}
 
         {err ? (
           <div className="shrink-0 rounded-md border border-red-500/25 bg-red-950/30 px-2 py-1 text-[11px] text-red-200">
@@ -530,7 +548,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                   type="button"
                   disabled={!drawPhaseMyTurn || busy || vm.stockCount <= 0}
                   onClick={() => void draw("stock")}
-                  className="inline-flex h-[5.4rem] w-[3.6rem] flex-col items-center justify-center rounded-2xl border border-slate-200/25 bg-gradient-to-b from-slate-700/95 to-slate-900 text-[10px] font-semibold text-slate-100 shadow-[0_10px_18px_rgba(0,0,0,0.4)] transition enabled:hover:-translate-y-1 enabled:hover:brightness-110 disabled:opacity-70 sm:h-[6.6rem] sm:w-[4.4rem]"
+                  className="inline-flex h-[5.2rem] w-[3.45rem] flex-col items-center justify-center rounded-2xl border border-slate-200/25 bg-gradient-to-b from-slate-700/95 to-slate-900 text-[10px] font-semibold text-slate-100 opacity-85 shadow-[0_8px_14px_rgba(0,0,0,0.33)] transition enabled:hover:-translate-y-1 enabled:hover:brightness-110 disabled:opacity-70 sm:h-[6.2rem] sm:w-[4.1rem]"
                 >
                   <span>Stock</span>
                   <span className="mt-1 text-[11px] text-zinc-200">{vm.stockCount}</span>
@@ -541,7 +559,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                   onClick={() => void draw("discard")}
                   className={`${OV2_DUEL_TOP_CARD_AURA} inline-flex rounded-2xl transition enabled:hover:-translate-y-1 disabled:opacity-70`}
                 >
-                  <div className={`${OV2_DUEL_TOP_CARD_FACE} rounded-[1.05rem] border border-zinc-300/50 bg-transparent p-0 font-semibold text-zinc-900 [text-shadow:none] ${topCardPulse ? "ring-2 ring-emerald-300/55 shadow-[0_0_34px_rgba(45,212,191,0.45),0_12px_22px_rgba(0,0,0,0.38)]" : "shadow-[0_12px_22px_rgba(0,0,0,0.38)]"}`}>
+                  <div className={`${OV2_DUEL_TOP_CARD_FACE} rounded-[1.05rem] border border-zinc-300/50 bg-transparent p-0 font-semibold text-zinc-900 [text-shadow:none] ${topCardPulse ? "ring-2 ring-emerald-300/55 shadow-[0_0_34px_rgba(45,212,191,0.45),0_10px_18px_rgba(0,0,0,0.34)]" : "shadow-[0_10px_18px_rgba(0,0,0,0.34)]"}`}>
                     <MmCardFace cardId={vm.discardTop ?? null} large />
                   </div>
                 </button>
@@ -569,18 +587,25 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
             <p className="text-[10px] text-zinc-400">{vm.myHand.length} cards</p>
           </div>
           {drawPhaseMyTurn ? <p className="mb-1 text-center text-[11px] font-medium text-emerald-100">Tap stock or discard to draw</p> : null}
-          <div className="flex items-end justify-center gap-0 overflow-hidden px-0.5 pb-1" style={{ "--mm-hand-count": Math.max(1, vm.myHand.length) }}>
+          <div className="flex h-[7.8rem] items-end justify-center gap-0 overflow-hidden px-0.5 pb-1 sm:h-[8.2rem] md:h-[7.1rem]">
             {vm.myHand.map((c, idx) => {
               const hid = `h-${idx}-${c}-${vm.revision}`;
               const showingHit = handCardHitKey === hid;
               const ui = mmCardUi(c);
               const map = finishMapByCard[c];
+              const selected = selectedHandCardKey === hid;
               return (
               <button
                 key={hid}
                 type="button"
                 disabled={!canInteractHand && !(vm.phase === "layoff" && vm.turnSeat === vm.mySeat)}
                 onClick={() => {
+                  if (coarsePointer && canInteractHand) {
+                    if (selectedHandCardKey !== hid) {
+                      setSelectedHandCardKey(hid);
+                      return;
+                    }
+                  }
                   if (vm.phase === "layoff" && vm.turnSeat === vm.mySeat) {
                     void onLayoffAddCard(c);
                     void (async () => {
@@ -594,6 +619,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                   if (canInteractHand) {
                     void (async () => {
                       const p = onCardDiscard(c);
+                      setSelectedHandCardKey(null);
                       await new Promise(r => setTimeout(r, OV2_DUEL_HAND_HIT_DELAY_MS));
                       playOv2DuelCardTap();
                       setHandCardHitKey(hid);
@@ -607,17 +633,18 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                     })();
                   }
                 }}
-                className={`${OV2_DUEL_HAND_PILL_BASE} first:ml-0 min-h-[max(62px,14vw)] md:min-h-[72px] rounded-[0.95rem] border border-zinc-400/65 bg-[linear-gradient(165deg,#ffffff_0%,#f7f3ea_52%,#ece7dc_100%)] px-1.5 py-1 md:py-0.5 text-zinc-900 shadow-[0_16px_28px_rgba(0,0,0,0.5)] transition-transform duration-150 hover:-translate-y-2 hover:scale-[1.05] active:scale-[0.98] ${showingHit ? `${OV2_DUEL_HAND_HIT} -translate-y-2 scale-[1.04]` : ""} ${
+                className={`${OV2_DUEL_HAND_PILL_BASE} first:ml-0 min-h-[max(62px,14vw)] md:min-h-[72px] rounded-[0.95rem] border border-zinc-400/65 bg-[linear-gradient(165deg,#ffffff_0%,#f7f3ea_52%,#ece7dc_100%)] px-1.5 py-1 md:py-0.5 text-zinc-900 shadow-[0_16px_28px_rgba(0,0,0,0.5)] transition-transform duration-150 hover:-translate-y-2 hover:scale-[1.05] active:scale-[0.98] ${selected ? "-translate-y-3 scale-[1.05] ring-2 ring-sky-300/55 shadow-[0_20px_32px_rgba(0,0,0,0.54)]" : ""} ${showingHit ? `${OV2_DUEL_HAND_HIT} -translate-y-2 scale-[1.04]` : ""} ${
                   canInteractHand || (vm.phase === "layoff" && vm.turnSeat === vm.mySeat)
                     ? "ring-1 ring-sky-400/30"
                     : "opacity-75"
                 } ${map?.kind === "meld" ? "ring-2 ring-emerald-400/55" : map?.kind === "deadwood" ? "ring-2 ring-amber-400/55" : ""}`}
                 style={{
-                  width: `min(72px, max(38px, calc((100vw - 18px) / var(--mm-hand-count) + 9px)))`,
-                  marginLeft: idx === 0 ? "0px" : "max(-11px, calc(-1 * (var(--mm-hand-count) - 7) * 1.4px))",
-                  transform: `translateY(${Math.abs(idx - (vm.myHand.length - 1) / 2) * 0.45}px) rotate(${(idx - (vm.myHand.length - 1) / 2) * 0.75}deg)`,
+                  width: handCardWidth,
+                  marginLeft: idx === 0 ? "0px" : handOverlap,
+                  transform: `${selected ? "translateY(-10px) " : ""}translateY(${Math.abs(idx - (vm.myHand.length - 1) / 2) * 0.32}px) rotate(${(idx - (vm.myHand.length - 1) / 2) * 0.55}deg)`,
                 }}
                 title={`${ui.rank} of ${ui.suitName}`}
+                aria-label={`${ui.rank} of ${ui.suitName}`}
               >
                 <MmCardFace cardId={c} />
                 {map?.kind === "meld" ? <span className="mt-0.5 block text-center text-[8px] font-semibold uppercase tracking-wide text-emerald-700">Meld {map.group}</span> : null}
