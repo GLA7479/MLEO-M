@@ -20,7 +20,8 @@ const finishDismissStorageKey = sid => `ov2_dom_finish_dismiss_${sid}`;
 const DOM_HAND_BASE_W_REM = 2.8;
 const DOM_HAND_BASE_H_REM = 4.4;
 const DOM_HAND_GAP_PX = 4;
-const DOM_BOARD_VERT_H_OVER_W = DOM_HAND_BASE_H_REM / DOM_HAND_BASE_W_REM;
+/** Lying board tile long / short (hW/hH). 2 = two square halves like a real domino. */
+const DOM_BOARD_LAYING_LONG_OVER_SHORT = 2;
 /** Along-row (X) and after-bridge spacing between segment blocks (see placeMixedSnake). */
 const DOM_BOARD_GAP_PX = 0;
 /** Guess for greedy H-run length (long side along X). */
@@ -43,6 +44,10 @@ const DOM_BOARD_BRIDGE_NUDGE_AFTER_RTL_PX = 0;
  * 1 = full short-end corner; ~0.3 keeps a slight corner without jumping all the way to the edge.
  */
 const DOM_BOARD_BRIDGE_JOINT_PULL = 0.32;
+/** Standing tiles only — after **LTR** row (pivot on the right). + = right. */
+const DOM_BOARD_STANDING_SHIFT_X_AFTER_LTR_PX = 4;
+/** Standing tiles only — after **RTL** row (pivot on the left). Opposite of LTR so both corners can align. */
+const DOM_BOARD_STANDING_SHIFT_X_AFTER_RTL_PX = -4;
 
 /**
  * Alternate horizontal runs and vertical bridges until all tiles are consumed.
@@ -133,7 +138,8 @@ function placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToVGap,
       const jointX = prevLtr
         ? lastHLeft + half + half * pull
         : lastHLeft + half - half * pull;
-      const bridgeLeft = jointX - vW / 2 + nudgeX;
+      const standingShiftX = prevLtr ? DOM_BOARD_STANDING_SHIFT_X_AFTER_LTR_PX : DOM_BOARD_STANDING_SHIFT_X_AFTER_RTL_PX;
+      const bridgeLeft = jointX - vW / 2 + nudgeX + standingShiftX;
       const vTopStart = yBelowLastHoriz + hToVGap;
       const vCount = seg.count;
       for (let j = 0; j < vCount; j++) {
@@ -183,7 +189,7 @@ function PipDots({ n, pipSize = "hand" }) {
     pipSize === "line"
       ? "h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12"
       : pipSize === "board"
-        ? "h-[1.45rem] w-[1.45rem] sm:h-6 sm:w-6 md:h-7 md:w-7"
+        ? ""
         : "h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11";
   const patterns = {
     0: [],
@@ -221,8 +227,17 @@ function PipDots({ n, pipSize = "hand" }) {
   };
   const pts = patterns[v] || [];
   const pr = pipSize === "board" ? "0.082" : "0.07";
+  const boardFill = pipSize === "board";
   return (
-    <svg viewBox="0 0 1 1" className={`shrink-0 text-zinc-900 ${dim}`}>
+    <svg
+      viewBox="0 0 1 1"
+      preserveAspectRatio="xMidYMid meet"
+      className={
+        boardFill
+          ? "h-full w-full min-h-0 min-w-0 max-h-full max-w-full shrink text-zinc-900"
+          : `shrink-0 text-zinc-900 ${dim}`
+      }
+    >
       <rect x="0.04" y="0.04" width="0.92" height="0.92" rx="0.06" fill="currentColor" className="text-[#f5f0e8]" />
       {pts.map(([x, y], i) => (
         <circle key={i} cx={x} cy={y} r={pr} className="fill-zinc-900/88" />
@@ -240,25 +255,42 @@ function DominoFace({ a, b, vertical, flipHoriz, pipSize: pipSizeProp }) {
       <div
         className={
           boardLine
-            ? "flex h-full min-h-0 w-full min-w-0 max-h-full max-w-full flex-col items-center justify-center gap-px rounded-md border border-black/20 bg-[#faf6ef] px-0.5 py-0.5 shadow-inner"
+            ? "flex h-full min-h-0 w-full min-w-0 max-h-full max-w-full flex-col items-stretch gap-px rounded-md border border-black/20 bg-[#faf6ef] px-0.5 py-0.5 shadow-inner"
             : "flex flex-col items-center justify-center gap-0.5 rounded-md border border-black/20 bg-[#faf6ef] px-1 py-1 shadow-inner sm:gap-1 sm:px-1.5 sm:py-1.5"
         }
       >
-        <PipDots n={a} pipSize={pip} />
-        <div className="h-px w-[82%] bg-black/25" />
-        <PipDots n={b} pipSize={pip} />
+        {boardLine ? (
+          <>
+            <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-px">
+              <PipDots n={a} pipSize={pip} />
+            </div>
+            <div className="h-px w-[82%] shrink-0 self-center bg-black/25" />
+            <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-px">
+              <PipDots n={b} pipSize={pip} />
+            </div>
+          </>
+        ) : (
+          <>
+            <PipDots n={a} pipSize={pip} />
+            <div className="h-px w-[82%] bg-black/25" />
+            <PipDots n={b} pipSize={pip} />
+          </>
+        )}
       </div>
     );
   }
   const leftPip = flipHoriz ? b : a;
   const rightPip = flipHoriz ? a : b;
   if (pip === "board") {
-    /** Same outer padding/gap as standing board tile so long↔long sizes match when cells are hW×hH vs hH×hW. */
     return (
-      <div className="flex h-full min-h-0 w-full min-w-0 max-h-full max-w-full flex-row items-center justify-center gap-px rounded-md border border-black/20 bg-[#faf6ef] px-0.5 py-0.5 shadow-inner">
-        <PipDots n={leftPip} pipSize={pip} />
-        <div className="h-[82%] w-px shrink-0 bg-black/25" />
-        <PipDots n={rightPip} pipSize={pip} />
+      <div className="flex h-full min-h-0 w-full min-w-0 max-h-full max-w-full flex-row items-stretch gap-px rounded-md border border-black/20 bg-[#faf6ef] px-0.5 py-0.5 shadow-inner">
+        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-px">
+          <PipDots n={leftPip} pipSize={pip} />
+        </div>
+        <div className="w-px shrink-0 self-stretch bg-black/25" />
+        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden p-px">
+          <PipDots n={rightPip} pipSize={pip} />
+        </div>
       </div>
     );
   }
@@ -833,7 +865,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
     const gap = DOM_BOARD_GAP_PX;
     if (n <= 0) {
       const hW = Math.min(48, capHW);
-      const hH = hW / DOM_BOARD_VERT_H_OVER_W;
+      const hH = hW / DOM_BOARD_LAYING_LONG_OVER_SHORT;
       return {
         segments: /** @type {{ kind: 'h' | 'v'; count: number }[]} */ ([]),
         placements: /** @type {{ left: number; top: number; w: number; h: number; vertical: boolean; flipHoriz?: boolean }[]} */ ([]),
@@ -858,7 +890,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
     const maxK = Math.max(1, ...horizLens);
 
     let hW = Math.max(24, Math.min(capHW, (innerW - (maxK - 1) * gap) / maxK));
-    let hH = hW / DOM_BOARD_VERT_H_OVER_W;
+    let hH = hW / DOM_BOARD_LAYING_LONG_OVER_SHORT;
     let vW = hH;
     let vH = hW;
 
@@ -872,7 +904,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
     if (spanW > innerW * 0.97 && spanW > 0) {
       const f = (innerW * 0.96) / spanW;
       hW = Math.max(22, hW * f);
-      hH = hW / DOM_BOARD_VERT_H_OVER_W;
+      hH = hW / DOM_BOARD_LAYING_LONG_OVER_SHORT;
       vW = hH;
       vH = hW;
       geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
@@ -883,7 +915,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
     if (spanH > innerH * 0.96 && spanH > 0) {
       const f = (innerH * 0.94) / spanH;
       hW = Math.max(20, hW * f);
-      hH = hW / DOM_BOARD_VERT_H_OVER_W;
+      hH = hW / DOM_BOARD_LAYING_LONG_OVER_SHORT;
       vW = hH;
       vH = hW;
       geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
@@ -892,7 +924,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
       if (spanW > innerW * 0.97 && spanW > 0) {
         const f2 = (innerW * 0.96) / spanW;
         hW = Math.max(20, hW * f2);
-        hH = hW / DOM_BOARD_VERT_H_OVER_W;
+        hH = hW / DOM_BOARD_LAYING_LONG_OVER_SHORT;
         vW = hH;
         vH = hW;
         geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
@@ -907,7 +939,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
     let guard = 0;
     while (geom.maxR - geom.minL > maxSpan && maxSpan > 0 && hW > 18 && guard < 14) {
       hW = Math.max(18, hW * (maxSpan / (geom.maxR - geom.minL)) * 0.99);
-      hH = hW / DOM_BOARD_VERT_H_OVER_W;
+      hH = hW / DOM_BOARD_LAYING_LONG_OVER_SHORT;
       vW = hH;
       vH = hW;
       geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
@@ -920,13 +952,45 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
     let guardV = 0;
     while (geom.maxB - geom.minT > maxSpanH && maxSpanH > 0 && hW > 18 && guardV < 14) {
       hW = Math.max(18, hW * (maxSpanH / (geom.maxB - geom.minT)) * 0.99);
-      hH = hW / DOM_BOARD_VERT_H_OVER_W;
+      hH = hW / DOM_BOARD_LAYING_LONG_OVER_SHORT;
       vW = hH;
       vH = hW;
       geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
       spanW = geom.contentW;
       spanH = geom.contentH;
       guardV++;
+    }
+
+    /** Integer 2:1 tiles + one final placement — avoids float drift and Math.round gaps between neighbours. */
+    hH = Math.max(9, Math.round(hW / DOM_BOARD_LAYING_LONG_OVER_SHORT));
+    hW = Math.max(18, hH * DOM_BOARD_LAYING_LONG_OVER_SHORT);
+    vW = hH;
+    vH = hW;
+    geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
+    spanW = geom.contentW;
+    spanH = geom.contentH;
+
+    let guardSnap = 0;
+    while (geom.maxR - geom.minL > maxSpan && maxSpan > 0 && hH > 9 && guardSnap < 28) {
+      hH -= 1;
+      hW = hH * DOM_BOARD_LAYING_LONG_OVER_SHORT;
+      vW = hH;
+      vH = hW;
+      geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
+      spanW = geom.contentW;
+      spanH = geom.contentH;
+      guardSnap++;
+    }
+    guardSnap = 0;
+    while (geom.maxB - geom.minT > maxSpanH && maxSpanH > 0 && hH > 9 && guardSnap < 28) {
+      hH -= 1;
+      hW = hH * DOM_BOARD_LAYING_LONG_OVER_SHORT;
+      vW = hH;
+      vH = hW;
+      geom = placeMixedSnake(segments, innerW, innerH, hW, hH, vW, vH, gap, hToV, vStack);
+      spanW = geom.contentW;
+      spanH = geom.contentH;
+      guardSnap++;
     }
 
     /** Keep chain anchored from center — nudge only so bbox stays inside (no full re-center). */
@@ -936,8 +1000,8 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
     let shiftY = pad - geom.minT;
     if (geom.maxB + shiftY > innerH - pad) shiftY = innerH - pad - geom.maxB;
     const placements = geom.placements.map(p => ({
-      left: Math.round(p.left + shiftX),
-      top: Math.round(p.top + shiftY),
+      left: p.left + shiftX,
+      top: p.top + shiftY,
       w: p.w,
       h: p.h,
       vertical: p.vertical,
