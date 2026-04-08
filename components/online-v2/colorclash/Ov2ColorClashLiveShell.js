@@ -374,23 +374,19 @@ export default function Ov2ColorClashLiveShell() {
             <section className="border-b border-white/[0.05] py-2.5 first:pt-0 last:border-b-0 last:pb-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Rules</p>
               <p className="mt-1.5 text-zinc-400/95">
-                Match color or number on the top card, or play a wild and pick the next match color. Skip, reverse, draw-two,
-                and wild draw four follow the v1 action rules (reverse acts like skip with two players). First to empty their
-                hand wins the pot.
+                Play a card that matches color or symbol. Wild cards let you choose the next color.
               </p>
             </section>
             <section className="border-b border-white/[0.05] py-2.5 last:border-b-0 last:pb-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Turns</p>
               <p className="mt-1.5 text-zinc-400/95">
-                Draw one card or play one legal card. If you draw, you may play that card immediately or pass. About 30
-                seconds per turn; three misses in a row removes you from the round.
+                If you cannot play, draw. After drawing you can play that drawn card or pass. About 30 seconds per turn.
               </p>
             </section>
             <section className="py-2.5 last:pb-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">After the result</p>
               <p className="mt-1.5 text-zinc-400/95">
-                Settlement runs automatically. Rematch, then the host starts the next match and players re-commit stakes in
-                the lobby.
+                Settlement is automatic. Request rematch, then host starts the next match.
               </p>
             </section>
           </div>

@@ -79,6 +79,65 @@ module.exports = {
           "0%": { opacity: "1" },
           "100%": { opacity: "0" },
         },
+        /** Color Clash + MeldMatch duel HUD — scoped polish */
+        ov2DuelOppGlow: {
+          "0%": {
+            boxShadow:
+              "inset 0 0 0 1px rgba(251,191,36,0.12), 0 0 6px rgba(251,191,36,0.06)",
+          },
+          "100%": {
+            boxShadow:
+              "inset 0 0 0 1px rgba(251,191,36,0.22), 0 0 14px rgba(251,191,36,0.2)",
+          },
+        },
+        ov2DuelTimerPulse: {
+          "0%, 100%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.05)" },
+        },
+        ov2DuelHandSnap: {
+          "0%": { transform: "translateY(-2px)" },
+          "100%": { transform: "translateY(0)" },
+        },
+        /** Duel pair — lead card: float + scale 1.35 + slow shadow “breath” */
+        ov2DuelTopCardHero: {
+          "0%, 100%": {
+            transform: "translateY(0) scale(1.35)",
+            boxShadow:
+              "0 24px 64px rgba(0,0,0,0.72), 0 14px 44px rgba(16,185,129,0.32), inset 0 0 22px rgba(16,185,129,0.1)",
+          },
+          "50%": {
+            transform: "translateY(-3px) scale(1.35)",
+            boxShadow:
+              "0 28px 72px rgba(0,0,0,0.76), 0 20px 56px rgba(16,185,129,0.45), inset 0 0 30px rgba(16,185,129,0.16)",
+          },
+        },
+        /** Hand hit: sharp press 0.94, snap back — 240ms total */
+        ov2DuelHandHit: {
+          "0%, 14%": { transform: "scale(1)", filter: "brightness(1)" },
+          "22%": {
+            transform: "scale(0.94)",
+            filter: "brightness(1.52) drop-shadow(0 0 14px rgba(255,255,255,0.38))",
+          },
+          "48%": { transform: "scale(1)", filter: "brightness(1)" },
+          "100%": { transform: "scale(1)", filter: "brightness(1)" },
+        },
+        ov2DuelRevealFade: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        ov2DuelCardFlash: {
+          "0%": { filter: "brightness(1)" },
+          "55%": { filter: "brightness(1.55)" },
+          "100%": { filter: "brightness(1)" },
+        },
+        ov2DuelCardSuccess: {
+          "0%": { filter: "brightness(1)", boxShadow: "0 0 0 0 rgba(16,185,129,0)" },
+          "50%": {
+            filter: "brightness(1.32)",
+            boxShadow: "0 0 22px rgba(16,185,129,0.72)",
+          },
+          "100%": { filter: "brightness(1)", boxShadow: "0 0 0 0 rgba(16,185,129,0)" },
+        },
       },
       animation: {
         "qf-coin-wobble": "qfCoinWobble 0.55s ease-in-out infinite",
@@ -96,6 +155,14 @@ module.exports = {
         "ov2-dom-draw-bounce": "ov2DomDrawBounce 0.5s cubic-bezier(0.34, 1.45, 0.64, 1) both",
         "ov2-dom-float-up": "ov2DomFloatUp 1.35s ease-out forwards",
         "fade-out": "fadeOutToast 1.15s ease-out 0.05s forwards",
+        "ov2-duel-opp-glow": "ov2DuelOppGlow 1.2s ease-in-out infinite alternate",
+        "ov2-duel-timer-pulse": "ov2DuelTimerPulse 1.2s ease-in-out infinite",
+        "ov2-duel-hand-snap": "ov2DuelHandSnap 0.18s ease-out both",
+        "ov2-duel-top-card-hero": "ov2DuelTopCardHero 2.8s ease-in-out infinite",
+        "ov2-duel-hand-hit": "ov2DuelHandHit 0.24s cubic-bezier(0.2,0.85,0.28,1) both",
+        "ov2-duel-reveal-fade": "ov2DuelRevealFade 0.12s ease-out both",
+        "ov2-duel-card-flash": "ov2DuelCardFlash 0.07s linear both",
+        "ov2-duel-card-success": "ov2DuelCardSuccess 0.075s linear both",
       },
     },
   },

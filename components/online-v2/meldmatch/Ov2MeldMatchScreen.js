@@ -6,19 +6,90 @@ import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { mmFormatCard, mmSuggestFinishFromHand11 } from "../../../lib/online-v2/meldmatch/ov2MeldMatchCards";
 import { useOv2MeldMatchSession } from "../../../hooks/useOv2MeldMatchSession";
+import {
+  OV2_DUEL_HAND_HIT_CLEAR_MS,
+  OV2_DUEL_HAND_HIT_DELAY_MS,
+  playOv2DuelCardTap,
+  playOv2DuelInvalid,
+  playOv2DuelSuccess,
+} from "../../../lib/online-v2/ov2DuelPairUiSounds";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
+import {
+  OV2_BTN_ACCENT,
+  OV2_BTN_DANGER,
+  OV2_BTN_PRIMARY,
+  OV2_BTN_SECONDARY,
+  OV2_CALLOUT_VIOLET,
+  OV2_DUEL_CHIP_METRIC,
+  OV2_DUEL_HAND_PILL_BASE,
+  OV2_DUEL_HAND_PILL_DISABLED,
+  OV2_DUEL_HAND_PILL_ENABLED,
+  OV2_DUEL_HAND_HIT,
+  OV2_DUEL_HUD_BAR,
+  OV2_DUEL_ACTION_STRIP,
+  OV2_DUEL_LAYOFF_MELD_BTN_BASE,
+  OV2_DUEL_LAYOFF_MELD_IDLE,
+  OV2_DUEL_LAYOFF_MELD_SELECTED,
+  OV2_DUEL_PANEL_HAND,
+  OV2_DUEL_PANEL_HAND_ACTIVE,
+  OV2_DUEL_PANEL_LABEL,
+  OV2_DUEL_PANEL_TOP,
+  OV2_DUEL_TOP_CARD_AURA,
+  OV2_DUEL_TOP_CARD_FACE,
+  OV2_DUEL_SETTLEMENT_BADGE,
+  OV2_DUEL_TIMER_ACTIVE,
+  OV2_DUEL_TIMER_IDLE,
+  OV2_REVEALED_HAND_PANEL,
+} from "../tokens/ov2DuelPairUiTokens";
 
 const finishDismissStorageKey = sid => `ov2_mm_finish_dismiss_${sid}`;
+const MM_SUIT_SYMBOL = ["♠", "♥", "♦", "♣"];
+const MM_SUIT_TEXT = ["Spades", "Hearts", "Diamonds", "Clubs"];
+const MM_RANK_TEXT = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
-const BTN_PRIMARY =
-  "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
-const BTN_SECONDARY =
-  "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98]";
-const BTN_ACCENT =
-  "rounded-lg border border-sky-500/24 bg-gradient-to-b from-sky-950/60 to-sky-950 px-3 py-2 text-[11px] font-semibold text-sky-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
-const BTN_DANGER =
-  "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+function mmCardUi(cardId) {
+  const n = Math.floor(Number(cardId));
+  if (!Number.isFinite(n) || n < 0 || n > 51) return { rank: "?", suit: "?", suitName: "Unknown", red: false };
+  const rank = n % 13;
+  const suit = Math.floor(n / 13);
+  const sym = MM_SUIT_SYMBOL[suit] ?? "?";
+  return {
+    rank: MM_RANK_TEXT[rank] ?? "?",
+    suit: sym,
+    suitName: MM_SUIT_TEXT[suit] ?? "Unknown",
+    red: suit === 1 || suit === 2,
+  };
+}
+
+/**
+ * @param {{ cardId: number|null|undefined, large?: boolean }} props
+ */
+function MmCardFace({ cardId, large = false }) {
+  if (cardId == null) {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-zinc-500">
+        —
+      </div>
+    );
+  }
+  const ui = mmCardUi(cardId);
+  return (
+    <div
+      className={`flex h-full w-full flex-col rounded-[1rem] border border-zinc-400/70 bg-[linear-gradient(165deg,#ffffff_0%,#f7f3ea_52%,#ece7dc_100%)] px-2 py-1 text-zinc-900 shadow-[0_12px_24px_rgba(0,0,0,0.35)] ${large ? "min-h-[6.4rem] min-w-[4.4rem] sm:min-h-[7.8rem] sm:min-w-[5.2rem]" : ""}`}
+      title={`${ui.rank} of ${ui.suitName}`}
+    >
+      <span className={`flex w-full items-start justify-between text-[clamp(11px,2.8vw,14px)] font-bold ${ui.red ? "text-rose-600" : "text-zinc-900"}`}>
+        <span>{ui.rank}</span>
+        <span className="opacity-80">{ui.suit}</span>
+      </span>
+      <span className={`mt-1.5 block text-center text-[clamp(21px,5.5vw,34px)] leading-none ${ui.red ? "text-rose-600" : "text-zinc-900"}`}>
+        {ui.suit}
+      </span>
+      <span className={`mt-auto text-left text-[11px] font-semibold ${ui.red ? "text-rose-500" : "text-zinc-700"}`}>{ui.rank}</span>
+    </div>
+  );
+}
 
 /** @param {unknown} raw */
 function normalizeLayoffMelds(raw) {
@@ -65,6 +136,8 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
   const [finishPanelOpen, setFinishPanelOpen] = useState(false);
   const [layoffAssignments, setLayoffAssignments] = useState(/** @type {{ meld_index: number, card_id: number }[]} */ ([]));
   const [layoffMeldPick, setLayoffMeldPick] = useState(0);
+  /** Delayed press + bounce on hand tile (discard / layoff) */
+  const [handCardHitKey, setHandCardHitKey] = useState(/** @type {string|null} */ (null));
 
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
@@ -76,6 +149,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
   useEffect(() => {
     setFinishModalDismissedSessionId("");
     setFinishPanelOpen(false);
+    setHandCardHitKey(null);
   }, [vm.sessionId]);
 
   useEffect(() => {
@@ -219,6 +293,13 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     const n = m && typeof m.display_name === "string" ? String(m.display_name).trim() : "";
     return n || `Seat ${Number(vm.winnerSeat) + 1}`;
   }, [members, vm.winnerSeat]);
+  const opponentDisplayName = useMemo(() => {
+    if (vm.mySeat == null) return "Opponent";
+    const oppSeat = vm.mySeat === 0 ? 1 : 0;
+    const m = members.find(x => Number(x?.seat_index) === oppSeat);
+    const n = m && typeof m.display_name === "string" ? String(m.display_name).trim() : "";
+    return n || `Seat ${oppSeat + 1}`;
+  }, [members, vm.mySeat]);
 
   const finishMultiplier = vm.stakeMultiplier ?? 1;
 
@@ -304,134 +385,247 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     !vm.mustRespondDouble &&
     !busy &&
     !vaultClaimBusy;
-
+  const handBoardActive =
+    (vm.phase === "playing" && vm.mySeat != null && vm.turnSeat === vm.mySeat) ||
+    (vm.phase === "layoff" && vm.mySeat != null && vm.turnSeat === vm.mySeat);
+  const myTurn = vm.mySeat != null && vm.turnSeat === vm.mySeat;
+  const goalStrip = "Make sets or runs · Draw one card, discard one card · Finish when ready";
+  const turnGuidance = useMemo(() => {
+    if (vm.phase === "finished") return "Round complete";
+    if (vm.mustRespondDouble) return "Opponent asked to increase table stake. Accept or decline.";
+    if (vm.phase === "layoff") {
+      return myTurn ? "Add cards to the revealed melds, then confirm scoring." : "Waiting for opponent to finish layoffs.";
+    }
+    if (vm.phase !== "playing") return "Waiting for round to start";
+    if (!myTurn) return "Waiting for opponent";
+    if (vm.turnPhase === "draw") return "Draw from stock or discard.";
+    if (vm.turnPhase === "discard") {
+      if (vm.myHand.length === 11 && finishSuggestion) return "Your hand is ready. Finish now or discard one card.";
+      return "Choose one card to discard.";
+    }
+    return "Your turn";
+  }, [vm, myTurn, finishSuggestion]);
+  const finishReasonReadable = useMemo(() => {
+    const res = vm.result && typeof vm.result === "object" ? vm.result : null;
+    if (!res) return "";
+    if (res.knockFinish) {
+      return `Knock finish: deadwood ${String(res.closerDeadwood ?? "—")} vs ${String(res.opponentDeadwoodAfterLayoff ?? "—")} after layoffs.`;
+    }
+    return "Perfect finish closed the hand with no deadwood.";
+  }, [vm.result]);
+  const drawPhaseMyTurn = vm.phase === "playing" && myTurn && vm.turnPhase === "draw" && !vm.mustRespondDouble;
+  const discardPhaseMyTurn = vm.phase === "playing" && myTurn && vm.turnPhase === "discard" && !vm.mustRespondDouble;
+  const finishMapByCard = useMemo(() => {
+    /** @type {Record<number, { kind: "meld"|"deadwood", group: number }>} */
+    const out = {};
+    if (!finishSuggestion) return out;
+    finishSuggestion.melds.forEach((group, i) => {
+      group.forEach(c => {
+        out[c] = { kind: "meld", group: i + 1 };
+      });
+    });
+    finishSuggestion.deadwood.forEach(c => {
+      if (!out[c]) out[c] = { kind: "deadwood", group: 0 };
+    });
+    return out;
+  }, [finishSuggestion]);
+  const topCardPulse = drawPhaseMyTurn || discardPhaseMyTurn;
+  const compactActionLine =
+    vm.phase === "playing" && vm.turnPhase === "draw"
+      ? "Draw from stock or top discard"
+      : vm.phase === "playing" && vm.turnPhase === "discard"
+        ? "Choose a discard"
+        : vm.phase === "layoff"
+          ? "Layoff phase"
+          : "Round state";
+  const canOfferDoubleNow =
+    vm.phase === "playing" &&
+    vm.mySeat === vm.turnSeat &&
+    vm.mustRespondDouble !== true &&
+    vm.canOfferDouble === true &&
+    !busy &&
+    !vaultClaimBusy;
+  const myMissedTurns = vm.mySeat != null ? vm.missedStreakBySeat[vm.mySeat] ?? 0 : 0;
+  const opponentMissedTurns = vm.mySeat === 0 ? vm.missedStreakBySeat[1] ?? 0 : vm.mySeat === 1 ? vm.missedStreakBySeat[0] ?? 0 : 0;
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
-      <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
-        <div className="rounded-lg border border-white/[0.08] bg-zinc-950/50 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
-            <div
-              className={`flex items-center rounded-md border px-2 py-1 tabular-nums ${
-                (vm.phase === "playing" || vm.phase === "layoff") &&
-                (vm.turnSeat === vm.mySeat ||
-                  (vm.mustRespondDouble && Number(vm.pendingDouble?.responder_seat) === vm.mySeat))
-                  ? "border-amber-400/38 bg-amber-950/50 text-amber-50/92"
-                  : "border-white/[0.12] bg-zinc-950/65 text-zinc-400"
-              }`}
-            >
-              {(vm.phase === "playing" || vm.phase === "layoff") && vm.turnTimeLeftSec != null ? (
-                <span>
-                  <span className="font-medium uppercase text-zinc-500">Timer</span>{" "}
-                  <span className="font-semibold text-zinc-100">~{vm.turnTimeLeftSec}s</span>
-                </span>
-              ) : (
-                <span>—</span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded border border-white/10 px-2 py-0.5 text-zinc-300">
-                Stock {vm.stockCount} · Discard {vm.discardCount}
-              </span>
-              <span className="rounded border border-white/10 px-2 py-0.5 text-zinc-300">
-                Table ×{vm.stakeMultiplier}
-              </span>
-              <span className="hidden rounded border border-white/10 px-2 py-0.5 sm:inline">You: {myColorLabel}</span>
-            </div>
-            {vaultClaimBusy ? (
-              <span className="rounded-md border border-sky-500/18 bg-sky-950/35 px-2 py-0.5 text-[10px] text-sky-100/88">
-                Settlement…
-              </span>
-            ) : null}
+    <div className="relative flex h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_52%,rgba(45,212,191,0.23),rgba(15,23,42,0.34)_42%,rgba(6,11,22,0.95)_76%),radial-gradient(circle_at_50%_20%,rgba(125,211,252,0.13),transparent_40%),linear-gradient(180deg,#162235_0%,#0c1626_55%,#070f1e_100%)] px-1 pb-[max(6px,env(safe-area-inset-bottom))] pt-[max(4px,env(safe-area-inset-top))] sm:h-full sm:px-2 sm:pb-2 sm:pt-2">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_38%),radial-gradient(circle_at_50%_50%,transparent_58%,rgba(3,7,16,0.55)_100%)]" />
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-2">
+        <div className="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-white/12 bg-zinc-900/45 px-2 py-1.5 text-[10px] text-zinc-300">
+          <div
+            className={
+              (vm.phase === "playing" || vm.phase === "layoff") &&
+              (vm.turnSeat === vm.mySeat || (vm.mustRespondDouble && Number(vm.pendingDouble?.responder_seat) === vm.mySeat))
+                ? OV2_DUEL_TIMER_ACTIVE
+                : OV2_DUEL_TIMER_IDLE
+            }
+          >
+            {(vm.phase === "playing" || vm.phase === "layoff") && vm.turnTimeLeftSec != null ? (
+              <span className="font-semibold text-zinc-100">~{vm.turnTimeLeftSec}s</span>
+            ) : (
+              <span>—</span>
+            )}
+          </div>
+          <p className="truncate text-center text-[10px] font-medium text-zinc-100">{compactActionLine}</p>
+          <div className="flex items-center gap-1 text-[9px] text-zinc-400">
+            <span>Stock {vm.stockCount}</span>
+            <span>·</span>
+            <span>Discard {vm.discardCount}</span>
+          </div>
+          {vaultClaimBusy ? <span className={OV2_DUEL_SETTLEMENT_BADGE}>Settlement…</span> : null}
+        </div>
+
+        <div className="shrink-0 rounded-xl border border-cyan-300/30 bg-cyan-900/20 px-2 py-1 text-center text-[10px] font-medium text-cyan-100/90">
+          {goalStrip}
+        </div>
+
+        <div className="grid shrink-0 grid-cols-2 gap-2">
+          <div
+            className={`rounded-2xl border px-2.5 py-1.5 backdrop-blur-[2px] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_20px_rgba(0,0,0,0.28)] ${
+              !myTurn && (vm.phase === "playing" || vm.phase === "layoff")
+                ? "border-amber-200/45 bg-gradient-to-b from-amber-200/18 to-amber-900/18 ring-1 ring-amber-200/30"
+                : "border-white/12 bg-gradient-to-b from-slate-200/12 to-slate-900/20"
+            }`}
+          >
+            <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">Opponent</p>
+            <p className="mt-0.5 truncate text-sm font-semibold text-slate-50">{opponentDisplayName} · {vm.opponentHandCount ?? "—"} cards</p>
+            <p className="mt-1 text-[10px] text-slate-200/85">{!myTurn && (vm.phase === "playing" || vm.phase === "layoff") ? "Active" : "Waiting"}</p>
+            <p className="mt-0.5 text-[10px] text-slate-300/70">Hand {vm.opponentHandCount ?? "—"} · Missed {opponentMissedTurns} · {oppColorLabel}</p>
+          </div>
+          <div
+            className={`rounded-2xl border px-2.5 py-1.5 backdrop-blur-[2px] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_8px_20px_rgba(0,0,0,0.28)] ${
+              myTurn && (vm.phase === "playing" || vm.phase === "layoff")
+                ? "border-emerald-200/45 bg-gradient-to-b from-emerald-200/20 to-emerald-900/16 ring-1 ring-emerald-200/30"
+                : "border-white/12 bg-gradient-to-b from-slate-200/12 to-slate-900/20"
+            }`}
+          >
+            <p className="text-[10px] uppercase tracking-[0.12em] text-slate-300/90">You</p>
+            <p className="mt-0.5 truncate text-sm font-semibold text-slate-50">Seat {vm.mySeat != null ? vm.mySeat + 1 : "—"}</p>
+            <p className="mt-1 text-[10px] text-slate-100">{myTurn ? "Active" : "Waiting"}</p>
+            <p className="mt-0.5 text-[10px] text-slate-300/70">{myColorLabel} · Missed {myMissedTurns} · Table ×{vm.stakeMultiplier}</p>
           </div>
         </div>
+
         {err ? (
-          <div className="rounded-md border border-red-500/20 bg-red-950/20 px-2 py-1.5 text-[11px] text-red-200/95">
+          <div className="shrink-0 rounded-md border border-red-500/25 bg-red-950/30 px-2 py-1 text-[11px] text-red-200">
             <span>{err}</span>{" "}
             <button type="button" className="text-red-300 underline" onClick={() => setErr("")}>
               Dismiss
             </button>
           </div>
         ) : null}
-      </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-        {vm.phase === "playing" && vm.discardTop != null && vm.turnPhase === "draw" ? (
-          <p className="text-center text-[10px] text-zinc-500">
-            Top discard: <span className="font-mono text-zinc-200">{mmFormatCard(vm.discardTop)}</span>
-          </p>
-        ) : null}
+        <div className="relative min-h-0 flex-1 rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_50%_44%,rgba(45,212,191,0.28),rgba(8,17,33,0.18)_36%,rgba(4,10,20,0.78)_82%),linear-gradient(180deg,rgba(19,34,56,0.5)_0%,rgba(6,12,24,0.82)_100%)] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-16px_60px_rgba(0,0,0,0.28),0_24px_40px_rgba(0,0,0,0.35)] sm:p-3">
+          <div className="flex h-full flex-col justify-between gap-2">
+            <div className="rounded-2xl bg-zinc-900/18 p-2">
+              <p className="text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">Top discard</p>
+              <div className="mt-2 flex items-center justify-center gap-2 sm:gap-4">
+                <button
+                  type="button"
+                  disabled={!drawPhaseMyTurn || busy || vm.stockCount <= 0}
+                  onClick={() => void draw("stock")}
+                  className="inline-flex h-[5.4rem] w-[3.6rem] flex-col items-center justify-center rounded-2xl border border-slate-200/25 bg-gradient-to-b from-slate-700/95 to-slate-900 text-[10px] font-semibold text-slate-100 shadow-[0_10px_18px_rgba(0,0,0,0.4)] transition enabled:hover:-translate-y-1 enabled:hover:brightness-110 disabled:opacity-45 sm:h-[6.6rem] sm:w-[4.4rem]"
+                >
+                  <span>Stock</span>
+                  <span className="mt-1 text-[11px] text-zinc-200">{vm.stockCount}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={!drawPhaseMyTurn || busy || vm.discardTop == null}
+                  onClick={() => void draw("discard")}
+                  className={`${OV2_DUEL_TOP_CARD_AURA} inline-flex rounded-2xl transition enabled:hover:-translate-y-1 disabled:opacity-45`}
+                >
+                  <div className={`${OV2_DUEL_TOP_CARD_FACE} rounded-[1.05rem] border border-zinc-300/50 bg-transparent p-0 font-semibold text-zinc-900 [text-shadow:none] ${topCardPulse ? "ring-2 ring-emerald-300/55 shadow-[0_0_34px_rgba(45,212,191,0.45),0_12px_22px_rgba(0,0,0,0.38)]" : "shadow-[0_12px_22px_rgba(0,0,0,0.38)]"}`}>
+                    <MmCardFace cardId={vm.discardTop ?? null} large />
+                  </div>
+                </button>
+              </div>
+              {drawPhaseMyTurn ? <p className="mt-2 text-center text-[11px] font-medium text-emerald-100">Tap stock or discard to draw</p> : null}
+            </div>
 
-        {vm.phase === "playing" && vm.mySeat === vm.turnSeat && vm.turnPhase === "draw" && !vm.mustRespondDouble ? (
-          <div className="flex flex-wrap justify-center gap-2">
-            <button
-              type="button"
-              disabled={busy || vm.stockCount <= 0}
-              className={BTN_PRIMARY}
-              onClick={() => void draw("stock")}
-            >
-              Draw stock
-            </button>
-            <button
-              type="button"
-              disabled={busy || vm.discardCount <= 0}
-              className={BTN_SECONDARY}
-              onClick={() => void draw("discard")}
-            >
-              Draw discard
-            </button>
-          </div>
-        ) : null}
-
-        {vm.phase === "playing" && vm.mySeat === vm.turnSeat && vm.turnPhase === "discard" && !vm.mustRespondDouble ? (
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {vm.myHand.length === 11 && finishSuggestion ? (
-              <button type="button" disabled={busy} className={BTN_ACCENT} onClick={() => setFinishPanelOpen(true)}>
-                Finish hand
-              </button>
+            {discardPhaseMyTurn ? (
+              <div className={`${OV2_DUEL_ACTION_STRIP} rounded-xl px-2 py-1.5`}>
+                <p className="text-center text-[11px] font-semibold text-emerald-200">Choose a discard</p>
+                <div className="mt-1.5 flex flex-wrap items-center justify-center gap-2">
+                  {vm.myHand.length === 11 && finishSuggestion ? (
+                    <button type="button" disabled={busy} className={OV2_BTN_ACCENT} onClick={() => setFinishPanelOpen(true)}>
+                      Ready to finish
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             ) : null}
-            {vm.canOfferDouble ? (
-              <button type="button" disabled={busy} className={BTN_SECONDARY} onClick={() => void offerDouble()}>
-                Increase table stake
-              </button>
-            ) : null}
           </div>
-        ) : null}
+        </div>
 
-        <div className="rounded-xl border border-white/[0.08] bg-zinc-900/50 p-2 sm:p-3">
-          <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Your hand</p>
-          <div className="flex flex-wrap justify-center gap-1 sm:gap-1.5">
-            {vm.myHand.map((c, idx) => (
+        <div className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? `${OV2_DUEL_PANEL_HAND_ACTIVE} ring-1 ring-emerald-300/35 shadow-[0_0_30px_rgba(16,185,129,0.2)]` : ""} shrink-0 rounded-3xl border-white/12 bg-[linear-gradient(180deg,rgba(17,27,45,0.62)_0%,rgba(8,14,27,0.86)_100%)] p-2 sm:p-3 md:py-2 md:max-h-[10.25rem]`}>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-200">Your hand</p>
+            <p className="text-[10px] text-zinc-400">{vm.myHand.length} cards</p>
+          </div>
+          <div className="flex items-end justify-center gap-0 overflow-hidden px-0.5 pb-1" style={{ "--mm-hand-count": Math.max(1, vm.myHand.length) }}>
+            {vm.myHand.map((c, idx) => {
+              const hid = `h-${idx}-${c}-${vm.revision}`;
+              const showingHit = handCardHitKey === hid;
+              const ui = mmCardUi(c);
+              const map = finishMapByCard[c];
+              return (
               <button
-                key={`h-${idx}-${c}-${vm.revision}`}
+                key={hid}
                 type="button"
                 disabled={!canInteractHand && !(vm.phase === "layoff" && vm.turnSeat === vm.mySeat)}
                 onClick={() => {
                   if (vm.phase === "layoff" && vm.turnSeat === vm.mySeat) {
                     void onLayoffAddCard(c);
+                    void (async () => {
+                      await new Promise(r => setTimeout(r, OV2_DUEL_HAND_HIT_DELAY_MS));
+                      playOv2DuelCardTap();
+                      setHandCardHitKey(hid);
+                      window.setTimeout(() => setHandCardHitKey(k => (k === hid ? null : k)), OV2_DUEL_HAND_HIT_CLEAR_MS);
+                    })();
                     return;
                   }
-                  if (canInteractHand) void onCardDiscard(c);
+                  if (canInteractHand) {
+                    void (async () => {
+                      const p = onCardDiscard(c);
+                      await new Promise(r => setTimeout(r, OV2_DUEL_HAND_HIT_DELAY_MS));
+                      playOv2DuelCardTap();
+                      setHandCardHitKey(hid);
+                      window.setTimeout(() => setHandCardHitKey(k => (k === hid ? null : k)), OV2_DUEL_HAND_HIT_CLEAR_MS);
+                      try {
+                        await p;
+                        playOv2DuelSuccess();
+                      } catch {
+                        playOv2DuelInvalid();
+                      }
+                    })();
+                  }
                 }}
-                className={`min-w-[2.35rem] rounded-md border px-1.5 py-1 font-mono text-[10px] sm:min-w-[2.6rem] sm:text-[11px] ${
+                className={`${OV2_DUEL_HAND_PILL_BASE} first:ml-0 min-h-[max(62px,14vw)] md:min-h-[72px] rounded-[0.95rem] border border-zinc-400/65 bg-[linear-gradient(165deg,#ffffff_0%,#f7f3ea_52%,#ece7dc_100%)] px-1.5 py-1 md:py-0.5 text-zinc-900 shadow-[0_16px_28px_rgba(0,0,0,0.5)] transition-transform duration-150 hover:-translate-y-2 hover:scale-[1.05] active:scale-[0.98] ${showingHit ? `${OV2_DUEL_HAND_HIT} -translate-y-2 scale-[1.04]` : ""} ${
                   canInteractHand || (vm.phase === "layoff" && vm.turnSeat === vm.mySeat)
-                    ? "border-sky-500/35 bg-sky-950/35 text-sky-100 active:scale-[0.97]"
-                    : "cursor-default border-white/[0.06] bg-zinc-950/50 text-zinc-500"
-                }`}
+                    ? "ring-1 ring-sky-400/30"
+                    : "opacity-45 grayscale"
+                } ${map?.kind === "meld" ? "ring-2 ring-emerald-400/55" : map?.kind === "deadwood" ? "ring-2 ring-amber-400/55" : ""}`}
+                style={{
+                  width: `min(72px, max(38px, calc((100vw - 18px) / var(--mm-hand-count) + 9px)))`,
+                  marginLeft: idx === 0 ? "0px" : "max(-11px, calc(-1 * (var(--mm-hand-count) - 7) * 1.4px))",
+                  transform: `translateY(${Math.abs(idx - (vm.myHand.length - 1) / 2) * 0.45}px) rotate(${(idx - (vm.myHand.length - 1) / 2) * 0.75}deg)`,
+                }}
+                title={`${ui.rank} of ${ui.suitName}`}
               >
-                {mmFormatCard(c)}
+                <MmCardFace cardId={c} />
+                {map?.kind === "meld" ? <span className="mt-0.5 block text-center text-[8px] font-semibold uppercase tracking-wide text-emerald-700">Meld {map.group}</span> : null}
+                {map?.kind === "deadwood" ? <span className="mt-0.5 block text-center text-[8px] font-semibold uppercase tracking-wide text-amber-700">Deadwood</span> : null}
               </button>
-            ))}
+            );
+            })}
           </div>
-          {vm.opponentHandCount != null ? (
-            <p className="mt-2 text-center text-[10px] text-zinc-500">Opponent hand: {vm.opponentHandCount} cards</p>
-          ) : null}
         </div>
 
         {vm.phase === "layoff" && vm.turnSeat === vm.mySeat ? (
-          <div className="rounded-lg border border-violet-500/25 bg-violet-950/20 p-2">
+          <div className={`p-2 ${OV2_CALLOUT_VIOLET}`}>
             <p className="text-[11px] text-violet-100/90">
-              Lay off onto the closer&apos;s melds only. Pick a meld slot, then tap cards from your hand. When done, confirm
-              scoring.
+              Add your matching cards to the closer&apos;s revealed melds. Pick a meld, tap cards in your hand, then confirm scoring.
             </p>
             {layoffMeldsNorm.length ? (
               <div className="mt-2 flex flex-wrap gap-1">
@@ -440,8 +634,8 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                     key={i}
                     type="button"
                     onClick={() => setLayoffMeldPick(i)}
-                    className={`rounded border px-2 py-1 font-mono text-[9px] ${
-                      layoffMeldPick === i ? "border-violet-400/60 bg-violet-900/40" : "border-white/10 bg-zinc-900/60"
+                    className={`${OV2_DUEL_LAYOFF_MELD_BTN_BASE} ${
+                      layoffMeldPick === i ? OV2_DUEL_LAYOFF_MELD_SELECTED : OV2_DUEL_LAYOFF_MELD_IDLE
                     }`}
                   >
                     #{i + 1}: {m.map(mmFormatCard).join(" ")}
@@ -462,18 +656,18 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
               </p>
             ) : null}
             <div className="mt-2 flex flex-wrap gap-2">
-              <button type="button" disabled={busy} className={BTN_PRIMARY} onClick={() => void onLayoffSubmit()}>
+              <button type="button" disabled={busy} className={OV2_BTN_PRIMARY} onClick={() => void onLayoffSubmit()}>
                 Confirm scoring
               </button>
               <button
                 type="button"
                 disabled={busy}
-                className={BTN_SECONDARY}
+                className={OV2_BTN_SECONDARY}
                 onClick={() => void resolveLayoff([])}
               >
                 Skip layoffs
               </button>
-              <button type="button" className={BTN_SECONDARY} onClick={() => setLayoffAssignments([])}>
+              <button type="button" className={OV2_BTN_SECONDARY} onClick={() => setLayoffAssignments([])}>
                 Clear pending
               </button>
             </div>
@@ -483,7 +677,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
         ) : null}
 
         {(vm.phase === "finished" || vm.phase === "layoff") && vm.opponentHandRevealed.length > 0 ? (
-          <div className="rounded-lg border border-white/[0.06] bg-zinc-900/40 p-2">
+          <div className={OV2_REVEALED_HAND_PANEL}>
             <p className="text-[10px] font-semibold text-zinc-500">Revealed opponent hand</p>
             <div className="mt-1 flex flex-wrap gap-1 font-mono text-[10px] text-zinc-300">
               {vm.opponentHandRevealed.map(c => (
@@ -493,22 +687,25 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           </div>
         ) : null}
 
-        <div className="mt-auto flex flex-col gap-1 border-t border-white/[0.06] pt-2 text-[10px] text-zinc-500">
-          <p>
-            Missed turns: you {vm.mySeat != null ? vm.missedStreakBySeat[vm.mySeat] ?? 0 : "—"} · opponent{" "}
-            {vm.mySeat === 0 ? vm.missedStreakBySeat[1] : vm.mySeat === 1 ? vm.missedStreakBySeat[0] : "—"}
-          </p>
-          <p className="sm:hidden">
-            You {myColorLabel} · Opponent {oppColorLabel}
-          </p>
-          <button
-            type="button"
-            disabled={exitBusy || !pk}
-            className="w-fit text-sky-300 underline disabled:opacity-45"
-            onClick={() => void onExitToLobby()}
-          >
-            {exitBusy ? "Leaving…" : "Leave table"}
-          </button>
+        <div className="mt-1 flex shrink-0 flex-col gap-1 border-t border-white/[0.08] pt-1 text-[9px] text-zinc-500 sm:text-[10px]">
+          <div className="flex items-stretch gap-2">
+            <button
+              type="button"
+              disabled={!canOfferDoubleNow}
+              className={`${OV2_BTN_ACCENT} flex-1 py-2 text-[11px] disabled:opacity-45`}
+              onClick={() => void offerDouble()}
+            >
+              Increase table stake
+            </button>
+            <button
+              type="button"
+              disabled={exitBusy || !pk}
+              className={`${OV2_BTN_DANGER} flex-1 py-2 text-[11px] disabled:opacity-45`}
+              onClick={() => void onExitToLobby()}
+            >
+              {exitBusy ? "Leaving…" : "Leave table"}
+            </button>
+          </div>
           {exitErr ? <span className="text-red-300">{exitErr}</span> : null}
         </div>
       </div>
@@ -519,11 +716,12 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
             <p id="ov2-mm-finish-hand-title" className="text-sm font-semibold text-zinc-100">
               Finish hand
             </p>
-            <p className="mt-1 text-[11px] text-zinc-400">
-              Suggested {finishSuggestion.kind === "gin" ? "perfect finish" : "early finish"} — discard{" "}
-              <span className="font-mono text-zinc-200">{mmFormatCard(finishSuggestion.discard)}</span>, deadwood pts{" "}
-              {finishSuggestion.deadwoodPts}.
+            <p className="mt-1 text-[11px] text-zinc-300">
+              {finishSuggestion.kind === "gin" ? "Perfect finish is available." : "Ready to finish with low deadwood."} You will discard{" "}
+              <span className="font-mono text-zinc-100">{mmFormatCard(finishSuggestion.discard)}</span> and declare{" "}
+              {finishSuggestion.deadwoodPts} deadwood points.
             </p>
+            <p className="mt-1 text-[10px] text-zinc-500">Why this works: {finishSuggestion.kind === "gin" ? "all cards fit into melds." : "deadwood is 10 or less."}</p>
             <p className="mt-2 text-[10px] text-zinc-500">Melds (server validates):</p>
             <ul className="mt-1 max-h-32 overflow-y-auto text-[10px] font-mono text-zinc-300">
               {finishSuggestion.melds.map((m, i) => (
@@ -536,10 +734,10 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
               </p>
             ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" disabled={busy} className={BTN_PRIMARY} onClick={() => void onSubmitFinish()}>
-                Submit to server
+              <button type="button" disabled={busy} className={OV2_BTN_PRIMARY} onClick={() => void onSubmitFinish()}>
+                Finish round
               </button>
-              <button type="button" className={BTN_SECONDARY} onClick={() => setFinishPanelOpen(false)}>
+              <button type="button" className={OV2_BTN_SECONDARY} onClick={() => setFinishPanelOpen(false)}>
                 Cancel
               </button>
             </div>
@@ -607,6 +805,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                   </p>
                 </div>
                 <p className="mt-3 text-center text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
+                {finishReasonReadable ? <p className="mt-1 text-center text-[10px] leading-snug text-zinc-500">{finishReasonReadable}</p> : null}
                 <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
                   {vaultClaimBusy ? "Sending results to your balance…" : "Round complete — rematch, then host starts next."}
                 </p>
@@ -614,10 +813,10 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
             </div>
           </div>
           <div className="flex flex-col gap-2 px-4 py-4">
-            <button type="button" className={BTN_PRIMARY} disabled={rematchBusy} onClick={() => void onRematch()}>
+            <button type="button" className={OV2_BTN_PRIMARY} disabled={rematchBusy} onClick={() => void onRematch()}>
               {rematchBusy ? "Requesting…" : "Request rematch"}
             </button>
-            <button type="button" className={BTN_SECONDARY} disabled={rematchBusy} onClick={() => void cancelRematch()}>
+            <button type="button" className={OV2_BTN_SECONDARY} disabled={rematchBusy} onClick={() => void cancelRematch()}>
               Cancel rematch
             </button>
             {isHost ? (
@@ -625,7 +824,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                 <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">Host only</p>
                 <button
                   type="button"
-                  className={BTN_PRIMARY + " w-full rounded-none"}
+                  className={OV2_BTN_PRIMARY + " w-full rounded-none"}
                   disabled={startNextBusy}
                   onClick={() => void onStartNext()}
                 >
@@ -637,12 +836,12 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                 Host starts the next match when both players rematch.
               </p>
             )}
-            <button type="button" className={BTN_SECONDARY} onClick={dismissFinishModal}>
+            <button type="button" className={OV2_BTN_SECONDARY} onClick={dismissFinishModal}>
               Dismiss
             </button>
             <button
               type="button"
-              className={BTN_DANGER + " w-full"}
+              className={OV2_BTN_DANGER + " w-full"}
               disabled={exitBusy || !pk}
               onClick={() => void onExitToLobby()}
             >

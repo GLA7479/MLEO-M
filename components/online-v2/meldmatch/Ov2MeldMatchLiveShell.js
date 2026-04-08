@@ -373,22 +373,19 @@ export default function Ov2MeldMatchLiveShell() {
             <section className="border-b border-white/[0.05] py-2.5 first:pt-0 last:border-b-0 last:pb-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Rules</p>
               <p className="mt-1.5 text-zinc-400/95">
-                Single-hand duel: draw then discard each turn. Melds are same-rank groups or same-suit sequences (ace low,
-                no wrap). Perfect finish clears all deadwood; early finish allows up to 10 deadwood points, then layoffs and
-                comparison. If the stock is empty and the discard is empty, the hand is a draw with entry returned.
+                Make sets (same rank) or runs (same suit in order). On your turn: draw one card, then discard one.
               </p>
             </section>
             <section className="border-b border-white/[0.05] py-2.5 last:border-b-0 last:pb-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Turns</p>
               <p className="mt-1.5 text-zinc-400/95">
-                About 30 seconds per turn. Three missed turns in a row ends the round against you. Table multiplier up to
-                ×16 (accept or decline offers).
+                Finish when your hand is ready (all melds, or low deadwood). About 30 seconds per turn; three misses in a row loses the round.
               </p>
             </section>
             <section className="py-2.5 last:pb-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">After the result</p>
               <p className="mt-1.5 text-zinc-400/95">
-                Settlement runs automatically. Rematch, then host starts the next match and players re-commit in the lobby.
+                Settlement is automatic. Request rematch, then host starts the next match.
               </p>
             </section>
           </div>
