@@ -632,31 +632,33 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                   title={`${seatDisplayName(seat)} — ${cardCount} cards · missed ${missed}/3`}
                   className={`${OV2_OPP_PANEL_BASE} ${
                     isTurn ? OV2_OPP_PANEL_ACTIVE : OV2_OPP_PANEL_IDLE
-                  } ${isMe ? "!opacity-100" : ""} flex min-h-[2.5rem] min-w-0 flex-1 basis-0 flex-row flex-nowrap items-center gap-x-1 px-1.5 py-1 sm:min-h-[2.75rem] sm:px-2 sm:py-2`}
+                  } ${isMe ? "!opacity-100" : ""} flex min-h-[3.1rem] min-w-0 flex-1 basis-0 flex-col justify-center gap-y-0.5 px-1.5 py-1 sm:min-h-[3.4rem] sm:px-2 sm:py-1.5`}
                 >
-                  {isMe ? (
-                    <span className="shrink-0 rounded border border-emerald-400/35 bg-emerald-500/12 px-0.5 py-0.5 text-[6px] font-bold uppercase leading-none text-emerald-100 sm:py-0.5 sm:text-[7px]">
-                      You
-                    </span>
-                  ) : null}
-                  <span className="min-w-0 flex-1 truncate text-[9px] font-semibold leading-snug sm:text-[10px]">
+                  <div className="min-w-0 truncate text-[9px] font-semibold leading-tight sm:text-[10px]">
                     {seatDisplayName(seat)}
-                  </span>
-                  {isTurn ? (
-                    <span className="shrink-0 rounded border border-amber-400/40 bg-amber-500/15 px-0.5 py-0.5 text-[6px] font-bold uppercase leading-none text-amber-100 sm:py-0.5 sm:text-[7px]">
-                      Turn
+                  </div>
+                  <div className="flex min-w-0 flex-row flex-nowrap items-center gap-x-1">
+                    {isMe ? (
+                      <span className="shrink-0 rounded border border-emerald-400/35 bg-emerald-500/12 px-0.5 py-0.5 text-[6px] font-bold uppercase leading-none text-emerald-100 sm:py-0.5 sm:text-[7px]">
+                        You
+                      </span>
+                    ) : null}
+                    {isTurn ? (
+                      <span className="shrink-0 rounded border border-amber-400/40 bg-amber-500/15 px-0.5 py-0.5 text-[6px] font-bold uppercase leading-none text-amber-100 sm:py-0.5 sm:text-[7px]">
+                        Turn
+                      </span>
+                    ) : null}
+                    <span
+                      className={`shrink-0 whitespace-nowrap text-[8px] leading-none tabular-nums sm:text-[9px] ${
+                        isTurn ? "text-amber-100/78" : "text-zinc-400"
+                      }`}
+                    >
+                      C{cardCount}
+                      <span className={isTurn ? "text-amber-200/45" : "text-zinc-600"}>·</span>
+                      M{missed}/3
+                      {out ? <span className="font-semibold text-rose-300/90">·Out</span> : null}
                     </span>
-                  ) : null}
-                  <span
-                    className={`shrink-0 whitespace-nowrap text-[8px] leading-none tabular-nums sm:text-[9px] ${
-                      isTurn ? "text-amber-100/78" : "text-zinc-400"
-                    }`}
-                  >
-                    C{cardCount}
-                    <span className={isTurn ? "text-amber-200/45" : "text-zinc-600"}>·</span>
-                    M{missed}/3
-                    {out ? <span className="font-semibold text-rose-300/90">·Out</span> : null}
-                  </span>
+                  </div>
                 </div>
               );
             })}
@@ -824,7 +826,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
         ) : null}
 
         <div
-          className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? OV2_DUEL_PANEL_HAND_ACTIVE : ""} flex min-h-[11rem] flex-1 flex-col overflow-hidden p-1.5 sm:min-h-[15rem] sm:p-2 md:p-3`}
+          className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? OV2_DUEL_PANEL_HAND_ACTIVE : ""} flex min-h-[10.4rem] flex-1 flex-col overflow-hidden p-1.5 sm:min-h-[14.4rem] sm:p-2 md:p-3`}
         >
           <p className={`mb-0.5 shrink-0 text-center text-[10px] ${OV2_DUEL_PANEL_LABEL}`}>Your hand</p>
           <div className="flex min-h-0 flex-1 flex-wrap content-center justify-center gap-1 overflow-x-hidden overflow-y-auto overscroll-y-contain sm:gap-2">
