@@ -44,8 +44,8 @@ import {
 
 const finishDismissStorageKey = sid => `ov2_mm_finish_dismiss_${sid}`;
 /** Replace files in `public/card-backs/` anytime — keep these paths or update here */
-const MM_CARD_BACK_SRC = "/card-backs/poker-back.jpg";
-const MM_CARD_FACE_SRC = "/card-backs/poker-front.jpg";
+const MM_CARD_BACK_SRC = "/card-backs/meldmatch-back.jpg";
+const MM_CARD_FACE_SRC = "/card-backs/meldmatch-front.jpg";
 /** Tailwind `sm` breakpoint — hand fan fills row width only below this */
 const MM_HAND_NARROW_MAX_PX = 639;
 
