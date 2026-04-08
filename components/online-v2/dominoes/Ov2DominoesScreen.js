@@ -16,12 +16,127 @@ import { OV2_BTN_ACCENT, OV2_BTN_DANGER } from "../tokens/ov2DuelPairUiTokens";
 
 const finishDismissStorageKey = sid => `ov2_dom_finish_dismiss_${sid}`;
 
-/** Fit-to-width math: hand tiles (vertical) + board line (horizontal), no scroll */
+/** Board snake (realistic): horizontal **lying** runs on X, short **standing** bridges on Y between rows. */
 const DOM_HAND_BASE_W_REM = 2.8;
 const DOM_HAND_BASE_H_REM = 4.4;
 const DOM_HAND_GAP_PX = 4;
-const DOM_BOARD_TILE_NATURAL_PX = 90;
+const DOM_BOARD_VERT_H_OVER_W = DOM_HAND_BASE_H_REM / DOM_HAND_BASE_W_REM;
 const DOM_BOARD_GAP_PX = 4;
+/** Guess for greedy H-run length (long side along X). */
+const DOM_BOARD_PACK_HORIZ_W_PX = 52;
+/** Max lying domino long-side (X) on board. */
+const DOM_BOARD_HORIZ_W_CAP_PX = 54;
+/** Max tiles per horizontal run (typ. 4–5 like a real table). */
+const DOM_BOARD_MAX_HORIZ_PER_ROW = 5;
+/** Standing bridge tiles between horizontal runs (1–2 like photo). */
+const DOM_BOARD_VERT_BRIDGE_TILES = 2;
+
+/**
+ * Alternate horizontal runs and vertical bridges until all tiles are consumed.
+ * @returns {{ kind: 'h' | 'v'; count: number }[]}
+ */
+function computeMixedSegments(totalN, innerW, gapPx, maxPerRow, vertBridge, horizWGuess) {
+  if (totalN <= 0) return [];
+  const inner = Math.max(0, innerW);
+  const segs = /** @type {{ kind: 'h' | 'v'; count: number }[]} */ ([]);
+  let i = 0;
+  while (i < totalN) {
+    const remain = totalN - i;
+    const maxFitW = Math.max(1, Math.floor((inner + gapPx) / (horizWGuess + gapPx)));
+    let takeH = Math.min(maxPerRow, maxFitW, remain);
+    if (takeH < 1) takeH = Math.min(maxPerRow, remain);
+    segs.push({ kind: "h", count: takeH });
+    i += takeH;
+    if (i >= totalN) break;
+    const takeV = Math.min(vertBridge, totalN - i);
+    segs.push({ kind: "v", count: takeV });
+    i += takeV;
+  }
+  return segs;
+}
+
+/**
+ * @param {{ kind: 'h' | 'v'; count: number }[]} segments
+ * @param {number} innerW
+ * @param {number} hW lying tile width (long, X)
+ * @param {number} hH lying tile height (short, Y)
+ * @param {number} vW standing tile width (short, X)
+ * @param {number} vH standing tile height (long, Y)
+ * @param {number} gap
+ * @returns {{ placements: { left: number; top: number; w: number; h: number; vertical: boolean }[]; minL: number; maxR: number; minT: number; maxB: number; contentW: number; contentH: number }}
+ */
+function placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap) {
+  const horizLens = segments.filter(s => s.kind === "h").map(s => s.count);
+  const R = horizLens.length;
+  const hStep = hW + gap;
+  const totalTiles = segments.reduce((a, s) => a + s.count, 0);
+  const placements = /** @type {{ left: number; top: number; w: number; h: number; vertical: boolean }[]} */ (
+    new Array(totalTiles)
+  );
+  if (totalTiles === 0) return { placements: [], minL: 0, maxR: 0, minT: 0, maxB: 0, contentW: 0, contentH: 0 };
+
+  const anchorLeft = /** @type {number[]} */ (new Array(R));
+  if (R > 0) {
+    const k0 = horizLens[0];
+    const row0W = k0 * hW + (k0 - 1) * gap;
+    anchorLeft[0] = (innerW - row0W) / 2;
+    for (let r = 1; r < R; r++) {
+      const kPrev = horizLens[r - 1];
+      const prevLtr = (r - 1) % 2 === 0;
+      anchorLeft[r] = prevLtr ? anchorLeft[r - 1] + (kPrev - 1) * hStep : anchorLeft[r - 1] - (kPrev - 1) * hStep;
+    }
+  }
+
+  let idx = 0;
+  let hr = 0;
+  let yNext = 0;
+
+  for (const seg of segments) {
+    if (seg.kind === "h") {
+      const k = seg.count;
+      const r = hr;
+      const ltr = r % 2 === 0;
+      const top = yNext;
+      for (let j = 0; j < k; j++) {
+        const left = ltr ? anchorLeft[r] + j * hStep : anchorLeft[r] - j * hStep;
+        placements[idx++] = { left, top, w: hW, h: hH, vertical: false };
+      }
+      yNext = top + hH + gap;
+      hr++;
+    } else {
+      const prevRow = hr - 1;
+      const kPrev = horizLens[prevRow];
+      const prevLtr = prevRow % 2 === 0;
+      const cornerLeft = prevLtr ? anchorLeft[prevRow] + (kPrev - 1) * hStep : anchorLeft[prevRow] - (kPrev - 1) * hStep;
+      const vTopStart = yNext;
+      const vCount = seg.count;
+      for (let j = 0; j < vCount; j++) {
+        placements[idx++] = {
+          left: cornerLeft,
+          top: vTopStart + j * (vH + gap),
+          w: vW,
+          h: vH,
+          vertical: true,
+        };
+      }
+      yNext = vTopStart + vCount * vH + (vCount > 0 ? (vCount - 1) * gap : 0) + gap;
+    }
+  }
+
+  let minL = Infinity;
+  let maxR = -Infinity;
+  let minT = Infinity;
+  let maxB = -Infinity;
+  for (const p of placements) {
+    minL = Math.min(minL, p.left);
+    maxR = Math.max(maxR, p.left + p.w);
+    minT = Math.min(minT, p.top);
+    maxB = Math.max(maxB, p.top + p.h);
+  }
+  const contentW = maxR - minL;
+  const contentH = maxB - minT;
+  return { placements, minL, maxR, minT, maxB, contentW, contentH };
+}
 
 /** Same tokens as `Ov2FourLineScreen` — finish modal + rematch actions stay visually aligned with FL. */
 const BTN_PRIMARY =
@@ -35,13 +150,15 @@ const BTN_DANGER =
 const T_OP = "transition-opacity duration-150 ease-out";
 const T_TF = "transition-[opacity,transform] duration-150 ease-out";
 
-/** @param {{ n: unknown, pipSize?: "hand" | "line" }} props */
+/** @param {{ n: unknown, pipSize?: "hand" | "line" | "board" }} props */
 function PipDots({ n, pipSize = "hand" }) {
   const v = Math.min(6, Math.max(0, Math.floor(Number(n) || 0)));
   const dim =
     pipSize === "line"
       ? "h-10 w-10 sm:h-11 sm:w-11 md:h-12 md:w-12"
-      : "h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11";
+      : pipSize === "board"
+        ? "h-[1.15rem] w-[1.15rem] sm:h-5 sm:w-5"
+        : "h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11";
   const patterns = {
     0: [],
     1: [[0.5, 0.5]],
@@ -87,13 +204,21 @@ function PipDots({ n, pipSize = "hand" }) {
   );
 }
 
-function DominoFace({ a, b, vertical }) {
-  const pip = vertical ? "hand" : "line";
+/** @param {{ a: unknown, b: unknown, vertical?: boolean, pipSize?: "hand" | "line" | "board" }} props */
+function DominoFace({ a, b, vertical, pipSize: pipSizeProp }) {
+  const pip = pipSizeProp ?? (vertical ? "hand" : "line");
   if (vertical) {
+    const boardLine = pip === "board";
     return (
-      <div className="flex flex-col items-center justify-center gap-0.5 rounded-md border border-black/20 bg-[#faf6ef] px-1 py-1 shadow-inner sm:gap-1 sm:px-1.5 sm:py-1.5">
+      <div
+        className={
+          boardLine
+            ? "flex max-h-full max-w-full flex-col items-center justify-center gap-px rounded-md border border-black/20 bg-[#faf6ef] px-0.5 py-0.5 shadow-inner"
+            : "flex flex-col items-center justify-center gap-0.5 rounded-md border border-black/20 bg-[#faf6ef] px-1 py-1 shadow-inner sm:gap-1 sm:px-1.5 sm:py-1.5"
+        }
+      >
         <PipDots n={a} pipSize={pip} />
-        <div className="h-px w-[80%] bg-black/25" />
+        <div className="h-px w-[82%] bg-black/25" />
         <PipDots n={b} pipSize={pip} />
       </div>
     );
@@ -193,7 +318,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
   const doubleAlertPlayedRef = useRef(false);
   const handRowMeasureRef = useRef(/** @type {HTMLDivElement | null} */ (null));
   const boardRowMeasureRef = useRef(/** @type {HTMLDivElement | null} */ (null));
-  const [rowWidths, setRowWidths] = useState(/** @type {{ hand: number; board: number }} */ ({ hand: 0, board: 0 }));
+  const [rowSizes, setRowSizes] = useState(/** @type {{ hand: number; board: number; boardH: number }} */ ({ hand: 0, board: 0, boardH: 0 }));
 
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
@@ -213,15 +338,20 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
     const boardEl = boardRowMeasureRef.current;
     if (!handEl && !boardEl) return;
     const ro = new ResizeObserver(entries => {
-      setRowWidths(prev => {
+      setRowSizes(prev => {
         let hand = prev.hand;
         let board = prev.board;
+        let boardH = prev.boardH;
         for (const e of entries) {
           const w = e.contentRect.width;
+          const h = e.contentRect.height;
           if (handEl && e.target === handEl) hand = w;
-          if (boardEl && e.target === boardEl) board = w;
+          if (boardEl && e.target === boardEl) {
+            board = w;
+            boardH = h;
+          }
         }
-        return { hand, board };
+        return { hand, board, boardH };
       });
     });
     if (handEl) ro.observe(handEl);
@@ -649,33 +779,115 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
     const baseH = DOM_HAND_BASE_H_REM * rem;
     const n = vm.myHand.length;
     if (n <= 0) return { w: baseW, h: baseH };
-    const wAvail = rowWidths.hand;
+    const wAvail = rowSizes.hand;
     if (wAvail <= 8) return { w: baseW, h: baseH };
     const inner = Math.max(0, wAvail - 6);
     const raw = (inner - (n - 1) * DOM_HAND_GAP_PX) / n;
     const clampedW = Math.min(baseW, Math.max(18, raw));
     const h = clampedW * (DOM_HAND_BASE_H_REM / DOM_HAND_BASE_W_REM);
     return { w: clampedW, h: Math.min(baseH, Math.max(28, h)) };
-  }, [vm.myHand.length, rowWidths.hand]);
+  }, [vm.myHand.length, rowSizes.hand]);
 
-  const boardSegPx = useMemo(() => {
+  const boardLayout = useMemo(() => {
     const n = vm.line.length;
-    if (n <= 0) return { segW: DOM_BOARD_TILE_NATURAL_PX, scale: 1, rowH: 56 };
-    const wAvail = rowWidths.board;
-    if (wAvail <= 8) return { segW: DOM_BOARD_TILE_NATURAL_PX, scale: 1, rowH: 56 };
-    const inner = wAvail * 0.96;
-    const raw = (inner - (n - 1) * DOM_BOARD_GAP_PX) / n;
-    const segW = Math.max(18, Math.min(DOM_BOARD_TILE_NATURAL_PX, raw));
-    const scale = segW / DOM_BOARD_TILE_NATURAL_PX;
-    return { segW, scale, rowH: 56 * scale };
-  }, [vm.line.length, rowWidths.board]);
+    const capHW = DOM_BOARD_HORIZ_W_CAP_PX;
+    const gap = DOM_BOARD_GAP_PX;
+    if (n <= 0) {
+      const hW = Math.min(48, capHW);
+      const hH = hW / DOM_BOARD_VERT_H_OVER_W;
+      return {
+        segments: /** @type {{ kind: 'h' | 'v'; count: number }[]} */ ([]),
+        placements: /** @type {{ left: number; top: number; w: number; h: number; vertical: boolean }[]} */ ([]),
+        singleHorizRun: true,
+        contentW: 0,
+        contentH: 0,
+        padW: hW,
+        padH: hH,
+      };
+    }
+    const innerW = (rowSizes.board > 8 ? rowSizes.board : 320) * 0.96;
+    const innerH = (rowSizes.boardH > 12 ? rowSizes.boardH : 240) * 0.96;
+    const segments = computeMixedSegments(
+      n,
+      innerW,
+      gap,
+      DOM_BOARD_MAX_HORIZ_PER_ROW,
+      DOM_BOARD_VERT_BRIDGE_TILES,
+      DOM_BOARD_PACK_HORIZ_W_PX,
+    );
+    const horizLens = segments.filter(s => s.kind === "h").map(s => s.count);
+    const maxK = Math.max(1, ...horizLens);
+
+    let hW = Math.max(24, Math.min(capHW, (innerW - (maxK - 1) * gap) / maxK));
+    let hH = hW / DOM_BOARD_VERT_H_OVER_W;
+    let vW = hH;
+    let vH = hW;
+
+    let geom = placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap);
+    let spanW = geom.contentW;
+    let spanH = geom.contentH;
+
+    if (spanW > innerW * 0.97 && spanW > 0) {
+      const f = (innerW * 0.96) / spanW;
+      hW = Math.max(22, hW * f);
+      hH = hW / DOM_BOARD_VERT_H_OVER_W;
+      vW = hH;
+      vH = hW;
+      geom = placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap);
+      spanW = geom.contentW;
+      spanH = geom.contentH;
+    }
+
+    if (spanH > innerH * 0.96 && spanH > 0) {
+      const f = (innerH * 0.94) / spanH;
+      hW = Math.max(20, hW * f);
+      hH = hW / DOM_BOARD_VERT_H_OVER_W;
+      vW = hH;
+      vH = hW;
+      geom = placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap);
+      spanW = geom.contentW;
+      spanH = geom.contentH;
+      if (spanW > innerW * 0.97 && spanW > 0) {
+        const f2 = (innerW * 0.96) / spanW;
+        hW = Math.max(20, hW * f2);
+        hH = hW / DOM_BOARD_VERT_H_OVER_W;
+        vW = hH;
+        vH = hW;
+        geom = placeMixedSnake(segments, innerW, hW, hH, vW, vH, gap);
+        spanW = geom.contentW;
+        spanH = geom.contentH;
+      }
+    }
+
+    const shiftX = spanW > 0 ? (innerW - spanW) / 2 - geom.minL : 0;
+    const shiftY = 2 - geom.minT;
+    const placements = geom.placements.map(p => ({
+      left: Math.round(p.left + shiftX),
+      top: Math.round(p.top + shiftY),
+      w: p.w,
+      h: p.h,
+      vertical: p.vertical,
+    }));
+
+    const singleHorizRun = segments.length === 1 && segments[0].kind === "h";
+
+    return {
+      segments,
+      placements,
+      singleHorizRun,
+      contentW: Math.ceil(spanW),
+      contentH: Math.ceil(spanH),
+      padW: hW,
+      padH: hH,
+    };
+  }, [vm.line.length, rowSizes.board, rowSizes.boardH]);
 
   const passToastVisible = Boolean(passToast.trim());
 
   const renderBoard = () => (
     <div
       ref={boardRowMeasureRef}
-      className="relative flex h-full w-full max-w-full items-center justify-center overflow-hidden px-1"
+      className="relative flex h-full w-full max-w-full flex-col items-stretch justify-start overflow-hidden px-1"
     >
       <span
         className={`pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] text-zinc-500 ${T_OP} ${
@@ -684,39 +896,50 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
       >
         Empty — first tile sets the line.
       </span>
-      <div className={`relative flex max-h-full min-h-0 w-full max-w-full items-center ${T_OP} ${vm.line.length === 0 ? "opacity-0" : "opacity-100"}`}>
-        <div
-          className={`pointer-events-none absolute left-0 top-1/2 z-10 h-12 w-2 -translate-y-1/2 rounded-full bg-gradient-to-r from-sky-400/50 to-transparent blur-[1px] animate-ov2-dom-endpoint-glow ${T_OP} ${
-            needSidePick && lineOpens && vm.line.length > 0 ? "opacity-100" : "opacity-0"
-          }`}
-          aria-hidden
-        />
-        <div
-          className="flex max-h-full min-h-0 w-full min-w-0 max-w-full flex-nowrap items-center justify-center gap-1 overflow-hidden py-0.5"
-          style={{ minHeight: boardSegPx.rowH }}
-        >
-          {vm.line.map((seg, i) => {
-            const lo = Math.floor(Number(seg?.lo));
-            const hi = Math.floor(Number(seg?.hi));
-            return (
+      <div
+        className={`relative flex min-h-0 w-full max-w-full flex-1 flex-col ${T_OP} ${vm.line.length === 0 ? "opacity-0" : "opacity-100"}`}
+      >
+        {(() => {
+          const showEdgeGlow = needSidePick && lineOpens && vm.line.length > 0 && boardLayout.singleHorizRun;
+          const trackH = Math.max(boardLayout.contentH, boardLayout.padH || 1);
+          const trackW = Math.max(boardLayout.contentW, boardLayout.padW || 1);
+          return (
+            <>
               <div
-                key={i}
-                className="flex shrink-0 items-center justify-center overflow-hidden"
-                style={{ width: boardSegPx.segW, height: boardSegPx.rowH }}
-              >
-                <div style={{ transform: `scale(${boardSegPx.scale})`, transformOrigin: "center center" }}>
-                  <DominoFace a={lo} b={hi} vertical={false} />
+                className={`pointer-events-none absolute left-0 top-1/2 z-10 h-12 w-2 -translate-y-1/2 rounded-full bg-gradient-to-r from-sky-400/50 to-transparent blur-[1px] animate-ov2-dom-endpoint-glow ${T_OP} ${showEdgeGlow ? "opacity-100" : "opacity-0"}`}
+                aria-hidden
+              />
+              <div className="relative mx-auto min-h-0 w-full max-w-full flex-1 overflow-auto py-0.5">
+                <div className="relative mx-auto" style={{ width: trackW, height: trackH }}>
+                  {vm.line.map((seg, i) => {
+                    const p = boardLayout.placements[i];
+                    if (!p) return null;
+                    const lo = Math.floor(Number(seg?.lo));
+                    const hi = Math.floor(Number(seg?.hi));
+                    return (
+                      <div
+                        key={`t-${i}`}
+                        className="absolute flex items-center justify-center overflow-visible"
+                        style={{
+                          left: p.left,
+                          top: p.top,
+                          width: p.w,
+                          height: p.h,
+                        }}
+                      >
+                        <DominoFace a={lo} b={hi} vertical={p.vertical} pipSize="board" />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            );
-          })}
-        </div>
-        <div
-          className={`pointer-events-none absolute right-0 top-1/2 z-10 h-12 w-2 -translate-y-1/2 rounded-full bg-gradient-to-l from-sky-400/50 to-transparent blur-[1px] animate-ov2-dom-endpoint-glow ${T_OP} ${
-            needSidePick && lineOpens && vm.line.length > 0 ? "opacity-100" : "opacity-0"
-          }`}
-          aria-hidden
-        />
+              <div
+                className={`pointer-events-none absolute right-0 top-1/2 z-10 h-12 w-2 -translate-y-1/2 rounded-full bg-gradient-to-l from-sky-400/50 to-transparent blur-[1px] animate-ov2-dom-endpoint-glow ${T_OP} ${showEdgeGlow ? "opacity-100" : "opacity-0"}`}
+                aria-hidden
+              />
+            </>
+          );
+        })()}
       </div>
     </div>
   );
@@ -871,7 +1094,7 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden px-2 pt-0.5">
-          <div className="flex min-h-[9rem] flex-[1.55] basis-0 flex-col items-stretch justify-center overflow-hidden rounded-xl border border-white/10 sm:min-h-[10.5rem] md:min-h-[11.5rem]">
+          <div className="flex min-h-[9rem] flex-[1.55] basis-0 flex-col items-stretch justify-start overflow-hidden rounded-xl border border-white/10 sm:min-h-[10.5rem] md:min-h-[11.5rem]">
             {renderBoard()}
           </div>
 
