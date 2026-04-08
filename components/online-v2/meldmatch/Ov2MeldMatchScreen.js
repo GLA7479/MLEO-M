@@ -35,7 +35,6 @@ import {
   OV2_DUEL_PANEL_HAND_ACTIVE,
   OV2_DUEL_PANEL_LABEL,
   OV2_DUEL_PANEL_TOP,
-  OV2_DUEL_TOP_CARD_FACE,
   OV2_DUEL_SETTLEMENT_BADGE,
   OV2_DUEL_TIMER_ACTIVE,
   OV2_DUEL_TIMER_IDLE,
@@ -48,7 +47,6 @@ const MM_CARD_BACK_SRC = "/card-backs/meldmatch-back.jpg";
 const MM_CARD_FACE_SRC = "/card-backs/meldmatch-front.jpg";
 /** Tailwind `sm` breakpoint — hand fan fills row width only below this */
 const MM_HAND_NARROW_MAX_PX = 639;
-
 /**
  * @param {number} rowWidthPx
  * @param {number} cardCount
@@ -107,32 +105,59 @@ function mmCardUi(cardId) {
 }
 
 /**
- * @param {{ cardId: number|null|undefined, large?: boolean }} props
+ * @param {{ cardId: number|null|undefined, large?: boolean, table?: boolean }} props
+ * `table` — Top discard / stock row: scales to parent height on small screens (no fixed min size).
  */
-function MmCardFace({ cardId, large = false }) {
+function MmCardFace({ cardId, large = false, table = false }) {
   if (cardId == null) {
-    return <div className="flex h-full w-full items-center justify-center text-zinc-500">—</div>;
+    return (
+      <div
+        className={`flex items-center justify-center text-zinc-500 ${
+          table
+            ? "aspect-[5/7] h-[min(30dvh,7.9rem)] w-auto max-h-[7.9rem] shrink-0 sm:mx-0 sm:h-[9.15rem] sm:min-h-[9.15rem] sm:min-w-[6.55rem] sm:max-h-none"
+            : "h-full w-full"
+        }`}
+      >
+        —
+      </div>
+    );
   }
 
   const ui = mmCardUi(cardId);
   const pip = ui.suit;
   const pipColor = ui.red ? "text-rose-600" : "text-zinc-900";
 
+  const sizeCls = table
+    ? "mx-auto aspect-[5/7] h-[min(30dvh,7.9rem)] w-auto max-h-[7.9rem] shrink-0 sm:mx-0 sm:h-[9.15rem] sm:min-h-[9.15rem] sm:min-w-[6.55rem] sm:max-h-none sm:w-auto"
+    : large
+      ? "min-h-[6.6rem] min-w-[4.57rem] sm:min-h-[7.7rem] sm:min-w-[5.4rem]"
+      : "";
+
+  const rankText = table
+    ? "text-[10px] sm:text-[16px]"
+    : large
+      ? "text-[15px] sm:text-[16px]"
+      : "text-[14px]";
+  const pipText = table ? "text-[11px] sm:text-[17px]" : large ? "text-[16px] sm:text-[17px]" : "text-[15px]";
+  const pipPad = table ? "left-1 top-1 sm:left-1.5 sm:top-1.5" : "left-1.5 top-1.5";
+
   return (
     <div
-      className={`relative flex h-full w-full overflow-hidden rounded-[0.78rem] border-0 bg-zinc-100 text-zinc-900 shadow-[0_8px_16px_rgba(0,0,0,0.24)] ${large ? "min-h-[6.6rem] min-w-[4.57rem] sm:min-h-[7.7rem] sm:min-w-[5.4rem]" : ""}`}
+      className={`relative flex overflow-hidden rounded-[0.78rem] border-0 text-zinc-900 ${
+        table ? `bg-transparent shadow-none ${sizeCls}` : `h-full w-full bg-zinc-100 shadow-[0_8px_16px_rgba(0,0,0,0.24)] ${sizeCls}`
+      }`}
       title={`${ui.rank} of ${ui.suitName}`}
       aria-label={`${ui.rank} of ${ui.suitName}`}
     >
       <img
         src={MM_CARD_FACE_SRC}
         alt=""
-        className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
+        className={`pointer-events-none absolute inset-0 h-full w-full select-none ${table ? "object-contain" : "object-cover"}`}
         draggable={false}
       />
-      <div className={`absolute left-1.5 top-1.5 z-[1] flex flex-col items-center leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}>
-        <span className={`font-black ${large ? "text-[15px] sm:text-[16px]" : "text-[14px]"}`}>{ui.rank}</span>
-        <span className={`mt-[1px] ${large ? "text-[16px] sm:text-[17px]" : "text-[15px]"}`}>{pip}</span>
+      <div className={`absolute ${pipPad} z-[1] flex flex-col items-center leading-none [text-shadow:0_0_2px_rgba(255,255,255,0.95),0_1px_2px_rgba(0,0,0,0.35)] ${pipColor}`}>
+        <span className={`font-black ${rankText}`}>{ui.rank}</span>
+        <span className={`mt-[1px] ${pipText}`}>{pip}</span>
       </div>
     </div>
   );
@@ -818,41 +843,43 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
         ) : null}
 
         <div className="relative min-h-0 flex-1 rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_50%_44%,rgba(45,212,191,0.28),rgba(8,17,33,0.18)_36%,rgba(4,10,20,0.78)_82%),linear-gradient(180deg,rgba(19,34,56,0.5)_0%,rgba(6,12,24,0.82)_100%)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-16px_60px_rgba(0,0,0,0.28),0_24px_40px_rgba(0,0,0,0.35)] sm:p-3">
-          <div className="flex h-full flex-col justify-between gap-2">
-            <div className="rounded-2xl bg-zinc-900/18 p-2">
-              <p className="text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">Top discard</p>
-              <div className="mt-6 flex min-h-[11.3rem] w-full items-center justify-center gap-2 sm:mt-4 sm:min-h-[9rem] sm:gap-4">
-                <button
-                  type="button"
-                  disabled={!drawPhaseMyTurn || busy || vm.stockCount <= 0}
-                  onClick={() => void draw("stock")}
-                  className="inline-flex h-[5.5rem] min-w-0 flex-row items-stretch gap-1.5 overflow-hidden rounded-2xl border-0 bg-slate-900/50 px-1 py-0.5 text-left text-[10px] font-semibold text-slate-100 opacity-78 shadow-[0_6px_12px_rgba(0,0,0,0.28)] transition enabled:hover:-translate-y-1 enabled:hover:brightness-110 disabled:opacity-60 sm:h-[6.85rem] sm:gap-2 sm:px-1.5"
-                >
-                  <span className="flex min-w-0 flex-col items-start justify-center gap-0.5 self-center pl-0.5 leading-none sm:pl-1">
-                    <span className="leading-tight">Stock</span>
-                    <span className="text-[11px] font-semibold tabular-nums text-zinc-200">{vm.stockCount}</span>
-                  </span>
-                  <span className="relative h-full w-auto shrink-0 overflow-hidden rounded-lg border-0 aspect-[5/7] max-h-full">
-                    <img
-                      src={MM_CARD_BACK_SRC}
-                      alt=""
-                      className="h-full w-full object-cover object-center"
-                      draggable={false}
-                    />
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  disabled={!drawPhaseMyTurn || busy || vm.discardTop == null}
-                  onClick={() => void draw("discard")}
-                  className="inline-flex rounded-[1.35rem] disabled:opacity-70"
-                >
-                  <div
-                    className={`${OV2_DUEL_TOP_CARD_FACE} !min-h-0 !min-w-0 !max-w-none w-max !animate-none !border-0 !transition-none hover:!brightness-100 rounded-[1.2rem] bg-transparent p-0 font-semibold text-zinc-900 !will-change-auto [text-shadow:none] shadow-[0_12px_22px_rgba(0,0,0,0.28)] backdrop-blur-none`}
+          <div className="flex h-full min-h-0 flex-col justify-between gap-2">
+            <div className="flex min-h-0 flex-1 flex-col rounded-2xl bg-transparent p-2">
+              <p className="shrink-0 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">Top discard</p>
+              <div className="mt-3 flex min-h-0 flex-1 items-center justify-center sm:mt-4">
+                <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-4">
+                  <button
+                    type="button"
+                    disabled={!drawPhaseMyTurn || busy || vm.stockCount <= 0}
+                    onClick={() => void draw("stock")}
+                    className="inline-flex max-w-[46%] flex-row items-center gap-1.5 overflow-visible rounded-2xl border-0 bg-transparent px-1.5 py-1 text-left text-[10px] font-semibold text-slate-100 shadow-none transition enabled:hover:brightness-110 disabled:opacity-50 sm:h-[9.15rem] sm:max-w-none sm:items-center sm:px-1.5"
                   >
-                    <MmCardFace cardId={vm.discardTop ?? null} large />
-                  </div>
-                </button>
+                    <span className="relative z-[1] flex min-w-0 shrink flex-col items-center gap-0.5 pl-0.5 leading-none sm:pl-1 -translate-x-7 sm:-translate-x-8">
+                      <span className="inline-block text-center">
+                        <span className="block leading-tight">Stock</span>
+                        <span className="block text-[11px] font-semibold tabular-nums text-zinc-200">{vm.stockCount}</span>
+                      </span>
+                    </span>
+                    <span className="relative aspect-[5/7] h-[min(26dvh,6.5rem)] w-auto max-h-[6.5rem] shrink-0 overflow-hidden rounded-lg border-0 bg-transparent sm:h-[9.15rem] sm:max-h-none sm:min-w-[6.55rem]">
+                      <img
+                        src={MM_CARD_BACK_SRC}
+                        alt=""
+                        className="h-full w-full object-contain object-center"
+                        draggable={false}
+                      />
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!drawPhaseMyTurn || busy || vm.discardTop == null}
+                    onClick={() => void draw("discard")}
+                    className="inline-flex max-w-[52%] items-center justify-center rounded-[1.35rem] disabled:opacity-70 sm:max-w-none"
+                  >
+                    <div className="inline-flex shrink-0 items-center justify-center rounded-[1.2rem] bg-transparent p-0 shadow-none">
+                      <MmCardFace cardId={vm.discardTop ?? null} table />
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -868,7 +895,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           </p>
           <div
             ref={handRowRef}
-            className="flex h-[5rem] w-full items-end justify-center overflow-hidden px-0 pb-0.5 sm:h-[8.9rem] sm:px-1 md:h-[7.4rem]"
+            className="flex h-[min(5rem,26dvh)] w-full max-h-[5.25rem] items-end justify-center overflow-hidden px-0 pb-0.5 sm:h-[min(8.9rem,34dvh)] sm:max-h-[8.9rem] sm:px-1 md:h-[7.4rem] md:max-h-[7.4rem]"
           >
             {displayedHand.map((c, idx) => {
               const hid = `h-${idx}-${c}-${vm.revision}`;
