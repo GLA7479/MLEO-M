@@ -16,6 +16,7 @@ import {
 } from "../../../lib/online-v2/backgammon/ov2BackgammonDraftTurn";
 import { useOv2BackgammonSession } from "../../../hooks/useOv2BackgammonSession";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
+import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
 
 const AUTO_ROLL_STORAGE_KEY = "ov2_bg_auto_roll";
 const finishDismissStorageKey = sid => `ov2_bg_finish_dismiss_${sid}`;
@@ -27,6 +28,8 @@ const BTN_FL_SECONDARY =
   "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98]";
 const BTN_FL_DANGER =
   "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+const BTN_STAKE_ACCENT =
+  "rounded-lg border border-sky-500/24 bg-gradient-to-b from-sky-950/60 to-sky-950 px-3 py-2 text-[11px] font-semibold text-sky-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
 /** Pure UI: shared motion + micro-interactions. Shadow tokens: base + ambient only (see --ov2bg-sh-*). */
 const OV2BG_STYLE = `
@@ -295,6 +298,8 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     setErr,
     roll,
     submitTurn,
+    offerDouble,
+    respondDouble,
     requestRematch,
     cancelRematch,
     startNextMatch,
@@ -386,6 +391,13 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
 
   const stakePerSeat =
     room?.stake_per_seat != null && Number.isFinite(Number(room.stake_per_seat)) ? Number(room.stake_per_seat) : null;
+
+  const canOfferDoubleNow =
+    String(vm.phase) === "playing" &&
+    vm.mySeat === vm.turnSeat &&
+    vm.mustRespondDouble !== true &&
+    vm.canOfferDouble === true;
+  const stakeBtnDisabled = busy || vaultClaimBusy || !canOfferDoubleNow;
 
   const draftBase = useMemo(() => {
     if (!snapshot?.board || String(vm.phase) !== "playing" || !vm.canClientMove || vm.readOnly) return null;
@@ -657,6 +669,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     async idx => {
       if (vm.readOnly || busy) return;
       if (String(vm.phase) !== "playing") return;
+      if (vm.mustRespondDouble) return;
       if (!vm.canClientMove && !vm.canClientRoll) return;
       if (vm.canClientRoll) return;
 
@@ -744,7 +757,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   }, [vm.readOnly, busy, selFrom, legalDest, tryCompleteMove, flashInvalid]);
 
   const onBarClick = useCallback(() => {
-    if (vm.readOnly || busy || String(vm.phase) !== "playing" || !vm.canClientMove) return;
+    if (vm.readOnly || busy || String(vm.phase) !== "playing" || vm.mustRespondDouble || !vm.canClientMove) return;
     if (myBar <= 0) return;
     const dests = ov2BgClientLegalDestinationsForFrom(legalityBoard, -1);
     if (dests.size === 0) {
@@ -752,7 +765,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       return;
     }
     setSelFrom(s => (s === "bar" ? null : "bar"));
-  }, [vm.readOnly, busy, vm.phase, vm.canClientMove, myBar, legalityBoard, flashInvalid]);
+  }, [vm.readOnly, busy, vm.phase, vm.mustRespondDouble, vm.canClientMove, myBar, legalityBoard, flashInvalid]);
 
   useEffect(() => {
     if (
@@ -760,6 +773,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       !vm.canClientRoll ||
       busy ||
       vm.readOnly ||
+      vm.mustRespondDouble ||
       String(vm.phase) !== "playing" ||
       vm.mySeat == null ||
       vm.turnSeat == null ||
@@ -792,6 +806,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     vm.sessionId,
     vm.turnSeat,
     vm.mySeat,
+    vm.mustRespondDouble,
     roll,
     err,
   ]);
@@ -844,7 +859,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   const showResultModal = isFinished && finishSessionId.length > 0 && !finishModalDismissed;
 
   const isDraw = isFinished && vm.winnerSeat == null;
-  const finishMultiplier = 1;
+  const finishMultiplier = vm.stakeMultiplier ?? 1;
 
   const finishOutcome = useMemo(() => {
     if (!isFinished) return "unknown";
@@ -872,8 +887,9 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     if (!isFinished) return { text: "—", className: "text-zinc-500" };
     if (vaultClaimBusy) return { text: "…", className: "text-zinc-400" };
     if (stakePerSeat == null) return { text: "—", className: "text-zinc-500" };
-    const seat = Math.floor(stakePerSeat);
-    const pot = Math.floor(stakePerSeat * 2);
+    const mult = Math.max(1, Math.min(16, Math.floor(Number(finishMultiplier)) || 1));
+    const seat = Math.floor(stakePerSeat * mult);
+    const pot = Math.floor(stakePerSeat * 2 * mult);
     if (isDraw) {
       return { text: `+${seat} MLEO (refunded)`, className: "font-semibold tabular-nums text-emerald-300/95" };
     }
@@ -884,7 +900,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       return { text: `−${seat} MLEO`, className: "font-semibold tabular-nums text-rose-300/95" };
     }
     return { text: "—", className: "text-zinc-500" };
-  }, [isFinished, vaultClaimBusy, stakePerSeat, isDraw, didIWin, vm.mySeat, vm.winnerSeat]);
+  }, [isFinished, vaultClaimBusy, stakePerSeat, isDraw, didIWin, vm.mySeat, vm.winnerSeat, finishMultiplier]);
 
   const dismissFinishModal = useCallback(() => {
     if (!finishSessionId) return;
@@ -951,7 +967,7 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     }
   }, [room, roomId, selfKey, router]);
 
-  const boardDisabled = busy || vm.readOnly || String(vm.phase) !== "playing";
+  const boardDisabled = busy || vm.readOnly || vm.mustRespondDouble || String(vm.phase) !== "playing";
   const compactBoard = narrowViewport;
   /** UI only: slightly richer inner wood while a match is actively in `playing` phase (vs finished / between states). */
   const activePlayFelt = String(vm.phase).toLowerCase() === "playing";
@@ -1099,14 +1115,22 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     </div>
   );
 
+  const timerIsMine =
+    String(vm.phase) === "playing" &&
+    (vm.turnSeat === vm.mySeat ||
+      (vm.mustRespondDouble && Number(vm.pendingDouble?.responder_seat) === vm.mySeat));
   const turnTimerTone =
     vm.turnTimeLeftSec == null
-      ? "border-white/22 bg-zinc-900/65 text-zinc-100"
+      ? timerIsMine
+        ? "border-amber-400/42 bg-amber-950/40 text-amber-50/95"
+        : "border-white/22 bg-zinc-900/65 text-zinc-100"
       : vm.turnTimeLeftSec <= 5
         ? "animate-pulse border-red-500/48 bg-red-950/42 text-red-50"
         : vm.turnTimeLeftSec <= 10
           ? "border-amber-500/44 bg-amber-950/38 text-amber-50"
-          : "border-sky-500/40 bg-sky-950/38 text-sky-50";
+          : timerIsMine
+            ? "border-amber-400/40 bg-amber-950/35 text-amber-50/92"
+            : "border-sky-500/40 bg-sky-950/38 text-sky-50";
 
   const myMiss =
     vm.mySeat === 0 ? vm.missedStreakBySeat[0] : vm.mySeat === 1 ? vm.missedStreakBySeat[1] : 0;
@@ -1221,6 +1245,11 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
             ) : String(vm.phase) === "playing" ? (
               <span className="shrink-0 text-[9px] text-zinc-400 sm:text-[10px]">
                 Turn P{vm.turnSeat != null ? vm.turnSeat + 1 : "—"}
+              </span>
+            ) : null}
+            {String(vm.phase) === "playing" ? (
+              <span className="rounded border border-white/12 bg-zinc-950/45 px-1.5 py-0.5 text-[8px] font-medium tabular-nums text-zinc-200 sm:text-[9px]">
+                Table ×{vm.stakeMultiplier ?? 1}
               </span>
             ) : null}
             {String(vm.phase) === "playing" ? (
@@ -1346,10 +1375,20 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
             Auto
           </button>
         ) : null}
+        {String(vm.phase) === "playing" ? (
+          <button
+            type="button"
+            disabled={stakeBtnDisabled}
+            onClick={() => void offerDouble()}
+            className={`${BTN_STAKE_ACCENT} !rounded-md !px-2 !py-1 !text-[9px] sm:!py-1.5 sm:!text-[10px]`}
+          >
+            Increase table stake
+          </button>
+        ) : null}
         {vm.canClientRoll ? (
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || vm.mustRespondDouble}
             onClick={() => void roll()}
             className={`${OV2BG_BTN} rounded-md border border-emerald-500/46 bg-emerald-950/42 px-2 py-1 text-[9px] font-bold text-emerald-50 hover:border-emerald-400/50 sm:px-2.5 sm:py-1.5 sm:text-[10px] md:text-xs`}
           >
@@ -1395,6 +1434,15 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         Backgammon table: your home is in the lower half of the home column; opponent home above it; bar between board
         halves. Confirm turn to commit moves.
       </span>
+
+      <Ov2SharedStakeDoubleModal
+        open={String(vm.phase) === "playing" && vm.mustRespondDouble && Boolean(vm.pendingDouble)}
+        proposedMult={vm.pendingDouble?.proposed_mult}
+        stakeMultiplier={vm.stakeMultiplier}
+        busy={busy}
+        onAccept={() => void respondDouble(true)}
+        onDecline={() => void respondDouble(false)}
+      />
 
       {isFinished ? (
         showResultModal ? (

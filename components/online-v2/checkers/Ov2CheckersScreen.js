@@ -13,7 +13,9 @@ import {
   ov2CheckersViewToServerIdx,
 } from "../../../lib/online-v2/checkers/ov2CheckersClientLegality";
 import { useOv2CheckersSession } from "../../../hooks/useOv2CheckersSession";
+import Ov2BoardDuelPlayerHeader from "../shared/Ov2BoardDuelPlayerHeader";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
+import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
 
 const finishDismissStorageKey = sid => `ov2_ck_finish_dismiss_${sid}`;
 
@@ -27,9 +29,7 @@ const BTN_ACCENT =
 const BTN_FINISH_DANGER =
   "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_DANGER =
-  "w-full rounded-lg border border-[#4a3035]/72 bg-gradient-to-b from-[#2e2226] to-[#10090b] py-2 px-3 text-[11px] font-semibold text-rose-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_3px_12px_rgba(0,0,0,0.32)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
-const BTN_GHOST =
-  "w-full rounded-lg border border-white/[0.1] bg-zinc-900/42 py-2 px-3 text-xs font-semibold text-zinc-200/76 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98]";
+  "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
 /**
  * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string }, onLeaveToLobby?: () => void|Promise<void>, leaveToLobbyBusy?: boolean } | null, onSessionRefresh?: (prev: string, rpcNew?: string, opts?: { expectClearedSession?: boolean }) => Promise<unknown> }} props
@@ -37,8 +37,22 @@ const BTN_GHOST =
 export default function Ov2CheckersScreen({ contextInput = null, onSessionRefresh }) {
   const router = useRouter();
   const session = useOv2CheckersSession(contextInput ?? undefined);
-  const { snapshot, vm, busy, vaultClaimBusy, err, setErr, applyStep, requestRematch, cancelRematch, startNextMatch, isHost, roomMatchSeq } =
-    session;
+  const {
+    snapshot,
+    vm,
+    busy,
+    vaultClaimBusy,
+    err,
+    setErr,
+    applyStep,
+    offerDouble,
+    respondDouble,
+    requestRematch,
+    cancelRematch,
+    startNextMatch,
+    isHost,
+    roomMatchSeq,
+  } = session;
   const [selViewIdx, setSelViewIdx] = useState(/** @type {number|null} */ (null));
   const [rematchBusy, setRematchBusy] = useState(false);
   const [startNextBusy, setStartNextBusy] = useState(false);
@@ -50,6 +64,35 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
   const roomId = room?.id != null ? String(room.id) : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
+
+  const seatDisplayName = useMemo(() => {
+    /** @type {{ 0: string, 1: string }} */
+    const out = { 0: "", 1: "" };
+    for (const m of members) {
+      const si = m?.seat_index;
+      if (si !== 0 && si !== 1) continue;
+      out[si] = String(m?.display_name ?? "").trim();
+    }
+    return out;
+  }, [members]);
+  const seat0Label = seatDisplayName[0] ? seatDisplayName[0] : "Guest";
+  const seat1Label = seatDisplayName[1] ? seatDisplayName[1] : "Guest";
+
+  const indicatorSeat = useMemo(() => {
+    if (String(vm.phase || "").toLowerCase() !== "playing") return null;
+    if (vm.mustRespondDouble && vm.pendingDouble?.responder_seat != null) {
+      const rs = Number(vm.pendingDouble.responder_seat);
+      if (rs === 0 || rs === 1) return rs;
+    }
+    const t = vm.turnSeat;
+    return t === 0 || t === 1 ? t : null;
+  }, [vm.phase, vm.mustRespondDouble, vm.pendingDouble, vm.turnSeat]);
+
+  const canOfferDoubleNow =
+    vm.phase === "playing" &&
+    vm.mySeat === vm.turnSeat &&
+    vm.mustRespondDouble !== true &&
+    vm.canOfferDouble === true;
 
   useEffect(() => {
     setSelViewIdx(null);
@@ -99,7 +142,7 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
 
   const onCellClick = useCallback(
     async viewIdx => {
-      if (vm.readOnly || !vm.canClientMove || busy || vaultClaimBusy) return;
+      if (vm.readOnly || !vm.canClientMove || busy || vaultClaimBusy || vm.mustRespondDouble) return;
       if (turn == null || mySeat == null) return;
       const serverIdx = ov2CheckersViewToServerIdx(viewIdx, mySeat);
       const occupant = cells[serverIdx];
@@ -165,6 +208,8 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
     },
     [vm, busy, vaultClaimBusy, turn, mySeat, chainAt, cells, selViewIdx, applyStep, setErr]
   );
+
+  const stakeBtnDisabled = busy || vaultClaimBusy || !canOfferDoubleNow;
 
   const onRematch = useCallback(async () => {
     if (!roomId || rematchBusy) return;
@@ -255,7 +300,7 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
 
   const stakePerSeat =
     room?.stake_per_seat != null && Number.isFinite(Number(room.stake_per_seat)) ? Number(room.stake_per_seat) : null;
-  const finishMultiplier = 1;
+  const finishMultiplier = vm.stakeMultiplier ?? 1;
 
   const winnerDisplayName = useMemo(() => {
     if (vm.winnerSeat == null) return "";
@@ -290,8 +335,9 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
     if (!finished) return { text: "—", className: "text-zinc-500" };
     if (vaultClaimBusy) return { text: "…", className: "text-zinc-400" };
     if (stakePerSeat == null) return { text: "—", className: "text-zinc-500" };
-    const seat = Math.floor(stakePerSeat);
-    const pot = Math.floor(stakePerSeat * 2);
+    const mult = Math.max(1, Math.min(16, Math.floor(Number(finishMultiplier)) || 1));
+    const seat = Math.floor(stakePerSeat * mult);
+    const pot = Math.floor(stakePerSeat * 2 * mult);
     if (isDraw) {
       return { text: `+${seat} MLEO (refunded)`, className: "font-semibold tabular-nums text-emerald-300/95" };
     }
@@ -302,7 +348,7 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
       return { text: `−${seat} MLEO`, className: "font-semibold tabular-nums text-rose-300/95" };
     }
     return { text: "—", className: "text-zinc-500" };
-  }, [finished, vaultClaimBusy, stakePerSeat, isDraw, didIWin, vm.mySeat, vm.winnerSeat]);
+  }, [finished, vaultClaimBusy, stakePerSeat, isDraw, didIWin, vm.mySeat, vm.winnerSeat, finishMultiplier]);
 
   const dismissFinishModal = useCallback(() => {
     if (!finishSessionId) return;
@@ -333,54 +379,57 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
   );
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
-      <div className="flex min-h-[3.25rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.5rem]">
-        <div className="rounded-lg border border-white/[0.08] bg-zinc-950/50 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:px-2 sm:py-2">
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[11px] sm:text-[12px]">
+    <div className="relative flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden bg-zinc-950 px-1 pb-1 sm:min-h-0 sm:gap-1 sm:px-2 sm:pb-1.5">
+      <div className="flex shrink-0 flex-col gap-0.5 sm:gap-0.5">
+        <div className="rounded-lg border border-white/[0.1] bg-zinc-900/70 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:py-1 sm:px-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
             <div
-              className={`flex min-h-[1.625rem] items-center rounded-md border px-2.5 py-1 tabular-nums shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-1px_2px_rgba(0,0,0,0.35)] ${
-                vm.phase === "playing" && vm.turnSeat === vm.mySeat
-                  ? "border-amber-400/38 bg-amber-950/50 text-amber-50/92"
-                  : "border-white/[0.12] bg-zinc-950/65 text-zinc-400"
+              className={`flex min-h-[1.625rem] items-center rounded-md border px-2 py-0.5 tabular-nums ${
+                vm.phase === "playing" &&
+                (vm.turnSeat === vm.mySeat ||
+                  (vm.mustRespondDouble && Number(vm.pendingDouble?.responder_seat) === vm.mySeat))
+                  ? "border-amber-400/35 bg-amber-950/45 text-amber-50/92"
+                  : "border-white/[0.12] bg-zinc-950/55 text-zinc-400"
               }`}
             >
               {vm.phase === "playing" && vm.turnTimeLeftSec != null ? (
-                <span className="tracking-wide">
-                  <span className="text-[10px] font-medium uppercase text-zinc-500 sm:text-[10px]">Turn</span>{" "}
-                  <span className="text-[12px] font-semibold text-zinc-100 sm:text-[13px]">~{vm.turnTimeLeftSec}s</span>
+                <span>
+                  <span className="font-medium uppercase text-zinc-500">Timer</span>{" "}
+                  <span className="font-semibold text-zinc-100">~{vm.turnTimeLeftSec}s</span>
                 </span>
+              ) : vm.phase === "finished" ? (
+                <span className="font-medium text-zinc-500">Round over</span>
               ) : (
-                <span className="text-zinc-500">—</span>
+                <span>—</span>
               )}
             </div>
-            {vaultClaimBusy ? (
-              <span className="rounded-md border border-sky-500/18 bg-sky-950/35 px-2 py-0.5 text-[10px] font-medium text-sky-100/88 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                Settlement…
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded border border-white/12 bg-zinc-950/40 px-2 py-0.5 font-medium tabular-nums text-zinc-200">
+                Table ×{vm.stakeMultiplier ?? 1}
               </span>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex min-h-[2.5rem] flex-col justify-center text-[11px] leading-snug">
-          {err ? (
-            <div className="rounded-md border border-red-500/20 bg-red-950/20 px-2 py-1.5 text-red-200/95 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-              <p className="pr-1">
-                {err}{" "}
-                <button
-                  type="button"
-                  className="ml-1 inline align-baseline text-[10px] font-medium text-red-300/90 underline decoration-red-400/40 underline-offset-2 transition hover:text-red-200"
-                  onClick={() => setErr("")}
-                >
-                  Dismiss
-                </button>
-              </p>
+              {vaultClaimBusy ? (
+                <span className="rounded-md border border-sky-500/22 bg-sky-950/40 px-2 py-0.5 text-[10px] text-sky-100/90">
+                  Settlement…
+                </span>
+              ) : null}
             </div>
-          ) : (
-            <div className="min-h-[2.5rem]" aria-hidden="true" />
-          )}
+          </div>
         </div>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-zinc-950">
+      <div className="mt-2 flex min-h-0 flex-1 flex-col gap-0 overflow-x-hidden overscroll-contain sm:mt-2.5 sm:min-h-0 sm:overflow-y-hidden">
+        <Ov2BoardDuelPlayerHeader
+          game="checkers"
+          seat0Label={seat0Label}
+          seat1Label={seat1Label}
+          mySeat={vm.mySeat}
+          indicatorSeat={indicatorSeat}
+          phase={String(vm.phase || "")}
+          missedStreakBySeat={vm.missedStreakBySeat}
+          mustRespondDouble={vm.mustRespondDouble === true}
+        />
+
+        <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden bg-zinc-950">
         <div
           className="relative z-[1] -mt-1.5 mb-[-4px] w-full max-w-[min(100%,448px)] rounded-[10px] p-[2px] shadow-[0_0_0_1px_rgba(255,255,255,0.09),0_0_0_1px_rgba(0,0,0,0.5),0_8px_28px_rgba(0,0,0,0.42),0_0_48px_rgba(18,26,42,0.28),inset_0_1px_0_rgba(255,255,255,0.14),inset_0_-2px_5px_rgba(0,0,0,0.28)] sm:max-w-[min(100%,548px)]"
           style={{
@@ -427,7 +476,7 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
                   <button
                     key={viewPos}
                     type="button"
-                    disabled={vm.readOnly || busy}
+                    disabled={vm.readOnly || busy || vm.mustRespondDouble}
                     onClick={() => void onCellClick(viewPos)}
                     className={`relative flex min-h-0 min-w-0 items-center justify-center outline-none transition-[box-shadow,opacity] disabled:opacity-50 ${baseSq} ${hierarchyClass}`}
                     style={{ WebkitTapHighlightColor: "transparent" }}
@@ -479,6 +528,46 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
           </div>
         </div>
       </div>
+
+        <div className="mt-5 shrink-0 pt-4 md:mt-4 md:pt-3 md:pb-2">
+          <div className="mx-auto flex w-full max-w-2xl min-w-0 flex-row items-stretch gap-2 md:max-w-3xl md:justify-center md:gap-3">
+            <button
+              type="button"
+              disabled={stakeBtnDisabled}
+              className={`${BTN_ACCENT} flex min-h-[2.75rem] min-w-0 flex-[1.65] items-center justify-center px-2 py-2.5 text-center !text-xs font-semibold leading-tight sm:!text-sm md:flex-1 md:max-w-md md:px-4 md:py-2.5`}
+              onClick={() => void offerDouble()}
+            >
+              Increase table stake
+            </button>
+            <button
+              type="button"
+              disabled={exitBusy || !pk}
+              className={`${BTN_DANGER} flex min-h-[2.75rem] min-w-0 flex-1 items-center justify-center px-2 py-2.5 text-center !text-xs font-semibold leading-tight sm:!text-sm md:max-w-[12.5rem] md:flex-none md:shrink-0 md:px-4 md:py-2.5`}
+              onClick={() => void onExitToLobby()}
+            >
+              {exitBusy ? "Leaving…" : "Leave table"}
+            </button>
+          </div>
+          {exitErr ? <p className="mt-2 text-center text-[11px] text-red-300">{exitErr}</p> : null}
+          {err ? (
+            <div className="mt-2 rounded-md border border-red-500/20 bg-red-950/20 px-2 py-1.5 text-[11px] text-red-200/95">
+              <span>{err}</span>{" "}
+              <button type="button" className="text-red-300 underline" onClick={() => setErr("")}>
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <Ov2SharedStakeDoubleModal
+        open={vm.phase === "playing" && vm.mustRespondDouble && vm.pendingDouble}
+        proposedMult={vm.pendingDouble?.proposed_mult}
+        stakeMultiplier={vm.stakeMultiplier}
+        busy={busy}
+        onAccept={() => void respondDouble(true)}
+        onDecline={() => void respondDouble(false)}
+      />
 
       {showResultModal ? (
         <Ov2SharedFinishModalFrame titleId="ov2-ck-finish-title">
@@ -589,13 +678,6 @@ export default function Ov2CheckersScreen({ contextInput = null, onSessionRefres
           <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.1] pt-3">{finishDismissedStripActions}</div>
         </div>
       ) : null}
-
-      <div className="shrink-0">
-        <button type="button" disabled={exitBusy || !pk} onClick={() => void onExitToLobby()} className={BTN_DANGER}>
-          {exitBusy ? "Leaving…" : "Leave table"}
-        </button>
-        {exitErr ? <p className="mt-1 min-h-[1rem] text-[10px] text-red-300/95">{exitErr}</p> : null}
-      </div>
     </div>
   );
 }

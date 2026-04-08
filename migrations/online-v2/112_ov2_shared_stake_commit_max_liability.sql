@@ -1,5 +1,6 @@
 -- OV2 shared: max round liability at stake commit (16× stake_per_seat for 1v1 ping-pong double products)
--- and open_session guard. Apply after 007_ov2_stake_commit.sql and before / alongside fourline 107 + 108–111.
+-- and open_session guard. Apply after 007_ov2_stake_commit.sql.
+-- Includes board-path doubles: fourline 107, flipgrid 108, fleethunt 109, dominoes 110, meldmatch 111; chess 146, checkers 147, backgammon 148.
 
 BEGIN;
 
@@ -11,10 +12,13 @@ IMMUTABLE
 SET search_path = public
 AS $$
   SELECT CASE trim(coalesce(p_product_game_id, ''))
-    WHEN 'ov2_fourline' THEN 16
-    WHEN 'ov2_flipgrid' THEN 16
-    WHEN 'ov2_fleet_hunt' THEN 16
+    WHEN 'ov2_backgammon' THEN 16
+    WHEN 'ov2_checkers' THEN 16
+    WHEN 'ov2_chess' THEN 16
     WHEN 'ov2_dominoes' THEN 16
+    WHEN 'ov2_fleet_hunt' THEN 16
+    WHEN 'ov2_flipgrid' THEN 16
+    WHEN 'ov2_fourline' THEN 16
     WHEN 'ov2_meldmatch' THEN 16
     ELSE 1
   END;

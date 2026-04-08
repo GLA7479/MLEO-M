@@ -95,10 +95,12 @@ backgammon/082_ov2_backgammon_shared_integration.sql
 backgammon/083_ov2_backgammon_turn_timer.sql
 backgammon/084_ov2_backgammon_submit_turn.sql
 backgammon/085_ov2_backgammon_submit_turn_crash_safe.sql
+backgammon/148_ov2_backgammon_double_pingpong.sql
 checkers/086_ov2_checkers_schema.sql
 checkers/087_ov2_checkers_engine.sql
 checkers/088_ov2_checkers_rpcs.sql
 checkers/089_ov2_checkers_shared_integration.sql
+checkers/147_ov2_checkers_double_pingpong.sql
 chess/090_ov2_chess_schema.sql
 chess/091_ov2_chess_engine_core.sql
 chess/092_ov2_chess_engine_apply.sql
@@ -106,6 +108,7 @@ chess/093_ov2_chess_engine_complete.sql
 chess/094_ov2_chess_rpcs.sql
 chess/095_ov2_chess_shared_integration.sql
 chess/096_ov2_chess_mate_legal_ux.sql
+chess/146_ov2_chess_double_pingpong.sql
 dominoes/097_ov2_dominoes_schema.sql
 dominoes/098_ov2_dominoes_engine.sql
 dominoes/099_ov2_dominoes_rpcs.sql

@@ -5,7 +5,9 @@ import {
   requestOv2CheckersApplyStep,
   requestOv2CheckersCancelRematch,
   requestOv2CheckersMarkTurnTimeout,
+  requestOv2CheckersOfferDouble,
   requestOv2CheckersRequestRematch,
+  requestOv2CheckersRespondDouble,
   requestOv2CheckersStartNextMatch,
   subscribeOv2CheckersSnapshot,
 } from "../lib/online-v2/checkers/ov2CheckersSessionAdapter";
@@ -111,9 +113,11 @@ export function useOv2CheckersSession(baseContext) {
     if (!s || String(s.phase || "").toLowerCase() !== "playing") return undefined;
     const dl = s.turnDeadline != null ? Number(s.turnDeadline) : NaN;
     const sid = String(s.sessionId || "").trim();
-    const turn = s.turnSeat != null ? Number(s.turnSeat) : NaN;
-    if (!sid || !Number.isFinite(dl) || !Number.isInteger(turn) || (turn !== 0 && turn !== 1)) return undefined;
-    const turnKey = `${sid}|${dl}|${turn}`;
+    const turnSeat = s.turnSeat != null ? Number(s.turnSeat) : NaN;
+    const pd = s.pendingDouble && typeof s.pendingDouble === "object" ? s.pendingDouble : null;
+    const dlSeat = pd?.responder_seat != null ? Number(pd.responder_seat) : turnSeat;
+    if (!sid || !Number.isFinite(dl) || !Number.isInteger(dlSeat) || (dlSeat !== 0 && dlSeat !== 1)) return undefined;
+    const turnKey = `${sid}|${dl}|${dlSeat}|${pd ? "dbl" : "mv"}`;
     if (processedTurnTimeoutKeysRef.current.has(turnKey)) return undefined;
     const ms = Math.max(0, dl - Date.now());
     const t = window.setTimeout(() => {
@@ -123,8 +127,9 @@ export function useOv2CheckersSession(baseContext) {
         if (!cur || String(cur.phase || "").toLowerCase() !== "playing") return;
         const vdl = cur.turnDeadline != null ? Number(cur.turnDeadline) : NaN;
         const vsid = String(cur.sessionId || "").trim();
-        const vturn = cur.turnSeat != null ? Number(cur.turnSeat) : NaN;
-        const vkey = `${vsid}|${vdl}|${vturn}`;
+        const vPd = cur.pendingDouble && typeof cur.pendingDouble === "object" ? cur.pendingDouble : null;
+        const vDlSeat = vPd?.responder_seat != null ? Number(vPd.responder_seat) : Number(cur.turnSeat);
+        const vkey = `${vsid}|${vdl}|${vDlSeat}|${vPd ? "dbl" : "mv"}`;
         if (vkey !== turnKey || Date.now() < vdl) return;
         const revBefore = cur.revision != null ? Number(cur.revision) : NaN;
         const r = await requestOv2CheckersMarkTurnTimeout(roomId, selfKey, {
@@ -153,6 +158,7 @@ export function useOv2CheckersSession(baseContext) {
     snap?.turnSeat,
     snap?.phase,
     snap?.revision,
+    snap?.pendingDouble,
   ]);
 
   const applyStep = useCallback(
@@ -164,6 +170,49 @@ export function useOv2CheckersSession(baseContext) {
         const r = await requestOv2CheckersApplyStep(roomId, selfKey, fromIdx, toIdx, { revision: snap.revision });
         if (!r.ok) {
           setErr(r.error || "Move failed");
+          return { ok: false };
+        }
+        if (r.snapshot) setSnap(r.snapshot);
+        return { ok: true };
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e));
+        return { ok: false };
+      } finally {
+        setBusy(false);
+      }
+    },
+    [roomId, selfKey, snap]
+  );
+
+  const offerDouble = useCallback(async () => {
+    if (!roomId || !selfKey || !snap) return { ok: false };
+    setBusy(true);
+    setErr("");
+    try {
+      const r = await requestOv2CheckersOfferDouble(roomId, selfKey, { revision: snap.revision });
+      if (!r.ok) {
+        setErr(r.error || "Could not propose stake increase");
+        return { ok: false };
+      }
+      if (r.snapshot) setSnap(r.snapshot);
+      return { ok: true };
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      return { ok: false };
+    } finally {
+      setBusy(false);
+    }
+  }, [roomId, selfKey, snap]);
+
+  const respondDouble = useCallback(
+    async accept => {
+      if (!roomId || !selfKey || !snap) return { ok: false };
+      setBusy(true);
+      setErr("");
+      try {
+        const r = await requestOv2CheckersRespondDouble(roomId, selfKey, accept, { revision: snap.revision });
+        if (!r.ok) {
+          setErr(r.error || "Response failed");
           return { ok: false };
         }
         if (r.snapshot) setSnap(r.snapshot);
@@ -236,6 +285,11 @@ export function useOv2CheckersSession(baseContext) {
       turnTimeLeftSec,
       missedStreakBySeat: { 0: m0, 1: m1 },
       jumpChainAt: jumpChainAtVm,
+      stakeMultiplier: snap?.stakeMultiplier ?? 1,
+      doublesAccepted: snap?.doublesAccepted ?? 0,
+      pendingDouble: snap?.pendingDouble ?? null,
+      canOfferDouble: snap?.canOfferDouble === true,
+      mustRespondDouble: snap?.mustRespondDouble === true,
     };
   }, [snap, nowMs]);
 
@@ -247,6 +301,8 @@ export function useOv2CheckersSession(baseContext) {
     err,
     setErr,
     applyStep,
+    offerDouble,
+    respondDouble,
     requestRematch,
     cancelRematch,
     startNextMatch,
