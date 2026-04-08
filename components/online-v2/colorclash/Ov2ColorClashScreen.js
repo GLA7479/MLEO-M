@@ -76,7 +76,7 @@ function ccCardPresentation(card) {
   if (t === "s") return { label: "SKIP", sub: "Skip next", wild: false };
   if (t === "r") return { label: "REVERSE", sub: "Turn flip", wild: false };
   if (t === "d") return { label: "+2", sub: "Draw two", wild: false };
-  return { label, sub: "Number card", wild: !hasColor };
+  return { label, sub: "", wild: !hasColor };
 }
 
 /** Same face layout as hand pills — modestly larger than hand, compact so the hand stays visible */
@@ -105,9 +105,11 @@ function CcTopDiscardCardFace({ card }) {
           <span className="shrink-0">{p.wild ? "★" : "●"}</span>
         </span>
         <span className="px-0.5 text-center text-xl font-black leading-none sm:text-2xl">{p.label}</span>
-        <span className="text-center text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-[11px]">
-          {p.sub}
-        </span>
+        {p.sub ? (
+          <span className="text-center text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-[11px]">
+            {p.sub}
+          </span>
+        ) : null}
       </span>
     </div>
   );
@@ -764,6 +766,10 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                 >
                   {err}
                 </button>
+              ) : turnGuidance ? (
+                <p className="line-clamp-3 max-w-[18rem] text-center text-[8px] font-medium leading-snug text-zinc-200/92 sm:text-[9px]">
+                  {turnGuidance}
+                </p>
               ) : (
                 <span
                   className="pointer-events-none line-clamp-3 max-w-[18rem] text-center text-[8px] text-transparent sm:text-[9px]"
@@ -776,11 +782,6 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
           </div>
         </div>
 
-        {turnGuidance ? (
-          <div className="flex min-h-[2.75rem] shrink-0 items-center justify-center rounded-md border border-white/10 bg-zinc-900/45 px-2 py-1 text-center text-[10px] font-medium leading-snug text-zinc-100 sm:min-h-[2.5rem] sm:py-1.5 sm:text-[11px]">
-            {turnGuidance}
-          </div>
-        ) : null}
         {vm.phase === "playing" && vm.mySeat != null && ccPlayingActionSlotInner ? (
           <div className="flex min-h-0 shrink-0 flex-col gap-1 px-0.5">
             {ccPlayingActionSlotInner}
@@ -897,7 +898,9 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                           <span>{p.wild ? "★" : "●"}</span>
                         </span>
                         <span className="mt-0.5 text-center text-sm font-black leading-none sm:mt-1 sm:text-lg">{p.label}</span>
-                        <span className="mt-auto text-center text-[8px] font-semibold uppercase tracking-wide text-white/85">{p.sub}</span>
+                        {p.sub ? (
+                          <span className="mt-auto text-center text-[8px] font-semibold uppercase tracking-wide text-white/85">{p.sub}</span>
+                        ) : null}
                       </span>
                     );
                   })()}
