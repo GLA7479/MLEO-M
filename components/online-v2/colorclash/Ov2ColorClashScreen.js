@@ -89,16 +89,16 @@ function CcSharedCardFaceInner({ card, variant }) {
   const ring = Number.isInteger(ci) && ci >= 0 && ci <= 3 ? CC_COLOR_CARD_RING[ci] : "ring-fuchsia-300/40";
   const isTop = variant === "top";
   const innerClass = isTop
-    ? `flex h-full min-h-[6.75rem] w-full flex-col justify-between rounded-lg border border-white/30 bg-black/20 px-0.5 py-0.5 text-white ring-1 sm:min-h-[8.35rem] sm:px-1 sm:py-0.5 ${ring}`
+    ? `flex h-full min-h-[5.25rem] w-full flex-col justify-between rounded-md border border-white/30 bg-black/20 px-0.5 py-px text-white ring-1 sm:min-h-[8.35rem] sm:rounded-lg sm:px-1 sm:py-0.5 ${ring}`
     : `flex min-h-0 w-full flex-1 flex-col justify-between rounded-md border border-white/25 bg-black/25 p-px text-white ring-1 sm:rounded-lg sm:p-0.5 ${ring}`;
   const cornerClass = isTop
-    ? "flex items-start justify-between text-sm font-bold leading-none sm:text-base"
+    ? "flex items-start justify-between text-[10px] font-bold leading-none sm:text-base"
     : "flex items-start justify-between text-[9px] font-bold leading-none sm:text-[10px]";
   const mainClass = isTop
-    ? "px-0.5 text-center text-3xl font-black leading-none sm:text-4xl"
+    ? "px-0.5 text-center text-2xl font-black leading-none sm:text-4xl"
     : "px-px text-center text-base font-black leading-none sm:text-xl";
   const subClass = isTop
-    ? "text-center text-xs font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-sm"
+    ? "text-center text-[9px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-sm"
     : "text-center text-[8px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-[9px]";
 
   return (
@@ -117,7 +117,7 @@ function CcSharedCardFaceInner({ card, variant }) {
 function CcTopDiscardCardFace({ card }) {
   if (card == null || typeof card !== "object") {
     return (
-      <div className="relative z-[1] inline-flex min-h-[8.4rem] min-w-[6rem] items-center justify-center rounded-xl border border-white/15 bg-zinc-900/55 text-center font-mono text-lg font-semibold text-zinc-500 sm:min-h-[10.15rem] sm:min-w-[7.15rem] sm:text-xl">
+      <div className="relative z-[1] inline-flex min-h-[6.85rem] min-w-[5.15rem] items-center justify-center rounded-lg border border-white/15 bg-zinc-900/55 text-center font-mono text-sm font-semibold text-zinc-500 sm:min-h-[10.15rem] sm:min-w-[7.15rem] sm:rounded-xl sm:text-xl">
         —
       </div>
     );
@@ -127,7 +127,7 @@ function CcTopDiscardCardFace({ card }) {
   const gradientClass = colorBg ? `bg-gradient-to-b ${colorBg}` : "bg-gradient-to-b from-fuchsia-500 to-indigo-700";
   return (
     <div
-      className={`relative z-[1] inline-flex min-h-[8.4rem] min-w-[6rem] flex-col rounded-xl border border-white/35 px-0.5 py-0.5 sm:min-h-[10.15rem] sm:min-w-[7.15rem] sm:px-1 sm:py-0.5 ${gradientClass}`}
+      className={`relative z-[1] inline-flex min-h-[6.85rem] min-w-[5.15rem] flex-col rounded-lg border border-white/35 px-0.5 py-px sm:min-h-[10.15rem] sm:min-w-[7.15rem] sm:rounded-xl sm:px-1 sm:py-0.5 ${gradientClass}`}
     >
       <CcSharedCardFaceInner card={card} variant="top" />
     </div>
@@ -669,38 +669,38 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
       <div className="flex min-h-0 w-full flex-1 flex-col gap-0.5 overflow-hidden sm:gap-0.5">
         <div className={`${OV2_DUEL_ACTION_GROUP} flex min-h-0 flex-1 flex-col`}>
           <div className={`${OV2_DUEL_PANEL_TOP} relative flex min-h-0 flex-1 flex-col p-2 sm:p-3`}>
-            <div className="relative z-10 mb-1 shrink-0 pr-[6.2rem] sm:pr-[6.85rem]">
+            <div className="relative z-10 mb-1 shrink-0 pr-[5.35rem] sm:pr-[6.85rem]">
               <p className={`text-left text-[10px] leading-tight sm:text-center ${OV2_DUEL_PANEL_LABEL}`}>
                 Top discard (match this card)
               </p>
             </div>
             {/* err / turn / stock hints — floated left so the card area keeps full height */}
             {err || turnGuidance || stockEmptyHint ? (
-              <div className="pointer-events-none absolute bottom-2 left-2 z-30 w-[7.35rem] max-w-[7.35rem] sm:bottom-3 sm:left-3 sm:w-[7.85rem] sm:max-w-[7.85rem]">
+              <div className="pointer-events-none absolute bottom-2 left-2 z-30 max-w-[7.35rem] sm:bottom-3 sm:left-3 sm:max-w-[7.85rem]">
                 {err ? (
                   <button
                     type="button"
-                    className="pointer-events-auto flex min-h-[5.85rem] w-full flex-col justify-center rounded-md border border-rose-500/25 bg-zinc-950/82 px-1.5 py-3 text-left text-[10px] font-medium leading-normal text-rose-200/95 shadow-lg backdrop-blur-[2px] sm:min-h-[6.5rem] sm:text-[11px]"
+                    className="pointer-events-auto w-full cursor-pointer appearance-none border-0 bg-transparent p-0 text-left text-[10px] font-medium leading-normal text-rose-200/95 sm:text-[11px]"
                     title="Tap to clear"
                     onClick={() => setErr("")}
                   >
                     <span className="line-clamp-8">{err}</span>
                   </button>
                 ) : turnGuidance ? (
-                  <p className="flex min-h-[5.85rem] flex-col justify-center rounded-md border border-white/10 bg-zinc-950/78 px-1.5 py-3 text-left text-[10px] font-medium leading-normal text-zinc-100/92 shadow-lg backdrop-blur-[2px] sm:min-h-[6.5rem] sm:text-[11px]">
+                  <p className="m-0 text-left text-[10px] font-medium leading-normal text-zinc-100/92 sm:text-[11px]">
                     <span className="line-clamp-8">{turnGuidance}</span>
                   </p>
                 ) : stockEmptyHint ? (
-                  <p className="flex min-h-[5.85rem] flex-col justify-center rounded-md border border-amber-500/20 bg-zinc-950/78 px-1.5 py-3 text-left text-[10px] font-medium leading-normal text-amber-200/90 shadow-lg backdrop-blur-[2px] sm:min-h-[6.5rem] sm:text-[11px]">
+                  <p className="m-0 text-left text-[10px] font-medium leading-normal text-amber-200/90 sm:text-[11px]">
                     <span className="line-clamp-8">Stock empty — play from hand; timer advances if nothing matches.</span>
                   </p>
                 ) : null}
               </div>
             ) : null}
             {/* Timer + draw/surge: out of document flow so the discard card stays vertically centered */}
-            <div className="pointer-events-auto absolute right-2 top-2 z-20 flex w-[5.95rem] flex-col items-stretch gap-1 sm:right-3 sm:top-3 sm:w-[6.55rem]">
+            <div className="pointer-events-auto absolute right-2 top-2 z-20 flex w-[5.15rem] flex-col items-stretch gap-0.5 sm:right-3 sm:top-3 sm:w-[6.55rem] sm:gap-1">
               <div
-                className={`w-full justify-center rounded-md border px-1 py-0.5 text-center text-[11px] tabular-nums sm:text-[12px] !animate-none !transition-none duration-0 will-change-auto ${
+                className={`w-full justify-center rounded-md border !px-1 !py-0.5 text-center text-[9px] tabular-nums sm:!px-2 sm:!py-1 sm:text-[12px] !animate-none !transition-none duration-0 will-change-auto ${
                   vm.phase === "playing" && vm.turnSeat === vm.mySeat ? OV2_DUEL_TIMER_ACTIVE : OV2_DUEL_TIMER_IDLE
                 }`}
               >
@@ -723,7 +723,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                       ? "Stock is empty — play from your hand"
                       : `Draw from stock (${vm.stockCount ?? 0} left)`
                 }
-                className={`${OV2_BTN_PRIMARY} w-full justify-center !px-1 py-1 !text-[11px] shadow-lg sm:!px-1.5 sm:!text-xs`}
+                className={`${OV2_BTN_PRIMARY} w-full justify-center !px-1 !py-1 !text-[9px] shadow-lg sm:!px-1.5 sm:!py-1.5 sm:!text-xs`}
                 onClick={() => {
                   if (!drawActionEnabled) return;
                   setSurgeTwoTapMode(false);
@@ -747,7 +747,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                 }
                 className={`${
                   surgeTwoTapMode && topStripDrawSurgeContext && vm.surgeAvailableForMe ? OV2_BTN_ACCENT : OV2_BTN_SECONDARY
-                } w-full justify-center !px-1 py-1 !text-[11px] shadow-lg sm:!px-1.5 sm:!text-xs`}
+                } w-full justify-center !px-1 !py-1 !text-[9px] shadow-lg sm:!px-1.5 sm:!py-1.5 sm:!text-xs`}
                 onClick={() => {
                   if (!surgeActionEnabled) return;
                   setErr("");
@@ -767,7 +767,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                       ? "Pass the turn"
                       : "Available after you draw — play a drawn card or pass"
                 }
-                className={`${OV2_BTN_SECONDARY} w-full justify-center !px-1 py-1 !text-[11px] shadow-lg sm:!px-1.5 sm:!text-xs`}
+                className={`${OV2_BTN_SECONDARY} w-full justify-center !px-1 !py-1 !text-[9px] shadow-lg sm:!px-1.5 sm:!py-1.5 sm:!text-xs`}
                 onClick={() => {
                   if (!passActionEnabled) return;
                   void passAfterDraw();
@@ -779,7 +779,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                 type="button"
                 disabled={!surgeCancelEnabled}
                 title="Clear first Surge tap"
-                className={`${OV2_BTN_SECONDARY} min-h-[1.85rem] w-full justify-center !px-1 py-1 !text-[11px] shadow-lg sm:min-h-[2rem] sm:!px-1.5 sm:!text-xs ${
+                className={`${OV2_BTN_SECONDARY} min-h-[1.5rem] w-full justify-center !px-1 !py-1 !text-[9px] shadow-lg sm:min-h-[2rem] sm:!px-1.5 sm:!py-1.5 sm:!text-xs ${
                   surgeCancelArmed ? "" : "pointer-events-none invisible"
                 }`}
                 onClick={() => {
@@ -1012,16 +1012,26 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
         </Ov2SharedFinishModalFrame>
       ) : null}
 
-      <div className="shrink-0 border-t border-white/[0.06] pt-2">
-        <button
-          type="button"
-          disabled={exitBusy || !pk}
-          className="w-full rounded-lg border border-white/10 bg-zinc-900/50 py-2 text-[11px] text-zinc-300 disabled:opacity-45"
-          onClick={() => void onExitToLobby()}
-        >
-          {exitBusy ? "Leaving…" : "Leave table (forfeit if in play)"}
-        </button>
-        {exitErr ? <p className="mt-1 text-center text-[10px] text-red-300">{exitErr}</p> : null}
+      <div className="mt-1 flex shrink-0 flex-col gap-1 border-t border-white/[0.12] pt-1 text-[9px] text-zinc-400 sm:text-[10px]">
+        <div className="flex items-stretch gap-2">
+          <button
+            type="button"
+            aria-disabled="true"
+            tabIndex={-1}
+            className={`${OV2_BTN_ACCENT} pointer-events-none flex-1 cursor-default select-none py-2 text-[11px]`}
+          >
+            Increase table stake
+          </button>
+          <button
+            type="button"
+            disabled={exitBusy || !pk}
+            className={`${OV2_BTN_DANGER} flex-1 py-2 text-[11px] disabled:opacity-45`}
+            onClick={() => void onExitToLobby()}
+          >
+            {exitBusy ? "Leaving…" : "Leave table"}
+          </button>
+        </div>
+        {exitErr ? <span className="text-red-300">{exitErr}</span> : null}
       </div>
     </div>
   );
