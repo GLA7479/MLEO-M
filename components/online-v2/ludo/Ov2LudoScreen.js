@@ -9,6 +9,7 @@ import {
 } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { useOv2LudoSession } from "../../../hooks/useOv2LudoSession";
+import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import Ov2LudoBoardView from "../../../lib/online-v2/ludo/ov2LudoBoardView";
 import Ov2SeatStrip from "../shared/Ov2SeatStrip";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
@@ -32,12 +33,16 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
   const {
     vm,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     rollDicePreview,
     onPieceClick,
     canRoll,
     resetPreviewBoard,
     offerDouble,
     respondDouble,
+    doubleRpcBusy,
+    doubleRpcErr,
     requestRematch,
     cancelRematch,
     startNextMatch,
@@ -56,6 +61,13 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
     contextInput?.room && typeof contextInput.room === "object" && contextInput.room.product_game_id != null
       ? String(contextInput.room.product_game_id)
       : null;
+  const roomHasActiveOv2Session =
+    Boolean(
+      contextInput?.room &&
+        typeof contextInput.room === "object" &&
+        contextInput.room.active_session_id != null &&
+        String(contextInput.room.active_session_id).trim() !== ""
+    );
   const {
     board,
     diceRolling,
@@ -92,6 +104,11 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
     isAtDoubleMultiplierCap,
     sessionId: ludoSessionId,
   } = vm;
+
+  const { matchSnapshotTimedOut } = useOv2MatchSnapshotWait(
+    Boolean(roomHasActiveOv2Session && roomProductId === OV2_LUDO_PRODUCT_GAME_ID),
+    Boolean(ludoSessionId)
+  );
 
   const isReadOnlyRoom = playMode === OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
   const isLiveMatch = playMode === OV2_LUDO_PLAY_MODE.LIVE_MATCH_ACTIVE;
@@ -151,7 +168,8 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
     (doubleState?.proposed_by == null || doubleState?.awaiting == null) &&
     !isDoubleCycleLockedForMe &&
     !isDoubleOfferCapped &&
-    !isAtDoubleMultiplierCap;
+    !isAtDoubleMultiplierCap &&
+    !doubleRpcBusy;
   const isAwaitingMyDouble = isLiveMatch && mySeat != null && doubleAwaitingSeat === mySeat;
   const ludoDoubleProposedMult = useMemo(
     () => Math.min(Math.max(1, Number(currentMultiplier || 1)) * 2, 16),
@@ -407,10 +425,31 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
         open={isAwaitingMyDouble}
         proposedMult={ludoDoubleProposedMult}
         stakeMultiplier={currentMultiplier}
-        busy={false}
+        busy={doubleRpcBusy}
         onAccept={() => void respondDouble("accept")}
         onDecline={() => void respondDouble("decline")}
       />
+      {roomHasActiveOv2Session && roomProductId === OV2_LUDO_PRODUCT_GAME_ID && !ludoSessionId ? (
+        !matchSnapshotTimedOut ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-2 text-center text-sm text-zinc-400">
+            Loading match…
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-2 text-center">
+            <p className="text-sm text-zinc-400">Could not load match.</p>
+            <button
+              type="button"
+              className="rounded-lg border border-white/15 bg-zinc-900/70 px-3 py-2 text-[11px] font-medium text-zinc-200"
+              onClick={() => {
+                if (typeof window !== "undefined") window.location.reload();
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )
+      ) : (
+      <>
       {playMode === OV2_LUDO_PLAY_MODE.PREVIEW_LOCAL ? (
         <div className="flex shrink-0 flex-wrap items-center gap-1">
           <button
@@ -440,6 +479,17 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
         awaitedIndex={isDoublePending ? doubleAwaitingSeat : null}
         eliminatedIndices={eliminatedSeats}
       />
+      {isLiveMatch && doubleRpcErr ? (
+        <p className="shrink-0 px-0.5 text-[10px] text-red-300/95">{doubleRpcErr}</p>
+      ) : null}
+      {isLiveMatch && vaultClaimError && !vaultClaimBusy ? (
+        <p className="shrink-0 px-0.5 text-[10px] text-red-300/95">
+          {vaultClaimError}{" "}
+          <button type="button" className="underline" onClick={() => void retryVaultClaim()}>
+            Retry
+          </button>
+        </p>
+      ) : null}
       {isLiveMatch && !isFinished && onLeaveToLobby ? (
         <div className="flex shrink-0 justify-end px-0.5 pt-0.5">
           <button
@@ -650,6 +700,8 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
         </Ov2SharedFinishModalFrame>
       ) : null}
       {isLiveMatch ? <div className="shrink-0 md:hidden">{mobileStateRow}</div> : null}
+      </>
+      )}
     </div>
   );
 }

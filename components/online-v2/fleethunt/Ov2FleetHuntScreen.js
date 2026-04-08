@@ -14,6 +14,7 @@ import {
   fhTryPlaceShip,
 } from "../../../lib/online-v2/fleethunt/ov2FleetHuntBoard";
 import { useOv2FleetHuntSession } from "../../../hooks/useOv2FleetHuntSession";
+import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
 
@@ -114,6 +115,8 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
     vm,
     busy,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     err,
     setErr,
     submitPlacement,
@@ -151,6 +154,9 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
   const roomId = room?.id != null ? String(room.id) : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
+  const roomHasActiveSession =
+    room?.active_session_id != null && String(room.active_session_id).trim() !== "";
+  const { matchSnapshotTimedOut } = useOv2MatchSnapshotWait(roomHasActiveSession, Boolean(snapshot));
 
   useEffect(() => {
     if (vm.sessionId) return;
@@ -642,6 +648,14 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
       {vaultClaimBusy ? (
         <div className="rounded-lg border border-sky-500/25 bg-sky-950/25 px-2 py-1 text-[10px] text-sky-100/90">Updating vault…</div>
       ) : null}
+      {vaultClaimError && !vaultClaimBusy ? (
+        <div className="rounded-lg border border-red-500/25 bg-red-950/35 px-2 py-1 text-[10px] text-red-200">
+          {vaultClaimError}{" "}
+          <button type="button" className="underline" onClick={() => void retryVaultClaim()}>
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       {vm.phase === "placement" && mySeat != null ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-x-hidden overflow-y-auto rounded-xl border border-white/[0.06] bg-zinc-950/50 p-1.5 max-sm:py-1.5 sm:gap-2 sm:p-3">
@@ -1035,7 +1049,7 @@ export default function Ov2FleetHuntScreen({ contextInput = null, onSessionRefre
       ) : null}
 
       {!snapshot && room?.active_session_id ? (
-        loadingError ? (
+        loadingError || matchSnapshotTimedOut ? (
           <div className="flex flex-col items-center justify-center gap-3 py-10">
             <div className="text-red-400 text-sm font-semibold">Failed to load match</div>
 

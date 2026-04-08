@@ -28,6 +28,7 @@ import { supabaseMP } from "../lib/supabaseClients";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import { requestOv2LudoClaimSettlement } from "../lib/online-v2/ludo/ov2LudoSettlement";
+import { ov2PreferNewerSnapshot } from "../lib/online-v2/ov2PreferNewerSnapshot";
 
 /** Total target time for live roll + reveal (RPC is authoritative; pacing is display-only). */
 const OV2_LUDO_LIVE_ROLL_MIN_MS = 2000;
@@ -95,6 +96,12 @@ export function useOv2LudoSession(baseContext) {
   const vaultDoubleMultRef = useRef(/** @type {{ sessionId: string, mult: number } | null} */ (null));
   /** One server-backed vault read per finished session (win/loss settlement visible on strip). */
   const vaultFinishedRefreshForSessionRef = useRef(/** @type {string|null} */ (null));
+  const vaultClaimInFlightRef = useRef(false);
+  const doubleRpcInFlightRef = useRef(false);
+  const [doubleRpcBusy, setDoubleRpcBusy] = useState(false);
+  const [doubleRpcErr, setDoubleRpcErr] = useState("");
+  const [vaultClaimError, setVaultClaimError] = useState("");
+  const [vaultClaimRetryTick, setVaultClaimRetryTick] = useState(0);
 
   useEffect(() => {
     authoritativeSnapshotRef.current = authoritativeSnapshot;
@@ -111,6 +118,12 @@ export function useOv2LudoSession(baseContext) {
     vaultDoubleMultRef.current = null;
     vaultFinishedRefreshForSessionRef.current = null;
     setVaultClaimBusy(false);
+    setVaultClaimError("");
+    setVaultClaimRetryTick(0);
+    vaultClaimInFlightRef.current = false;
+    doubleRpcInFlightRef.current = false;
+    setDoubleRpcBusy(false);
+    setDoubleRpcErr("");
   }, [roomId]);
 
   useEffect(() => {
@@ -125,6 +138,12 @@ export function useOv2LudoSession(baseContext) {
     vaultDoubleMultRef.current = null;
     vaultFinishedRefreshForSessionRef.current = null;
     setVaultClaimBusy(false);
+    setVaultClaimError("");
+    setVaultClaimRetryTick(0);
+    vaultClaimInFlightRef.current = false;
+    doubleRpcInFlightRef.current = false;
+    setDoubleRpcBusy(false);
+    setDoubleRpcErr("");
   }, [roomId, activeSessionKey]);
 
   useEffect(() => {
@@ -135,13 +154,13 @@ export function useOv2LudoSession(baseContext) {
     let cancelled = false;
     void (async () => {
       const snap = await fetchOv2LudoAuthoritativeSnapshot(roomId, { participantKey: selfKey ?? "" });
-      if (!cancelled) setAuthoritativeSnapshot(snap ?? null);
+      if (!cancelled) setAuthoritativeSnapshot(prev => ov2PreferNewerSnapshot(prev, snap ?? null));
     })();
 
     const unsub = subscribeOv2LudoAuthoritativeSnapshot(roomId, {
       participantKey: selfKey ?? "",
       onSnapshot: s => {
-        if (!cancelled) setAuthoritativeSnapshot(s);
+        if (!cancelled) setAuthoritativeSnapshot(prev => ov2PreferNewerSnapshot(prev, s));
       },
     });
 
@@ -207,24 +226,38 @@ export function useOv2LudoSession(baseContext) {
     const sid = String(authoritativeSnapshot.sessionId || "").trim();
     if (!sid || !roomId || !selfKey) return;
     if (vaultFinishedRefreshForSessionRef.current === sid) return;
-    vaultFinishedRefreshForSessionRef.current = sid;
+    if (vaultClaimInFlightRef.current) return;
+    vaultClaimInFlightRef.current = true;
     setVaultClaimBusy(true);
+    setVaultClaimError("");
     void (async () => {
       try {
         const claim = await requestOv2LudoClaimSettlement(roomId, selfKey);
         if (claim.ok && Array.isArray(claim.lines) && claim.lines.length > 0) {
           await applyBoardPathSettlementClaimLinesToVault(claim.lines, OV2_LUDO_PRODUCT_GAME_ID);
+          vaultFinishedRefreshForSessionRef.current = sid;
+          setVaultClaimError("");
         } else if (!claim.ok) {
-          vaultFinishedRefreshForSessionRef.current = null;
+          setVaultClaimError(String(claim.error || claim.message || "Could not update balance."));
+        } else {
+          vaultFinishedRefreshForSessionRef.current = sid;
         }
-      } catch {
-        vaultFinishedRefreshForSessionRef.current = null;
+      } catch (e) {
+        setVaultClaimError(e instanceof Error ? e.message : String(e));
       } finally {
+        vaultClaimInFlightRef.current = false;
         await readOnlineV2Vault({ fresh: true }).catch(() => {});
         setVaultClaimBusy(false);
       }
     })();
-  }, [playMode, authoritativeSnapshot, roomProductId, roomId, selfKey]);
+  }, [playMode, authoritativeSnapshot, roomProductId, roomId, selfKey, vaultClaimRetryTick]);
+
+  const retryVaultClaim = useCallback(() => {
+    vaultFinishedRefreshForSessionRef.current = null;
+    vaultClaimInFlightRef.current = false;
+    setVaultClaimError("");
+    setVaultClaimRetryTick(t => t + 1);
+  }, []);
 
   const lobbySeatStrip = useMemo(() => {
     if (playMode !== OV2_LUDO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET || roomProductId !== OV2_LUDO_PRODUCT_GAME_ID) {
@@ -335,7 +368,7 @@ export function useOv2LudoSession(baseContext) {
   const refreshAuthoritativeSnapshot = useCallback(async () => {
     if (!roomId || roomProductId !== OV2_LUDO_PRODUCT_GAME_ID) return null;
     const snap = await fetchOv2LudoAuthoritativeSnapshot(roomId, { participantKey: selfKey ?? "" });
-    if (snap) setAuthoritativeSnapshot(snap);
+    if (snap) setAuthoritativeSnapshot(prev => ov2PreferNewerSnapshot(prev, snap));
     return snap ?? null;
   }, [roomId, roomProductId, selfKey]);
 
@@ -344,7 +377,7 @@ export function useOv2LudoSession(baseContext) {
     const poll = window.setInterval(() => {
       void (async () => {
         const snap = await fetchOv2LudoAuthoritativeSnapshot(roomId || "", { participantKey: selfKey ?? "" });
-        if (snap) setAuthoritativeSnapshot(snap);
+        if (snap) setAuthoritativeSnapshot(prev => ov2PreferNewerSnapshot(prev, snap));
       })();
     }, 2000);
     return () => window.clearInterval(poll);
@@ -391,7 +424,7 @@ export function useOv2LudoSession(baseContext) {
         const wait = Math.max(0, OV2_LUDO_LIVE_ROLL_MIN_MS - (Date.now() - t0));
         await sleepMs(wait);
         if (res.ok && res.snapshot) {
-          setAuthoritativeSnapshot(res.snapshot);
+          setAuthoritativeSnapshot(prev => ov2PreferNewerSnapshot(prev, res.snapshot));
           const snap = res.snapshot;
           const bd = snap.board?.dice;
           const hasDice = bd != null && bd !== "" && !Number.isNaN(Number(bd));
@@ -538,7 +571,7 @@ export function useOv2LudoSession(baseContext) {
           if (res.ok) {
             liveAutoRollCompletedKeyRef.current = autoKey;
             if (res.snapshot) {
-              setAuthoritativeSnapshot(res.snapshot);
+              setAuthoritativeSnapshot(prev => ov2PreferNewerSnapshot(prev, res.snapshot));
               const ns = res.snapshot;
               const bd = ns.board?.dice;
               const hasDice = bd != null && bd !== "" && !Number.isNaN(Number(bd));
@@ -611,7 +644,7 @@ export function useOv2LudoSession(baseContext) {
       });
       if (res.ok) {
         processedExpiredTurnKeysRef.current.add(turnKey);
-        if (res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+        if (res.snapshot) setAuthoritativeSnapshot(prev => ov2PreferNewerSnapshot(prev, res.snapshot));
         else await refreshAuthoritativeSnapshot();
       } else {
         await refreshAuthoritativeSnapshot();
@@ -637,7 +670,7 @@ export function useOv2LudoSession(baseContext) {
       const res = await requestOv2LudoHandleDoubleTimeout(roomId, awaiting, { revision: authoritativeSnapshot.revision });
       if (res.ok) {
         processedDoubleExpiryKeysRef.current.add(timeoutKey);
-        if (res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+        if (res.snapshot) setAuthoritativeSnapshot(prev => ov2PreferNewerSnapshot(prev, res.snapshot));
         else await refreshAuthoritativeSnapshot();
       } else {
         await refreshAuthoritativeSnapshot();
@@ -662,7 +695,7 @@ export function useOv2LudoSession(baseContext) {
           revision: authoritativeSnapshot.revision,
           participantKey: selfKey,
         });
-        if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
+        if (res.ok && res.snapshot) setAuthoritativeSnapshot(prev => ov2PreferNewerSnapshot(prev, res.snapshot));
         return;
       }
       if (interactionTier !== "local_preview" || previewControlledSeatIndex == null) return;
@@ -758,6 +791,13 @@ export function useOv2LudoSession(baseContext) {
   const doubleTimeLeftSec = doubleTimeLeftMs != null ? Math.ceil(doubleTimeLeftMs / 1000) : null;
   const isDoubleTimerActive = doubleTimeLeftMs != null && doubleTimeLeftMs > 0;
 
+  const doublePendingPrevRef = useRef(false);
+  useEffect(() => {
+    const p = Boolean(isDoublePending);
+    if (doublePendingPrevRef.current && !p) setDoubleRpcErr("");
+    doublePendingPrevRef.current = p;
+  }, [isDoublePending]);
+
   const doubleInitiationsRecord = useMemo(() => {
     const d = authoritativeSnapshot?.doubleInitiations;
     if (!d || typeof d !== "object" || Array.isArray(d)) return {};
@@ -819,8 +859,57 @@ export function useOv2LudoSession(baseContext) {
     return "";
   }, [authoritativeSnapshot?.phase, authoritativeSnapshot?.result, eliminatedSeats, isDoublePending, doubleExpiresAt, nowMs]);
 
+  const offerDouble = useCallback(async () => {
+    if (!roomId || !selfKey || !authoritativeSnapshot?.sessionId) return;
+    if (doubleRpcInFlightRef.current) return;
+    doubleRpcInFlightRef.current = true;
+    setDoubleRpcBusy(true);
+    setDoubleRpcErr("");
+    try {
+      const res = await requestOv2LudoOfferDouble(roomId, authoritativeSnapshot.sessionId, {
+        revision: authoritativeSnapshot.revision,
+        participantKey: selfKey,
+      });
+      if (res.ok && res.snapshot) setAuthoritativeSnapshot(prev => ov2PreferNewerSnapshot(prev, res.snapshot));
+      else setDoubleRpcErr(String(res.error || res.message || "Offer double failed."));
+    } catch (e) {
+      setDoubleRpcErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      doubleRpcInFlightRef.current = false;
+      setDoubleRpcBusy(false);
+    }
+  }, [roomId, selfKey, authoritativeSnapshot?.sessionId, authoritativeSnapshot?.revision]);
+
+  const respondDouble = useCallback(
+    async answer => {
+      if (!roomId || !selfKey || !authoritativeSnapshot?.sessionId) return;
+      if (doubleRpcInFlightRef.current) return;
+      doubleRpcInFlightRef.current = true;
+      setDoubleRpcBusy(true);
+      setDoubleRpcErr("");
+      try {
+        const res = await requestOv2LudoRespondDouble(roomId, authoritativeSnapshot.sessionId, answer, {
+          revision: authoritativeSnapshot.revision,
+          participantKey: selfKey,
+        });
+        if (res.ok && res.snapshot) setAuthoritativeSnapshot(prev => ov2PreferNewerSnapshot(prev, res.snapshot));
+        else setDoubleRpcErr(String(res.error || res.message || "Respond double failed."));
+      } catch (e) {
+        setDoubleRpcErr(e instanceof Error ? e.message : String(e));
+      } finally {
+        doubleRpcInFlightRef.current = false;
+        setDoubleRpcBusy(false);
+      }
+    },
+    [roomId, selfKey, authoritativeSnapshot?.sessionId, authoritativeSnapshot?.revision]
+  );
+
   return {
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
+    doubleRpcBusy,
+    doubleRpcErr,
     vm: {
       playMode,
       interactionTier,
@@ -873,22 +962,8 @@ export function useOv2LudoSession(baseContext) {
     onPieceClick,
     canRoll,
     resetPreviewBoard,
-    offerDouble: async () => {
-      if (!roomId || !selfKey || !authoritativeSnapshot?.sessionId) return;
-      const res = await requestOv2LudoOfferDouble(roomId, authoritativeSnapshot.sessionId, {
-        revision: authoritativeSnapshot.revision,
-        participantKey: selfKey,
-      });
-      if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
-    },
-    respondDouble: async answer => {
-      if (!roomId || !selfKey || !authoritativeSnapshot?.sessionId) return;
-      const res = await requestOv2LudoRespondDouble(roomId, authoritativeSnapshot.sessionId, answer, {
-        revision: authoritativeSnapshot.revision,
-        participantKey: selfKey,
-      });
-      if (res.ok && res.snapshot) setAuthoritativeSnapshot(res.snapshot);
-    },
+    offerDouble,
+    respondDouble,
     requestRematch: async () => {
       if (!roomId || !selfKey) return { ok: false, error: "missing" };
       return requestOv2LudoRequestRematch(roomId, selfKey);

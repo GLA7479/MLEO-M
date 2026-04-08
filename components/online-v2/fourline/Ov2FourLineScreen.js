@@ -11,6 +11,7 @@ import {
   parseFourLineCells,
 } from "../../../lib/online-v2/fourline/ov2FourLineClientLegality";
 import { useOv2FourLineSession } from "../../../hooks/useOv2FourLineSession";
+import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
 
@@ -250,6 +251,8 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
     vm,
     busy,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     err,
     setErr,
     playColumn,
@@ -286,6 +289,9 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
   }, [members]);
   const seat0Label = seatDisplayName[0] ? seatDisplayName[0] : "Guest";
   const seat1Label = seatDisplayName[1] ? seatDisplayName[1] : "Guest";
+  const roomHasActiveSession =
+    room?.active_session_id != null && String(room.active_session_id).trim() !== "";
+  const { matchSnapshotTimedOut } = useOv2MatchSnapshotWait(roomHasActiveSession, Boolean(snapshot));
 
   useEffect(() => {
     setFinishModalDismissedSessionId("");
@@ -596,6 +602,27 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden bg-zinc-950 px-1 pb-1 sm:min-h-0 sm:gap-1 sm:px-2 sm:pb-1.5">
+      {roomHasActiveSession && !snapshot ? (
+        !matchSnapshotTimedOut ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-2 text-center text-sm text-zinc-400">
+            Loading match…
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-2 text-center">
+            <p className="text-sm text-zinc-400">Could not load match.</p>
+            <button
+              type="button"
+              className="rounded-lg border border-white/15 bg-zinc-900/70 px-3 py-2 text-[11px] font-medium text-zinc-200"
+              onClick={() => {
+                if (typeof window !== "undefined") window.location.reload();
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )
+      ) : (
+        <>
       <div className="flex shrink-0 flex-col gap-0.5 sm:gap-0.5">
         <div className="rounded-lg border border-white/[0.1] bg-zinc-900/70 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:py-1 sm:px-2">
           <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
@@ -624,6 +651,14 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
               {vaultClaimBusy ? (
                 <span className="rounded-md border border-sky-500/22 bg-sky-950/40 px-2 py-0.5 text-[10px] text-sky-100/90">
                   Settlement…
+                </span>
+              ) : null}
+              {vaultClaimError && !vaultClaimBusy ? (
+                <span className="flex max-w-full flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] text-red-300/95">{vaultClaimError}</span>
+                  <button type="button" className="text-[10px] text-red-200 underline" onClick={() => void retryVaultClaim()}>
+                    Retry
+                  </button>
                 </span>
               ) : null}
             </div>
@@ -899,6 +934,8 @@ export default function Ov2FourLineScreen({ contextInput = null, onSessionRefres
             </div>
         </Ov2SharedFinishModalFrame>
       ) : null}
+        </>
+      )}
     </div>
   );
 }

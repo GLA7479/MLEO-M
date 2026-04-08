@@ -12,7 +12,7 @@ export function useOv2LiveShellFatalRoomRedirect(router, roomId, loadError) {
     // `ov2_shared_get_room_canonical_ledger` returns "Room not found or invalid credentials." for
     // auth/member-state mismatches — substring "not found" must NOT trigger a redirect loop with /online-v2/rooms.
     const fatalWrongProduct =
-      err.includes("not a ludo") || err.includes("not a rummy") || err.includes("not a bingo");
+      err.includes("this room is not a") && err.includes("table");
     const fatalMissingRoom =
       (err.includes("room not found") || err.includes("room is not")) &&
       !err.includes("invalid credentials");

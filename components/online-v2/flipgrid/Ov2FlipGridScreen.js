@@ -9,6 +9,7 @@ import {
   parseFlipGridCells,
 } from "../../../lib/online-v2/flipgrid/ov2FlipGridClientLegality";
 import { useOv2FlipGridSession } from "../../../hooks/useOv2FlipGridSession";
+import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
 
@@ -175,6 +176,8 @@ export default function Ov2FlipGridScreen({ contextInput = null, onSessionRefres
     vm,
     busy,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     err,
     setErr,
     playCell,
@@ -199,6 +202,9 @@ export default function Ov2FlipGridScreen({ contextInput = null, onSessionRefres
   const leaveToLobbyBusy = Boolean(contextInput?.leaveToLobbyBusy);
   const leaveToLobbyError =
     contextInput && typeof contextInput.leaveToLobbyError === "string" ? contextInput.leaveToLobbyError.trim() : "";
+  const roomHasActiveSession =
+    room?.active_session_id != null && String(room.active_session_id).trim() !== "";
+  const { matchSnapshotTimedOut } = useOv2MatchSnapshotWait(roomHasActiveSession, Boolean(snapshot));
 
   const cells = useMemo(() => parseFlipGridCells(vm.cells), [vm.cells]);
 
@@ -450,6 +456,27 @@ export default function Ov2FlipGridScreen({ contextInput = null, onSessionRefres
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col gap-0 overflow-hidden bg-zinc-950">
+      {roomHasActiveSession && !snapshot ? (
+        !matchSnapshotTimedOut ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-2 text-center text-sm text-zinc-400">
+            Loading match…
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-2 text-center">
+            <p className="text-sm text-zinc-400">Could not load match.</p>
+            <button
+              type="button"
+              className="rounded-lg border border-white/15 bg-zinc-900/70 px-3 py-2 text-[11px] font-medium text-zinc-200"
+              onClick={() => {
+                if (typeof window !== "undefined") window.location.reload();
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )
+      ) : (
+        <>
       {/* Top status */}
       <div className="flex shrink-0 flex-col gap-1 px-2 pt-2 sm:px-3 sm:pt-2.5">
         <div className="rounded-lg border border-white/[0.1] bg-zinc-900/70 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:py-1.5 sm:px-2.5">
@@ -481,6 +508,14 @@ export default function Ov2FlipGridScreen({ contextInput = null, onSessionRefres
               {vaultClaimBusy ? (
                 <span className="rounded-md border border-sky-500/22 bg-sky-950/40 px-2 py-0.5 text-[10px] text-sky-100/90">
                   Settlement…
+                </span>
+              ) : null}
+              {vaultClaimError && !vaultClaimBusy ? (
+                <span className="flex max-w-full flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] text-red-300/95">{vaultClaimError}</span>
+                  <button type="button" className="text-[10px] text-red-200 underline" onClick={() => void retryVaultClaim()}>
+                    Retry
+                  </button>
                 </span>
               ) : null}
             </div>
@@ -647,6 +682,8 @@ export default function Ov2FlipGridScreen({ contextInput = null, onSessionRefres
             </div>
         </Ov2SharedFinishModalFrame>
       ) : null}
+        </>
+      )}
     </div>
   );
 }

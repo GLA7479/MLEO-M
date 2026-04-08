@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { useOv2GoalDuelSession } from "../../../hooks/useOv2GoalDuelSession";
+import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import {
   drawGoalDuelArena,
   drawGoalDuelDog,
@@ -141,6 +142,8 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     vm,
     snapshot,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     err,
     setErr,
     setInput,
@@ -154,6 +157,11 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
     roomMatchSeq,
     isUiPreview = false,
   } = session;
+
+  const roomForSnapshotWait = contextInput?.room && typeof contextInput.room === "object" ? contextInput.room : null;
+  const roomHasActiveSessionForWait =
+    roomForSnapshotWait?.active_session_id != null && String(roomForSnapshotWait.active_session_id).trim() !== "";
+  const { matchSnapshotTimedOut } = useOv2MatchSnapshotWait(roomHasActiveSessionForWait, Boolean(snapshot));
 
   const gdDebug =
     typeof process !== "undefined" &&
@@ -993,6 +1001,14 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       {vaultClaimBusy ? (
         <div className="rounded-lg border border-zinc-500/20 bg-zinc-900/40 px-2 py-1 text-[10px] text-zinc-400">Updating vault…</div>
       ) : null}
+      {vaultClaimError && !vaultClaimBusy ? (
+        <div className="rounded-lg border border-red-500/25 bg-red-950/35 px-2 py-1 text-[10px] text-red-200">
+          {vaultClaimError}{" "}
+          <button type="button" className="underline" onClick={() => void retryVaultClaim()}>
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       {vm.phase === "playing" && mySeat != null ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -1298,28 +1314,53 @@ export default function Ov2GoalDuelScreen({ contextInput = null, onSessionRefres
       ) : null}
 
       {!session.snapshot && room?.active_session_id ? (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-4 py-8 text-center">
-          <p className="text-sm text-zinc-300">Loading match…</p>
-          <p className="max-w-sm text-[11px] leading-snug text-zinc-500">
-            If this takes too long, leave the table or return to the lobby — you are not stuck here.
-          </p>
-          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <button
-              type="button"
-              disabled={leaveToLobbyBusy || exitBusy}
-              className={BTN_SECONDARY}
-              onClick={() => void (onLeaveToLobby ? onLeaveToLobby() : onExitToLobby())}
-            >
-              {leaveToLobbyBusy || exitBusy ? "Leaving…" : "Leave table"}
-            </button>
-            <Link
-              href="/online-v2/rooms"
-              className="text-[11px] font-semibold text-sky-300/90 underline decoration-sky-500/30 underline-offset-2 transition hover:text-sky-200"
-            >
-              Back to lobby
-            </Link>
+        !matchSnapshotTimedOut ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-4 py-8 text-center">
+            <p className="text-sm text-zinc-300">Loading match…</p>
+            <p className="max-w-sm text-[11px] leading-snug text-zinc-500">
+              If this takes too long, leave the table or return to the lobby — you are not stuck here.
+            </p>
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <button
+                type="button"
+                disabled={leaveToLobbyBusy || exitBusy}
+                className={BTN_SECONDARY}
+                onClick={() => void (onLeaveToLobby ? onLeaveToLobby() : onExitToLobby())}
+              >
+                {leaveToLobbyBusy || exitBusy ? "Leaving…" : "Leave table"}
+              </button>
+              <Link
+                href="/online-v2/rooms"
+                className="text-[11px] font-semibold text-sky-300/90 underline decoration-sky-500/30 underline-offset-2 transition hover:text-sky-200"
+              >
+                Back to lobby
+              </Link>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-4 py-8 text-center">
+            <p className="text-sm text-zinc-300">Could not load match.</p>
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <button
+                type="button"
+                className={BTN_SECONDARY}
+                onClick={() => {
+                  if (typeof window !== "undefined") window.location.reload();
+                }}
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                disabled={leaveToLobbyBusy || exitBusy}
+                className={BTN_SECONDARY}
+                onClick={() => void (onLeaveToLobby ? onLeaveToLobby() : onExitToLobby())}
+              >
+                {leaveToLobbyBusy || exitBusy ? "Leaving…" : "Leave table"}
+              </button>
+            </div>
+          </div>
+        )
       ) : null}
 
       {session.snapshot &&

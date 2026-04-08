@@ -17,6 +17,7 @@ import {
 import { requestOv2DominoesClaimSettlement } from "../lib/online-v2/dominoes/ov2DominoesSettlement";
 import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
+import { ov2PreferNewerSnapshot } from "../lib/online-v2/ov2PreferNewerSnapshot";
 
 /** @param {null|undefined|{ room?: object, members?: unknown[], self?: { participant_key?: string } }} baseContext */
 export function useOv2DominoesSession(baseContext) {
@@ -36,12 +37,15 @@ export function useOv2DominoesSession(baseContext) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [vaultClaimBusy, setVaultClaimBusy] = useState(false);
+  const [vaultClaimError, setVaultClaimError] = useState("");
+  const [vaultClaimRetryTick, setVaultClaimRetryTick] = useState(0);
   const [settlementPrizeAmount, setSettlementPrizeAmount] = useState(/** @type {number|null} */ (null));
   const [nowMs, setNowMs] = useState(() => Date.now());
   const vaultFinishedRef = useRef(/** @type {string|null} */ (null));
   const vaultLinesAppliedForSessionRef = useRef(/** @type {Set<string>} */ (new Set()));
   const snapRef = useRef(/** @type {typeof snap} */ (null));
   const processedTurnTimeoutKeysRef = useRef(/** @type {Set<string>} */ (new Set()));
+  const vaultClaimInFlightRef = useRef(false);
 
   useEffect(() => {
     setSnap(null);
@@ -49,7 +53,10 @@ export function useOv2DominoesSession(baseContext) {
     vaultLinesAppliedForSessionRef.current.clear();
     processedTurnTimeoutKeysRef.current.clear();
     setVaultClaimBusy(false);
+    setVaultClaimError("");
+    setVaultClaimRetryTick(0);
     setSettlementPrizeAmount(null);
+    vaultClaimInFlightRef.current = false;
   }, [roomId, activeSessionKey]);
 
   useEffect(() => {
@@ -70,12 +77,12 @@ export function useOv2DominoesSession(baseContext) {
     let cancelled = false;
     void (async () => {
       const s = await fetchOv2DominoesSnapshot(roomId, { participantKey: selfKey ?? "" });
-      if (!cancelled) setSnap(s ?? null);
+      if (!cancelled) setSnap(prev => ov2PreferNewerSnapshot(prev, s ?? null));
     })();
     const unsub = subscribeOv2DominoesSnapshot(roomId, {
       participantKey: selfKey ?? "",
       onSnapshot: s => {
-        if (!cancelled) setSnap(s);
+        if (!cancelled) setSnap(prev => ov2PreferNewerSnapshot(prev, s));
       },
     });
     return () => {
@@ -88,32 +95,44 @@ export function useOv2DominoesSession(baseContext) {
     if (!snap || String(snap.phase || "").toLowerCase() !== "finished" || !roomId || !selfKey) return;
     const sid = String(snap.sessionId || "").trim();
     if (!sid || vaultFinishedRef.current === sid) return;
-    vaultFinishedRef.current = sid;
+    if (vaultClaimInFlightRef.current) return;
+    vaultClaimInFlightRef.current = true;
     setSettlementPrizeAmount(null);
     setVaultClaimBusy(true);
+    setVaultClaimError("");
     void (async () => {
       try {
         const claim = await requestOv2DominoesClaimSettlement(roomId, selfKey);
-        if (claim.ok && Array.isArray(claim.lines) && claim.lines.length > 0) {
-          if (!vaultLinesAppliedForSessionRef.current.has(sid)) {
-            await applyBoardPathSettlementClaimLinesToVault(claim.lines, OV2_DOMINOES_PRODUCT_GAME_ID);
-            vaultLinesAppliedForSessionRef.current.add(sid);
+        if (!claim.ok) {
+          setVaultClaimError(String(claim.error || claim.message || "Could not update balance."));
+        } else {
+          if (Array.isArray(claim.lines) && claim.lines.length > 0) {
+            if (!vaultLinesAppliedForSessionRef.current.has(sid)) {
+              await applyBoardPathSettlementClaimLinesToVault(claim.lines, OV2_DOMINOES_PRODUCT_GAME_ID);
+              vaultLinesAppliedForSessionRef.current.add(sid);
+            }
           }
-        }
-        if (claim.ok) {
           const ta = claim.total_amount != null ? Number(claim.total_amount) : NaN;
           if (Number.isFinite(ta) && ta >= 0) setSettlementPrizeAmount(ta);
-        } else {
-          vaultFinishedRef.current = null;
+          setVaultClaimError("");
+          vaultFinishedRef.current = sid;
         }
-      } catch {
-        vaultFinishedRef.current = null;
+      } catch (e) {
+        setVaultClaimError(e instanceof Error ? e.message : String(e));
       } finally {
+        vaultClaimInFlightRef.current = false;
         await readOnlineV2Vault({ fresh: true }).catch(() => {});
         setVaultClaimBusy(false);
       }
     })();
-  }, [snap, roomId, selfKey]);
+  }, [snap, roomId, selfKey, vaultClaimRetryTick]);
+
+  const retryVaultClaim = useCallback(() => {
+    vaultFinishedRef.current = null;
+    vaultClaimInFlightRef.current = false;
+    setVaultClaimError("");
+    setVaultClaimRetryTick(t => t + 1);
+  }, []);
 
   useEffect(() => {
     if (!roomId || !selfKey || roomProductId !== OV2_DOMINOES_PRODUCT_GAME_ID) return undefined;
@@ -144,7 +163,7 @@ export function useOv2DominoesSession(baseContext) {
         const r = await requestOv2DominoesMarkTurnTimeout(roomId, selfKey, {
           revision: cur.revision,
         });
-        if (r.ok && r.snapshot) setSnap(r.snapshot);
+        if (r.ok && r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
         const sn = r.snapshot && typeof r.snapshot === "object" ? r.snapshot : null;
         const revAfter = sn?.revision != null ? Number(sn.revision) : NaN;
         const phaseAfter = sn ? String(sn.phase || "").toLowerCase() : "";
@@ -173,6 +192,7 @@ export function useOv2DominoesSession(baseContext) {
   const playTile = useCallback(
     async (handIndex, side) => {
       if (!roomId || !selfKey || !snap) return { ok: false };
+      if (busy) return { ok: false };
       setBusy(true);
       setErr("");
       try {
@@ -181,7 +201,7 @@ export function useOv2DominoesSession(baseContext) {
           setErr(r.error || "Move failed");
           return { ok: false };
         }
-        if (r.snapshot) setSnap(r.snapshot);
+        if (r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
         return { ok: true };
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
@@ -190,11 +210,12 @@ export function useOv2DominoesSession(baseContext) {
         setBusy(false);
       }
     },
-    [roomId, selfKey, snap]
+    [roomId, selfKey, snap, busy]
   );
 
   const drawOne = useCallback(async () => {
     if (!roomId || !selfKey || !snap) return { ok: false };
+    if (busy) return { ok: false };
     setBusy(true);
     setErr("");
     try {
@@ -203,7 +224,7 @@ export function useOv2DominoesSession(baseContext) {
         setErr(r.error || "Draw failed");
         return { ok: false };
       }
-      if (r.snapshot) setSnap(r.snapshot);
+      if (r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
       return { ok: true };
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -211,10 +232,11 @@ export function useOv2DominoesSession(baseContext) {
     } finally {
       setBusy(false);
     }
-  }, [roomId, selfKey, snap]);
+  }, [roomId, selfKey, snap, busy]);
 
   const passTurn = useCallback(async () => {
     if (!roomId || !selfKey || !snap) return { ok: false };
+    if (busy) return { ok: false };
     setBusy(true);
     setErr("");
     try {
@@ -223,7 +245,7 @@ export function useOv2DominoesSession(baseContext) {
         setErr(r.error || "Pass failed");
         return { ok: false };
       }
-      if (r.snapshot) setSnap(r.snapshot);
+      if (r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
       return { ok: true };
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -231,10 +253,11 @@ export function useOv2DominoesSession(baseContext) {
     } finally {
       setBusy(false);
     }
-  }, [roomId, selfKey, snap]);
+  }, [roomId, selfKey, snap, busy]);
 
   const offerDouble = useCallback(async () => {
     if (!roomId || !selfKey || !snap) return { ok: false };
+    if (busy) return { ok: false };
     setBusy(true);
     setErr("");
     try {
@@ -243,7 +266,7 @@ export function useOv2DominoesSession(baseContext) {
         setErr(r.error || "Could not propose stake increase");
         return { ok: false };
       }
-      if (r.snapshot) setSnap(r.snapshot);
+      if (r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
       return { ok: true };
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -251,11 +274,12 @@ export function useOv2DominoesSession(baseContext) {
     } finally {
       setBusy(false);
     }
-  }, [roomId, selfKey, snap]);
+  }, [roomId, selfKey, snap, busy]);
 
   const respondDouble = useCallback(
     async accept => {
       if (!roomId || !selfKey || !snap) return { ok: false };
+      if (busy) return { ok: false };
       setBusy(true);
       setErr("");
       try {
@@ -264,7 +288,7 @@ export function useOv2DominoesSession(baseContext) {
           setErr(r.error || "Response failed");
           return { ok: false };
         }
-        if (r.snapshot) setSnap(r.snapshot);
+        if (r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
         return { ok: true };
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
@@ -273,7 +297,7 @@ export function useOv2DominoesSession(baseContext) {
         setBusy(false);
       }
     },
-    [roomId, selfKey, snap]
+    [roomId, selfKey, snap, busy]
   );
 
   const requestRematch = useCallback(async () => {
@@ -414,6 +438,8 @@ export function useOv2DominoesSession(baseContext) {
     vm,
     busy,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     settlementPrizeAmount,
     err,
     setErr,

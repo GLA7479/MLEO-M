@@ -14,6 +14,7 @@ import {
 } from "../../../lib/online-v2/chess/ov2ChessBoardView";
 import { requestOv2ChessLegalTos } from "../../../lib/online-v2/chess/ov2ChessSessionAdapter";
 import { useOv2ChessSession } from "../../../hooks/useOv2ChessSession";
+import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import Ov2BoardDuelPlayerHeader from "../shared/Ov2BoardDuelPlayerHeader";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
@@ -69,6 +70,8 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
     vm,
     busy,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     err,
     setErr,
     applyMove,
@@ -92,6 +95,9 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
+  const roomHasActiveSession =
+    room?.active_session_id != null && String(room.active_session_id).trim() !== "";
+  const { matchSnapshotTimedOut } = useOv2MatchSnapshotWait(roomHasActiveSession, Boolean(snapshot));
 
   const seatDisplayName = useMemo(() => {
     /** @type {{ 0: string, 1: string }} */
@@ -426,6 +432,27 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden bg-zinc-950 px-1 pb-1 sm:min-h-0 sm:gap-1 sm:px-2 sm:pb-1.5">
+      {roomHasActiveSession && !snapshot ? (
+        !matchSnapshotTimedOut ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-2 text-center text-sm text-zinc-400">
+            Loading match…
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-2 text-center">
+            <p className="text-sm text-zinc-400">Could not load match.</p>
+            <button
+              type="button"
+              className="rounded-lg border border-white/15 bg-zinc-900/70 px-3 py-2 text-[11px] font-medium text-zinc-200"
+              onClick={() => {
+                if (typeof window !== "undefined") window.location.reload();
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )
+      ) : (
+        <>
       <div className="flex shrink-0 flex-col gap-0.5 sm:gap-0.5">
         <div className="rounded-lg border border-white/[0.1] bg-zinc-900/70 px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:py-1 sm:px-2">
           <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-zinc-400 sm:text-[11px]">
@@ -464,6 +491,14 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
               {vaultClaimBusy ? (
                 <span className="rounded-md border border-sky-500/22 bg-sky-950/40 px-2 py-0.5 text-[10px] text-sky-100/90">
                   Settlement…
+                </span>
+              ) : null}
+              {vaultClaimError && !vaultClaimBusy ? (
+                <span className="flex max-w-full flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] text-red-300/95">{vaultClaimError}</span>
+                  <button type="button" className="text-[10px] text-red-200 underline" onClick={() => void retryVaultClaim()}>
+                    Retry
+                  </button>
                 </span>
               ) : null}
             </div>
@@ -747,6 +782,8 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
           <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.1] pt-3">{finishDismissedStripActions}</div>
         </div>
       ) : null}
+        </>
+      )}
     </div>
   );
 }

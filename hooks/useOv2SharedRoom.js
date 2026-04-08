@@ -13,7 +13,14 @@ export function useOv2SharedRoom({ roomId, participantKey, pollMs = 3000 }) {
   const [lastLoadedAt, setLastLoadedAt] = useState(null);
   const [isEjected, setIsEjected] = useState(false);
 
+  const roomIdRef = useRef(roomId);
+  const participantKeyRef = useRef(participantKey);
+  roomIdRef.current = roomId;
+  participantKeyRef.current = participantKey;
+
   const inFlightRef = useRef(false);
+  /** When true, a refresh was requested while another was in flight; run one silent follow-up load. */
+  const pendingFollowUpRef = useRef(false);
 
   const me = useMemo(
     () => members.find(m => m.participant_key === participantKey) || null,
@@ -29,24 +36,36 @@ export function useOv2SharedRoom({ roomId, participantKey, pollMs = 3000 }) {
 
   const loadSnapshot = useCallback(
     async (opts = { silent: false }) => {
-      if (!roomId || inFlightRef.current) return;
+      const id = roomIdRef.current;
+      const pk = participantKeyRef.current;
+      if (!id) return;
+      if (inFlightRef.current) {
+        pendingFollowUpRef.current = true;
+        return;
+      }
       inFlightRef.current = true;
       if (!opts.silent) setLoading(true);
       setError("");
       try {
-        await reconnectOv2RoomMember({ room_id: roomId, participant_key: participantKey }).catch(() => {});
+        await reconnectOv2RoomMember({ room_id: id, participant_key: pk }).catch(() => {});
         const out = await getOv2RoomSnapshot({
-          room_id: roomId,
-          viewer_participant_key: participantKey,
+          room_id: id,
+          viewer_participant_key: pk,
         });
+        if (roomIdRef.current !== id || participantKeyRef.current !== pk) return;
         setRoom(out.room || null);
         setMembers(Array.isArray(out.members) ? out.members : []);
         setLastLoadedAt(Date.now());
       } catch (e) {
+        if (roomIdRef.current !== id || participantKeyRef.current !== pk) return;
         setError(e?.message || String(e));
       } finally {
         inFlightRef.current = false;
         if (!opts.silent) setLoading(false);
+        if (pendingFollowUpRef.current) {
+          pendingFollowUpRef.current = false;
+          void loadSnapshot({ silent: true });
+        }
       }
     },
     [roomId, participantKey]
@@ -58,6 +77,7 @@ export function useOv2SharedRoom({ roomId, participantKey, pollMs = 3000 }) {
       setMembers([]);
       setError("");
       setIsEjected(false);
+      pendingFollowUpRef.current = false;
       return;
     }
     void loadSnapshot();

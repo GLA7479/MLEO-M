@@ -6,6 +6,7 @@ import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { mmFormatCard, mmSuggestFinishFromHand11 } from "../../../lib/online-v2/meldmatch/ov2MeldMatchCards";
 import { useOv2MeldMatchSession } from "../../../hooks/useOv2MeldMatchSession";
+import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import {
   OV2_DUEL_HAND_HIT_CLEAR_MS,
   OV2_DUEL_HAND_HIT_DELAY_MS,
@@ -251,6 +252,8 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     vm,
     busy,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     err,
     setErr,
     draw,
@@ -289,6 +292,9 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
   const roomId = room?.id != null ? String(room.id) : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
+  const roomHasActiveSession =
+    room?.active_session_id != null && String(room.active_session_id).trim() !== "";
+  const { matchSnapshotTimedOut } = useOv2MatchSnapshotWait(roomHasActiveSession, Boolean(snapshot));
 
   const layoffMeldsNorm = useMemo(() => normalizeLayoffMelds(vm.layoffMelds), [vm.layoffMelds]);
 
@@ -764,6 +770,27 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     <div className="relative flex h-full min-h-0 w-full max-w-full flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_52%,rgba(45,212,191,0.23),rgba(15,23,42,0.34)_42%,rgba(6,11,22,0.95)_76%),radial-gradient(circle_at_50%_20%,rgba(125,211,252,0.13),transparent_40%),linear-gradient(180deg,#162235_0%,#0c1626_55%,#070f1e_100%)] px-1 pb-1 pt-[max(4px,env(safe-area-inset-top))] sm:px-2 sm:pb-2 sm:pt-2">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_38%),radial-gradient(circle_at_50%_50%,transparent_58%,rgba(3,7,16,0.55)_100%)]" />
       <div className="relative z-[1] flex h-full min-h-0 w-full max-w-full flex-col gap-1 overflow-hidden sm:gap-2">
+        {roomHasActiveSession && !snapshot ? (
+          !matchSnapshotTimedOut ? (
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-2 text-center text-sm text-zinc-400">
+              Loading match…
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-2 text-center">
+              <p className="text-sm text-zinc-400">Could not load match.</p>
+              <button
+                type="button"
+                className="rounded-lg border border-white/15 bg-zinc-900/70 px-3 py-2 text-[11px] font-medium text-zinc-200"
+                onClick={() => {
+                  if (typeof window !== "undefined") window.location.reload();
+                }}
+              >
+                Retry
+              </button>
+            </div>
+          )
+        ) : (
+          <>
         <div className="flex min-h-[2.65rem] shrink-0 items-center justify-between gap-1.5 rounded-xl border border-white/12 bg-zinc-900/45 px-2 py-1 text-[10px] text-zinc-300 sm:min-h-[2.6rem] sm:gap-2 sm:py-1.5">
           <p className="line-clamp-2 min-h-[2.25rem] max-w-[56%] flex-1 text-left text-[10px] font-medium leading-snug text-zinc-100 sm:max-w-none sm:line-clamp-none sm:min-h-0 sm:text-center">
             {compactActionLine}
@@ -775,6 +802,14 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
               <span>Disc {vm.discardCount}</span>
             </div>
             {vaultClaimBusy ? <span className={OV2_DUEL_SETTLEMENT_BADGE}>Settlement…</span> : null}
+            {vaultClaimError && !vaultClaimBusy ? (
+              <span className="max-w-[12rem] text-right text-[9px] text-red-300">
+                {vaultClaimError}{" "}
+                <button type="button" className="underline" onClick={() => void retryVaultClaim()}>
+                  Retry
+                </button>
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -977,7 +1012,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           </p>
           <div
             ref={handRowRef}
-            className="flex h-[4.75rem] w-full max-h-[5.1rem] shrink-0 items-end justify-center overflow-x-hidden overflow-y-hidden px-0 pb-0.5 sm:h-[8.35rem] sm:max-h-[8.75rem] sm:px-1 md:h-[7.15rem] md:max-h-[7.35rem]"
+            className="flex h-[4.75rem] w-full max-h-[5.1rem] shrink-0 items-end justify-center overflow-x-auto overflow-y-hidden px-0 pb-0.5 sm:h-[8.35rem] sm:max-h-[8.75rem] sm:px-1 md:h-[7.15rem] md:max-h-[7.35rem]"
           >
             {displayedHand.map((c, idx) => {
               const hid = `h-${idx}-${c}-${vm.revision}`;
@@ -1220,6 +1255,8 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           </div>
           {exitErr ? <span className="text-red-300">{exitErr}</span> : null}
         </div>
+          </>
+        )}
       </div>
 
       {finishPanelOpen && finishSuggestion ? (

@@ -15,6 +15,7 @@ import {
   ov2BgReplayDraftSteps,
 } from "../../../lib/online-v2/backgammon/ov2BackgammonDraftTurn";
 import { useOv2BackgammonSession } from "../../../hooks/useOv2BackgammonSession";
+import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
 
@@ -294,6 +295,8 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     vm,
     busy,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     err,
     setErr,
     roll,
@@ -380,6 +383,9 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   const room = contextInput?.room && typeof contextInput.room === "object" ? contextInput.room : null;
   const roomId = room?.id != null ? String(room.id) : "";
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
+  const roomHasActiveSession =
+    room?.active_session_id != null && String(room.active_session_id).trim() !== "";
+  const { matchSnapshotTimedOut } = useOv2MatchSnapshotWait(roomHasActiveSession, Boolean(snapshot));
   const selfKey = contextInput?.self?.participant_key?.trim() || "";
   const onLeaveToLobby =
     contextInput && typeof contextInput === "object" && typeof contextInput.onLeaveToLobby === "function"
@@ -1222,6 +1228,27 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   return (
     <div className="ov2-backgammon-root ov2bg-bg-breath relative flex h-full min-h-0 flex-1 flex-col gap-0.5 overflow-hidden bg-[radial-gradient(ellipse_85%_65%_at_50%_42%,#0F1720_0%,#0B0F14_55%,#080b10_100%)] px-1 pb-0.5 pt-0 text-white before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_70%_55%_at_50%_48%,transparent_0%,rgba(5,8,14,0.55)_100%)] sm:gap-1 sm:px-2 sm:pb-1">
       <style>{OV2BG_STYLE}</style>
+      {roomHasActiveSession && !snapshot ? (
+        !matchSnapshotTimedOut ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-2 text-center text-sm text-zinc-400">
+            Loading match…
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-2 text-center">
+            <p className="text-sm text-zinc-400">Could not load match.</p>
+            <button
+              type="button"
+              className="rounded-lg border border-white/15 bg-zinc-900/70 px-3 py-2 text-[11px] font-medium text-zinc-200"
+              onClick={() => {
+                if (typeof window !== "undefined") window.location.reload();
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )
+      ) : (
+        <>
       <div className="ov2bg-frame-sh relative z-[1] shrink-0 rounded-md border border-white/[0.09] bg-[rgba(24,28,38,0.86)] px-1.5 py-1 backdrop-blur-md sm:px-2 sm:py-1.5">
         <div
           className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2 transition-opacity duration-[180ms] [transition-timing-function:cubic-bezier(0.22,1,0.36,1)]"
@@ -1285,6 +1312,14 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       <div className="flex min-h-[3rem] shrink-0 flex-col justify-center gap-1 sm:min-h-[3.25rem]">
         {vaultClaimBusy ? (
           <p className="text-center text-[9px] text-zinc-300 sm:text-[10px]">Updating balance…</p>
+        ) : null}
+        {vaultClaimError && !vaultClaimBusy ? (
+          <p className="text-center text-[9px] text-red-300 sm:text-[10px]">
+            {vaultClaimError}{" "}
+            <button type="button" className={`${OV2BG_BTN_FLAT} underline`} onClick={() => void retryVaultClaim()}>
+              Retry
+            </button>
+          </p>
         ) : null}
         {err ? (
           <div className="rounded border border-amber-500/40 bg-amber-950/40 px-1.5 py-0.5 text-[8px] text-amber-100 sm:px-2 sm:py-1 sm:text-[9px]">
@@ -1544,6 +1579,8 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
           <div className="shrink-0 rounded-xl border border-white/15 bg-black/40 p-3">{finishedPanel}</div>
         )
       ) : null}
+        </>
+      )}
     </div>
   );
 }

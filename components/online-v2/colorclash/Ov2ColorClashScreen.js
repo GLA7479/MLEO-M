@@ -14,6 +14,7 @@ import {
 } from "../../../lib/online-v2/colorclash/ov2ColorClashCards";
 import { ccIsPlayableOn, ccSurgeSecondPlayable, humanizeOv2ColorClashError } from "../../../lib/online-v2/colorclash/ov2ColorClashPlayLogic";
 import { useOv2ColorClashSession } from "../../../hooks/useOv2ColorClashSession";
+import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import {
   OV2_DUEL_HAND_HIT_CLEAR_MS,
   OV2_DUEL_HAND_HIT_DELAY_MS,
@@ -145,6 +146,8 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
     vm,
     busy,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     err,
     setErr,
     drawCard,
@@ -175,6 +178,9 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
   const roomId = room?.id != null ? String(room.id) : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
+  const roomHasActiveSession =
+    room?.active_session_id != null && String(room.active_session_id).trim() !== "";
+  const { matchSnapshotTimedOut } = useOv2MatchSnapshotWait(roomHasActiveSession, Boolean(snapshot));
 
   useEffect(() => {
     setFinishModalDismissedSessionId("");
@@ -572,6 +578,27 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
 
   return (
     <div className="relative flex h-full min-h-0 w-full max-w-full flex-1 flex-col gap-0.5 overflow-hidden bg-zinc-950 px-1 pb-1 sm:gap-1 sm:px-2 sm:pb-1.5">
+      {roomHasActiveSession && !snapshot ? (
+        !matchSnapshotTimedOut ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-2 text-center text-sm text-zinc-400">
+            Loading match…
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-2 text-center">
+            <p className="text-sm text-zinc-400">Could not load match.</p>
+            <button
+              type="button"
+              className="rounded-lg border border-white/15 bg-zinc-900/70 px-3 py-2 text-[11px] font-medium text-zinc-200"
+              onClick={() => {
+                if (typeof window !== "undefined") window.location.reload();
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )
+      ) : (
+      <>
       <div className="flex shrink-0 flex-col justify-center gap-1">
         <div className="flex min-h-[2.5rem] items-center justify-center rounded-lg border border-cyan-400/25 bg-cyan-950/25 px-2 py-1 text-center text-[10px] font-medium leading-snug text-cyan-100/90 sm:min-h-[2.75rem] sm:py-1.5">
           {goalStrip}
@@ -610,6 +637,14 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
               {vaultClaimBusy ? (
                 <span className={OV2_DUEL_SETTLEMENT_BADGE}>
                   Settlement…
+                </span>
+              ) : null}
+              {vaultClaimError && !vaultClaimBusy ? (
+                <span className="max-w-[14rem] text-right text-[9px] text-red-300">
+                  {vaultClaimError}{" "}
+                  <button type="button" className="underline" onClick={() => void retryVaultClaim()}>
+                    Retry
+                  </button>
                 </span>
               ) : null}
             </div>
@@ -1033,6 +1068,8 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
         </div>
         {exitErr ? <span className="text-red-300">{exitErr}</span> : null}
       </div>
+      </>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   parseDominoTile,
 } from "../../../lib/online-v2/dominoes/ov2DominoesClientLegality";
 import { useOv2DominoesSession } from "../../../hooks/useOv2DominoesSession";
+import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
 import { OV2_BTN_ACCENT, OV2_BTN_DANGER } from "../tokens/ov2DuelPairUiTokens";
@@ -360,6 +361,8 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
     vm,
     busy,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     settlementPrizeAmount,
     err,
     setErr,
@@ -395,6 +398,9 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
   const roomId = room?.id != null ? String(room.id) : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
+  const roomHasActiveSession =
+    room?.active_session_id != null && String(room.active_session_id).trim() !== "";
+  const { matchSnapshotTimedOut } = useOv2MatchSnapshotWait(roomHasActiveSession, Boolean(snapshot));
 
   useEffect(() => {
     setSelIdx(null);
@@ -1149,6 +1155,27 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#0b0f14]">
+      {roomHasActiveSession && !snapshot ? (
+        !matchSnapshotTimedOut ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-2 text-center text-sm text-zinc-400">
+            Loading match…
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-2 text-center">
+            <p className="text-sm text-zinc-400">Could not load match.</p>
+            <button
+              type="button"
+              className="rounded-lg border border-white/15 bg-zinc-900/70 px-3 py-2 text-[11px] font-medium text-zinc-200"
+              onClick={() => {
+                if (typeof window !== "undefined") window.location.reload();
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        )
+      ) : (
+        <>
       <Ov2SharedStakeDoubleModal
         open={doubleModalActive}
         proposedMult={vm.pendingDouble?.proposed_mult}
@@ -1270,6 +1297,14 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
             </button>
           </div>
           {exitErr ? <span className="text-red-300">{exitErr}</span> : null}
+          {vaultClaimError && !vaultClaimBusy ? (
+            <span className="text-red-300">
+              {vaultClaimError}{" "}
+              <button type="button" className="underline" onClick={() => void retryVaultClaim()}>
+                Retry
+              </button>
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -1369,6 +1404,8 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
           </div>
         </Ov2SharedFinishModalFrame>
       ) : null}
+        </>
+      )}
     </div>
   );
 }

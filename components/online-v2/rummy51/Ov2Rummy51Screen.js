@@ -3,6 +3,7 @@
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOv2Rummy51Session } from "../../../hooks/useOv2Rummy51Session";
+import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import {
@@ -239,6 +240,10 @@ export default function Ov2Rummy51Screen({ contextInput = null, onSessionRefresh
     selfKey,
     busy,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
+    snapshotLoadError,
+    refresh,
     actionError,
     setActionError,
     drawStock,
@@ -255,6 +260,8 @@ export default function Ov2Rummy51Screen({ contextInput = null, onSessionRefresh
     startNextMatch,
     roomMatchSeq,
   } = session;
+
+  const { matchSnapshotTimedOut } = useOv2MatchSnapshotWait(hasActiveSession, Boolean(snapshot));
 
   const [rematchBusy, setRematchBusy] = useState(false);
   const [startNextBusy, setStartNextBusy] = useState(false);
@@ -1137,8 +1144,24 @@ export default function Ov2Rummy51Screen({ contextInput = null, onSessionRefresh
   }
 
   if (!snapshot) {
+    const showFailure = Boolean(snapshotLoadError || matchSnapshotTimedOut);
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-zinc-500">Loading table…</div>
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-3 text-center">
+        {!showFailure ? (
+          <p className="text-sm text-zinc-500">Loading table…</p>
+        ) : (
+          <>
+            <p className="text-sm text-zinc-400">{snapshotLoadError || "Could not load match."}</p>
+            <button
+              type="button"
+              className="rounded-lg border border-white/15 bg-zinc-900/70 px-3 py-2 text-[11px] font-medium text-zinc-200"
+              onClick={() => void refresh()}
+            >
+              Retry
+            </button>
+          </>
+        )}
+      </div>
     );
   }
 
@@ -1405,6 +1428,14 @@ export default function Ov2Rummy51Screen({ contextInput = null, onSessionRefresh
                 <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
                   {vaultClaimBusy ? "Sending results to your balance…" : "Round complete — rematch, then host starts next."}
                 </p>
+                {vaultClaimError && !vaultClaimBusy ? (
+                  <p className="mt-2 text-center text-[10px] text-red-300">
+                    {vaultClaimError}{" "}
+                    <button type="button" className="underline" onClick={() => void retryVaultClaim()}>
+                      Retry
+                    </button>
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>

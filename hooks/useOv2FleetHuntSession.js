@@ -19,6 +19,7 @@ import { requestOv2FleetHuntClaimSettlement } from "../lib/online-v2/fleethunt/o
 import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import { ONLINE_V2_GAME_KINDS } from "../lib/online-v2/ov2Economy";
+import { ov2PreferNewerSnapshot } from "../lib/online-v2/ov2PreferNewerSnapshot";
 
 /** @param {null|undefined|{ room?: object, members?: unknown[], self?: { participant_key?: string } }} baseContext */
 export function useOv2FleetHuntSession(baseContext) {
@@ -38,11 +39,14 @@ export function useOv2FleetHuntSession(baseContext) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [vaultClaimBusy, setVaultClaimBusy] = useState(false);
+  const [vaultClaimError, setVaultClaimError] = useState("");
+  const [vaultClaimRetryTick, setVaultClaimRetryTick] = useState(0);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const vaultFinishedRef = useRef(/** @type {string|null} */ (null));
   const vaultLinesAppliedForSessionRef = useRef(/** @type {Set<string>} */ (new Set()));
   const snapRef = useRef(/** @type {typeof snap} */ (null));
   const processedTimeoutKeysRef = useRef(/** @type {Set<string>} */ (new Set()));
+  const vaultClaimInFlightRef = useRef(false);
 
   useEffect(() => {
     setSnap(null);
@@ -50,6 +54,9 @@ export function useOv2FleetHuntSession(baseContext) {
     vaultLinesAppliedForSessionRef.current.clear();
     processedTimeoutKeysRef.current.clear();
     setVaultClaimBusy(false);
+    setVaultClaimError("");
+    setVaultClaimRetryTick(0);
+    vaultClaimInFlightRef.current = false;
   }, [roomId, activeSessionKey]);
 
   useEffect(() => {
@@ -70,12 +77,12 @@ export function useOv2FleetHuntSession(baseContext) {
     let cancelled = false;
     void (async () => {
       const s = await fetchOv2FleetHuntSnapshot(roomId, { participantKey: selfKey ?? "" });
-      if (!cancelled) setSnap(s ?? null);
+      if (!cancelled) setSnap(prev => ov2PreferNewerSnapshot(prev, s ?? null));
     })();
     const unsub = subscribeOv2FleetHuntSnapshot(roomId, {
       participantKey: selfKey ?? "",
       onSnapshot: s => {
-        if (!cancelled) setSnap(s);
+        if (!cancelled) setSnap(prev => ov2PreferNewerSnapshot(prev, s));
       },
     });
     return () => {
@@ -88,8 +95,10 @@ export function useOv2FleetHuntSession(baseContext) {
     if (!snap || String(snap.phase || "").toLowerCase() !== "finished" || !roomId || !selfKey) return;
     const sid = String(snap.sessionId || "").trim();
     if (!sid || vaultFinishedRef.current === sid) return;
-    vaultFinishedRef.current = sid;
+    if (vaultClaimInFlightRef.current) return;
+    vaultClaimInFlightRef.current = true;
     setVaultClaimBusy(true);
+    setVaultClaimError("");
     void (async () => {
       try {
         const claim = await requestOv2FleetHuntClaimSettlement(roomId, selfKey);
@@ -98,17 +107,29 @@ export function useOv2FleetHuntSession(baseContext) {
             await applyBoardPathSettlementClaimLinesToVault(claim.lines, ONLINE_V2_GAME_KINDS.FLEET_HUNT);
             vaultLinesAppliedForSessionRef.current.add(sid);
           }
+          vaultFinishedRef.current = sid;
+          setVaultClaimError("");
         } else if (!claim.ok) {
-          vaultFinishedRef.current = null;
+          setVaultClaimError(String(claim.error || claim.message || "Could not update balance."));
+        } else {
+          vaultFinishedRef.current = sid;
         }
-      } catch {
-        vaultFinishedRef.current = null;
+      } catch (e) {
+        setVaultClaimError(e instanceof Error ? e.message : String(e));
       } finally {
+        vaultClaimInFlightRef.current = false;
         await readOnlineV2Vault({ fresh: true }).catch(() => {});
         setVaultClaimBusy(false);
       }
     })();
-  }, [snap, roomId, selfKey]);
+  }, [snap, roomId, selfKey, vaultClaimRetryTick]);
+
+  const retryVaultClaim = useCallback(() => {
+    vaultFinishedRef.current = null;
+    vaultClaimInFlightRef.current = false;
+    setVaultClaimError("");
+    setVaultClaimRetryTick(t => t + 1);
+  }, []);
 
   useEffect(() => {
     if (!roomId || !selfKey || roomProductId !== OV2_FLEET_HUNT_PRODUCT_GAME_ID) return undefined;
@@ -149,7 +170,7 @@ export function useOv2FleetHuntSession(baseContext) {
         const r = await requestOv2FleetHuntMarkTurnTimeout(roomId, selfKey, {
           revision: cur.revision,
         });
-        if (r.ok && r.snapshot) setSnap(r.snapshot);
+        if (r.ok && r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
         const sn = r.snapshot && typeof r.snapshot === "object" ? r.snapshot : null;
         const revAfter = sn?.revision != null ? Number(sn.revision) : NaN;
         const phaseAfter = sn ? String(sn.phase || "").toLowerCase() : "";
@@ -201,7 +222,7 @@ export function useOv2FleetHuntSession(baseContext) {
         const r = await requestOv2FleetHuntMarkTurnTimeout(roomId, selfKey, {
           revision: cur.revision,
         });
-        if (r.ok && r.snapshot) setSnap(r.snapshot);
+        if (r.ok && r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
         const sn = r.snapshot && typeof r.snapshot === "object" ? r.snapshot : null;
         const revAfter = sn?.revision != null ? Number(sn.revision) : NaN;
         const phaseAfter = sn ? String(sn.phase || "").toLowerCase() : "";
@@ -220,6 +241,7 @@ export function useOv2FleetHuntSession(baseContext) {
   const submitPlacement = useCallback(
     async ships => {
       if (!roomId || !selfKey || !snap) return { ok: false };
+      if (busy) return { ok: false };
       setBusy(true);
       setErr("");
       try {
@@ -228,7 +250,7 @@ export function useOv2FleetHuntSession(baseContext) {
           setErr(r.error || "Placement failed");
           return { ok: false, code: r.code };
         }
-        if (r.snapshot) setSnap(r.snapshot);
+        if (r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
         return { ok: true };
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
@@ -237,11 +259,12 @@ export function useOv2FleetHuntSession(baseContext) {
         setBusy(false);
       }
     },
-    [roomId, selfKey, snap]
+    [roomId, selfKey, snap, busy]
   );
 
   const randomPlacement = useCallback(async () => {
     if (!roomId || !selfKey || !snap) return { ok: false };
+    if (busy) return { ok: false };
     setBusy(true);
     setErr("");
     try {
@@ -250,7 +273,7 @@ export function useOv2FleetHuntSession(baseContext) {
         setErr(r.error || "Random placement failed");
         return { ok: false, code: r.code };
       }
-      if (r.snapshot) setSnap(r.snapshot);
+      if (r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
       return { ok: true };
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -258,10 +281,11 @@ export function useOv2FleetHuntSession(baseContext) {
     } finally {
       setBusy(false);
     }
-  }, [roomId, selfKey, snap]);
+  }, [roomId, selfKey, snap, busy]);
 
   const lockPlacement = useCallback(async () => {
     if (!roomId || !selfKey || !snap) return { ok: false };
+    if (busy) return { ok: false };
     setBusy(true);
     setErr("");
     try {
@@ -270,7 +294,7 @@ export function useOv2FleetHuntSession(baseContext) {
         setErr(r.error || "Could not lock placement");
         return { ok: false, code: r.code };
       }
-      if (r.snapshot) setSnap(r.snapshot);
+      if (r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
       return { ok: true };
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -278,11 +302,12 @@ export function useOv2FleetHuntSession(baseContext) {
     } finally {
       setBusy(false);
     }
-  }, [roomId, selfKey, snap]);
+  }, [roomId, selfKey, snap, busy]);
 
   const fireShot = useCallback(
     async (r, c) => {
       if (!roomId || !selfKey || !snap) return { ok: false };
+      if (busy) return { ok: false };
       setBusy(true);
       setErr("");
       try {
@@ -291,7 +316,7 @@ export function useOv2FleetHuntSession(baseContext) {
           setErr(res.error || "Shot failed");
           return { ok: false, code: res.code };
         }
-        if (res.snapshot) setSnap(res.snapshot);
+        if (res.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, res.snapshot));
         return { ok: true };
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
@@ -300,11 +325,12 @@ export function useOv2FleetHuntSession(baseContext) {
         setBusy(false);
       }
     },
-    [roomId, selfKey, snap]
+    [roomId, selfKey, snap, busy]
   );
 
   const offerDouble = useCallback(async () => {
     if (!roomId || !selfKey || !snap) return { ok: false };
+    if (busy) return { ok: false };
     setBusy(true);
     setErr("");
     try {
@@ -313,7 +339,7 @@ export function useOv2FleetHuntSession(baseContext) {
         setErr(r.error || "Double offer failed");
         return { ok: false, code: r.code };
       }
-      if (r.snapshot) setSnap(r.snapshot);
+      if (r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
       return { ok: true };
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -321,11 +347,12 @@ export function useOv2FleetHuntSession(baseContext) {
     } finally {
       setBusy(false);
     }
-  }, [roomId, selfKey, snap]);
+  }, [roomId, selfKey, snap, busy]);
 
   const respondDouble = useCallback(
     async accept => {
       if (!roomId || !selfKey || !snap) return { ok: false };
+      if (busy) return { ok: false };
       setBusy(true);
       setErr("");
       try {
@@ -334,7 +361,7 @@ export function useOv2FleetHuntSession(baseContext) {
           setErr(r.error || "Response failed");
           return { ok: false, code: r.code };
         }
-        if (r.snapshot) setSnap(r.snapshot);
+        if (r.snapshot) setSnap(prev => ov2PreferNewerSnapshot(prev, r.snapshot));
         return { ok: true };
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e));
@@ -343,7 +370,7 @@ export function useOv2FleetHuntSession(baseContext) {
         setBusy(false);
       }
     },
-    [roomId, selfKey, snap]
+    [roomId, selfKey, snap, busy]
   );
 
   const requestRematch = useCallback(async () => {
@@ -416,6 +443,8 @@ export function useOv2FleetHuntSession(baseContext) {
     vm,
     busy,
     vaultClaimBusy,
+    vaultClaimError,
+    retryVaultClaim,
     err,
     setErr,
     submitPlacement,
