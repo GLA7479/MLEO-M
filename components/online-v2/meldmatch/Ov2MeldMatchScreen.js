@@ -175,6 +175,46 @@ function normalizeLayoffMelds(raw) {
     .filter(m => m.length >= 3);
 }
 
+function mmSortCardsByRank(cards) {
+  return [...cards].sort((a, b) => {
+    const ra = a % 13;
+    const rb = b % 13;
+    if (ra !== rb) return ra - rb;
+    return Math.floor(a / 13) - Math.floor(b / 13);
+  });
+}
+
+function mmSortCardsBySuit(cards) {
+  return [...cards].sort((a, b) => {
+    const sa = Math.floor(a / 13);
+    const sb = Math.floor(b / 13);
+    if (sa !== sb) return sa - sb;
+    return (a % 13) - (b % 13);
+  });
+}
+
+function mmSortCardsSmart(cards) {
+  const bySuit = mmSortCardsBySuit(cards);
+  const byRank = mmSortCardsByRank(cards);
+
+  const suitRunsScore = bySuit.reduce((acc, c, i, arr) => {
+    if (i === 0) return acc;
+    const prev = arr[i - 1];
+    const sameSuit = Math.floor(prev / 13) === Math.floor(c / 13);
+    const sequential = (prev % 13) + 1 === (c % 13);
+    return acc + (sameSuit && sequential ? 2 : sameSuit ? 1 : 0);
+  }, 0);
+
+  const setScore = byRank.reduce((acc, c, i, arr) => {
+    if (i === 0) return acc;
+    const prev = arr[i - 1];
+    const sameRank = (prev % 13) === (c % 13);
+    return acc + (sameRank ? 2 : 0);
+  }, 0);
+
+  return suitRunsScore >= setScore ? bySuit : byRank;
+}
+
 /**
  * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string }, onLeaveToLobby?: () => void|Promise<void>, leaveToLobbyBusy?: boolean } | null, onSessionRefresh?: (prev: string, rpcNew?: string, opts?: { expectClearedSession?: boolean }) => Promise<unknown> }} props
  */
@@ -214,6 +254,8 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
   /** Mobile-first: first tap selects, second tap confirms discard */
   const [selectedHandCardKey, setSelectedHandCardKey] = useState(/** @type {string|null} */ (null));
   const [coarsePointer, setCoarsePointer] = useState(false);
+  const [handOrderMode, setHandOrderMode] = useState(/** @type {"smart"|"rank"|"suit"|"manual"} */ ("smart"));
+  const [manualHandOrder, setManualHandOrder] = useState(/** @type {number[]|null} */ (null));
   const handRowRef = useRef(/** @type {HTMLDivElement|null} */ (null));
   const [handTrackWidth, setHandTrackWidth] = useState(0);
   const [isNarrowHandViewport, setIsNarrowHandViewport] = useState(false);
@@ -230,6 +272,8 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     setFinishPanelOpen(false);
     setHandCardHitKey(null);
     setSelectedHandCardKey(null);
+    setHandOrderMode("smart");
+    setManualHandOrder(null);
   }, [vm.sessionId]);
 
   useEffect(() => {
@@ -271,6 +315,32 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     apply();
     return () => ro.disconnect();
   }, [isNarrowHandViewport, vm.myHand.length, vm.sessionId, vm.revision]);
+
+  useEffect(() => {
+    const src = Array.isArray(vm.myHand) ? vm.myHand : [];
+    if (src.length === 0) {
+      setManualHandOrder(null);
+      return;
+    }
+
+    setManualHandOrder(prev => {
+      if (!Array.isArray(prev) || prev.length === 0) return src;
+
+      const remaining = [...src];
+      const next = [];
+
+      for (const c of prev) {
+        const idx = remaining.indexOf(c);
+        if (idx >= 0) {
+          next.push(c);
+          remaining.splice(idx, 1);
+        }
+      }
+
+      next.push(...remaining);
+      return next;
+    });
+  }, [vm.myHand]);
 
   useEffect(() => {
     if (vm.phase !== "layoff") setLayoffAssignments([]);
@@ -555,6 +625,72 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
     });
     return out;
   }, [finishSuggestion]);
+
+  const displayedHand = useMemo(() => {
+    const src = Array.isArray(vm.myHand) ? vm.myHand : [];
+    if (src.length === 0) return [];
+
+    if (handOrderMode === "manual" && Array.isArray(manualHandOrder) && manualHandOrder.length === src.length) {
+      const counts = new Map();
+      src.forEach(c => counts.set(c, (counts.get(c) || 0) + 1));
+      const ok = manualHandOrder.every(c => {
+        const n = counts.get(c) || 0;
+        if (n <= 0) return false;
+        counts.set(c, n - 1);
+        return true;
+      });
+      if (ok) return [...manualHandOrder];
+    }
+
+    if (handOrderMode === "rank") return mmSortCardsByRank(src);
+    if (handOrderMode === "suit") return mmSortCardsBySuit(src);
+    return mmSortCardsSmart(src);
+  }, [vm.myHand, handOrderMode, manualHandOrder]);
+
+  const handAnalysisText = useMemo(() => {
+    const cards = Array.isArray(vm.myHand) ? vm.myHand : [];
+    if (cards.length === 0) return "";
+
+    if (cards.length === 11 && finishSuggestion) {
+      return finishSuggestion.kind === "gin"
+        ? "Your hand can finish right now with gin."
+        : `Your hand can finish right now with knock (${finishSuggestion.deadwoodPts} deadwood).`;
+    }
+
+    const rankCounts = new Map();
+    const suitBuckets = new Map();
+
+    for (const c of cards) {
+      const rank = c % 13;
+      const suit = Math.floor(c / 13);
+      rankCounts.set(rank, (rankCounts.get(rank) || 0) + 1);
+      if (!suitBuckets.has(suit)) suitBuckets.set(suit, []);
+      suitBuckets.get(suit).push(rank);
+    }
+
+    let pairRanks = 0;
+    let setRanks = 0;
+    for (const [, count] of rankCounts) {
+      if (count >= 2) pairRanks += 1;
+      if (count >= 3) setRanks += 1;
+    }
+
+    let nearRuns = 0;
+    for (const [, ranks] of suitBuckets) {
+      const uniq = [...new Set(ranks)].sort((a, b) => a - b);
+      for (let i = 1; i < uniq.length; i++) {
+        if (uniq[i] === uniq[i - 1] + 1) nearRuns += 1;
+      }
+    }
+
+    if (setRanks > 0 && nearRuns > 0) return "You are close on both sets and runs. Keep deadwood low.";
+    if (setRanks > 0) return "You have a strong set build. Keep matching ranks together.";
+    if (pairRanks > 0 && nearRuns > 0) return "You have partial sets and partial runs. Avoid breaking both.";
+    if (nearRuns > 0) return "You are close to a run. Keep same-suit sequences together.";
+    if (pairRanks > 0) return "You have matching ranks forming toward a set.";
+    return "No strong meld yet. Reduce deadwood and build toward one suit or one rank group.";
+  }, [vm.myHand, finishSuggestion]);
+
   const compactActionLine =
     vm.phase === "playing" && vm.turnPhase === "draw"
       ? "Draw from stock or top discard"
@@ -596,8 +732,8 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
 
   const narrowMobileHandLayout = useMemo(() => {
     if (!isNarrowHandViewport || handTrackWidth <= 0) return null;
-    return computeNarrowMobileHandLayout(handTrackWidth, vm.myHand.length);
-  }, [isNarrowHandViewport, handTrackWidth, vm.myHand.length]);
+    return computeNarrowMobileHandLayout(handTrackWidth, displayedHand.length);
+  }, [isNarrowHandViewport, handTrackWidth, displayedHand.length]);
 
   return (
     <div className="relative flex h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_52%,rgba(45,212,191,0.23),rgba(15,23,42,0.34)_42%,rgba(6,11,22,0.95)_76%),radial-gradient(circle_at_50%_20%,rgba(125,211,252,0.13),transparent_40%),linear-gradient(180deg,#162235_0%,#0c1626_55%,#070f1e_100%)] px-1 pb-[max(6px,env(safe-area-inset-bottom))] pt-[max(4px,env(safe-area-inset-top))] sm:h-full sm:px-2 sm:pb-2 sm:pt-2">
@@ -719,23 +855,10 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                 </button>
               </div>
             </div>
-
-            {discardPhaseMyTurn ? (
-              <div className={`${OV2_DUEL_ACTION_STRIP} rounded-xl px-2 py-1.5`}>
-                <p className="text-center text-[11px] font-semibold text-emerald-200">Choose a discard</p>
-                <div className="mt-1.5 flex flex-wrap items-center justify-center gap-2">
-                  {vm.myHand.length === 11 && finishSuggestion ? (
-                    <button type="button" disabled={busy} className={OV2_BTN_ACCENT} onClick={() => setFinishPanelOpen(true)}>
-                      Ready to finish
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
           </div>
         </div>
 
-        <div className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? `${OV2_DUEL_PANEL_HAND_ACTIVE} shadow-[0_0_30px_rgba(16,185,129,0.2)]` : ""} max-sm:-mx-1 shrink-0 rounded-[1.5rem] !border-0 bg-[linear-gradient(180deg,rgba(15,24,40,0.74)_0%,rgba(7,12,24,0.94)_100%)] px-0 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_-16px_40px_rgba(0,0,0,0.22)_inset,0_12px_28px_rgba(0,0,0,0.28)] sm:mx-0 sm:rounded-[1.75rem] sm:p-3 md:py-2 md:max-h-[10.25rem]`}>
+        <div className={`${OV2_DUEL_PANEL_HAND} ${handBoardActive ? `${OV2_DUEL_PANEL_HAND_ACTIVE} shadow-[0_0_30px_rgba(16,185,129,0.2)]` : ""} max-sm:-mx-1 shrink-0 rounded-[1.5rem] !border-0 bg-[linear-gradient(180deg,rgba(15,24,40,0.74)_0%,rgba(7,12,24,0.94)_100%)] px-0 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_-16px_40px_rgba(0,0,0,0.22)_inset,0_12px_28px_rgba(0,0,0,0.28)] sm:mx-0 sm:rounded-[1.75rem] sm:p-3 md:py-2`}>
           <div className="mb-1 flex items-center justify-between gap-2 px-2 sm:px-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-200">Your hand</p>
             <p className="text-[9px] text-zinc-400">{vm.myHand.length} cards</p>
@@ -747,7 +870,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
             ref={handRowRef}
             className="flex h-[5rem] w-full items-end justify-center overflow-hidden px-0 pb-0.5 sm:h-[8.9rem] sm:px-1 md:h-[7.4rem]"
           >
-            {vm.myHand.map((c, idx) => {
+            {displayedHand.map((c, idx) => {
               const hid = `h-${idx}-${c}-${vm.revision}`;
               const showingHit = handCardHitKey === hid;
               const ui = mmCardUi(c);
@@ -826,7 +949,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
                               : desktopOverlap
                         }px`,
                   zIndex: selected ? 40 : idx + 1,
-                  transform: `${selected ? "translateY(-4px) scale(1.04)" : ""} translateY(${Math.abs(idx - (vm.myHand.length - 1) / 2) * (coarsePointer ? 0.1 : 0.3)}px) rotate(${(idx - (vm.myHand.length - 1) / 2) * (coarsePointer ? 0.26 : 0.65)}deg)`,
+                  transform: `${selected ? "translateY(-4px) scale(1.04)" : ""} translateY(${Math.abs(idx - (displayedHand.length - 1) / 2) * (coarsePointer ? 0.1 : 0.3)}px) rotate(${(idx - (displayedHand.length - 1) / 2) * (coarsePointer ? 0.26 : 0.65)}deg)`,
                 }}
                 title={`${ui.rank} of ${ui.suitName}`}
                 aria-label={`${ui.rank} of ${ui.suitName}`}
@@ -846,6 +969,59 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
             );
             })}
           </div>
+          {discardPhaseMyTurn ? (
+            <div className={`mt-1 px-2 sm:px-0 ${OV2_DUEL_ACTION_STRIP} rounded-xl py-1`}>
+              <p className="text-center text-[10px] font-semibold text-emerald-200 sm:text-[11px]">Choose a discard</p>
+            </div>
+          ) : null}
+          <div className="mt-1 flex items-center justify-center gap-1 px-2 sm:px-0">
+            <button
+              type="button"
+              className={`rounded-md px-2 py-0.5 text-[9px] font-semibold transition ${handOrderMode === "smart" ? "bg-emerald-500/20 text-emerald-100 ring-1 ring-emerald-300/35" : "bg-white/5 text-zinc-300 ring-1 ring-white/10"}`}
+              onClick={() => setHandOrderMode("smart")}
+            >
+              Smart
+            </button>
+            <button
+              type="button"
+              className={`rounded-md px-2 py-0.5 text-[9px] font-semibold transition ${handOrderMode === "rank" ? "bg-sky-500/20 text-sky-100 ring-1 ring-sky-300/35" : "bg-white/5 text-zinc-300 ring-1 ring-white/10"}`}
+              onClick={() => setHandOrderMode("rank")}
+            >
+              Rank
+            </button>
+            <button
+              type="button"
+              className={`rounded-md px-2 py-0.5 text-[9px] font-semibold transition ${handOrderMode === "suit" ? "bg-violet-500/20 text-violet-100 ring-1 ring-violet-300/35" : "bg-white/5 text-zinc-300 ring-1 ring-white/10"}`}
+              onClick={() => setHandOrderMode("suit")}
+            >
+              Suit
+            </button>
+          </div>
+          {discardPhaseMyTurn && finishSuggestion ? (
+            <div className="mt-1 px-2 sm:px-0">
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-2 py-1">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold text-emerald-100">
+                    {finishSuggestion.kind === "gin" ? "Gin ready" : `Knock ready · ${finishSuggestion.deadwoodPts} deadwood`}
+                  </p>
+                  <p className="truncate text-[9px] text-emerald-200/80">
+                    Discard {mmFormatCard(finishSuggestion.discard)} and finish the hand
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="shrink-0 rounded-md bg-emerald-400/20 px-2 py-0.5 text-[10px] font-bold text-emerald-50 ring-1 ring-emerald-300/35 transition hover:bg-emerald-400/30 disabled:opacity-50"
+                  onClick={() => setFinishPanelOpen(true)}
+                >
+                  Finish
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {handAnalysisText ? (
+            <p className="mt-1 px-2 text-center text-[9px] leading-tight text-zinc-400 sm:px-0 sm:text-[10px]">{handAnalysisText}</p>
+          ) : null}
         </div>
 
         {vm.phase === "layoff" && vm.turnSeat === vm.mySeat ? (
