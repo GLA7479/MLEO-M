@@ -761,9 +761,9 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
   }, [isNarrowHandViewport, handTrackWidth, displayedHand.length]);
 
   return (
-    <div className="relative flex h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_52%,rgba(45,212,191,0.23),rgba(15,23,42,0.34)_42%,rgba(6,11,22,0.95)_76%),radial-gradient(circle_at_50%_20%,rgba(125,211,252,0.13),transparent_40%),linear-gradient(180deg,#162235_0%,#0c1626_55%,#070f1e_100%)] px-1 pb-[max(6px,env(safe-area-inset-bottom))] pt-[max(4px,env(safe-area-inset-top))] sm:h-full sm:px-2 sm:pb-2 sm:pt-2">
+    <div className="relative flex w-full min-h-min flex-col overflow-x-hidden bg-[radial-gradient(circle_at_50%_52%,rgba(45,212,191,0.23),rgba(15,23,42,0.34)_42%,rgba(6,11,22,0.95)_76%),radial-gradient(circle_at_50%_20%,rgba(125,211,252,0.13),transparent_40%),linear-gradient(180deg,#162235_0%,#0c1626_55%,#070f1e_100%)] px-1 pb-[max(6px,env(safe-area-inset-bottom))] pt-[max(4px,env(safe-area-inset-top))] sm:px-2 sm:pb-2 sm:pt-2">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_38%),radial-gradient(circle_at_50%_50%,transparent_58%,rgba(3,7,16,0.55)_100%)]" />
-      <div className="relative z-[1] flex min-h-0 flex-1 flex-col gap-2">
+      <div className="relative z-[1] flex w-full min-h-min flex-col gap-2">
         <div className="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-white/12 bg-zinc-900/45 px-2 py-1.5 text-[10px] text-zinc-300">
           <div
             className={
@@ -842,11 +842,38 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           </div>
         ) : null}
 
-        <div className="relative min-h-0 flex-1 rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_50%_44%,rgba(45,212,191,0.28),rgba(8,17,33,0.18)_36%,rgba(4,10,20,0.78)_82%),linear-gradient(180deg,rgba(19,34,56,0.5)_0%,rgba(6,12,24,0.82)_100%)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-16px_60px_rgba(0,0,0,0.28),0_24px_40px_rgba(0,0,0,0.35)] sm:p-3">
-          <div className="flex h-full min-h-0 flex-col justify-between gap-2">
-            <div className="flex min-h-0 flex-1 flex-col rounded-2xl bg-transparent p-2">
+        {vm.phase === "playing" && drawPhaseMyTurn ? (
+          <div className={`${OV2_DUEL_ACTION_STRIP} shrink-0 rounded-lg border border-emerald-500/25 bg-emerald-950/20 px-2 py-2`}>
+            <p className="mb-1.5 text-center text-[10px] text-emerald-100/88">
+              Draw step — use the buttons or tap the stock / discard on the table.
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                disabled={busy || vm.stockCount <= 0}
+                title={vm.stockCount <= 0 ? "Stock is empty" : "Draw from stock"}
+                className={OV2_BTN_PRIMARY}
+                onClick={() => void draw("stock")}
+              >
+                Draw from stock{typeof vm.stockCount === "number" && vm.stockCount > 0 ? ` (${vm.stockCount})` : ""}
+              </button>
+              <button
+                type="button"
+                disabled={busy || vm.discardTop == null}
+                className={OV2_BTN_SECONDARY}
+                onClick={() => void draw("discard")}
+              >
+                Take discard
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="relative w-full shrink-0 min-h-[min(42dvh,17rem)] rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_50%_44%,rgba(45,212,191,0.28),rgba(8,17,33,0.18)_36%,rgba(4,10,20,0.78)_82%),linear-gradient(180deg,rgba(19,34,56,0.5)_0%,rgba(6,12,24,0.82)_100%)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-16px_60px_rgba(0,0,0,0.28),0_24px_40px_rgba(0,0,0,0.35)] sm:min-h-[min(44dvh,18.5rem)] sm:p-3">
+          <div className="flex min-h-[min(40dvh,16rem)] flex-col justify-between gap-2 sm:min-h-[min(42dvh,17.5rem)]">
+            <div className="flex min-h-[min(36dvh,14rem)] flex-col rounded-2xl bg-transparent p-2 sm:min-h-[min(38dvh,15rem)]">
               <p className="shrink-0 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-300">Top discard</p>
-              <div className="mt-3 flex min-h-0 flex-1 items-center justify-center sm:mt-4">
+              <div className="mt-3 flex min-h-[min(28dvh,10.5rem)] flex-1 items-center justify-center sm:mt-4 sm:min-h-[min(30dvh,11rem)]">
                 <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-4">
                   <button
                     type="button"
@@ -895,7 +922,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
           </p>
           <div
             ref={handRowRef}
-            className="flex h-[min(5rem,26dvh)] w-full max-h-[5.25rem] items-end justify-center overflow-hidden px-0 pb-0.5 sm:h-[min(8.9rem,34dvh)] sm:max-h-[8.9rem] sm:px-1 md:h-[7.4rem] md:max-h-[7.4rem]"
+            className="flex h-[min(5rem,26dvh)] w-full max-h-[5.25rem] items-end justify-center overflow-x-hidden overflow-y-visible px-0 pb-0.5 sm:h-[min(8.9rem,34dvh)] sm:max-h-[8.9rem] sm:px-1 md:h-[7.4rem] md:max-h-[7.4rem]"
           >
             {displayedHand.map((c, idx) => {
               const hid = `h-${idx}-${c}-${vm.revision}`;
@@ -1152,7 +1179,7 @@ export default function Ov2MeldMatchScreen({ contextInput = null, onSessionRefre
             </p>
             <p className="mt-1 text-[10px] text-zinc-500">Why this works: {finishSuggestion.kind === "gin" ? "all cards fit into melds." : "deadwood is 10 or less."}</p>
             <p className="mt-2 text-[10px] text-zinc-500">Melds (server validates):</p>
-            <ul className="mt-1 max-h-32 overflow-y-auto text-[10px] font-mono text-zinc-300">
+            <ul className="mt-1 text-[10px] font-mono text-zinc-300">
               {finishSuggestion.melds.map((m, i) => (
                 <li key={i}>{m.map(mmFormatCard).join(" ")}</li>
               ))}

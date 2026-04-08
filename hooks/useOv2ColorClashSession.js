@@ -12,6 +12,7 @@ import {
   requestOv2ColorClashStartNextMatch,
   subscribeOv2ColorClashSnapshot,
 } from "../lib/online-v2/colorclash/ov2ColorClashSessionAdapter";
+import { humanizeOv2ColorClashError } from "../lib/online-v2/colorclash/ov2ColorClashPlayLogic";
 import { requestOv2ColorClashClaimSettlement } from "../lib/online-v2/colorclash/ov2ColorClashSettlement";
 import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
@@ -202,13 +203,13 @@ export function useOv2ColorClashSession(baseContext) {
     try {
       const r = await requestOv2ColorClashDrawCard(roomId, selfKey, { revision: snap.revision });
       if (!r.ok) {
-        setErr(r.error || "Draw failed");
+        setErr(humanizeOv2ColorClashError(r.code, r.error || "Draw failed"));
         return { ok: false, code: r.code };
       }
       if (r.snapshot) setSnap(r.snapshot);
       return { ok: true };
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(humanizeOv2ColorClashError(undefined, e instanceof Error ? e.message : String(e)));
       return { ok: false };
     } finally {
       setBusy(false);
@@ -222,13 +223,13 @@ export function useOv2ColorClashSession(baseContext) {
     try {
       const r = await requestOv2ColorClashPassAfterDraw(roomId, selfKey, { revision: snap.revision });
       if (!r.ok) {
-        setErr(r.error || "Pass failed");
+        setErr(humanizeOv2ColorClashError(r.code, r.error || "Pass failed"));
         return { ok: false, code: r.code };
       }
       if (r.snapshot) setSnap(r.snapshot);
       return { ok: true };
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      setErr(humanizeOv2ColorClashError(undefined, e instanceof Error ? e.message : String(e)));
       return { ok: false };
     } finally {
       setBusy(false);
@@ -249,13 +250,13 @@ export function useOv2ColorClashSession(baseContext) {
           secondChosenColor: opts?.secondChosenColor != null ? opts.secondChosenColor : null,
         });
         if (!r.ok) {
-          setErr(r.error || "Play failed");
+          setErr(humanizeOv2ColorClashError(r.code, r.error || "Play failed"));
           return { ok: false, code: r.code };
         }
         if (r.snapshot) setSnap(r.snapshot);
         return { ok: true };
       } catch (e) {
-        setErr(e instanceof Error ? e.message : String(e));
+        setErr(humanizeOv2ColorClashError(undefined, e instanceof Error ? e.message : String(e)));
         return { ok: false };
       } finally {
         setBusy(false);
