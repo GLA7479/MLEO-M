@@ -12,6 +12,7 @@ import {
 import { useOv2DominoesSession } from "../../../hooks/useOv2DominoesSession";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 import Ov2SharedStakeDoubleModal from "../Ov2SharedStakeDoubleModal";
+import { OV2_BTN_ACCENT, OV2_BTN_DANGER } from "../tokens/ov2DuelPairUiTokens";
 
 const finishDismissStorageKey = sid => `ov2_dom_finish_dismiss_${sid}`;
 
@@ -855,17 +856,6 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
                 <span className="text-[10px] font-semibold tracking-wide text-zinc-100 sm:text-[11px]">OPPONENT</span>
               </div>
             </div>
-            <div className="mt-0.5 flex items-center justify-between gap-1">
-              <button
-                type="button"
-                disabled={exitBusy || !pk || doubleModalActive}
-                className="min-w-0 truncate text-left text-[10px] font-medium text-sky-300 underline disabled:opacity-45"
-                onClick={() => void onExitToLobby()}
-              >
-                {exitBusy ? "Leaving…" : "Leave table"}
-              </button>
-              <span className={`max-w-[55%] truncate text-right text-[9px] ${exitErr ? "text-red-300" : "text-transparent"}`}>{exitErr || "—"}</span>
-            </div>
           </div>
         </div>
 
@@ -896,17 +886,26 @@ export default function Ov2DominoesScreen({ contextInput = null, onSessionRefres
           </div>
         </div>
 
-        <div className="flex min-h-[3.25rem] shrink-0 items-center gap-1 px-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-0.5">
-          <button
-            type="button"
-            disabled={busy || !showBottomActions || !vm.canOfferDouble}
-            className={`w-full max-w-md flex-1 h-9 rounded-lg border border-white/10 bg-zinc-900 px-2 text-[12px] font-medium tracking-wide text-zinc-200 transition-opacity disabled:opacity-45 ${T_OP} ${
-              vm.canOfferDouble ? "opacity-100" : "pointer-events-none opacity-40"
-            }`}
-            onClick={() => void offerDouble()}
-          >
-            Double
-          </button>
+        <div className="mt-1 flex shrink-0 flex-col gap-1 border-t border-white/[0.12] px-2 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] text-[9px] text-zinc-400 sm:text-[10px]">
+          <div className="flex items-stretch gap-2">
+            <button
+              type="button"
+              disabled={busy || !showBottomActions || !vm.canOfferDouble}
+              className={`${OV2_BTN_ACCENT} flex-1 py-2 text-[11px]`}
+              onClick={() => void offerDouble()}
+            >
+              Double
+            </button>
+            <button
+              type="button"
+              disabled={exitBusy || !pk || doubleModalActive}
+              className={`${OV2_BTN_DANGER} flex-1 py-2 text-[11px] disabled:opacity-45`}
+              onClick={() => void onExitToLobby()}
+            >
+              {exitBusy ? "Leaving…" : "Leave table"}
+            </button>
+          </div>
+          {exitErr ? <span className="text-red-300">{exitErr}</span> : null}
         </div>
       </div>
 
