@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import {
+  cancelOv2Rummy51Rematch,
   fetchOv2Rummy51Snapshot,
   normalizeOv2Rummy51Snapshot,
   ov2Rummy51DrawDiscard,
@@ -9,6 +10,8 @@ import {
   ov2Rummy51SubmitTurn,
   ov2Rummy51UndoDiscardDraw,
   OV2_RUMMY51_PRODUCT_GAME_ID,
+  requestOv2Rummy51Rematch,
+  startOv2Rummy51NextMatch,
   subscribeOv2Rummy51Session,
 } from "../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
 import { requestOv2Rummy51ClaimSettlement } from "../lib/online-v2/rummy51/ov2Rummy51Settlement";
@@ -33,6 +36,7 @@ export function useOv2Rummy51Session(baseContext) {
   const [snapshot, setSnapshot] = useState(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [vaultClaimBusy, setVaultClaimBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!roomId || roomProductId !== OV2_RUMMY51_PRODUCT_GAME_ID) return;
@@ -67,6 +71,7 @@ export function useOv2Rummy51Session(baseContext) {
 
   useEffect(() => {
     vaultFinishedRefreshForSessionRef.current = null;
+    setVaultClaimBusy(false);
   }, [roomId]);
 
   useEffect(() => {
@@ -76,6 +81,7 @@ export function useOv2Rummy51Session(baseContext) {
     if (!sid || !selfKey) return;
     if (vaultFinishedRefreshForSessionRef.current === sid) return;
     vaultFinishedRefreshForSessionRef.current = sid;
+    setVaultClaimBusy(true);
     void (async () => {
       try {
         const claim = await requestOv2Rummy51ClaimSettlement(roomId, selfKey);
@@ -86,8 +92,10 @@ export function useOv2Rummy51Session(baseContext) {
         }
       } catch {
         vaultFinishedRefreshForSessionRef.current = null;
+      } finally {
+        await readOnlineV2Vault({ fresh: true }).catch(() => {});
+        setVaultClaimBusy(false);
       }
-      await readOnlineV2Vault({ fresh: true }).catch(() => {});
     })();
   }, [roomId, roomProductId, snapshot?.phase, snapshot?.sessionId, selfKey]);
 
@@ -191,12 +199,31 @@ export function useOv2Rummy51Session(baseContext) {
   const hostKey = room?.host_participant_key != null ? String(room.host_participant_key) : "";
   const isHost = Boolean(selfKey && hostKey && selfKey === hostKey);
 
+  const requestRematch = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false };
+    return requestOv2Rummy51Rematch(roomId, selfKey);
+  }, [roomId, selfKey]);
+
+  const cancelRematch = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false };
+    return cancelOv2Rummy51Rematch(roomId, selfKey);
+  }, [roomId, selfKey]);
+
+  const startNextMatch = useCallback(
+    async expectedMatchSeq => {
+      if (!roomId || !selfKey) return { ok: false };
+      return startOv2Rummy51NextMatch(roomId, selfKey, expectedMatchSeq);
+    },
+    [roomId, selfKey]
+  );
+
   return {
     snapshot,
     members,
     room,
     selfKey,
     busy,
+    vaultClaimBusy,
     actionError,
     setActionError,
     refresh,
@@ -209,6 +236,10 @@ export function useOv2Rummy51Session(baseContext) {
     isPlaying,
     isFinished,
     isHost,
+    requestRematch,
+    cancelRematch,
+    startNextMatch,
+    roomMatchSeq: room?.match_seq != null ? Number(room.match_seq) : null,
     productId: OV2_RUMMY51_PRODUCT_GAME_ID,
   };
 }

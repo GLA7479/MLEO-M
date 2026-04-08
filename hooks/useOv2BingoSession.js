@@ -13,16 +13,19 @@ import {
 } from "../lib/online-v2/bingo/ov2BingoEngine";
 import {
   callOv2BingoNext,
+  cancelOv2BingoRematch,
   claimOv2BingoPrize,
   coalesceOv2BingoLiveSnapshots,
   fetchOv2BingoLiveRoundSnapshot,
   normalizeOv2BingoAuthoritativeSnapshot,
   normalizeMemberRow,
   openOv2BingoSession,
+  requestOv2BingoRematch,
   resolveOv2BingoSeatCard,
   OV2_BINGO_PLAY_MODE,
   OV2_BINGO_PRODUCT_GAME_ID,
   resolveOv2BingoPlayMode,
+  startOv2BingoNextMatch,
   subscribeOv2BingoAuthoritativeSnapshot,
 } from "../lib/online-v2/bingo/ov2BingoSessionAdapter";
 import { creditOnlineV2VaultForSettlementLine } from "../lib/online-v2/onlineV2VaultBridge";
@@ -323,6 +326,32 @@ export function useOv2BingoSession(baseContext) {
     return r;
   }, [roomId, selfKey, liveSnapshot]);
 
+  const requestRematch = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false, error: "Not ready" };
+    const r = await requestOv2BingoRematch(roomId, selfKey);
+    await refreshLiveSnapshot();
+    if (typeof reloadRoomContext === "function") void Promise.resolve(reloadRoomContext());
+    return r;
+  }, [roomId, selfKey, refreshLiveSnapshot, reloadRoomContext]);
+
+  const cancelRematch = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false, error: "Not ready" };
+    const r = await cancelOv2BingoRematch(roomId, selfKey);
+    await refreshLiveSnapshot();
+    if (typeof reloadRoomContext === "function") void Promise.resolve(reloadRoomContext());
+    return r;
+  }, [roomId, selfKey, refreshLiveSnapshot, reloadRoomContext]);
+
+  const startNextMatch = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false, error: "Not ready" };
+    const seq =
+      room?.match_seq != null && Number.isFinite(Number(room.match_seq)) ? Math.floor(Number(room.match_seq)) : null;
+    const r = await startOv2BingoNextMatch(roomId, selfKey, seq);
+    await refreshLiveSnapshot();
+    if (typeof reloadRoomContext === "function") void Promise.resolve(reloadRoomContext());
+    return r;
+  }, [roomId, selfKey, room?.match_seq, refreshLiveSnapshot, reloadRoomContext]);
+
   const claimPrize = useCallback(
     async prizeKey => {
       if (!roomId || !selfKey || !liveSnapshot) return { ok: false, error: "Not ready" };
@@ -503,9 +532,9 @@ export function useOv2BingoSession(baseContext) {
       openSession: snap?.canOpenSession ? null : snap?.roomLifecyclePhase !== "active" ? "Room not active" : "Session already active or not eligible",
       callNext: snap?.canCallNext ? (nextCallDue ? null : "Waiting for call timer") : "Only the caller can draw",
       claim: snap?.sessionPhase === "playing" ? (!liveCard ? "No card (seat required)" : null) : "Match not in play",
-      rematch: "Rematch not available",
-      cancelRematch: "Nothing to cancel",
-      startNextMatch: "Not available",
+      rematch: snap?.canRequestRematch ? null : snap?.sessionPhase === "finished" ? "Cannot request rematch now" : "Rematch not available",
+      cancelRematch: snap?.canCancelRematch ? null : "Nothing to cancel",
+      startNextMatch: snap?.canStartNextMatch ? null : "Not host or not ready",
     };
 
     const selfClaimedPrizeKeys =
@@ -582,9 +611,9 @@ export function useOv2BingoSession(baseContext) {
       canCallNext: snap?.canCallNext ?? false,
       canCallNextNow,
       canClaimAnyPrize: false,
-      canRequestRematch: false,
-      canCancelRematch: false,
-      canStartNextMatch: false,
+      canRequestRematch: snap?.canRequestRematch ?? false,
+      canCancelRematch: snap?.canCancelRematch ?? false,
+      canStartNextMatch: snap?.canStartNextMatch ?? false,
       cardIsAuthoritative: Boolean(liveCard),
       disabledReasons: dr,
     };
@@ -628,6 +657,9 @@ export function useOv2BingoSession(baseContext) {
       openSession,
       callNextManual,
       claimPrize,
+      requestRematch,
+      cancelRematch,
+      startNextMatch,
     },
     rebindSnapshotFromServerPayload,
   };

@@ -111,6 +111,70 @@ export default function Ov2BingoLiveShell() {
     }
   }, [roomId, participantId]);
 
+  const reloadContextUntilSessionChanges = useCallback(
+    async (previousSessionId, rpcNewSessionId, timeoutMs = 20000, options = {}) => {
+      if (!roomId) return { ok: false, error: "no room" };
+      const pk = String(participantId || "").trim();
+      if (!pk) return { ok: false, error: "no participant" };
+      const expectClearedSession = options?.expectClearedSession === true;
+      const prev =
+        previousSessionId != null && String(previousSessionId).trim() !== "" ? String(previousSessionId).trim() : "";
+      const rpcSid =
+        rpcNewSessionId != null && String(rpcNewSessionId).trim() !== "" ? String(rpcNewSessionId).trim() : "";
+      const start = Date.now();
+      setLoadError("");
+      try {
+        if (!expectClearedSession && rpcSid && rpcSid !== prev) {
+          setRoom(row => (row && typeof row === "object" ? { ...row, active_session_id: rpcSid } : row));
+        }
+        while (Date.now() - start < timeoutMs) {
+          const { room: r, members: m } = await fetchOv2RoomLedgerForViewer(roomId, { viewer_participant_key: pk });
+          if (!r) {
+            setRoom(null);
+            setMembers([]);
+            setLoadError("Room not found.");
+            return { ok: false, error: "Room not found" };
+          }
+          if (r.product_game_id !== ONLINE_V2_GAME_IDS.BINGO) {
+            setRoom(null);
+            setMembers([]);
+            setLoadError("This room is not a Bingo table.");
+            return { ok: false, error: "wrong game" };
+          }
+          const nextId = r.active_session_id != null ? String(r.active_session_id).trim() : "";
+          const life = r.lifecycle_phase != null ? String(r.lifecycle_phase).trim() : "";
+          setRoom(r);
+          setMembers(m);
+          loadedOnceForRoomRef.current = roomId;
+          if (expectClearedSession) {
+            if ((!nextId || nextId === "") && life === "pending_stakes") return { ok: true };
+          } else if (nextId) {
+            if (rpcSid && nextId === rpcSid) return { ok: true };
+            if (!rpcSid && prev && nextId !== prev) return { ok: true };
+          }
+          await new Promise(res => setTimeout(res, 150));
+        }
+        setLoadError(
+          expectClearedSession
+            ? "Timed out waiting for the room to return to stake phase."
+            : "Timed out waiting for the new match to start."
+        );
+        return { ok: false, error: "timeout" };
+      } catch (e) {
+        const msg = e?.message || String(e);
+        setLoadError(msg);
+        const softLedger =
+          e instanceof Ov2RoomRpcError && e.code === "room_not_found_or_invalid_credentials";
+        if (!softLedger) {
+          setRoom(null);
+          setMembers([]);
+        }
+        return { ok: false, error: msg };
+      }
+    },
+    [roomId, participantId]
+  );
+
   const debouncedReloadContext = useOv2DebouncedReload(() => {
     void reloadContext();
   }, 400);
@@ -352,7 +416,11 @@ export default function Ov2BingoLiveShell() {
         ) : room && contextInput ? (
           <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden overscroll-y-contain">
             <div className="min-h-0 min-w-0 flex-1 overflow-hidden overscroll-y-contain">
-              <Ov2BingoScreen contextInput={contextInput} />
+              <Ov2BingoScreen
+                key={room?.active_session_id ? String(room.active_session_id) : "ov2-bingo-no-session"}
+                contextInput={contextInput}
+                onSessionRefresh={reloadContextUntilSessionChanges}
+              />
             </div>
           </div>
         ) : (

@@ -1,6 +1,9 @@
 "use client";
 
+import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
+import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import { BINGO_PRIZE_KEYS } from "../../../lib/online-v2/bingo/ov2BingoEngine";
 import { getOv2BingoSeatStyle } from "../../../lib/online-v2/bingo/ov2BingoSeatColors";
 import { OV2_BINGO_PLAY_MODE } from "../../../lib/online-v2/bingo/ov2BingoSessionAdapter";
@@ -27,9 +30,11 @@ function fmtCountdown(ms) {
  *     onLeaveToLobby?: (() => void | Promise<void>) | null,
  *     leaveToLobbyBusy?: boolean,
  *   } | null,
+ *   onSessionRefresh?: (prev: string, rpcNew?: string, opts?: { expectClearedSession?: boolean }) => Promise<unknown>,
  * }} props
  */
-export default function Ov2BingoScreen({ contextInput = null }) {
+export default function Ov2BingoScreen({ contextInput = null, onSessionRefresh }) {
+  const router = useRouter();
   const session = useOv2BingoSession(contextInput ?? undefined);
   const { vm, actions, selfKey, callNextPreviewNumber, resetPreviewRound, onToggleMark, previewDisabledReasonCallNext } =
     session;
@@ -43,6 +48,21 @@ export default function Ov2BingoScreen({ contextInput = null }) {
   const [claimPendingKey, setClaimPendingKey] = useState(/** @type {string|null} */ (null));
   const claimFlightRef = useRef(false);
   const [finishModalDismissedForSessionId, setFinishModalDismissedForSessionId] = useState("");
+  const [rematchBusy, setRematchBusy] = useState(false);
+  const [startNextBusy, setStartNextBusy] = useState(false);
+  const [exitBusy, setExitBusy] = useState(false);
+  const [exitErr, setExitErr] = useState("");
+
+  const roomId =
+    contextInput?.room && typeof contextInput.room === "object" && contextInput.room.id != null
+      ? String(contextInput.room.id).trim()
+      : "";
+  const pk = selfKey != null ? String(selfKey).trim() : "";
+  const hostPk =
+    contextInput?.room && typeof contextInput.room === "object" && contextInput.room.host_participant_key != null
+      ? String(contextInput.room.host_participant_key).trim()
+      : "";
+  const isHost = Boolean(pk && hostPk && pk === hostPk);
 
   const isRoomShell = vm.playMode === OV2_BINGO_PLAY_MODE.LIVE_ROOM_NO_MATCH_YET;
   const isLiveMatch = vm.playMode === OV2_BINGO_PLAY_MODE.LIVE_MATCH_ACTIVE;
@@ -121,6 +141,81 @@ export default function Ov2BingoScreen({ contextInput = null }) {
     }
     return slots;
   }, [vm.membersVm]);
+
+  const onRequestRematch = useCallback(async () => {
+    if (!roomId || rematchBusy) return;
+    setRematchBusy(true);
+    setExitErr("");
+    try {
+      const r = await actions.requestRematch();
+      if (!r.ok) setExitErr(r.error || "Rematch request failed");
+    } finally {
+      setRematchBusy(false);
+    }
+  }, [roomId, rematchBusy, actions]);
+
+  const onCancelRematch = useCallback(async () => {
+    if (!roomId || rematchBusy) return;
+    setRematchBusy(true);
+    setExitErr("");
+    try {
+      const r = await actions.cancelRematch();
+      if (!r.ok) setExitErr(r.error || "Could not cancel rematch");
+    } finally {
+      setRematchBusy(false);
+    }
+  }, [roomId, rematchBusy, actions]);
+
+  const onStartNext = useCallback(async () => {
+    if (!roomId || !isHost || startNextBusy) return;
+    setStartNextBusy(true);
+    setExitErr("");
+    try {
+      const r = await actions.startNextMatch();
+      if (!r.ok) {
+        setExitErr(r.error || "Could not start next match");
+        return;
+      }
+      try {
+        window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_SESSION_KEY, roomId);
+      } catch {
+        /* ignore */
+      }
+      if (typeof onSessionRefresh === "function") {
+        const prev =
+          vm.authoritativeSnapshot?.sessionId != null ? String(vm.authoritativeSnapshot.sessionId) : "";
+        await onSessionRefresh(prev, "", { expectClearedSession: true });
+      }
+      await router.push(`/online-v2/rooms?room=${encodeURIComponent(roomId)}`);
+    } catch (e) {
+      setExitErr(e?.message || String(e) || "Could not start next match.");
+    } finally {
+      setStartNextBusy(false);
+    }
+  }, [roomId, isHost, startNextBusy, actions, onSessionRefresh, vm.authoritativeSnapshot?.sessionId, router]);
+
+  const onExitToLobby = useCallback(async () => {
+    if (!roomId || !pk || exitBusy) return;
+    setExitBusy(true);
+    setExitErr("");
+    try {
+      await leaveOv2RoomWithForfeitRetry({
+        room: contextInput?.room,
+        room_id: roomId,
+        participant_key: pk,
+      });
+      try {
+        window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
+      } catch {
+        /* ignore */
+      }
+      await router.push("/online-v2/rooms");
+    } catch (e) {
+      setExitErr(e?.message || String(e) || "Could not leave.");
+    } finally {
+      setExitBusy(false);
+    }
+  }, [roomId, pk, exitBusy, contextInput?.room, router]);
 
   const onClaim = useCallback(
     async prizeKey => {
@@ -421,11 +516,25 @@ export default function Ov2BingoScreen({ contextInput = null }) {
 
       <Ov2BingoFinishModal
         open={showFinishModal}
-        onClose={() => setFinishModalDismissedForSessionId(finishSessionId)}
+        onDismiss={() => setFinishModalDismissedForSessionId(finishSessionId)}
         prizeLabels={prizeLabels}
         claims={finishModalClaims}
         winner={vm.winner}
         walkoverPayoutAmount={vm.walkoverPayoutAmount ?? null}
+        vaultClaimBusy={false}
+        selfKey={pk}
+        isHost={isHost}
+        canRequestRematch={Boolean(vm.canRequestRematch)}
+        canCancelRematch={Boolean(vm.canCancelRematch)}
+        canStartNextMatch={Boolean(vm.canStartNextMatch)}
+        rematchBusy={rematchBusy}
+        startNextBusy={startNextBusy}
+        exitBusy={exitBusy}
+        exitErr={exitErr}
+        onRequestRematch={onRequestRematch}
+        onCancelRematch={onCancelRematch}
+        onStartNext={onStartNext}
+        onLeaveTable={onExitToLobby}
       />
     </div>
   );

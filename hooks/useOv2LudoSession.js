@@ -110,6 +110,7 @@ export function useOv2LudoSession(baseContext) {
     setLiveRollServerFace(null);
     vaultDoubleMultRef.current = null;
     vaultFinishedRefreshForSessionRef.current = null;
+    setVaultClaimBusy(false);
   }, [roomId]);
 
   useEffect(() => {
@@ -123,6 +124,7 @@ export function useOv2LudoSession(baseContext) {
     setLiveRollServerFace(null);
     vaultDoubleMultRef.current = null;
     vaultFinishedRefreshForSessionRef.current = null;
+    setVaultClaimBusy(false);
   }, [roomId, activeSessionKey]);
 
   useEffect(() => {
@@ -206,6 +208,7 @@ export function useOv2LudoSession(baseContext) {
     if (!sid || !roomId || !selfKey) return;
     if (vaultFinishedRefreshForSessionRef.current === sid) return;
     vaultFinishedRefreshForSessionRef.current = sid;
+    setVaultClaimBusy(true);
     void (async () => {
       try {
         const claim = await requestOv2LudoClaimSettlement(roomId, selfKey);
@@ -216,8 +219,10 @@ export function useOv2LudoSession(baseContext) {
         }
       } catch {
         vaultFinishedRefreshForSessionRef.current = null;
+      } finally {
+        await readOnlineV2Vault({ fresh: true }).catch(() => {});
+        setVaultClaimBusy(false);
       }
-      await readOnlineV2Vault({ fresh: true }).catch(() => {});
     })();
   }, [playMode, authoritativeSnapshot, roomProductId, roomId, selfKey]);
 
@@ -255,6 +260,8 @@ export function useOv2LudoSession(baseContext) {
     }
     return false;
   }, [playMode, authoritativeSnapshot]);
+
+  const [vaultClaimBusy, setVaultClaimBusy] = useState(false);
 
   const [previewBoard, setPreviewBoard] = useState(() => createOv2LudoLocalPreviewBoard());
   const [diceRolling, setDiceRolling] = useState(false);
@@ -813,6 +820,7 @@ export function useOv2LudoSession(baseContext) {
   }, [authoritativeSnapshot?.phase, authoritativeSnapshot?.result, eliminatedSeats, isDoublePending, doubleExpiresAt, nowMs]);
 
   return {
+    vaultClaimBusy,
     vm: {
       playMode,
       interactionTier,

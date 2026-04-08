@@ -19,10 +19,8 @@ const finishDismissStorageKey = sid => `ov2_ludo_finish_dismiss_${sid}`;
 const BTN_PRIMARY =
   "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_SECONDARY =
-  "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98]";
-const BTN_ACCENT =
-  "rounded-lg border border-sky-500/24 bg-gradient-to-b from-sky-950/60 to-sky-950 px-3 py-2 text-[11px] font-semibold text-sky-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
-const BTN_DANGER =
+  "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+const BTN_FINISH_DANGER =
   "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
 /**
@@ -31,8 +29,19 @@ const BTN_DANGER =
 export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh }) {
   const router = useRouter();
   const session = useOv2LudoSession(contextInput ?? undefined);
-  const { vm, rollDicePreview, onPieceClick, canRoll, resetPreviewBoard, offerDouble, respondDouble, requestRematch, cancelRematch, startNextMatch } =
-    session;
+  const {
+    vm,
+    vaultClaimBusy,
+    rollDicePreview,
+    onPieceClick,
+    canRoll,
+    resetPreviewBoard,
+    offerDouble,
+    respondDouble,
+    requestRematch,
+    cancelRematch,
+    startNextMatch,
+  } = session;
   const [rematchIntentBusy, setRematchIntentBusy] = useState(false);
   const [startNextBusy, setStartNextBusy] = useState(false);
   const [exitBusy, setExitBusy] = useState(false);
@@ -232,13 +241,13 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
     (String(matchPhase || "").toLowerCase() === "finished" || vm?.board?.winner != null || result?.winner != null);
   const winnerFromResult = result?.winner != null ? Number(result.winner) : winnerSeat != null ? Number(winnerSeat) : null;
   const didIWin = isFinished && mySeat != null && winnerFromResult != null && Number(mySeat) === Number(winnerFromResult);
-  const canToggleRematchIntent =
+  const baseRematchEligible =
     isFinished &&
     mySeat != null &&
     String(myMemberRow?.wallet_state || "").trim() === "committed" &&
     eligibleRematch >= 2 &&
-    eligibleRematch <= 4 &&
-    !rematchIntentBusy;
+    eligibleRematch <= 4;
+  const finishActionsLocked = vaultClaimBusy;
   const canHostStartNextMatch =
     isFinished && isHost && eligibleRematch >= 2 && readyRematch >= eligibleRematch && !startNextBusy;
   const lossPerSeat =
@@ -493,7 +502,7 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
                 {finishOutcome === "win" ? "🏆" : finishOutcome === "loss" ? "✕" : "⎔"}
               </span>
               <div className="min-w-0 flex-1 text-left">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Match result</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Round result</p>
                 <h2
                   id="ov2-ludo-finish-title"
                   className={[
@@ -515,116 +524,127 @@ export default function Ov2LudoScreen({ contextInput = null, onSessionRefresh })
                     {finishAmountLine.text}
                   </p>
                 </div>
-                <p className="mt-3 text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
+                <p className="mt-3 text-center text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
                 {mySeat == null && prizeTotal != null && winnerFromResult != null ? (
                   <p className="mt-2 text-center text-[10px] text-zinc-500">
                     Spectator · winner S{winnerFromResult + 1} · pot {prizeTotal.toLocaleString()}
                   </p>
                 ) : null}
                 <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
-                  {eligibleRematch >= 2 ? `Rematch ready: ${readyRematch}/${eligibleRematch} seated players` : "Round complete — rematch, then host starts next."}
+                  {finishActionsLocked
+                    ? "Sending results to your balance…"
+                    : eligibleRematch >= 2
+                      ? `Rematch ready: ${readyRematch}/${eligibleRematch} seated players — then host starts next.`
+                      : "Round complete — rematch, then host starts next."}
                 </p>
               </div>
             </div>
           </div>
           <div className="flex flex-col gap-2 px-4 py-4">
-            {canToggleRematchIntent ? (
+            <button
+              type="button"
+              disabled={rematchIntentBusy || myRematchRequested || !baseRematchEligible || finishActionsLocked}
+              onClick={async () => {
+                if (!baseRematchEligible || finishActionsLocked) return;
+                setRematchIntentBusy(true);
+                try {
+                  const r = await requestRematch();
+                  if (!r?.ok && r?.error) console.warn("[Ludo rematch intent]", r.error);
+                } finally {
+                  setRematchIntentBusy(false);
+                }
+              }}
+              className={BTN_PRIMARY + " w-full"}
+            >
+              {rematchIntentBusy && !myRematchRequested ? "Requesting…" : "Request rematch"}
+            </button>
+            <button
+              type="button"
+              disabled={rematchIntentBusy || !myRematchRequested || !baseRematchEligible}
+              onClick={async () => {
+                if (!baseRematchEligible) return;
+                setRematchIntentBusy(true);
+                try {
+                  const r = await cancelRematch();
+                  if (!r?.ok && r?.error) console.warn("[Ludo rematch cancel]", r.error);
+                } finally {
+                  setRematchIntentBusy(false);
+                }
+              }}
+              className={BTN_SECONDARY + " w-full"}
+            >
+              Cancel rematch
+            </button>
+            <div className="w-full overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-950/15 pt-2">
+              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">Host only</p>
               <button
                 type="button"
-                disabled={rematchIntentBusy}
+                className={BTN_PRIMARY + " w-full rounded-none"}
+                disabled={!isHost || startNextBusy || finishActionsLocked || !canHostStartNextMatch}
+                title={!isHost ? "Only the host can start the next match" : undefined}
                 onClick={async () => {
-                  setRematchIntentBusy(true);
+                  if (!canHostStartNextMatch || finishActionsLocked) return;
+                  const prevSessionId =
+                    contextInput?.room?.active_session_id != null ? String(contextInput.room.active_session_id) : "";
+                  setStartNextBusy(true);
                   try {
-                    const r = myRematchRequested ? await cancelRematch() : await requestRematch();
-                    if (!r?.ok && r?.error) console.warn("[Ludo rematch intent]", r.error);
-                  } finally {
-                    setRematchIntentBusy(false);
-                  }
-                }}
-                className={BTN_ACCENT + " w-full"}
-              >
-                {rematchIntentBusy ? "Updating…" : myRematchRequested ? "Cancel rematch" : "Ready for rematch"}
-              </button>
-            ) : null}
-            {isHost ? (
-              <div className="w-full overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-950/15 pt-2">
-                <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">Host only</p>
-                <button
-                  type="button"
-                  className={BTN_PRIMARY + " w-full rounded-none"}
-                  disabled={!canHostStartNextMatch}
-                  onClick={async () => {
-                    if (!canHostStartNextMatch) return;
-                    const prevSessionId =
-                      contextInput?.room?.active_session_id != null ? String(contextInput.room.active_session_id) : "";
-                    setStartNextBusy(true);
-                    try {
-                      const r = await startNextMatch();
-                      if (r?.ok && onSessionRefresh) {
-                        await onSessionRefresh(prevSessionId, undefined, { expectClearedSession: true });
-                      } else if (!r?.ok && r?.error) {
-                        console.warn("[Ludo start next match]", r.error);
-                      }
-                    } finally {
-                      setStartNextBusy(false);
-                    }
-                  }}
-                >
-                  {startNextBusy ? "Starting…" : "Start next match (host)"}
-                </button>
-              </div>
-            ) : isFinished && eligibleRematch >= 2 && readyRematch < eligibleRematch ? (
-              <p className="rounded-lg border border-white/[0.06] bg-zinc-950/35 px-2 py-1.5 text-center text-[11px] text-zinc-500">
-                Waiting for all players to confirm rematch…
-              </p>
-            ) : null}
-            <button type="button" className={BTN_SECONDARY} onClick={dismissFinishModal}>
-              Dismiss
-            </button>
-            {roomId ? (
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={exitBusy}
-                  className={BTN_SECONDARY}
-                  onClick={() => {
-                    setExitErr("");
-                    void router.replace({ pathname: "/online-v2/rooms", query: { room: roomId } }, undefined, { shallow: true });
-                  }}
-                >
-                  Back to room
-                </button>
-                <button
-                  type="button"
-                  disabled={exitBusy || !selfKey}
-                  className={BTN_DANGER + " w-full"}
-                  onClick={async () => {
-                    if (!selfKey) return;
-                    setExitErr("");
-                    setExitBusy(true);
-                    try {
-                      await leaveOv2RoomWithForfeitRetry({
-                        room: contextInput?.room,
-                        room_id: roomId,
-                        participant_key: selfKey,
-                      });
+                    const r = await startNextMatch();
+                    if (r?.ok) {
                       try {
-                        window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
+                        window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_SESSION_KEY, roomId);
                       } catch {
                         /* ignore */
                       }
-                      await router.replace("/online-v2/rooms");
-                    } catch (e) {
-                      setExitErr(e?.message || "Could not leave room.");
-                    } finally {
-                      setExitBusy(false);
+                      if (onSessionRefresh) {
+                        await onSessionRefresh(prevSessionId, "", { expectClearedSession: true });
+                      }
+                      await router.push(`/online-v2/rooms?room=${encodeURIComponent(roomId)}`);
+                    } else if (r?.error) {
+                      console.warn("[Ludo start next match]", r.error);
                     }
-                  }}
-                >
-                  {exitBusy ? "Leaving…" : "Leave room"}
-                </button>
-              </div>
-            ) : null}
+                  } finally {
+                    setStartNextBusy(false);
+                  }
+                }}
+              >
+                {startNextBusy ? "Starting…" : "Start next (host)"}
+              </button>
+              <p className="px-2 py-1.5 text-center text-[11px] text-zinc-500">
+                Host starts the next match when all seated players rematch.
+              </p>
+            </div>
+            <button type="button" className={BTN_SECONDARY + " w-full"} onClick={dismissFinishModal}>
+              Dismiss
+            </button>
+            <button
+              type="button"
+              disabled={exitBusy || !selfKey}
+              className={BTN_FINISH_DANGER + " w-full"}
+              onClick={async () => {
+                if (!selfKey) return;
+                setExitErr("");
+                setExitBusy(true);
+                try {
+                  await leaveOv2RoomWithForfeitRetry({
+                    room: contextInput?.room,
+                    room_id: roomId,
+                    participant_key: selfKey,
+                  });
+                  try {
+                    window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
+                  } catch {
+                    /* ignore */
+                  }
+                  await router.replace("/online-v2/rooms");
+                } catch (e) {
+                  setExitErr(e?.message || "Could not leave room.");
+                } finally {
+                  setExitBusy(false);
+                }
+              }}
+            >
+              {exitBusy ? "Leaving…" : "Leave table"}
+            </button>
             {exitErr ? <p className="text-center text-[11px] text-red-300">{exitErr}</p> : null}
           </div>
         </Ov2SharedFinishModalFrame>

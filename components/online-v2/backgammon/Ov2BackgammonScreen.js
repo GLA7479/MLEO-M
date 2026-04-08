@@ -20,6 +20,14 @@ import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 const AUTO_ROLL_STORAGE_KEY = "ov2_bg_auto_roll";
 const finishDismissStorageKey = sid => `ov2_bg_finish_dismiss_${sid}`;
 
+/** Finish modal — same tokens as `Ov2FourLineScreen` / dominoes */
+const BTN_FL_PRIMARY =
+  "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+const BTN_FL_SECONDARY =
+  "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98]";
+const BTN_FL_DANGER =
+  "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+
 /** Pure UI: shared motion + micro-interactions. Shadow tokens: base + ambient only (see --ov2bg-sh-*). */
 const OV2BG_STYLE = `
 .ov2-backgammon-root{
@@ -808,6 +816,13 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
   const didIWin = vm.mySeat != null && vm.winnerSeat != null && vm.winnerSeat === vm.mySeat;
   const canHostStartNext = isHost && isFinished && eligibleRematch >= 2 && readyRematch >= eligibleRematch;
 
+  const winnerDisplayName = useMemo(() => {
+    if (vm.winnerSeat == null) return "";
+    const m = members.find(x => Number(x?.seat_index) === Number(vm.winnerSeat));
+    const n = m && typeof m.display_name === "string" ? String(m.display_name).trim() : "";
+    return n || `Seat ${vm.winnerSeat + 1}`;
+  }, [members, vm.winnerSeat]);
+
   const finishSessionId = isFinished ? String(vm.sessionId || "").trim() : "";
 
   useEffect(() => {
@@ -827,6 +842,114 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
         })()));
 
   const showResultModal = isFinished && finishSessionId.length > 0 && !finishModalDismissed;
+
+  const isDraw = isFinished && vm.winnerSeat == null;
+  const finishMultiplier = 1;
+
+  const finishOutcome = useMemo(() => {
+    if (!isFinished) return "unknown";
+    if (isDraw) return "draw";
+    if (didIWin) return "win";
+    if (vm.mySeat != null && vm.winnerSeat != null && vm.winnerSeat !== vm.mySeat) return "loss";
+    return "unknown";
+  }, [isFinished, isDraw, didIWin, vm.mySeat, vm.winnerSeat]);
+
+  const finishTitle = useMemo(() => {
+    if (!isFinished) return "";
+    if (isDraw) return "Draw";
+    if (didIWin) return "Victory";
+    if (vm.mySeat != null && vm.winnerSeat != null && vm.winnerSeat !== vm.mySeat) return "Defeat";
+    return "Match finished";
+  }, [isFinished, isDraw, didIWin, vm.mySeat, vm.winnerSeat]);
+
+  const finishReasonLine = useMemo(() => {
+    if (!isFinished) return "";
+    if (isDraw) return "No winner — stakes refunded";
+    return winnerDisplayName ? `Winner: ${winnerDisplayName}` : "Round complete";
+  }, [isFinished, isDraw, winnerDisplayName]);
+
+  const finishAmountLine = useMemo(() => {
+    if (!isFinished) return { text: "—", className: "text-zinc-500" };
+    if (vaultClaimBusy) return { text: "…", className: "text-zinc-400" };
+    if (stakePerSeat == null) return { text: "—", className: "text-zinc-500" };
+    const seat = Math.floor(stakePerSeat);
+    const pot = Math.floor(stakePerSeat * 2);
+    if (isDraw) {
+      return { text: `+${seat} MLEO (refunded)`, className: "font-semibold tabular-nums text-emerald-300/95" };
+    }
+    if (didIWin) {
+      return { text: `+${pot} MLEO`, className: "font-semibold tabular-nums text-amber-200/95" };
+    }
+    if (vm.mySeat != null && vm.winnerSeat != null) {
+      return { text: `−${seat} MLEO`, className: "font-semibold tabular-nums text-rose-300/95" };
+    }
+    return { text: "—", className: "text-zinc-500" };
+  }, [isFinished, vaultClaimBusy, stakePerSeat, isDraw, didIWin, vm.mySeat, vm.winnerSeat]);
+
+  const dismissFinishModal = useCallback(() => {
+    if (!finishSessionId) return;
+    setFinishModalDismissedSessionId(finishSessionId);
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(finishDismissStorageKey(finishSessionId), "1");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [finishSessionId]);
+
+  const onRequestRematchBg = useCallback(async () => {
+    setRematchBusy(true);
+    try {
+      const r = await requestRematch();
+      if (!r?.ok && r?.error) setErr(r.error);
+    } finally {
+      setRematchBusy(false);
+    }
+  }, [requestRematch, setErr]);
+
+  const onCancelRematchBg = useCallback(async () => {
+    setRematchBusy(true);
+    try {
+      const r = await cancelRematch();
+      if (!r?.ok && r?.error) setErr(r.error);
+    } finally {
+      setRematchBusy(false);
+    }
+  }, [cancelRematch, setErr]);
+
+  const onStartNextBg = useCallback(async () => {
+    const prev = room?.active_session_id != null ? String(room.active_session_id) : "";
+    setStartNextBusy(true);
+    try {
+      const r = await startNextMatch(roomMatchSeq);
+      if (r?.ok && onSessionRefresh) {
+        await onSessionRefresh(prev, undefined, { expectClearedSession: true });
+      } else if (!r?.ok && r?.error) {
+        setErr(r.error);
+      }
+    } finally {
+      setStartNextBusy(false);
+    }
+  }, [room?.active_session_id, startNextMatch, roomMatchSeq, onSessionRefresh, setErr]);
+
+  const onLeaveTableBg = useCallback(async () => {
+    setExitErr("");
+    setExitBusy(true);
+    try {
+      await leaveOv2RoomWithForfeitRetry({ room, room_id: roomId, participant_key: selfKey });
+      try {
+        window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
+      } catch {
+        /* ignore */
+      }
+      await router.replace("/online-v2/rooms");
+    } catch (e) {
+      setExitErr(e?.message || "Could not leave.");
+    } finally {
+      setExitBusy(false);
+    }
+  }, [room, roomId, selfKey, router]);
 
   const boardDisabled = busy || vm.readOnly || String(vm.phase) !== "playing";
   const compactBoard = narrowViewport;
@@ -989,13 +1112,6 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
     vm.mySeat === 0 ? vm.missedStreakBySeat[0] : vm.mySeat === 1 ? vm.missedStreakBySeat[1] : 0;
   const oppMiss =
     vm.mySeat === 0 ? vm.missedStreakBySeat[1] : vm.mySeat === 1 ? vm.missedStreakBySeat[0] : 0;
-
-  const winnerDisplayName = useMemo(() => {
-    if (vm.winnerSeat == null) return "";
-    const m = members.find(x => Number(x?.seat_index) === Number(vm.winnerSeat));
-    const n = m && typeof m.display_name === "string" ? String(m.display_name).trim() : "";
-    return n || `Seat ${vm.winnerSeat + 1}`;
-  }, [members, vm.winnerSeat]);
 
   const finishedPanel = (
     <div className="mt-3 flex w-full max-w-sm flex-col gap-2">
@@ -1283,52 +1399,97 @@ export default function Ov2BackgammonScreen({ contextInput = null, onSessionRefr
       {isFinished ? (
         showResultModal ? (
           <Ov2SharedFinishModalFrame titleId="ov2-bg-finish-title">
-            <div className="p-4 text-center">
-              <p
-                id="ov2-bg-finish-title"
-                className={`text-lg font-bold uppercase tracking-wide sm:text-xl ${
-                  didIWin ? "text-emerald-200" : vm.mySeat != null ? "text-red-300" : "text-white"
-                }`}
-              >
-                {didIWin ? "YOU WIN" : vm.mySeat != null ? "YOU LOSE" : "MATCH OVER"}
-              </p>
-              <p className="mt-1 text-xs text-zinc-300">
-                {vm.winnerSeat != null ? (
-                  <>
-                    Winner: <span className="font-semibold text-zinc-100">{winnerDisplayName}</span>
-                  </>
-                ) : (
-                  "Match complete"
-                )}
-              </p>
-              {stakePerSeat != null ? (
-                <p className="mt-2 text-[11px] text-zinc-400">
-                  Entry {stakePerSeat.toLocaleString()} · pot {(stakePerSeat * 2).toLocaleString()}
+            <div
+              className={[
+                "border-b px-4 pb-3 pt-4",
+                finishOutcome === "win"
+                  ? "border-emerald-500/20 bg-gradient-to-br from-emerald-950/45 to-zinc-950/80"
+                  : finishOutcome === "loss"
+                    ? "border-rose-500/20 bg-gradient-to-br from-rose-950/40 to-zinc-950/80"
+                    : "border-white/[0.07] bg-zinc-950/60",
+              ].join(" ")}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className={[
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl shadow-inner",
+                    finishOutcome === "win" && "border-emerald-500/45 bg-emerald-950/60 text-emerald-200",
+                    finishOutcome === "loss" && "border-rose-500/45 bg-rose-950/55 text-rose-200",
+                    (finishOutcome === "draw" || finishOutcome === "unknown") && "border-white/10 bg-zinc-900/80 text-zinc-200",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-hidden
+                >
+                  {finishOutcome === "win" ? "🏆" : finishOutcome === "loss" ? "✕" : "⎔"}
+                </span>
+                <div className="min-w-0 flex-1 text-left">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Round result</p>
+                  <h2
+                    id="ov2-bg-finish-title"
+                    className={[
+                      "mt-0.5 text-2xl font-extrabold leading-tight tracking-tight",
+                      finishOutcome === "win" && "text-emerald-400",
+                      finishOutcome === "loss" && "text-rose-400",
+                      finishOutcome === "draw" && "text-sky-300",
+                      finishOutcome === "unknown" && "text-zinc-100",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {finishTitle}
+                  </h2>
+                  <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Table multiplier</p>
+                  <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">×{finishMultiplier}</p>
+                  <div className="mt-3 rounded-lg border border-white/[0.1] bg-black/25 px-2.5 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Settlement</p>
+                    <p className={`mt-2 text-center text-xl font-bold tabular-nums leading-tight sm:text-2xl ${finishAmountLine.className}`}>
+                      {finishAmountLine.text}
+                    </p>
+                  </div>
+                  <p className="mt-3 text-center text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
+                  <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
+                    {vaultClaimBusy ? "Sending results to your balance…" : "Round complete — rematch, then host starts next."}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 px-4 py-4">
+              <button type="button" className={BTN_FL_PRIMARY} disabled={rematchBusy} onClick={() => void onRequestRematchBg()}>
+                {rematchBusy ? "Requesting…" : "Request rematch"}
+              </button>
+              <button type="button" className={BTN_FL_SECONDARY} disabled={rematchBusy} onClick={() => void onCancelRematchBg()}>
+                Cancel rematch
+              </button>
+              {isHost ? (
+                <div className="w-full overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-950/15 pt-2">
+                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">Host only</p>
+                  <button
+                    type="button"
+                    className={BTN_FL_PRIMARY + " w-full rounded-none"}
+                    disabled={startNextBusy || !canHostStartNext}
+                    onClick={() => void onStartNextBg()}
+                  >
+                    {startNextBusy ? "Starting…" : "Start next (host)"}
+                  </button>
+                </div>
+              ) : (
+                <p className="rounded-lg border border-white/[0.06] bg-zinc-950/35 px-2 py-1.5 text-center text-[11px] text-zinc-500">
+                  Host starts the next match when both players rematch.
                 </p>
-              ) : null}
-              {didIWin && stakePerSeat != null ? (
-                <p className="mt-1 text-sm font-semibold text-emerald-300/95">
-                  You take the pot ({(stakePerSeat * 2).toLocaleString()})
-                </p>
-              ) : null}
-              {!didIWin && vm.mySeat != null && stakePerSeat != null ? (
-                <p className="mt-1 text-sm font-semibold text-red-400/95">Entry settled ({stakePerSeat.toLocaleString()})</p>
-              ) : null}
-              {finishedPanel}
+              )}
+              <button type="button" className={BTN_FL_SECONDARY} onClick={dismissFinishModal}>
+                Dismiss
+              </button>
               <button
                 type="button"
-                className={`${OV2BG_BTN} mt-3 w-full rounded-md border border-white/20 bg-white/10 py-2 text-xs font-semibold text-zinc-100`}
-                onClick={() => {
-                  try {
-                    window.sessionStorage.setItem(finishDismissStorageKey(finishSessionId), "1");
-                  } catch {
-                    /* ignore */
-                  }
-                  setFinishModalDismissedSessionId(finishSessionId);
-                }}
+                className={BTN_FL_DANGER + " w-full"}
+                disabled={exitBusy || !selfKey}
+                onClick={() => void onLeaveTableBg()}
               >
-                Continue
+                {exitBusy ? "Leaving…" : "Leave table"}
               </button>
+              {exitErr ? <p className="text-center text-[11px] text-red-300">{exitErr}</p> : null}
             </div>
           </Ov2SharedFinishModalFrame>
         ) : (

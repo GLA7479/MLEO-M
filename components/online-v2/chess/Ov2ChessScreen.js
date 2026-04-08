@@ -16,6 +16,8 @@ import { requestOv2ChessLegalTos } from "../../../lib/online-v2/chess/ov2ChessSe
 import { useOv2ChessSession } from "../../../hooks/useOv2ChessSession";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 
+const finishDismissStorageKey = sid => `ov2_chess_finish_dismiss_${sid}`;
+
 /** Shared premium button language (Chess + Checkers product family). */
 const BTN_PRIMARY =
   "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
@@ -25,6 +27,9 @@ const BTN_ACCENT =
   "rounded-lg border border-sky-500/24 bg-gradient-to-b from-sky-950/60 to-sky-950 px-3 py-2 text-[11px] font-semibold text-sky-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_DANGER =
   "w-full rounded-lg border border-[#4a3035]/72 bg-gradient-to-b from-[#2e2226] to-[#10090b] py-2 px-3 text-[11px] font-semibold text-rose-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_3px_12px_rgba(0,0,0,0.32)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+/** Same tokens as `Ov2FourLineScreen` finish modal footer */
+const BTN_FINISH_DANGER =
+  "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
 /** Local cburnett SVG set under `public/assets/chess/cburnett/`. */
 const CBURNETT_BASE = "/assets/chess/cburnett";
@@ -66,9 +71,11 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
   const [startNextBusy, setStartNextBusy] = useState(false);
   const [exitBusy, setExitBusy] = useState(false);
   const [exitErr, setExitErr] = useState("");
+  const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
 
   const room = contextInput?.room;
   const roomId = room?.id != null ? String(room.id) : "";
+  const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
   const turn = vm.turnSeat != null ? Number(vm.turnSeat) : null;
   const mySeat = vm.mySeat;
@@ -78,6 +85,10 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
     setPromoOpen(null);
     setLegalTosServer([]);
   }, [vm.sessionId, vm.revision]);
+
+  useEffect(() => {
+    setFinishModalDismissedSessionId("");
+  }, [vm.sessionId]);
 
   useEffect(() => {
     setLegalTosServer([]);
@@ -251,6 +262,104 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
       ? String(snapshot.board.resultKind)
       : "";
   const rkNorm = rk.replace(/^["']+|["']+$/g, "").toLowerCase();
+
+  const finishSessionId = finished ? String(vm.sessionId || "").trim() : "";
+  const finishModalDismissed =
+    finishSessionId.length > 0 &&
+    (finishModalDismissedSessionId === finishSessionId ||
+      (typeof window !== "undefined" &&
+        (() => {
+          try {
+            return window.sessionStorage.getItem(finishDismissStorageKey(finishSessionId)) === "1";
+          } catch {
+            return false;
+          }
+        })()));
+  const showResultModal = finished && finishSessionId.length > 0 && !finishModalDismissed;
+
+  const didIWin = vm.mySeat != null && vm.winnerSeat != null && vm.winnerSeat === vm.mySeat;
+  const isDraw = finished && vm.winnerSeat == null;
+
+  const stakePerSeat =
+    room?.stake_per_seat != null && Number.isFinite(Number(room.stake_per_seat)) ? Number(room.stake_per_seat) : null;
+  const finishMultiplier = 1;
+
+  const winnerDisplayName = useMemo(() => {
+    if (vm.winnerSeat == null) return "";
+    const m = members.find(x => Number(x?.seat_index) === Number(vm.winnerSeat));
+    const n = m && typeof m.display_name === "string" ? String(m.display_name).trim() : "";
+    return n || `Seat ${Number(vm.winnerSeat) + 1}`;
+  }, [members, vm.winnerSeat]);
+
+  const finishOutcome = useMemo(() => {
+    if (!finished) return "unknown";
+    if (isDraw) return "draw";
+    if (didIWin) return "win";
+    if (vm.mySeat != null && vm.winnerSeat != null && vm.winnerSeat !== vm.mySeat) return "loss";
+    return "unknown";
+  }, [finished, isDraw, didIWin, vm.mySeat, vm.winnerSeat]);
+
+  const finishTitle = useMemo(() => {
+    if (!finished) return "";
+    if (isDraw) return "Draw";
+    if (didIWin) return "Victory";
+    if (vm.mySeat != null && vm.winnerSeat != null && vm.winnerSeat !== vm.mySeat) return "Defeat";
+    return "Match finished";
+  }, [finished, isDraw, didIWin, vm.mySeat, vm.winnerSeat]);
+
+  const finishReasonLine = useMemo(() => {
+    if (!finished) return "";
+    if (rkNorm === "checkmate") return didIWin ? "Checkmate — you won the position" : "Checkmate";
+    if (rkNorm === "stalemate") return "Draw by stalemate";
+    if (isDraw) return "No winner — stakes refunded";
+    return winnerDisplayName ? `Winner: ${winnerDisplayName}` : "Round complete";
+  }, [finished, rkNorm, didIWin, isDraw, winnerDisplayName]);
+
+  const finishAmountLine = useMemo(() => {
+    if (!finished) return { text: "—", className: "text-zinc-500" };
+    if (vaultClaimBusy) return { text: "…", className: "text-zinc-400" };
+    if (stakePerSeat == null) return { text: "—", className: "text-zinc-500" };
+    const seat = Math.floor(stakePerSeat);
+    const pot = Math.floor(stakePerSeat * 2);
+    if (isDraw) {
+      return { text: `+${seat} MLEO (refunded)`, className: "font-semibold tabular-nums text-emerald-300/95" };
+    }
+    if (didIWin) {
+      return { text: `+${pot} MLEO`, className: "font-semibold tabular-nums text-amber-200/95" };
+    }
+    if (vm.mySeat != null && vm.winnerSeat != null) {
+      return { text: `−${seat} MLEO`, className: "font-semibold tabular-nums text-rose-300/95" };
+    }
+    return { text: "—", className: "text-zinc-500" };
+  }, [finished, vaultClaimBusy, stakePerSeat, isDraw, didIWin, vm.mySeat, vm.winnerSeat]);
+
+  const dismissFinishModal = useCallback(() => {
+    if (!finishSessionId) return;
+    setFinishModalDismissedSessionId(finishSessionId);
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(finishDismissStorageKey(finishSessionId), "1");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [finishSessionId]);
+
+  const finishDismissedStripActions = (
+    <div className="flex flex-wrap gap-2">
+      <button type="button" disabled={rematchBusy} onClick={() => void onRematch()} className={BTN_PRIMARY}>
+        {rematchBusy ? "…" : "Rematch"}
+      </button>
+      <button type="button" onClick={() => void cancelRematch()} className={BTN_SECONDARY}>
+        Cancel rematch
+      </button>
+      {isHost ? (
+        <button type="button" disabled={startNextBusy} onClick={() => void onStartNext()} className={BTN_ACCENT}>
+          {startNextBusy ? "…" : "Start next (host)"}
+        </button>
+      ) : null}
+    </div>
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden bg-zinc-950 px-1 pb-1.5 sm:gap-2 sm:px-2 sm:pb-2">
@@ -429,35 +538,109 @@ export default function Ov2ChessScreen({ contextInput = null, onSessionRefresh }
         </div>
       </div>
 
-      {finished ? (
+      {showResultModal ? (
         <Ov2SharedFinishModalFrame titleId="ov2-chess-finish-title">
-          <div className="space-y-2 p-4 text-[11px] text-zinc-200/88">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Result</p>
-            <p id="ov2-chess-finish-title" className="mt-1 text-sm font-semibold text-zinc-50">
-              Match finished
-            </p>
-            {rkNorm === "checkmate" ? (
-              <p className="mt-1 text-zinc-400/90">Checkmate.</p>
-            ) : rkNorm === "stalemate" ? (
-              <p className="mt-1 text-zinc-400/90">Draw by stalemate.</p>
-            ) : vm.winnerSeat != null && vm.mySeat != null ? (
-              <p className="mt-1 text-zinc-400/90">{vm.winnerSeat === vm.mySeat ? "You won." : "You lost."}</p>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.1] pt-3">
-              <button type="button" disabled={rematchBusy} onClick={() => void onRematch()} className={BTN_PRIMARY}>
-                {rematchBusy ? "…" : "Rematch"}
-              </button>
-              <button type="button" onClick={() => void cancelRematch()} className={BTN_SECONDARY}>
-                Cancel rematch
-              </button>
-              {isHost ? (
-                <button type="button" disabled={startNextBusy} onClick={() => void onStartNext()} className={BTN_ACCENT}>
-                  {startNextBusy ? "…" : "Start next (host)"}
-                </button>
-              ) : null}
+          <div
+            className={[
+              "border-b px-4 pb-3 pt-4",
+              finishOutcome === "win"
+                ? "border-emerald-500/20 bg-gradient-to-br from-emerald-950/45 to-zinc-950/80"
+                : finishOutcome === "loss"
+                  ? "border-rose-500/20 bg-gradient-to-br from-rose-950/40 to-zinc-950/80"
+                  : "border-white/[0.07] bg-zinc-950/60",
+            ].join(" ")}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className={[
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl shadow-inner",
+                  finishOutcome === "win" && "border-emerald-500/45 bg-emerald-950/60 text-emerald-200",
+                  finishOutcome === "loss" && "border-rose-500/45 bg-rose-950/55 text-rose-200",
+                  (finishOutcome === "draw" || finishOutcome === "unknown") && "border-white/10 bg-zinc-900/80 text-zinc-200",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-hidden
+              >
+                {finishOutcome === "win" ? "🏆" : finishOutcome === "loss" ? "✕" : "⎔"}
+              </span>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Round result</p>
+                <h2
+                  id="ov2-chess-finish-title"
+                  className={[
+                    "mt-0.5 text-2xl font-extrabold leading-tight tracking-tight",
+                    finishOutcome === "win" && "text-emerald-400",
+                    finishOutcome === "loss" && "text-rose-400",
+                    finishOutcome === "draw" && "text-sky-300",
+                    finishOutcome === "unknown" && "text-zinc-100",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {finishTitle}
+                </h2>
+                <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Table multiplier</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">×{finishMultiplier}</p>
+                <div className="mt-3 rounded-lg border border-white/[0.1] bg-black/25 px-2.5 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Settlement</p>
+                  <p className={`mt-2 text-center text-xl font-bold tabular-nums leading-tight sm:text-2xl ${finishAmountLine.className}`}>
+                    {finishAmountLine.text}
+                  </p>
+                </div>
+                <p className="mt-3 text-center text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
+                <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
+                  {vaultClaimBusy ? "Sending results to your balance…" : "Round complete — rematch, then host starts next."}
+                </p>
+              </div>
             </div>
           </div>
+          <div className="flex flex-col gap-2 px-4 py-4">
+            <button type="button" className={BTN_PRIMARY} disabled={rematchBusy} onClick={() => void onRematch()}>
+              {rematchBusy ? "Requesting…" : "Request rematch"}
+            </button>
+            <button type="button" className={BTN_SECONDARY} disabled={rematchBusy} onClick={() => void cancelRematch()}>
+              Cancel rematch
+            </button>
+            {isHost ? (
+              <div className="w-full overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-950/15 pt-2">
+                <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">Host only</p>
+                <button
+                  type="button"
+                  className={BTN_PRIMARY + " w-full rounded-none"}
+                  disabled={startNextBusy}
+                  onClick={() => void onStartNext()}
+                >
+                  {startNextBusy ? "Starting…" : "Start next (host)"}
+                </button>
+              </div>
+            ) : (
+              <p className="rounded-lg border border-white/[0.06] bg-zinc-950/35 px-2 py-1.5 text-center text-[11px] text-zinc-500">
+                Host starts the next match when both players rematch.
+              </p>
+            )}
+            <button type="button" className={BTN_SECONDARY} onClick={dismissFinishModal}>
+              Dismiss
+            </button>
+            <button
+              type="button"
+              className={BTN_FINISH_DANGER + " w-full"}
+              disabled={exitBusy || !pk}
+              onClick={() => void onExitToLobby()}
+            >
+              {exitBusy ? "Leaving…" : "Leave table"}
+            </button>
+            {exitErr ? <p className="text-center text-[11px] text-red-300">{exitErr}</p> : null}
+          </div>
         </Ov2SharedFinishModalFrame>
+      ) : null}
+
+      {finished && !showResultModal ? (
+        <div className="shrink-0 space-y-2 rounded-xl border border-white/[0.11] bg-gradient-to-b from-zinc-900/78 to-zinc-950 p-3 text-[11px] text-zinc-200/88 shadow-[0_12px_32px_rgba(0,0,0,0.42),0_0_0_1px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.055),inset_0_-8px_18px_rgba(0,0,0,0.24)]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Result</p>
+          <p className="mt-1 text-sm font-semibold text-zinc-50">Match finished</p>
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.1] pt-3">{finishDismissedStripActions}</div>
+        </div>
       ) : null}
 
       <div className="shrink-0 rounded-lg border border-white/[0.09] bg-zinc-900/42 p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_2px_8px_rgba(0,0,0,0.16)]">

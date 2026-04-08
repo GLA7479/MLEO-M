@@ -1,7 +1,10 @@
 "use client";
 
+import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOv2Rummy51Session } from "../../../hooks/useOv2Rummy51Session";
+import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
+import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
 import {
   deserializeCard,
   getCardDisplayLabel,
@@ -23,7 +26,10 @@ const finishDismissStorageKey = sid => `ov2_r51_finish_dismiss_${sid}`;
 const BTN_PRIMARY =
   "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_SECONDARY =
-  "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98]";
+  "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+/** Same token as `Ov2CheckersScreen` finish modal leave action */
+const BTN_FINISH_DANGER =
+  "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
 /**
  * @typedef {import("../../../lib/online-v2/rummy51/ov2Rummy51Engine").Rummy51Card} Rummy51Card
@@ -221,9 +227,10 @@ function DiscardUndoIconButton({ disabled, onClick }) {
 }
 
 /**
- * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string }, onLeaveToLobby?: () => void | Promise<void>, leaveToLobbyBusy?: boolean } | null }} props
+ * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string }, onLeaveToLobby?: () => void | Promise<void>, leaveToLobbyBusy?: boolean } | null, onSessionRefresh?: (prev: string, rpcNew?: string, opts?: { expectClearedSession?: boolean }) => Promise<unknown> }} props
  */
-export default function Ov2Rummy51Screen({ contextInput = null }) {
+export default function Ov2Rummy51Screen({ contextInput = null, onSessionRefresh }) {
+  const router = useRouter();
   const session = useOv2Rummy51Session(contextInput ?? undefined);
   const {
     snapshot,
@@ -231,6 +238,7 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     room,
     selfKey,
     busy,
+    vaultClaimBusy,
     actionError,
     setActionError,
     drawStock,
@@ -242,7 +250,16 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     isPlaying,
     isFinished,
     isHost,
+    requestRematch,
+    cancelRematch,
+    startNextMatch,
+    roomMatchSeq,
   } = session;
+
+  const [rematchBusy, setRematchBusy] = useState(false);
+  const [startNextBusy, setStartNextBusy] = useState(false);
+  const [exitBusy, setExitBusy] = useState(false);
+  const [exitErr, setExitErr] = useState("");
 
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [discardPickMode, setDiscardPickMode] = useState(false);
@@ -277,13 +294,84 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
 
   const isRummyRoom = roomProductId === OV2_RUMMY51_PRODUCT_GAME_ID;
 
-  const onLeaveToLobby =
-    contextInput && typeof contextInput === "object" && typeof contextInput.onLeaveToLobby === "function"
-      ? contextInput.onLeaveToLobby
-      : null;
-  const leaveToLobbyBusy = Boolean(
-    contextInput && typeof contextInput === "object" && contextInput.leaveToLobbyBusy === true
-  );
+  const roomId = room && typeof room === "object" && room.id != null ? String(room.id).trim() : "";
+  const pk =
+    contextInput && typeof contextInput === "object" && contextInput.self?.participant_key != null
+      ? String(contextInput.self.participant_key).trim()
+      : "";
+
+  const finishActionsLocked = vaultClaimBusy;
+
+  const onRematch = useCallback(async () => {
+    if (!roomId || rematchBusy || finishActionsLocked) return;
+    setRematchBusy(true);
+    setActionError("");
+    try {
+      const r = await requestRematch();
+      if (!r.ok) setActionError(r.error || "Rematch request failed");
+    } finally {
+      setRematchBusy(false);
+    }
+  }, [roomId, rematchBusy, finishActionsLocked, requestRematch, setActionError]);
+
+  const onStartNext = useCallback(async () => {
+    if (!roomId || !isHost || startNextBusy || finishActionsLocked) return;
+    setStartNextBusy(true);
+    setActionError("");
+    try {
+      const r = await startNextMatch(roomMatchSeq);
+      if (!r.ok) {
+        setActionError(r.error || "Could not start next match");
+        return;
+      }
+      if (typeof window !== "undefined") {
+        try {
+          window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_SESSION_KEY, roomId);
+        } catch {
+          /* ignore */
+        }
+      }
+      if (typeof onSessionRefresh === "function") {
+        const prev = snapshot?.sessionId != null ? String(snapshot.sessionId) : "";
+        await onSessionRefresh(prev, "", { expectClearedSession: true });
+      }
+      await router.push(`/online-v2/rooms?room=${encodeURIComponent(roomId)}`);
+    } finally {
+      setStartNextBusy(false);
+    }
+  }, [
+    roomId,
+    isHost,
+    startNextBusy,
+    finishActionsLocked,
+    startNextMatch,
+    roomMatchSeq,
+    onSessionRefresh,
+    snapshot?.sessionId,
+    router,
+    setActionError,
+  ]);
+
+  const onExitToLobby = useCallback(async () => {
+    if (!roomId || !pk || exitBusy) return;
+    setExitBusy(true);
+    setExitErr("");
+    try {
+      await leaveOv2RoomWithForfeitRetry({ room, room_id: roomId, participant_key: pk });
+      if (typeof window !== "undefined") {
+        try {
+          window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
+        } catch {
+          /* ignore */
+        }
+      }
+      await router.push("/online-v2/rooms");
+    } catch (e) {
+      setExitErr(e?.message || String(e) || "Could not leave.");
+    } finally {
+      setExitBusy(false);
+    }
+  }, [roomId, pk, exitBusy, room, router]);
 
   const finishedPotLabel = useMemo(() => {
     if (!snapshot || String(snapshot.phase) !== "finished") return "";
@@ -391,21 +479,14 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
     }
     if (finishedPotTotalUnits != null) {
       return {
-        text: `Pot ${formatCompactNumber(finishedPotTotalUnits)}`,
+        text: `Pot ${formatCompactNumber(finishedPotTotalUnits)} MLEO`,
         className: "font-semibold tabular-nums text-zinc-300",
       };
     }
     return { text: "—", className: "text-zinc-500" };
   }, [isFinished, snapshot, r51FinishOutcome, finishedPotTotalUnits, finishedPotLabel]);
 
-  const tablePoolSubtitle = useMemo(() => {
-    const m = snapshot?.matchMeta && typeof snapshot.matchMeta === "object" ? snapshot.matchMeta : null;
-    if (!m) return "—";
-    const stake = m.stakePerSeat != null ? Number(m.stakePerSeat) : 0;
-    const seats = m.seatCount != null ? Number(m.seatCount) : 0;
-    if (!Number.isFinite(stake) || !Number.isFinite(seats) || stake <= 0 || seats <= 0) return "—";
-    return `${stake} × ${seats} seats`;
-  }, [snapshot]);
+  const finishTableMultiplier = 1;
 
   const myHandRaw = useMemo(() => {
     if (!snapshot?.hands || !selfKey) return [];
@@ -1092,16 +1173,17 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
         seatOpenedFlags={seatStripMeta.openedFlags}
         seatNearElim={seatStripMeta.nearFlags}
       />
-      {onLeaveToLobby ? (
-        <div className="flex shrink-0 justify-end px-0.5 pt-0.5">
+      {roomId ? (
+        <div className="flex shrink-0 flex-col items-end justify-end gap-0.5 px-0.5 pt-0.5">
           <button
             type="button"
-            disabled={leaveToLobbyBusy}
-            onClick={() => void onLeaveToLobby()}
+            disabled={exitBusy || !pk}
+            onClick={() => void onExitToLobby()}
             className="text-[10px] font-semibold text-red-200/95 underline decoration-red-400/50 disabled:opacity-45"
           >
-            {leaveToLobbyBusy ? "Leaving…" : "Leave table"}
+            {exitBusy ? "Leaving…" : "Leave table"}
           </button>
+          {exitErr ? <p className="max-w-full text-right text-[9px] text-red-300/95">{exitErr}</p> : null}
         </div>
       ) : null}
 
@@ -1311,35 +1393,65 @@ export default function Ov2Rummy51Screen({ contextInput = null }) {
                 >
                   {finishTitle}
                 </h2>
-                <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Table pool</p>
-                <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">{tablePoolSubtitle}</p>
+                <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Table multiplier</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">×{finishTableMultiplier}</p>
                 <div className="mt-3 rounded-lg border border-white/[0.1] bg-black/25 px-2.5 py-2.5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Settlement</p>
                   <p className={`mt-2 text-center text-xl font-bold tabular-nums leading-tight sm:text-2xl ${finishAmountLine.className}`}>
                     {finishAmountLine.text}
                   </p>
                 </div>
-                <p className="mt-3 text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
+                <p className="mt-3 text-center text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
                 <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
-                  Result recorded · vault updates when settlement loads
+                  {vaultClaimBusy ? "Sending results to your balance…" : "Round complete — rematch, then host starts next."}
                 </p>
               </div>
             </div>
           </div>
           <div className="flex flex-col gap-2 px-4 py-4">
-            {onLeaveToLobby ? (
+            <button
+              type="button"
+              className={BTN_PRIMARY + " w-full"}
+              disabled={rematchBusy || !roomId || !pk || finishActionsLocked}
+              onClick={() => void onRematch()}
+            >
+              {rematchBusy ? "Requesting…" : "Request rematch"}
+            </button>
+            <button
+              type="button"
+              className={BTN_SECONDARY + " w-full"}
+              disabled={rematchBusy || !roomId || !pk}
+              onClick={() => void cancelRematch()}
+            >
+              Cancel rematch
+            </button>
+            <div className="w-full overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-950/15 pt-2">
+              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">Host only</p>
               <button
                 type="button"
-                disabled={leaveToLobbyBusy}
-                className={BTN_PRIMARY + " w-full"}
-                onClick={() => void onLeaveToLobby()}
+                className={BTN_PRIMARY + " w-full rounded-none"}
+                disabled={!isHost || startNextBusy || !roomId || !pk || finishActionsLocked}
+                title={!isHost ? "Only the host can start the next match" : undefined}
+                onClick={() => void onStartNext()}
               >
-                {leaveToLobbyBusy ? "Leaving…" : "Back to lobby"}
+                {startNextBusy ? "Starting…" : "Start next (host)"}
               </button>
-            ) : null}
+              <p className="px-2 py-1.5 text-center text-[11px] text-zinc-500">
+                Host starts the next match when everyone rematches.
+              </p>
+            </div>
             <button type="button" className={BTN_SECONDARY + " w-full"} onClick={dismissFinishModal}>
               Dismiss
             </button>
+            <button
+              type="button"
+              className={BTN_FINISH_DANGER + " w-full"}
+              disabled={exitBusy || !pk}
+              onClick={() => void onExitToLobby()}
+            >
+              {exitBusy ? "Leaving…" : "Leave table"}
+            </button>
+            {exitErr ? <p className="text-center text-[11px] text-red-300">{exitErr}</p> : null}
           </div>
         </Ov2SharedFinishModalFrame>
       ) : null}
