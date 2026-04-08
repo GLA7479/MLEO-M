@@ -79,7 +79,41 @@ function ccCardPresentation(card) {
   return { label, sub: "", wild: !hasColor };
 }
 
-/** Same face layout as hand pills — modestly larger than hand, compact so the hand stays visible */
+/**
+ * Shared card interior: corner row, main label, optional sub — `justify-between` so number cards match top vs hand.
+ * @param {{ card: Record<string, unknown>, variant: "top" | "hand" }} props
+ */
+function CcSharedCardFaceInner({ card, variant }) {
+  const p = ccCardPresentation(card);
+  const ci = Number(card?.c);
+  const ring = Number.isInteger(ci) && ci >= 0 && ci <= 3 ? CC_COLOR_CARD_RING[ci] : "ring-fuchsia-300/40";
+  const isTop = variant === "top";
+  const innerClass = isTop
+    ? `flex h-full min-h-[5.35rem] w-full flex-col justify-between rounded-lg border border-white/30 bg-black/20 px-0.5 py-0.5 text-white ring-1 sm:min-h-[6.6rem] sm:px-1 sm:py-0.5 ${ring}`
+    : `flex min-h-0 w-full flex-1 flex-col justify-between rounded-md border border-white/25 bg-black/25 p-px text-white ring-1 sm:rounded-lg sm:p-0.5 ${ring}`;
+  const cornerClass = isTop
+    ? "flex items-start justify-between text-[11px] font-bold leading-none sm:text-xs"
+    : "flex items-start justify-between text-[9px] font-bold leading-none sm:text-[10px]";
+  const mainClass = isTop
+    ? "px-0.5 text-center text-xl font-black leading-none sm:text-2xl"
+    : "px-px text-center text-base font-black leading-none sm:text-xl";
+  const subClass = isTop
+    ? "text-center text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-[11px]"
+    : "text-center text-[8px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-[9px]";
+
+  return (
+    <span className={innerClass}>
+      <span className={cornerClass}>
+        <span className="min-w-0 truncate">{p.label}</span>
+        <span className="shrink-0">{p.wild ? "★" : "●"}</span>
+      </span>
+      <span className={mainClass}>{p.label}</span>
+      {p.sub ? <span className={subClass}>{p.sub}</span> : null}
+    </span>
+  );
+}
+
+/** Top discard — outer sizing only; face matches hand via CcSharedCardFaceInner */
 function CcTopDiscardCardFace({ card }) {
   if (card == null || typeof card !== "object") {
     return (
@@ -88,29 +122,14 @@ function CcTopDiscardCardFace({ card }) {
       </div>
     );
   }
-  const p = ccCardPresentation(card);
   const ci = Number(card?.c);
   const colorBg = Number.isInteger(ci) && ci >= 0 && ci <= 3 ? CC_COLOR_CARD_BG[ci] : null;
-  const ring = Number.isInteger(ci) && ci >= 0 && ci <= 3 ? CC_COLOR_CARD_RING[ci] : "ring-fuchsia-300/40";
   const gradientClass = colorBg ? `bg-gradient-to-b ${colorBg}` : "bg-gradient-to-b from-fuchsia-500 to-indigo-700";
   return (
     <div
       className={`relative z-[1] inline-flex min-h-[6.65rem] min-w-[4.75rem] flex-col rounded-xl border border-white/35 px-0.5 py-0.5 sm:min-h-[8rem] sm:min-w-[5.7rem] sm:px-1 sm:py-0.5 ${gradientClass}`}
     >
-      <span
-        className={`flex h-full min-h-[5.35rem] w-full flex-col justify-between rounded-lg border border-white/30 bg-black/20 px-0.5 py-0.5 text-white ring-1 sm:min-h-[6.6rem] sm:px-1 sm:py-0.5 ${ring}`}
-      >
-        <span className="flex items-start justify-between text-[11px] font-bold leading-none sm:text-xs">
-          <span className="min-w-0 truncate">{p.label}</span>
-          <span className="shrink-0">{p.wild ? "★" : "●"}</span>
-        </span>
-        <span className="px-0.5 text-center text-xl font-black leading-none sm:text-2xl">{p.label}</span>
-        {p.sub ? (
-          <span className="text-center text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/85 sm:text-[11px]">
-            {p.sub}
-          </span>
-        ) : null}
-      </span>
+      <CcSharedCardFaceInner card={card} variant="top" />
     </div>
   );
 }
@@ -869,7 +888,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                       }
                     })();
                   }}
-                  className={`${OV2_DUEL_HAND_PILL_BASE} min-h-[3.35rem] min-w-[2.35rem] rounded-lg border border-white/35 px-0.5 py-0.5 text-[10px] sm:min-h-[5rem] sm:min-w-[3.25rem] sm:rounded-xl sm:px-1.5 sm:py-1 sm:text-[11px] !animate-none !transition-none duration-0 will-change-auto enabled:hover:!translate-y-0 enabled:hover:!scale-100 enabled:hover:!brightness-100 enabled:hover:!shadow-none enabled:hover:!bg-top active:!scale-100 active:!brightness-100 ${
+                  className={`${OV2_DUEL_HAND_PILL_BASE} inline-flex min-h-[3.6rem] min-w-[2.55rem] flex-col items-stretch rounded-lg border border-white/35 !p-0.5 text-[10px] sm:min-h-[5.35rem] sm:min-w-[3.5rem] sm:rounded-xl sm:!px-1 sm:!py-0.5 sm:text-[11px] !animate-none !transition-none duration-0 will-change-auto enabled:hover:!translate-y-0 enabled:hover:!scale-100 enabled:hover:!brightness-100 enabled:hover:!shadow-none enabled:hover:!bg-top active:!scale-100 active:!brightness-100 ${
                     (() => {
                       const ci = Number(card?.c);
                       const colorBg = Number.isInteger(ci) && ci >= 0 && ci <= 3 ? CC_COLOR_CARD_BG[ci] : null;
@@ -887,23 +906,7 @@ export default function Ov2ColorClashScreen({ contextInput = null, onSessionRefr
                           : OV2_DUEL_HAND_PILL_DISABLED
                   } ${showPlayableRing ? "ring-2 ring-cyan-400/55" : ""}`}
                 >
-                  {(() => {
-                    const p = ccCardPresentation(card);
-                    const ci = Number(card?.c);
-                    const ring = Number.isInteger(ci) && ci >= 0 && ci <= 3 ? CC_COLOR_CARD_RING[ci] : "ring-fuchsia-300/40";
-                    return (
-                      <span className={`flex h-full w-full flex-col rounded-lg border border-white/30 bg-black/20 px-1 py-0.5 text-white ring-1 ${ring}`}>
-                        <span className="flex items-start justify-between text-[9px] font-bold">
-                          <span>{p.label}</span>
-                          <span>{p.wild ? "★" : "●"}</span>
-                        </span>
-                        <span className="mt-0.5 text-center text-sm font-black leading-none sm:mt-1 sm:text-lg">{p.label}</span>
-                        {p.sub ? (
-                          <span className="mt-auto text-center text-[8px] font-semibold uppercase tracking-wide text-white/85">{p.sub}</span>
-                        ) : null}
-                      </span>
-                    );
-                  })()}
+                  <CcSharedCardFaceInner card={card} variant="hand" />
                 </button>
               );
             })}
