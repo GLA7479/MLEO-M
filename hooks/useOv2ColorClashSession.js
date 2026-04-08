@@ -15,7 +15,7 @@ import {
 import { humanizeOv2ColorClashError } from "../lib/online-v2/colorclash/ov2ColorClashPlayLogic";
 import { ov2PreferNewerSnapshot } from "../lib/online-v2/ov2PreferNewerSnapshot";
 import { requestOv2ColorClashClaimSettlement } from "../lib/online-v2/colorclash/ov2ColorClashSettlement";
-import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
+import { applyBoardPathSettlementClaimLinesToVaultAndConfirm } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import { ONLINE_V2_GAME_KINDS } from "../lib/online-v2/ov2Economy";
 
@@ -143,7 +143,12 @@ export function useOv2ColorClashSession(baseContext) {
         const claim = await requestOv2ColorClashClaimSettlement(roomId, selfKey);
         if (claim.ok && Array.isArray(claim.lines) && claim.lines.length > 0) {
           if (!vaultLinesAppliedForSessionRef.current.has(sid)) {
-            await applyBoardPathSettlementClaimLinesToVault(claim.lines, ONLINE_V2_GAME_KINDS.COLOR_CLASH);
+            await applyBoardPathSettlementClaimLinesToVaultAndConfirm(
+              claim.lines,
+              ONLINE_V2_GAME_KINDS.COLOR_CLASH,
+              roomId,
+              selfKey
+            );
             vaultLinesAppliedForSessionRef.current.add(sid);
           }
           vaultFinishedRef.current = sid;

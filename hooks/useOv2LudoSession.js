@@ -26,7 +26,7 @@ import {
 } from "../lib/online-v2/ludo/ov2LudoSessionAdapter";
 import { supabaseMP } from "../lib/supabaseClients";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
-import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
+import { applyBoardPathSettlementClaimLinesToVaultAndConfirm } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import { requestOv2LudoClaimSettlement } from "../lib/online-v2/ludo/ov2LudoSettlement";
 import { ov2PreferNewerSnapshot } from "../lib/online-v2/ov2PreferNewerSnapshot";
 
@@ -234,7 +234,12 @@ export function useOv2LudoSession(baseContext) {
       try {
         const claim = await requestOv2LudoClaimSettlement(roomId, selfKey);
         if (claim.ok && Array.isArray(claim.lines) && claim.lines.length > 0) {
-          await applyBoardPathSettlementClaimLinesToVault(claim.lines, OV2_LUDO_PRODUCT_GAME_ID);
+          await applyBoardPathSettlementClaimLinesToVaultAndConfirm(
+            claim.lines,
+            OV2_LUDO_PRODUCT_GAME_ID,
+            roomId,
+            selfKey
+          );
           vaultFinishedRefreshForSessionRef.current = sid;
           setVaultClaimError("");
         } else if (!claim.ok) {

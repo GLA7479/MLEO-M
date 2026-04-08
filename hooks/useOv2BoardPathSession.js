@@ -32,7 +32,11 @@ import {
   normalizeClaimSettlementRpcResult,
   rpcOv2BoardPathClaimSettlement,
 } from "../lib/online-v2/board-path/ov2BoardPathSettlementApi";
-import { applyBoardPathSettlementClaimLinesToVaultWithTrace } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
+import {
+  applyBoardPathSettlementClaimLinesToVaultWithTrace,
+  settlementLineIdsForVaultConfirmAfterTrace,
+} from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
+import { requestOv2ConfirmSettlementVaultDelivery } from "../lib/online-v2/ov2ConfirmSettlementVaultDeliveryApi";
 import {
   OV2_BP_LIVE_SYNC_DEBOUNCE_MS,
   OV2_BP_LIVE_SYNC_STATE,
@@ -1239,8 +1243,33 @@ export function useOv2BoardPathSession(baseContext) {
         vaultRows,
         ONLINE_V2_GAME_KINDS.BOARD_PATH
       );
-      const gap = trace.failedLines.length > 0;
       const positives = trace.lineResults.filter(r => r.amount > 0);
+      const idsToConfirm = settlementLineIdsForVaultConfirmAfterTrace(vaultRows, trace);
+      if (idsToConfirm.length > 0) {
+        const cr = await requestOv2ConfirmSettlementVaultDelivery(roomId, selfKey, idsToConfirm);
+        if (!cr.ok) {
+          setSettlementClaimLastTouch({
+            at: Date.now(),
+            rpcReturnedCount: norm.lines.length,
+            rpcIdempotentEmpty: false,
+            vaultCreditableAttempted: positives.length,
+            vaultCreditedCount: trace.creditedCount,
+            vaultFailedCount: trace.failedLines.length,
+            vaultSkippedLocalIdemCount: trace.skippedLocalIdemCount,
+            vaultGapAfterDbMark: false,
+            vaultSuccessAll: false,
+            lineResults: trace.lineResults,
+          });
+          setSettlementClaimError({
+            code: "CONFIRM_DELIVERED_FAILED",
+            message: String(cr.message || cr.code || "Could not mark settlement delivered after vault apply."),
+          });
+          await refreshAfterBoardPathAction();
+          return;
+        }
+      }
+
+      const gap = trace.failedLines.length > 0;
       const vaultSuccessAll =
         !gap && positives.every(r => r.outcome === "credited" || r.outcome === "skipped_local_idem");
 
@@ -1261,7 +1290,7 @@ export function useOv2BoardPathSession(baseContext) {
         const fl = trace.failedLines[0];
         const partial = trace.creditedCount > 0 || trace.skippedLocalIdemCount > 0;
         setSettlementClaimError({
-          code: partial ? "VAULT_GAP_PARTIAL" : "VAULT_GAP_NO_DB_RETRY",
+          code: partial ? "VAULT_GAP_PARTIAL" : "VAULT_APPLY_ALL_FAILED",
           message:
             trace.failedLines.length === 1
               ? `Vault: ${fl.error}`

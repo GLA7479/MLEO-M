@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
+import { applyBoardPathSettlementClaimLinesToVaultAndConfirm } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import {
   cancelOv2Rummy51Rematch,
@@ -113,7 +113,12 @@ export function useOv2Rummy51Session(baseContext) {
       try {
         const claim = await requestOv2Rummy51ClaimSettlement(roomId, selfKey);
         if (claim.ok && Array.isArray(claim.lines) && claim.lines.length > 0) {
-          await applyBoardPathSettlementClaimLinesToVault(claim.lines, OV2_RUMMY51_PRODUCT_GAME_ID);
+          await applyBoardPathSettlementClaimLinesToVaultAndConfirm(
+            claim.lines,
+            OV2_RUMMY51_PRODUCT_GAME_ID,
+            roomId,
+            selfKey
+          );
           vaultFinishedRefreshForSessionRef.current = sid;
           setVaultClaimError("");
         } else if (!claim.ok) {

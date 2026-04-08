@@ -14,7 +14,7 @@ import {
   subscribeOv2BackgammonSnapshot,
 } from "../lib/online-v2/backgammon/ov2BackgammonSessionAdapter";
 import { requestOv2BackgammonClaimSettlement } from "../lib/online-v2/backgammon/ov2BackgammonSettlement";
-import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
+import { applyBoardPathSettlementClaimLinesToVaultAndConfirm } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import { ov2PreferNewerSnapshot } from "../lib/online-v2/ov2PreferNewerSnapshot";
 
@@ -99,7 +99,12 @@ export function useOv2BackgammonSession(baseContext) {
         const claim = await requestOv2BackgammonClaimSettlement(roomId, selfKey);
         if (claim.ok && Array.isArray(claim.lines) && claim.lines.length > 0) {
           if (!vaultLinesAppliedForSessionRef.current.has(sid)) {
-            await applyBoardPathSettlementClaimLinesToVault(claim.lines, OV2_BACKGAMMON_PRODUCT_GAME_ID);
+            await applyBoardPathSettlementClaimLinesToVaultAndConfirm(
+              claim.lines,
+              OV2_BACKGAMMON_PRODUCT_GAME_ID,
+              roomId,
+              selfKey
+            );
             vaultLinesAppliedForSessionRef.current.add(sid);
           }
           vaultFinishedRef.current = sid;

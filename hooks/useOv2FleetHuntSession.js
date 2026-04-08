@@ -16,7 +16,7 @@ import {
   subscribeOv2FleetHuntSnapshot,
 } from "../lib/online-v2/fleethunt/ov2FleetHuntSessionAdapter";
 import { requestOv2FleetHuntClaimSettlement } from "../lib/online-v2/fleethunt/ov2FleetHuntSettlement";
-import { applyBoardPathSettlementClaimLinesToVault } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
+import { applyBoardPathSettlementClaimLinesToVaultAndConfirm } from "../lib/online-v2/board-path/ov2BoardPathSettlementDelivery";
 import { readOnlineV2Vault } from "../lib/online-v2/onlineV2VaultBridge";
 import { ONLINE_V2_GAME_KINDS } from "../lib/online-v2/ov2Economy";
 import { ov2PreferNewerSnapshot } from "../lib/online-v2/ov2PreferNewerSnapshot";
@@ -104,7 +104,12 @@ export function useOv2FleetHuntSession(baseContext) {
         const claim = await requestOv2FleetHuntClaimSettlement(roomId, selfKey);
         if (claim.ok && Array.isArray(claim.lines) && claim.lines.length > 0) {
           if (!vaultLinesAppliedForSessionRef.current.has(sid)) {
-            await applyBoardPathSettlementClaimLinesToVault(claim.lines, ONLINE_V2_GAME_KINDS.FLEET_HUNT);
+            await applyBoardPathSettlementClaimLinesToVaultAndConfirm(
+              claim.lines,
+              ONLINE_V2_GAME_KINDS.FLEET_HUNT,
+              roomId,
+              selfKey
+            );
             vaultLinesAppliedForSessionRef.current.add(sid);
           }
           vaultFinishedRef.current = sid;
