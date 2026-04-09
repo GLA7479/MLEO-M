@@ -96,6 +96,8 @@ export function useOv2LudoSession(baseContext) {
   const vaultDoubleMultRef = useRef(/** @type {{ sessionId: string, mult: number } | null} */ (null));
   /** One server-backed vault read per finished session (win/loss settlement visible on strip). */
   const vaultFinishedRefreshForSessionRef = useRef(/** @type {string|null} */ (null));
+  /** Claim RPC can return ok + empty lines before `ov2_settlement_lines` exist; do not mark session "done" until idempotent or lines arrive. */
+  const ludoVaultSettleEmptyPollsRef = useRef(0);
   const vaultClaimInFlightRef = useRef(false);
   const doubleRpcInFlightRef = useRef(false);
   const [doubleRpcBusy, setDoubleRpcBusy] = useState(false);
@@ -117,6 +119,7 @@ export function useOv2LudoSession(baseContext) {
     setLiveRollServerFace(null);
     vaultDoubleMultRef.current = null;
     vaultFinishedRefreshForSessionRef.current = null;
+    ludoVaultSettleEmptyPollsRef.current = 0;
     setVaultClaimBusy(false);
     setVaultClaimError("");
     setVaultClaimRetryTick(0);
@@ -137,6 +140,7 @@ export function useOv2LudoSession(baseContext) {
     setLiveRollServerFace(null);
     vaultDoubleMultRef.current = null;
     vaultFinishedRefreshForSessionRef.current = null;
+    ludoVaultSettleEmptyPollsRef.current = 0;
     setVaultClaimBusy(false);
     setVaultClaimError("");
     setVaultClaimRetryTick(0);
@@ -240,12 +244,24 @@ export function useOv2LudoSession(baseContext) {
             roomId,
             selfKey
           );
+          ludoVaultSettleEmptyPollsRef.current = 0;
           vaultFinishedRefreshForSessionRef.current = sid;
           setVaultClaimError("");
         } else if (!claim.ok) {
+          ludoVaultSettleEmptyPollsRef.current = 0;
           setVaultClaimError(String(claim.error || claim.message || "Could not update balance."));
-        } else {
+        } else if (claim.idempotent === true) {
+          ludoVaultSettleEmptyPollsRef.current = 0;
           vaultFinishedRefreshForSessionRef.current = sid;
+          setVaultClaimError("");
+        } else {
+          const n = (ludoVaultSettleEmptyPollsRef.current += 1);
+          if (n >= 45) {
+            ludoVaultSettleEmptyPollsRef.current = 0;
+            setVaultClaimError("Settlement is still preparing. Tap Retry.");
+          } else {
+            window.setTimeout(() => setVaultClaimRetryTick(t => t + 1), Math.min(1200, 280 + n * 40));
+          }
         }
       } catch (e) {
         setVaultClaimError(e instanceof Error ? e.message : String(e));
@@ -259,6 +275,7 @@ export function useOv2LudoSession(baseContext) {
 
   const retryVaultClaim = useCallback(() => {
     vaultFinishedRefreshForSessionRef.current = null;
+    ludoVaultSettleEmptyPollsRef.current = 0;
     vaultClaimInFlightRef.current = false;
     setVaultClaimError("");
     setVaultClaimRetryTick(t => t + 1);

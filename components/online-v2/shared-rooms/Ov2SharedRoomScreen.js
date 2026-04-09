@@ -829,8 +829,14 @@ export default function Ov2SharedRoomScreen({
       const canon =
         canonicalRoom ||
         (await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId }).catch(() => null));
+      const base = canon || room;
+      /** Shared-room screen is always `shared_schema_version = 1`; merging avoids a stray legacy leave RPC when a field is missing from one snapshot. */
+      const roomForLeave =
+        base && typeof base === "object"
+          ? { ...base, shared_schema_version: 1 }
+          : { shared_schema_version: 1 };
       const leaveOut = await leaveOv2RoomWithForfeitRetry({
-        room: canon || room,
+        room: roomForLeave,
         room_id: roomId,
         participant_key: participantId,
       });

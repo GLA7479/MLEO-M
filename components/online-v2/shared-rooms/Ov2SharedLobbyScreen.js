@@ -4,6 +4,7 @@ import {
   joinOv2Room,
   joinOv2RoomByCode,
   listOv2Rooms,
+  Ov2SharedRoomRpcError,
 } from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
 import {
   isOv2ActiveSharedProductId,
@@ -133,7 +134,22 @@ export default function Ov2SharedLobbyScreen({
       onEnterRoom(out.room?.id || null);
       await loadRooms({ silent: true });
     } catch (e) {
-      setMsg(e?.message || String(e));
+      if (e instanceof Ov2SharedRoomRpcError) {
+        const c = String(e.code || "").toLowerCase();
+        if (c === "room_not_found_or_invalid_credentials") {
+          setMsg("Invalid room code or password.");
+        } else if (c === "room_full") {
+          setMsg("This room is full.");
+        } else if (c === "invalid_state") {
+          setMsg(e.message || "This room is not open for join.");
+        } else if (c === "migration_required") {
+          setMsg(e.message || "Could not complete join. Try again or contact support.");
+        } else {
+          setMsg(e.message || "Could not join this room.");
+        }
+      } else {
+        setMsg(e?.message || String(e));
+      }
     } finally {
       setBusy(false);
     }
