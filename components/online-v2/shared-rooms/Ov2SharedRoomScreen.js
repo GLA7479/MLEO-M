@@ -826,6 +826,22 @@ export default function Ov2SharedRoomScreen({
     setBusy(true);
     setMsg("");
     try {
+      try {
+        console.info("[OV2][leave-trace]", "leave_button_click", {
+          room_id: roomId,
+          participant_key: participantId,
+          room_status: String(room?.status || ""),
+          room_lifecycle_phase: String(room?.lifecycle_phase || ""),
+          room_shared_schema_version:
+            room && typeof room === "object" ? Number(room.shared_schema_version) || null : null,
+          canonical_status: String(canonicalRoom?.status || ""),
+          canonical_lifecycle_phase: String(canonicalRoom?.lifecycle_phase || ""),
+          canonical_shared_schema_version:
+            canonicalRoom && typeof canonicalRoom === "object" ? Number(canonicalRoom.shared_schema_version) || null : null,
+        });
+      } catch {
+        // ignore
+      }
       const canon =
         canonicalRoom ||
         (await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId }).catch(() => null));
@@ -843,8 +859,26 @@ export default function Ov2SharedRoomScreen({
       if (leaveOut?.stakeRefundVaultApplyError) {
         setMsg(String(leaveOut.stakeRefundVaultApplyError));
       }
+      try {
+        console.info("[OV2][leave-trace]", "leave_button_exit_reached", {
+          room_id: roomId,
+          participant_key: participantId,
+        });
+      } catch {
+        // ignore
+      }
       onExitRoom();
     } catch (e) {
+      try {
+        console.info("[OV2][leave-trace]", "leave_button_catch", {
+          room_id: roomId,
+          participant_key: participantId,
+          code: e && typeof e === "object" && "code" in e ? String(e.code || "") : "",
+          message: e && typeof e === "object" && "message" in e ? String(e.message || "") : String(e || ""),
+        });
+      } catch {
+        // ignore
+      }
       setMsg(e?.message || String(e));
     } finally {
       leaveInFlightRef.current = false;
