@@ -69,7 +69,9 @@ export default function Ov2SharedLobbyScreen({
   onDisplayNameChange,
   onEnterRoom,
 }) {
-  const [selectedGameId, setSelectedGameId] = useState(null);
+  const [selectedGameId, setSelectedGameId] = useState(
+    () => ONLINE_V2_SHARED_LOBBY_GAMES[0]?.id ?? null
+  );
   const [rooms, setRooms] = useState([]);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -92,23 +94,24 @@ export default function Ov2SharedLobbyScreen({
     return out;
   }, []);
 
-  const pickerItems = useMemo(() => {
-    const all = {
-      key: "__all__",
-      id: null,
-      title: "All games",
-      emoji: "🎮",
-      meta: "Every room",
-    };
-    const rows = games.map(g => ({
-      key: g.id,
-      id: g.id,
-      title: g.title,
-      emoji: GAME_TILE_EMOJI[g.id] || "🕹️",
-      meta: `Up to ${getOv2DefaultMaxPlayersForProduct(g.id)} players`,
-    }));
-    return [all, ...rows];
-  }, [games]);
+  const pickerItems = useMemo(
+    () =>
+      games.map(g => ({
+        key: g.id,
+        id: g.id,
+        title: g.title,
+        emoji: GAME_TILE_EMOJI[g.id] || "🕹️",
+        meta: `Up to ${getOv2DefaultMaxPlayersForProduct(g.id)} players`,
+      })),
+    [games]
+  );
+
+  useEffect(() => {
+    if (!games.length) return;
+    if (selectedGameId == null || !games.some(g => g.id === selectedGameId)) {
+      setSelectedGameId(games[0].id);
+    }
+  }, [games, selectedGameId]);
 
   const totalPages = Math.max(1, Math.ceil(pickerItems.length / tilesPerPage));
 
@@ -320,7 +323,7 @@ export default function Ov2SharedLobbyScreen({
             </p>
             <div className={`${gameGridClass} mt-1.5 min-h-0 md:mt-3`}>
               {pageSlice.map(item => {
-                const selected = item.id == null ? selectedGameId == null : selectedGameId === item.id;
+                const selected = selectedGameId === item.id;
                 return (
                   <button
                     key={item.key}
