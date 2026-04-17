@@ -247,9 +247,9 @@ export default function Ov2SharedLobbyScreen({
   const showRoomsColumn =
     !isNarrow || mobileLobbyTab === "rooms";
 
-  /** Narrow Games tab: capped grid height so picker + pager + Auto Match fit without page/tab scroll. */
+  /** Narrow Games tab: cap with svh first (iOS Safari toolbar / dvh jitter); fr rows need minmax(0,1fr). */
   const gameGridClass = isNarrow
-    ? "grid h-[min(35dvh,286px)] min-h-0 w-full shrink-0 grid-cols-2 grid-rows-2 gap-[5px] [grid-template-rows:repeat(2,minmax(0,1fr))]"
+    ? "grid h-[min(286px,34svh)] min-h-0 w-full shrink-0 grid-cols-2 grid-rows-2 gap-1.5 [grid-template-rows:repeat(2,minmax(0,1fr))] items-stretch justify-items-stretch [align-content:stretch]"
     : "grid min-h-0 w-full flex-1 grid-cols-3 grid-rows-2 gap-3 lg:grid-cols-4 lg:gap-3.5";
 
   return (
@@ -348,11 +348,11 @@ export default function Ov2SharedLobbyScreen({
             <div
               className={
                 isNarrow
-                  ? "flex min-h-0 flex-col gap-0 overflow-hidden rounded-lg border border-white/[0.07] bg-black/20 px-[3px] pb-[3px] pt-[2px]"
+                  ? "isolate flex min-h-0 flex-col gap-0 overflow-hidden rounded-lg border border-white/[0.07] bg-black/20 px-[3px] pb-[3px] pt-[2px]"
                   : "flex min-h-0 flex-col"
               }
             >
-            <div className={`${gameGridClass} ${isNarrow ? "mt-0" : "mt-1.5 min-h-0 md:mt-3"}`}>
+            <div className={`${gameGridClass} ${isNarrow ? "mt-0 [text-size-adjust:100%]" : "mt-1.5 min-h-0 md:mt-3"}`}>
               {pageSlice.map(item => {
                 const selected = selectedGameId === item.id;
                 return (
@@ -360,9 +360,9 @@ export default function Ov2SharedLobbyScreen({
                     key={item.key}
                     type="button"
                     onClick={() => setSelectedGameId(item.id)}
-                    className={`group flex min-h-0 touch-manipulation flex-col overflow-hidden text-left shadow-[0_14px_40px_rgba(0,0,0,0.35)] transition md:rounded-[1.35rem] md:border-2 md:px-3 md:py-3 ${
+                    className={`group box-border flex min-h-0 touch-manipulation flex-col overflow-hidden text-left shadow-[0_14px_40px_rgba(0,0,0,0.35)] transition [-webkit-tap-highlight-color:transparent] [text-size-adjust:100%] md:rounded-[1.35rem] md:border-2 md:px-3 md:py-3 ${
                       isNarrow
-                        ? "rounded-lg border px-1 py-1"
+                        ? "appearance-none rounded-lg border px-1 py-1"
                         : "rounded-2xl border-2 px-1.5 py-1.5"
                     } ${
                       selected
@@ -373,14 +373,14 @@ export default function Ov2SharedLobbyScreen({
                     } `}
                   >
                     <div
-                      className={`flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-0.5 md:gap-2 md:px-0.5 md:pt-0 ${
+                      className={`flex min-h-0 flex-1 basis-0 flex-col items-center justify-center overflow-hidden px-0.5 md:gap-2 md:px-0.5 md:pt-0 ${
                         isNarrow ? "gap-0 pt-0" : "gap-1 pt-0.5"
                       }`}
                     >
                       <span
                         className={`select-none leading-none ${
                           isNarrow
-                            ? "text-[clamp(1.68rem,9.8vmin,2.38rem)]"
+                            ? "max-w-full shrink-0 text-[clamp(1.35rem,8.5vw,1.9rem)] leading-none"
                             : "text-[clamp(2.75rem,10vmin,4.25rem)]"
                         }`}
                         aria-hidden
@@ -390,7 +390,7 @@ export default function Ov2SharedLobbyScreen({
                       <span
                         className={`line-clamp-2 text-center leading-tight text-white md:leading-snug ${
                           isNarrow
-                            ? "text-[15px] font-black tracking-tight drop-shadow-sm"
+                            ? "break-words text-[15px] font-black tracking-tight drop-shadow-sm [overflow-wrap:anywhere]"
                             : "text-base font-extrabold lg:text-lg"
                         }`}
                       >
@@ -407,7 +407,7 @@ export default function Ov2SharedLobbyScreen({
                     <span
                       className={`mt-auto flex w-full shrink-0 items-center justify-center font-black tracking-wide md:rounded-xl ${
                         isNarrow
-                          ? "mt-0.5 min-h-[42px] rounded-md py-0 text-[12px] leading-none"
+                          ? "mt-0.5 min-h-[36px] rounded-md py-0 text-[11px] leading-none sm:min-h-[38px] sm:text-[12px]"
                           : "mt-2 h-11 rounded-lg text-sm md:h-12 md:text-[15px]"
                       } ${
                         selected
