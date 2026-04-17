@@ -186,17 +186,18 @@ export default function OnlineV2RoomsScreen() {
         }}
       >
         <div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col gap-1 overflow-hidden px-2 md:max-w-4xl md:gap-1.5 md:px-4 lg:max-w-5xl lg:px-6 xl:max-w-6xl xl:gap-2 xl:px-8 2xl:max-w-7xl">
-          <header className="flex shrink-0 items-center justify-between gap-1.5 rounded-xl border border-white/12 bg-black/40 px-2 py-1 shadow-[0_8px_28px_rgba(0,0,0,0.3)] backdrop-blur-sm md:gap-2 md:rounded-2xl md:px-3 md:py-1.5 lg:px-4">
+          <header className="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-white/15 bg-black/30 px-2.5 py-2 shadow-[0_8px_28px_rgba(0,0,0,0.3)] backdrop-blur-sm md:rounded-2xl md:px-3 md:py-2 lg:gap-2 lg:px-4 lg:py-2.5 xl:px-5">
             <Link
               href="/online-v2"
-              className="shrink-0 touch-manipulation rounded-lg border border-white/18 bg-white/10 px-2 py-1 text-[11px] font-semibold text-white md:rounded-xl md:px-2.5 md:py-1.5 md:text-xs lg:text-sm"
+              className="inline-flex shrink-0 touch-manipulation items-center justify-center rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white lg:px-3 lg:py-1.5 lg:text-sm"
             >
               Back
             </Link>
-            <div className="min-w-0 flex-1 px-0.5 text-center leading-tight">
-              <h1 className="truncate text-xs font-extrabold tracking-tight text-white md:text-sm lg:text-lg xl:text-xl">
+            <div className="min-w-0 flex-1 px-1 text-center leading-tight">
+              <h1 className="truncate text-sm font-extrabold tracking-tight text-white sm:text-base lg:text-lg xl:text-xl">
                 Shared rooms
               </h1>
+              <p className="mt-0.5 truncate text-[11px] text-zinc-300 md:hidden">Play with others</p>
               <div className="mt-0.5 hidden min-w-0 items-center justify-center gap-2 md:flex">
                 <p className="truncate text-[11px] text-zinc-300 lg:text-xs xl:text-sm">Play with others</p>
                 {isOv2UiPreviewsEnabled() ? <span className="h-3 w-px bg-white/15" aria-hidden /> : null}
