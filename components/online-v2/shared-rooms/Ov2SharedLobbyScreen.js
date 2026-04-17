@@ -7,13 +7,61 @@ import {
   Ov2SharedRoomRpcError,
 } from "../../../lib/online-v2/room-api/ov2SharedRoomsApi";
 import {
+  getOv2DefaultMaxPlayersForProduct,
   isOv2ActiveSharedProductId,
+  ONLINE_V2_GAME_IDS,
   ONLINE_V2_SHARED_LOBBY_GAMES,
 } from "../../../lib/online-v2/onlineV2GameRegistry";
 import Ov2SharedCreateRoomModal from "./Ov2SharedCreateRoomModal";
 import Ov2SharedJoinByCodeModal from "./Ov2SharedJoinByCodeModal";
 import Ov2SharedQuickMatchBar from "./Ov2SharedQuickMatchBar";
 import Ov2SharedRoomDirectory from "./Ov2SharedRoomDirectory";
+
+/** Large tile identity — presentation only. */
+const GAME_TILE_EMOJI = {
+  [ONLINE_V2_GAME_IDS.LUDO]: "🎲",
+  [ONLINE_V2_GAME_IDS.RUMMY51]: "🃏",
+  [ONLINE_V2_GAME_IDS.BINGO]: "🎱",
+  [ONLINE_V2_GAME_IDS.BACKGAMMON]: "🏛️",
+  [ONLINE_V2_GAME_IDS.CHECKERS]: "⚫",
+  [ONLINE_V2_GAME_IDS.CHESS]: "♟️",
+  [ONLINE_V2_GAME_IDS.DOMINOES]: "🧱",
+  [ONLINE_V2_GAME_IDS.FOURLINE]: "🔵",
+  [ONLINE_V2_GAME_IDS.FLIPGRID]: "🔲",
+  [ONLINE_V2_GAME_IDS.MELDMATCH]: "🧩",
+  [ONLINE_V2_GAME_IDS.COLOR_CLASH]: "🎨",
+  [ONLINE_V2_GAME_IDS.FLEET_HUNT]: "🛸",
+  [ONLINE_V2_GAME_IDS.GOAL_DUEL]: "⚽",
+};
+
+const MOBILE_MAX = 767.98;
+
+function useIsNarrowLobby() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia(`(max-width: ${MOBILE_MAX}px)`);
+    const apply = () => setNarrow(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return narrow;
+}
+
+/** Tile count for desktop game column (not used on narrow mobile Games tab — fixed 4). */
+function useDesktopTilesPerPage() {
+  const [n, setN] = useState(6);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mqLg = window.matchMedia("(min-width: 1024px)");
+    const apply = () => setN(mqLg.matches ? 8 : 6);
+    apply();
+    mqLg.addEventListener("change", apply);
+    return () => mqLg.removeEventListener("change", apply);
+  }, []);
+  return n;
+}
 
 export default function Ov2SharedLobbyScreen({
   participantId,
@@ -29,6 +77,13 @@ export default function Ov2SharedLobbyScreen({
   const listRequestIdRef = useRef(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [pickerPage, setPickerPage] = useState(0);
+  /** Visual-only mobile panel: which stack is shown (< md). */
+  const [mobileLobbyTab, setMobileLobbyTab] = useState("games");
+  const isNarrow = useIsNarrowLobby();
+  const desktopTilesPerPage = useDesktopTilesPerPage();
+
+  const tilesPerPage = isNarrow ? 4 : desktopTilesPerPage;
 
   const games = useMemo(() => ONLINE_V2_SHARED_LOBBY_GAMES, []);
   const gameTitleById = useMemo(() => {
@@ -36,6 +91,35 @@ export default function Ov2SharedLobbyScreen({
     for (const g of ONLINE_V2_SHARED_LOBBY_GAMES) out[g.id] = g.title;
     return out;
   }, []);
+
+  const pickerItems = useMemo(() => {
+    const all = {
+      key: "__all__",
+      id: null,
+      title: "All games",
+      emoji: "🎮",
+      meta: "Every room",
+    };
+    const rows = games.map(g => ({
+      key: g.id,
+      id: g.id,
+      title: g.title,
+      emoji: GAME_TILE_EMOJI[g.id] || "🕹️",
+      meta: `Up to ${getOv2DefaultMaxPlayersForProduct(g.id)} players`,
+    }));
+    return [all, ...rows];
+  }, [games]);
+
+  const totalPages = Math.max(1, Math.ceil(pickerItems.length / tilesPerPage));
+
+  useEffect(() => {
+    setPickerPage(p => Math.min(p, totalPages - 1));
+  }, [totalPages]);
+
+  const pageSlice = useMemo(() => {
+    const start = pickerPage * tilesPerPage;
+    return pickerItems.slice(start, start + tilesPerPage);
+  }, [pickerItems, pickerPage, tilesPerPage]);
 
   const loadRooms = useCallback(async (opts = {}) => {
     const silent = opts.silent === true;
@@ -155,92 +239,266 @@ export default function Ov2SharedLobbyScreen({
     }
   }
 
+  const showGamesColumn =
+    !isNarrow || mobileLobbyTab === "games";
+  const showRoomsColumn =
+    !isNarrow || mobileLobbyTab === "rooms";
+
+  const gameGridClass = isNarrow
+    ? "grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-3"
+    : "grid min-h-0 w-full flex-1 grid-cols-3 grid-rows-2 gap-3 lg:grid-cols-4 lg:gap-3.5";
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-      <div className="shrink-0 rounded-xl border border-white/10 bg-black/25 p-3">
-        <div className="text-sm font-bold">Central lobby</div>
-        <div className="mt-1 flex min-w-0 flex-row items-stretch gap-2">
-          <input
-            value={displayName}
-            onChange={e => onDisplayNameChange(e.target.value)}
-            maxLength={24}
-            placeholder="Display name"
-            className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/40 px-2 py-1.5 text-sm text-white placeholder:text-zinc-500"
-          />
-          <button
-            type="button"
-            disabled={listRefreshing}
-            aria-busy={listRefreshing}
-            onClick={() => void loadRooms({ silent: false })}
-            className="shrink-0 touch-manipulation whitespace-nowrap rounded-lg border border-white/20 bg-white/10 px-2.5 py-1.5 text-xs font-semibold disabled:opacity-60 sm:px-3"
-          >
-            {listRefreshing ? "…" : "Refresh"}
-          </button>
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-1 overflow-hidden px-1.5 pb-1 pt-1 md:gap-2 md:px-2 md:pb-2 md:pt-2 lg:px-3 lg:pb-3 lg:pt-3">
+      {/* Compact identity row — no tall framed card */}
+      <div className="flex shrink-0 items-stretch gap-2 border-b border-white/[0.08] pb-1.5 md:pb-2">
+        <input
+          value={displayName}
+          onChange={e => onDisplayNameChange(e.target.value)}
+          maxLength={24}
+          placeholder="Display name"
+          className="min-w-0 flex-1 rounded-lg border border-white/14 bg-black/50 px-2.5 py-1.5 text-sm text-white shadow-inner placeholder:text-zinc-500 md:rounded-xl md:px-3 md:py-2"
+        />
+        <button
+          type="button"
+          disabled={listRefreshing}
+          aria-busy={listRefreshing}
+          onClick={() => void loadRooms({ silent: false })}
+          className="shrink-0 touch-manipulation rounded-lg border border-white/20 bg-white/12 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60 md:rounded-xl md:text-sm"
+        >
+          {listRefreshing ? "…" : "Refresh"}
+        </button>
+      </div>
+
+      {/* Mobile-only segmented switch — visual panel only */}
+      <div
+        className="flex shrink-0 rounded-xl border border-white/12 bg-black/40 p-0.5 md:hidden"
+        role="tablist"
+        aria-label="Lobby view"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobileLobbyTab === "games"}
+          className={`min-h-[36px] flex-1 touch-manipulation rounded-lg px-2 text-xs font-extrabold transition ${
+            mobileLobbyTab === "games"
+              ? "bg-white/14 text-white shadow-sm"
+              : "text-zinc-400"
+          }`}
+          onClick={() => setMobileLobbyTab("games")}
+        >
+          Games
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobileLobbyTab === "rooms"}
+          className={`min-h-[36px] flex-1 touch-manipulation rounded-lg px-2 text-xs font-extrabold transition ${
+            mobileLobbyTab === "rooms"
+              ? "bg-white/14 text-white shadow-sm"
+              : "text-zinc-400"
+          }`}
+          onClick={() => setMobileLobbyTab("rooms")}
+        >
+          Rooms
+        </button>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden md:flex-row md:gap-3 lg:gap-4">
+        {/* Game picker column */}
+        <div
+          className={`min-h-0 min-w-0 flex-col overflow-hidden lg:flex-[0.9] ${
+            showGamesColumn
+              ? "flex flex-1 md:flex-[0.95]"
+              : "hidden md:flex md:flex-1 md:flex-col md:flex-[0.95]"
+          }`}
+        >
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/14 bg-gradient-to-b from-zinc-900/90 via-zinc-950/80 to-black p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_20px_50px_rgba(0,0,0,0.45)] md:rounded-3xl md:p-3 lg:p-4">
+            <p className="shrink-0 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+              Pick a game
+            </p>
+            <div className={`${gameGridClass} mt-2 min-h-0 md:mt-3`}>
+              {pageSlice.map(item => {
+                const selected = item.id == null ? selectedGameId == null : selectedGameId === item.id;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setSelectedGameId(item.id)}
+                    className={`group flex min-h-0 touch-manipulation flex-col rounded-2xl border-2 px-2 py-2 text-left shadow-[0_14px_40px_rgba(0,0,0,0.35)] transition md:rounded-[1.35rem] md:px-3 md:py-3 ${
+                      selected
+                        ? "border-emerald-400/70 bg-gradient-to-b from-emerald-900/65 to-emerald-950/55 ring-2 ring-emerald-400/40"
+                        : "border-white/14 bg-gradient-to-b from-white/[0.07] to-black/50 hover:border-white/25 hover:from-white/[0.09]"
+                    } `}
+                  >
+                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 px-0.5 pt-1 md:gap-2 md:pt-0">
+                      <span
+                        className={`select-none leading-none ${
+                          isNarrow
+                            ? "text-[clamp(3rem,20vmin,4.75rem)]"
+                            : "text-[clamp(2.75rem,10vmin,4.25rem)]"
+                        }`}
+                        aria-hidden
+                      >
+                        {item.emoji}
+                      </span>
+                      <span
+                        className={`line-clamp-2 text-center font-extrabold leading-snug text-white ${
+                          isNarrow ? "text-[15px] tracking-tight" : "text-base lg:text-lg"
+                        }`}
+                      >
+                        {item.title}
+                      </span>
+                      <span
+                        className={`line-clamp-1 text-center font-medium text-zinc-400 ${
+                          isNarrow ? "text-[11px]" : "text-xs lg:text-[13px]"
+                        }`}
+                      >
+                        {item.meta}
+                      </span>
+                    </div>
+                    <span
+                      className={`mt-auto flex w-full shrink-0 items-center justify-center rounded-xl font-black tracking-wide ${
+                        isNarrow ? "mt-2 h-11 text-sm" : "mt-2 h-11 text-sm md:h-12 md:text-[15px]"
+                      } ${
+                        selected
+                          ? "bg-emerald-400/25 text-emerald-50"
+                          : "bg-white/14 text-zinc-50 group-hover:bg-white/20"
+                      }`}
+                    >
+                      {selected ? "Selected" : "Tap to choose"}
+                    </span>
+                  </button>
+                );
+              })}
+              {Array.from({ length: Math.max(0, tilesPerPage - pageSlice.length) }).map((_, i) => (
+                <div
+                  key={`pad-${i}`}
+                  className="pointer-events-none min-h-0 rounded-2xl border-2 border-dashed border-white/[0.06] bg-white/[0.02] md:rounded-[1.35rem]"
+                  aria-hidden
+                />
+              ))}
+            </div>
+
+            {totalPages > 1 ? (
+              <div className="mt-2 flex shrink-0 items-center justify-center gap-3 md:mt-3">
+                <button
+                  type="button"
+                  className="touch-manipulation rounded-full border border-white/18 bg-white/12 px-3 py-1.5 text-sm font-bold text-white disabled:opacity-35"
+                  disabled={pickerPage <= 0}
+                  onClick={() => setPickerPage(p => Math.max(0, p - 1))}
+                  aria-label="Previous games"
+                >
+                  ‹
+                </button>
+                <div className="flex items-center gap-1.5" role="tablist" aria-label="Game pages">
+                  {Array.from({ length: totalPages }).map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      role="tab"
+                      aria-selected={i === pickerPage}
+                      className={`h-2.5 rounded-full touch-manipulation transition-all ${
+                        i === pickerPage ? "w-7 bg-emerald-400" : "w-2.5 bg-white/22 hover:bg-white/40"
+                      }`}
+                      onClick={() => setPickerPage(i)}
+                      aria-label={`Games page ${i + 1}`}
+                    />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="touch-manipulation rounded-full border border-white/18 bg-white/12 px-3 py-1.5 text-sm font-bold text-white disabled:opacity-35"
+                  disabled={pickerPage >= totalPages - 1}
+                  onClick={() => setPickerPage(p => Math.min(totalPages - 1, p + 1))}
+                  aria-label="Next games"
+                >
+                  ›
+                </button>
+              </div>
+            ) : null}
+
+            {/* Mobile Games tab: slim primary actions */}
+            {isNarrow && mobileLobbyTab === "games" ? (
+              <div className="mt-2 flex shrink-0 gap-2 border-t border-white/[0.07] pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(true)}
+                  className="touch-manipulation min-h-[44px] flex-1 rounded-xl border border-emerald-500/50 bg-emerald-950/50 py-2 text-xs font-extrabold text-emerald-50"
+                >
+                  Create room
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCodeOpen(true)}
+                  className="touch-manipulation min-h-[44px] flex-1 rounded-xl border border-sky-500/50 bg-sky-950/45 py-2 text-xs font-extrabold text-sky-50"
+                >
+                  Join by code
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Rooms stack: directory, quick match, actions */}
+        <div
+          className={`min-h-0 min-w-0 flex-col gap-2 overflow-hidden md:min-w-0 md:flex-1 ${
+            showRoomsColumn
+              ? "flex flex-1"
+              : "hidden md:flex md:flex-1 md:flex-col"
+          }`}
+        >
+          {/* Desktop always; mobile only on Rooms tab — before QM + directory */}
+          {(!isNarrow || mobileLobbyTab === "rooms") && (
+            <div className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className="touch-manipulation min-h-[44px] flex-1 rounded-xl border border-emerald-500/50 bg-emerald-950/50 py-2 text-xs font-extrabold text-emerald-50 shadow-[0_10px_28px_rgba(16,185,129,0.12)] md:min-h-[48px] md:rounded-2xl md:py-2.5 md:text-sm"
+              >
+                Create room
+              </button>
+              <button
+                type="button"
+                onClick={() => setCodeOpen(true)}
+                className="touch-manipulation min-h-[44px] flex-1 rounded-xl border border-sky-500/50 bg-sky-950/45 py-2 text-xs font-extrabold text-sky-50 shadow-[0_10px_28px_rgba(14,165,233,0.12)] md:min-h-[48px] md:rounded-2xl md:py-2.5 md:text-sm"
+              >
+                Join by code
+              </button>
+            </div>
+          )}
+
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden md:gap-2.5">
+            <Ov2SharedQuickMatchBar
+              games={games}
+              selectedGameId={selectedGameId}
+              participantId={participantId}
+              displayName={displayName}
+              busy={busy}
+              setBusy={setBusy}
+              setMsg={setMsg}
+              onEnterRoom={onEnterRoom}
+            />
+
+            <div
+              className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain rounded-2xl border border-white/12 bg-black/35 p-2 shadow-inner md:rounded-3xl md:p-3"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              <Ov2SharedRoomDirectory
+                rooms={rooms}
+                busy={busy}
+                gameTitleById={gameTitleById}
+                onJoinRoom={handleJoin}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-wrap gap-1">
-        <button
-          type="button"
-          onClick={() => setSelectedGameId(null)}
-          className={`rounded px-2 py-1 text-xs ${selectedGameId == null ? "bg-emerald-900/40 text-emerald-100" : "bg-white/10 text-zinc-200"}`}
-        >
-          All
-        </button>
-        {games.map(g => (
-          <button
-            key={g.id}
-            type="button"
-            onClick={() => setSelectedGameId(g.id)}
-            className={`rounded px-2 py-1 text-xs ${selectedGameId === g.id ? "bg-emerald-900/40 text-emerald-100" : "bg-white/10 text-zinc-200"}`}
-          >
-            {g.title}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex shrink-0 gap-2">
-        <button
-          type="button"
-          onClick={() => setCreateOpen(true)}
-          className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-900/40 py-2 text-xs font-bold text-emerald-100"
-        >
-          Create room
-        </button>
-        <button
-          type="button"
-          onClick={() => setCodeOpen(true)}
-          className="flex-1 rounded-lg border border-sky-500/40 bg-sky-900/35 py-2 text-xs font-bold text-sky-100"
-        >
-          Join by code
-        </button>
-      </div>
-
-      <Ov2SharedQuickMatchBar
-        games={games}
-        selectedGameId={selectedGameId}
-        participantId={participantId}
-        displayName={displayName}
-        busy={busy}
-        setBusy={setBusy}
-        setMsg={setMsg}
-        onEnterRoom={onEnterRoom}
-      />
-
-      <div
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain rounded-xl border border-white/10 bg-black/20 p-2"
-        style={{ WebkitOverflowScrolling: "touch" }}
-      >
-        <Ov2SharedRoomDirectory
-          rooms={rooms}
-          busy={busy}
-          gameTitleById={gameTitleById}
-          onJoinRoom={handleJoin}
-        />
-      </div>
-
       {msg ? (
-        <div className="shrink-0 rounded border border-red-500/30 bg-red-950/30 px-2 py-1 text-xs text-red-200">{msg}</div>
+        <div className="shrink-0 rounded-xl border border-red-500/35 bg-red-950/40 px-2 py-1.5 text-xs text-red-100">
+          {msg}
+        </div>
       ) : null}
 
       <Ov2SharedCreateRoomModal
@@ -260,4 +518,3 @@ export default function Ov2SharedLobbyScreen({
     </div>
   );
 }
-

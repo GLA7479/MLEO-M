@@ -181,35 +181,52 @@ export default function OnlineV2RoomsScreen() {
       <main
         className="online-v2-rooms-main flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 text-white"
         style={{
-          paddingTop: "max(8px, env(safe-area-inset-top))",
-          paddingBottom: "max(8px, env(safe-area-inset-bottom))",
+          paddingTop: "max(6px, env(safe-area-inset-top))",
+          paddingBottom: "max(6px, env(safe-area-inset-bottom))",
         }}
       >
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col gap-2 overflow-hidden px-2 md:max-w-4xl md:px-4 lg:max-w-5xl lg:gap-2 lg:px-6 xl:max-w-6xl xl:gap-2.5 xl:px-8 2xl:max-w-7xl">
-          <header className="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-white/15 bg-black/30 px-2 py-2 md:px-3 lg:px-4 lg:py-2.5 xl:px-5">
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-2xl flex-col gap-1 overflow-hidden px-2 md:max-w-4xl md:gap-1.5 md:px-4 lg:max-w-5xl lg:px-6 xl:max-w-6xl xl:gap-2 xl:px-8 2xl:max-w-7xl">
+          <header className="flex shrink-0 items-center justify-between gap-1.5 rounded-xl border border-white/12 bg-black/40 px-2 py-1 shadow-[0_8px_28px_rgba(0,0,0,0.3)] backdrop-blur-sm md:gap-2 md:rounded-2xl md:px-3 md:py-1.5 lg:px-4">
             <Link
               href="/online-v2"
-              className="rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-xs font-semibold text-white lg:px-3 lg:py-1.5 lg:text-sm"
+              className="shrink-0 touch-manipulation rounded-lg border border-white/18 bg-white/10 px-2 py-1 text-[11px] font-semibold text-white md:rounded-xl md:px-2.5 md:py-1.5 md:text-xs lg:text-sm"
             >
               Back
             </Link>
-            <div className="min-w-0 flex-1 text-center">
-              <h1 className="truncate text-sm font-extrabold sm:text-base lg:text-lg xl:text-xl">
+            <div className="min-w-0 flex-1 px-0.5 text-center leading-tight">
+              <h1 className="truncate text-xs font-extrabold tracking-tight text-white md:text-sm lg:text-lg xl:text-xl">
                 Shared rooms
               </h1>
-              <p className="truncate text-[11px] text-zinc-300 lg:text-xs xl:text-sm">Play with others</p>
-              {isOv2UiPreviewsEnabled() ? (
-                <p className="mt-1 truncate text-[10px] text-zinc-500">
-                  <Link href="/online-v2/game-ui-previews" className="text-amber-400/90 underline decoration-amber-500/30">
-                    New games — UI preview (no DB)
+              <div className="mt-0.5 hidden min-w-0 items-center justify-center gap-2 md:flex">
+                <p className="truncate text-[11px] text-zinc-300 lg:text-xs xl:text-sm">Play with others</p>
+                {isOv2UiPreviewsEnabled() ? <span className="h-3 w-px bg-white/15" aria-hidden /> : null}
+                {isOv2UiPreviewsEnabled() ? (
+                  <Link
+                    href="/online-v2/game-ui-previews"
+                    className="truncate text-[10px] font-semibold text-amber-400/95 underline decoration-amber-500/35 underline-offset-2 lg:text-[11px]"
+                  >
+                    UI previews
                   </Link>
-                </p>
+                ) : null}
+              </div>
+              {isOv2UiPreviewsEnabled() ? (
+                <div className="mt-0.5 md:hidden">
+                  <Link
+                    href="/online-v2/game-ui-previews"
+                    className="text-[9px] font-semibold text-amber-400/90 underline decoration-amber-500/30 underline-offset-1"
+                  >
+                    UI previews
+                  </Link>
+                </div>
               ) : null}
             </div>
             <OnlineV2VaultStrip />
           </header>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <section
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-black/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:bg-black/20"
+            aria-label="Rooms content"
+          >
             {!enabled ? (
               <div className="shrink-0 rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-100">
                 Online V2 is disabled.
@@ -230,9 +247,11 @@ export default function OnlineV2RoomsScreen() {
                 onEnterRoom={enterRoom}
               />
             )}
-          </div>
+          </section>
 
-          <OnlineV2ReservedAdSlot variant="subtle" />
+          <footer className="shrink-0 rounded-2xl border border-white/[0.06] bg-black/20 px-1 py-0.5 shadow-[0_-8px_32px_rgba(0,0,0,0.25)] md:border-white/10 md:bg-black/25">
+            <OnlineV2ReservedAdSlot variant="subtle" minHeightClass="min-h-10 md:min-h-11" className="rounded-xl border-0 bg-transparent py-1" />
+          </footer>
         </div>
       </main>
     </Layout>
