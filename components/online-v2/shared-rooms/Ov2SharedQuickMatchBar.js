@@ -39,6 +39,8 @@ function qmCoerceIso(v) {
  *   setBusy: (v: boolean) => void,
  *   setMsg: (s: string) => void,
  *   onEnterRoom: (roomId: string) => void,
+ *   bodyMinClassName?: string,
+ *   className?: string,
  * }} props
  */
 export default function Ov2SharedQuickMatchBar({
@@ -50,6 +52,8 @@ export default function Ov2SharedQuickMatchBar({
   setBusy,
   setMsg,
   onEnterRoom,
+  bodyMinClassName,
+  className = "",
 }) {
   const [open, setOpen] = useState(false);
   const [selectedPresetUnits, setSelectedPresetUnits] = useState(1000);
@@ -243,9 +247,8 @@ export default function Ov2SharedQuickMatchBar({
     }
   }
 
-  return (
-    <div className="shrink-0 space-y-2 rounded-xl border border-amber-500/25 bg-amber-950/20 p-3">
-      <div className="text-xs font-bold text-amber-100">Quick Match / Auto Match</div>
+  const phaseBody = (
+    <>
       {!open ? (
         <div className="flex flex-col gap-2">
           {!gameId ? (
@@ -369,6 +372,15 @@ export default function Ov2SharedQuickMatchBar({
           </button>
         </div>
       )}
+    </>
+  );
+
+  return (
+    <div
+      className={`shrink-0 space-y-2 rounded-xl border border-amber-500/25 bg-amber-950/20 p-3 ${className}`.trim()}
+    >
+      <div className="text-xs font-bold text-amber-100">Quick Match / Auto Match</div>
+      {bodyMinClassName ? <div className={bodyMinClassName}>{phaseBody}</div> : phaseBody}
     </div>
   );
 }

@@ -313,18 +313,28 @@ export default function Ov2SharedLobbyScreen({
           isNarrow && mobileLobbyTab === "games" ? "gap-1" : "gap-2"
         }`}
       >
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row md:gap-3 lg:gap-4">
+        <div
+          className={
+            isNarrow && mobileLobbyTab === "games"
+              ? "flex shrink-0 flex-col overflow-hidden md:min-h-0 md:flex-1 md:flex-row md:gap-3 lg:gap-4"
+              : "flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row md:gap-3 lg:gap-4"
+          }
+        >
         {/* Game picker column */}
         <div
           className={`min-h-0 min-w-0 flex-col overflow-hidden lg:flex-[0.9] ${
             showGamesColumn
-              ? "flex flex-1 md:flex-[0.95]"
+              ? isNarrow
+                ? "flex shrink-0"
+                : "flex flex-1 md:flex-[0.95]"
               : "hidden md:flex md:flex-1 md:flex-col md:flex-[0.95]"
           }`}
         >
           <div
-            className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/14 bg-gradient-to-b from-zinc-900/90 via-zinc-950/80 to-black shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_20px_50px_rgba(0,0,0,0.45)] md:rounded-3xl md:p-3 lg:p-4 ${
-              isNarrow ? "p-[6px]" : "p-1.5"
+            className={`flex min-h-0 flex-col overflow-hidden md:rounded-3xl md:p-3 lg:p-4 ${
+              isNarrow
+                ? "shrink-0 rounded-xl border border-white/12 bg-gradient-to-b from-zinc-900/90 via-zinc-950/80 to-black px-1.5 pb-1.5 pt-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_20px_rgba(0,0,0,0.24)]"
+                : "flex-1 rounded-2xl border border-white/14 bg-gradient-to-b from-zinc-900/90 via-zinc-950/80 to-black p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_20px_50px_rgba(0,0,0,0.45)]"
             }`}
           >
             <p
@@ -334,6 +344,14 @@ export default function Ov2SharedLobbyScreen({
             >
               Pick a game
             </p>
+            {/* Narrow: inner rim only around grid + pager (~10% tighter chrome); tile grid size unchanged */}
+            <div
+              className={
+                isNarrow
+                  ? "flex min-h-0 flex-col gap-0 overflow-hidden rounded-lg border border-white/[0.07] bg-black/20 px-[3px] pb-[3px] pt-[2px]"
+                  : "flex min-h-0 flex-col"
+              }
+            >
             <div className={`${gameGridClass} ${isNarrow ? "mt-0" : "mt-1.5 min-h-0 md:mt-3"}`}>
               {pageSlice.map(item => {
                 const selected = selectedGameId === item.id;
@@ -416,14 +434,14 @@ export default function Ov2SharedLobbyScreen({
             {totalPages > 1 ? (
               <div
                 className={`flex shrink-0 items-center justify-center md:mt-3 ${
-                  isNarrow ? "mt-1 gap-2 py-0.5" : "mt-2 gap-3"
+                  isNarrow ? "mt-0 gap-1.5 py-0" : "mt-2 gap-3"
                 }`}
               >
                 <button
                   type="button"
                   className={`touch-manipulation flex items-center justify-center rounded-full border-2 font-extrabold text-white shadow-[0_4px_14px_rgba(0,0,0,0.35)] transition active:scale-95 disabled:opacity-35 disabled:active:scale-100 ${
                     isNarrow
-                      ? "min-h-[44px] min-w-[44px] border-white/35 bg-gradient-to-b from-white/22 to-white/10 text-2xl leading-none ring-1 ring-white/15"
+                      ? "min-h-[40px] min-w-[40px] border-white/35 bg-gradient-to-b from-white/22 to-white/10 text-xl leading-none ring-1 ring-white/15"
                       : "min-h-[48px] min-w-[48px] border-white/30 bg-gradient-to-b from-white/20 to-white/10 text-2xl leading-none ring-1 ring-white/10"
                   }`}
                   disabled={pickerPage <= 0}
@@ -451,7 +469,7 @@ export default function Ov2SharedLobbyScreen({
                   type="button"
                   className={`touch-manipulation flex items-center justify-center rounded-full border-2 font-extrabold text-white shadow-[0_4px_14px_rgba(0,0,0,0.35)] transition active:scale-95 disabled:opacity-35 disabled:active:scale-100 ${
                     isNarrow
-                      ? "min-h-[44px] min-w-[44px] border-white/35 bg-gradient-to-b from-white/22 to-white/10 text-2xl leading-none ring-1 ring-white/15"
+                      ? "min-h-[40px] min-w-[40px] border-white/35 bg-gradient-to-b from-white/22 to-white/10 text-xl leading-none ring-1 ring-white/15"
                       : "min-h-[48px] min-w-[48px] border-white/30 bg-gradient-to-b from-white/20 to-white/10 text-2xl leading-none ring-1 ring-white/10"
                   }`}
                   disabled={pickerPage >= totalPages - 1}
@@ -462,6 +480,7 @@ export default function Ov2SharedLobbyScreen({
                 </button>
               </div>
             ) : null}
+            </div>
           </div>
         </div>
 
@@ -522,9 +541,9 @@ export default function Ov2SharedLobbyScreen({
         </div>
         </div>
 
-        {/* Mobile Games: compact Auto Match — descendant tightening only (no QuickMatch source edits); no inner scroll */}
+        {/* Mobile Games: compact Auto Match — natural height, no flex filler stealing ad slot */}
         {isNarrow && mobileLobbyTab === "games" ? (
-          <div className="shrink-0 overflow-hidden rounded-lg border border-white/12 bg-black/35 px-1 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] [&>div]:!space-y-1 [&>div]:!rounded-lg [&>div]:!border-amber-500/20 [&>div]:!p-1.5 [&>div]:!text-[10px] [&_button]:!min-h-0 [&_button]:!rounded-md [&_button]:!py-1 [&_button]:!text-[10px] [&_button]:!leading-tight [&_p]:!my-0 [&_p]:!text-[10px] [&_p]:!leading-snug [&_ul]:!max-h-9 [&_ul]:!overflow-hidden [&_ul]:!text-[10px] [&_.mb-1]:!mb-0 [&_.flex-wrap]:!gap-1">
+          <div className="shrink-0 rounded-xl border-2 border-amber-500/45 bg-gradient-to-b from-amber-950/40 to-black/55 p-1.5 shadow-[0_8px_24px_rgba(245,158,11,0.14)] ring-1 ring-amber-400/25">
             <Ov2SharedQuickMatchBar
               games={games}
               selectedGameId={selectedGameId}
@@ -534,6 +553,7 @@ export default function Ov2SharedLobbyScreen({
               setBusy={setBusy}
               setMsg={setMsg}
               onEnterRoom={onEnterRoom}
+              className="!space-y-1.5 !p-2"
             />
           </div>
         ) : null}
