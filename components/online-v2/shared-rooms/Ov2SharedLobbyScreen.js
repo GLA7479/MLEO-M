@@ -20,6 +20,7 @@ import Ov2SharedRoomDirectory from "./Ov2SharedRoomDirectory";
 /** Large tile identity — presentation only. */
 const GAME_TILE_EMOJI = {
   [ONLINE_V2_GAME_IDS.LUDO]: "🎲",
+  [ONLINE_V2_GAME_IDS.SNAKES_LADDERS]: "🐍",
   [ONLINE_V2_GAME_IDS.RUMMY51]: "🃏",
   [ONLINE_V2_GAME_IDS.BINGO]: "🎱",
   [ONLINE_V2_GAME_IDS.BACKGAMMON]: "🏛️",

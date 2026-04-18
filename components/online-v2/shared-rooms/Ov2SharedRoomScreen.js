@@ -11,6 +11,10 @@ import {
   fetchOv2LudoAuthoritativeSnapshot,
   requestOv2LudoOpenSession,
 } from "../../../lib/online-v2/ludo/ov2LudoSessionAdapter";
+import {
+  fetchOv2SnakesLaddersAuthoritativeSnapshot,
+  requestOv2SnakesLaddersOpenSession,
+} from "../../../lib/online-v2/snakes-ladders/ov2SnakesLaddersSessionAdapter";
 import { openOv2BingoSession, OV2_BINGO_PRODUCT_GAME_ID } from "../../../lib/online-v2/bingo/ov2BingoSessionAdapter";
 import { openOv2Rummy51Session, OV2_RUMMY51_PRODUCT_GAME_ID } from "../../../lib/online-v2/rummy51/ov2Rummy51SessionAdapter";
 import {
@@ -167,6 +171,7 @@ export default function Ov2SharedRoomScreen({
   const isColorClashRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.COLOR_CLASH;
   const isFleetHuntRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.FLEET_HUNT;
   const isGoalDuelRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.GOAL_DUEL;
+  const isSnakesLaddersRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.SNAKES_LADDERS;
   const isStakeSharedRoom =
     isRummy51Room ||
     isLudoRoom ||
@@ -180,7 +185,8 @@ export default function Ov2SharedRoomScreen({
     isMeldMatchRoom ||
     isColorClashRoom ||
     isFleetHuntRoom ||
-    isGoalDuelRoom;
+    isGoalDuelRoom ||
+    isSnakesLaddersRoom;
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
 
   const ledgerByParticipant = useMemo(() => {
@@ -423,6 +429,17 @@ export default function Ov2SharedRoomScreen({
           await router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
           return;
         }
+        if (isSnakesLaddersRoom) {
+          const open = await requestOv2SnakesLaddersOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-snakes-ladders?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
         if (isBingoRoom) {
           const open = await openOv2BingoSession(roomId, qmAuthorityHostPk);
           if (cancelled || !open?.ok) return;
@@ -564,6 +581,7 @@ export default function Ov2SharedRoomScreen({
     qmAuthorityHostPk,
     sharedStatusUpper,
     isLudoRoom,
+    isSnakesLaddersRoom,
     isBingoRoom,
     isRummy51Room,
     isBackgammonRoom,
@@ -893,6 +911,7 @@ export default function Ov2SharedRoomScreen({
     try {
       if (
         isLudoRoom ||
+        isSnakesLaddersRoom ||
         isBingoRoom ||
         isBackgammonRoom ||
         isCheckersRoom ||
@@ -927,6 +946,19 @@ export default function Ov2SharedRoomScreen({
         didRouteToLiveRef.current = true;
         setLaunchingLive(true);
         await router.push(`/ov2-ludo?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isSnakesLaddersRoom) {
+        const open = await requestOv2SnakesLaddersOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Snakes & Ladders session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-snakes-ladders?room=${encodeURIComponent(roomId)}`);
         return;
       }
       if (isBingoRoom) {
@@ -1536,6 +1568,28 @@ export default function Ov2SharedRoomScreen({
         cancelled = true;
       };
     }
+    if (isSnakesLaddersRoom) {
+      const slSid = room?.active_session_id || null;
+      if (slSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-snakes-ladders?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledSl = false;
+      void fetchOv2SnakesLaddersAuthoritativeSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledSl || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-snakes-ladders?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      return () => {
+        cancelledSl = true;
+      };
+    }
     if (isBackgammonRoom) {
       const bgSid = room?.active_session_id || null;
       if (bgSid) {
@@ -1560,6 +1614,7 @@ export default function Ov2SharedRoomScreen({
     }
   }, [
     isLudoRoom,
+    isSnakesLaddersRoom,
     isRummy51Room,
     isBingoRoom,
     isBackgammonRoom,
@@ -1776,6 +1831,7 @@ export default function Ov2SharedRoomScreen({
 
         {runtimeHandoff && !isRummy51Room ? (
           !isLudoRoom &&
+          !isSnakesLaddersRoom &&
           !isBingoRoom &&
           !isBackgammonRoom &&
           !isCheckersRoom &&
@@ -1797,6 +1853,7 @@ export default function Ov2SharedRoomScreen({
         ) : null}
         {sharedStatusUpper === "IN_GAME" &&
         (isRummy51Room ||
+          isSnakesLaddersRoom ||
           isBingoRoom ||
           isBackgammonRoom ||
           isCheckersRoom ||
@@ -1896,7 +1953,9 @@ export default function Ov2SharedRoomScreen({
           <p className="text-[11px] text-sky-300">
             {isRummy51Room
               ? "Opening live Rummy 51 game..."
-              : isBingoRoom
+              : isSnakesLaddersRoom
+                ? "Opening live Snakes & Ladders..."
+                : isBingoRoom
                 ? "Opening live Bingo..."
                 : isBackgammonRoom
                   ? "Opening live Backgammon..."
