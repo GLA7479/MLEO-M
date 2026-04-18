@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { initVaultShim } from "../lib/vaultShim";
 import { supabaseMP } from "../lib/supabaseClients";
 
-export default function Layout({ children, title }) {
+export default function Layout({ children, title, lockShellScroll = false }) {
   useEffect(() => {
     initVaultShim();
   }, []);
@@ -30,15 +30,16 @@ export default function Layout({ children, title }) {
     <>
       <Head>
         <title>{title || "MLEO App"}</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </Head>
 
       <div
-        className="app-shell relative w-full text-white overflow-x-hidden overflow-y-auto"
-        style={{
-          minHeight: "var(--app-100vh, 100svh)",
-          background: "#0b1220",
-        }}
+        className={
+          lockShellScroll
+            ? "app-shell relative h-[100dvh] max-h-[100dvh] min-h-0 w-full overflow-x-hidden overflow-y-hidden text-white"
+            : "app-shell relative min-h-[var(--app-100vh,100svh)] w-full overflow-x-hidden overflow-y-auto text-white"
+        }
+        style={lockShellScroll ? { background: "#0b1220" } : { minHeight: "var(--app-100vh, 100svh)", background: "#0b1220" }}
       >
         {children}
       </div>

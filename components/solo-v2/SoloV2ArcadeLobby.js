@@ -159,13 +159,13 @@ export default function SoloV2ArcadeLobby() {
   const vaultLabel = vaultReadable ? formatCompactNumber(vaultBalance) : "…";
 
   return (
-    <Layout title="MLEO — Arcade Solo V2">
+    <Layout title="MLEO — Arcade Solo V2" lockShellScroll>
       <main
-        className="relative text-white max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:overflow-hidden md:flex md:h-[100dvh] md:max-h-[100dvh] md:min-h-0 md:flex-col md:overflow-hidden"
+        className="relative flex h-full min-h-0 w-full max-w-none flex-col overflow-hidden text-white max-md:overscroll-none md:h-[100dvh] md:max-h-[100dvh]"
         style={{ background: ARCADE_SHELL_BG }}
       >
-        {/* Mobile shell — classes aligned with `pages/arcade.js` */}
-        <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col gap-1 overflow-hidden px-2 pb-[max(0.2rem,env(safe-area-inset-bottom))] pt-2 md:hidden">
+        {/* Mobile: single screen, no shell scroll — safe areas + overscroll for iOS */}
+        <div className="flex min-h-0 max-md:flex-1 flex-col gap-1 overflow-hidden overscroll-none px-2 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] [-webkit-touch-callout:none] md:hidden">
           <header className="flex-shrink-0 space-y-1.5 rounded-xl border border-white/20 bg-black/40 px-2.5 py-2 shadow-sm">
             <div className="flex items-center justify-between gap-2">
               <Link
@@ -275,7 +275,7 @@ export default function SoloV2ArcadeLobby() {
                   />
                 ))
               ) : (
-                <div className="col-span-3 row-span-3 min-h-0 overflow-auto rounded-md border border-white/10 bg-black/30 p-2">
+                <div className="col-span-3 row-span-3 min-h-0 overflow-hidden rounded-md border border-white/10 bg-black/30 p-2">
                   <SoloV2StatusPanel
                     status="unavailable"
                     details="Solo V2 feature flag is disabled. This lobby stays isolated from legacy arcade flows."
@@ -314,7 +314,7 @@ export default function SoloV2ArcadeLobby() {
         </div>
 
         {/* Desktop shell */}
-        <div className="mx-auto hidden min-h-0 w-full max-w-[72rem] flex-1 flex-col overflow-hidden px-3 pb-2 pt-1.5 md:flex">
+        <div className="mx-auto hidden min-h-0 w-full max-w-[72rem] flex-1 flex-col overflow-hidden px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 md:flex md:pt-[max(0.35rem,env(safe-area-inset-top))]">
           <div className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-white/10 pb-1.5">
             <div className="flex justify-start">
               <Link
