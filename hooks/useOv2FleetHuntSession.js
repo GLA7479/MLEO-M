@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useOv2UiPreviewOptional } from "../lib/online-v2/dev/Ov2UiPreviewContext";
 import {
   fetchOv2FleetHuntSnapshot,
   OV2_FLEET_HUNT_PRODUCT_GAME_ID,
@@ -23,8 +22,6 @@ import { ov2PreferNewerSnapshot } from "../lib/online-v2/ov2PreferNewerSnapshot"
 
 /** @param {null|undefined|{ room?: object, members?: unknown[], self?: { participant_key?: string } }} baseContext */
 export function useOv2FleetHuntSession(baseContext) {
-  const preview = useOv2UiPreviewOptional("fleethunt");
-  if (preview) return preview;
   const room = baseContext?.room && typeof baseContext.room === "object" ? baseContext.room : null;
   const roomId = room?.id != null ? String(room.id) : null;
   const roomProductId = room?.product_game_id != null ? String(room.product_game_id) : null;

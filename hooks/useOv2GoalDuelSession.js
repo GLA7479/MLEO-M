@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useOv2UiPreviewOptional } from "../lib/online-v2/dev/Ov2UiPreviewContext";
 import {
   fetchOv2GoalDuelSnapshot,
   OV2_GOAL_DUEL_PRODUCT_GAME_ID,
@@ -19,122 +18,11 @@ import { ov2PreferNewerSnapshot } from "../lib/online-v2/ov2PreferNewerSnapshot"
 
 /** @param {null|undefined|{ room?: object, members?: unknown[], self?: { participant_key?: string } }} baseContext */
 export function useOv2GoalDuelSession(baseContext) {
-  const preview = useOv2UiPreviewOptional("goalduel");
   const gdDebug =
     typeof process !== "undefined" &&
     process.env.NODE_ENV === "development" &&
     typeof window !== "undefined" &&
     window.localStorage?.getItem("ov2_gd_debug") === "1";
-
-  /** UI previews: real input ref + local physics so controls and canvas respond (no server). */
-  const previewInputRef = useRef({ l: false, r: false, j: false, k: false, jTap: false, kTap: false });
-  const previewSetInput = useCallback(partial => {
-    const c = previewInputRef.current;
-    if (partial.l !== undefined) c.l = partial.l;
-    if (partial.r !== undefined) c.r = partial.r;
-    if (partial.j !== undefined) c.j = partial.j;
-    if (partial.k !== undefined) c.k = partial.k;
-  }, []);
-  const previewLivePublicRef = useRef(/** @type {Record<string, unknown>|null} */ (null));
-  const previewVyRef = useRef(0);
-  const previewWasJRef = useRef(false);
-  const previewWasKRef = useRef(false);
-
-  useEffect(() => {
-    if (!preview) return undefined;
-    let raf = 0;
-    let last = typeof performance !== "undefined" ? performance.now() : Date.now();
-    const loop = t => {
-      const dt = Math.min(0.055, Math.max(0, (t - last) / 1000));
-      last = t;
-      const pub = previewLivePublicRef.current;
-      if (pub && typeof pub === "object") {
-        const mySeat = Number(preview.snapshot?.mySeat ?? 0);
-        const inp = previewInputRef.current;
-        /** Same as server `ov2_gd_sim_step`: l/r are world-x (screen left/right), both seats. */
-        const effL = inp.l;
-        const effR = inp.r;
-        const arena = /** @type {Record<string, unknown>} */ (pub.arena || {});
-        const aw = Number(arena.w ?? 800) || 800;
-        const gy = Number(arena.groundY ?? 360) || 360;
-        const gm = Number(arena.goalMargin ?? 48) || 48;
-        const key = mySeat === 0 ? "p0" : "p1";
-        const p = /** @type {Record<string, unknown>|undefined} */ (pub[key]);
-        if (p && typeof p === "object") {
-          const hw = Number(p.hw ?? 14) || 14;
-          const hh = Number(p.hh ?? 22) || 22;
-          const runSpeed = 260;
-          let vx = 0;
-          if (effL) vx -= runSpeed;
-          if (effR) vx += runSpeed;
-          const y0 = Number(p.y ?? gy - hh);
-          const feet = y0 + hh;
-          const onGround = feet >= gy - 2;
-          if (inp.j && !previewWasJRef.current && onGround) {
-            previewVyRef.current = -420;
-          }
-          previewWasJRef.current = Boolean(inp.j);
-          previewVyRef.current += 980 * dt;
-          let y = y0 + previewVyRef.current * dt;
-          if (y + hh >= gy) {
-            y = gy - hh;
-            previewVyRef.current = 0;
-          }
-          p.y = y;
-          let x = Number(p.x ?? 400) + vx * dt;
-          const minX = hw;
-          const maxX = aw - hw;
-          p.x = Math.max(minX, Math.min(maxX, x));
-        }
-        const ball = /** @type {Record<string, unknown>|undefined} */ (pub.ball);
-        if (ball && typeof ball === "object") {
-          const kDown = Boolean(inp.k);
-          if (kDown && !previewWasKRef.current) {
-            const dir = mySeat === 0 ? 1 : -1;
-            const bx = Number(ball.x ?? 400);
-            const by = Number(ball.y ?? 220);
-            const toBallX = bx - (Number(p?.x) || 0);
-            const kickDir = Math.abs(toBallX) < 8 ? dir : Math.sign(toBallX) || dir;
-            ball.x = bx + kickDir * 6;
-            ball.y = by - 4;
-          }
-          previewWasKRef.current = kDown;
-        }
-      }
-      raf = window.requestAnimationFrame(loop);
-    };
-    raf = window.requestAnimationFrame(loop);
-    return () => {
-      window.cancelAnimationFrame(raf);
-      previewLivePublicRef.current = null;
-      previewVyRef.current = 0;
-      previewWasJRef.current = false;
-      previewWasKRef.current = false;
-    };
-  }, [preview]);
-
-  if (preview) {
-    if (!previewLivePublicRef.current) {
-      const src = preview.snapshot?.public;
-      try {
-        previewLivePublicRef.current =
-          src && typeof src === "object" ? structuredClone(/** @type {object} */ (src)) : {};
-      } catch {
-        previewLivePublicRef.current =
-          src && typeof src === "object" ? JSON.parse(JSON.stringify(src)) : {};
-      }
-    }
-    const pub = previewLivePublicRef.current;
-    return {
-      ...preview,
-      vm: { ...preview.vm, public: pub },
-      snapshot: { ...preview.snapshot, public: pub },
-      inputRef: previewInputRef,
-      setInput: previewSetInput,
-      flushInputNow: () => {},
-      isUiPreview: true,
-    };
-  }
 
   const room = baseContext?.room && typeof baseContext.room === "object" ? baseContext.room : null;
   const roomId = room?.id != null ? String(room.id) : null;

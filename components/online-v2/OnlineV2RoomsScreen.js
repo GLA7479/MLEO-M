@@ -9,7 +9,6 @@ import {
   ONLINE_V2_SHARED_LOBBY_GAMES,
   OV2_SHARED_LAST_ROOM_SESSION_KEY,
 } from "../../lib/online-v2/onlineV2GameRegistry";
-import { isOv2UiPreviewsEnabled } from "../../lib/online-v2/dev/ov2UiPreviewMocks";
 import { getOv2ParticipantId } from "../../lib/online-v2/ov2ParticipantId";
 import {
   OV2_SHARED_DISPLAY_NAME_KEY,
@@ -197,29 +196,7 @@ export default function OnlineV2RoomsScreen() {
               <h1 className="truncate text-sm font-extrabold tracking-tight text-white sm:text-base lg:text-lg xl:text-xl">
                 Shared rooms
               </h1>
-              <p className="mt-0.5 truncate text-[11px] text-zinc-300 md:hidden">Play with others</p>
-              <div className="mt-0.5 hidden min-w-0 items-center justify-center gap-2 md:flex">
-                <p className="truncate text-[11px] text-zinc-300 lg:text-xs xl:text-sm">Play with others</p>
-                {isOv2UiPreviewsEnabled() ? <span className="h-3 w-px bg-white/15" aria-hidden /> : null}
-                {isOv2UiPreviewsEnabled() ? (
-                  <Link
-                    href="/online-v2/game-ui-previews"
-                    className="truncate text-[10px] font-semibold text-amber-400/95 underline decoration-amber-500/35 underline-offset-2 lg:text-[11px]"
-                  >
-                    UI previews
-                  </Link>
-                ) : null}
-              </div>
-              {isOv2UiPreviewsEnabled() ? (
-                <div className="mt-0.5 md:hidden">
-                  <Link
-                    href="/online-v2/game-ui-previews"
-                    className="text-[9px] font-semibold text-amber-400/90 underline decoration-amber-500/30 underline-offset-1"
-                  >
-                    UI previews
-                  </Link>
-                </div>
-              ) : null}
+              <p className="mt-0.5 truncate text-[11px] text-zinc-300 lg:text-xs xl:text-sm">Play with others</p>
             </div>
             <OnlineV2VaultStrip />
           </header>

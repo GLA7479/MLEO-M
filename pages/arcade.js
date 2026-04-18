@@ -1017,17 +1017,14 @@ export default function ArcadeHub() {
             />
           </div>
 
-          {/* Bottom zone: footer actions */}
-          <footer className="mobile-arcade-footer flex-shrink-0 flex flex-col gap-1 pt-1 border-t border-white/20">
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
-              <Link
-                href="/mining"
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-[10px] font-bold text-white border border-emerald-400/40"
-              >
-                <span>⬅️</span>
-                <span>Back to Home</span>
-              </Link>
-            </div>
+          {/* Reserved fixed-height slot for mobile banner ads */}
+          <footer className="mobile-arcade-footer flex-shrink-0 flex flex-col gap-1 border-t border-white/20 pt-1">
+            <div
+              id="arcade-mobile-ad-slot"
+              data-ad-slot="arcade-mobile-footer"
+              className="mx-auto flex h-[50px] w-full shrink-0 items-center justify-center rounded-lg border border-dashed border-white/25 bg-black/25"
+              aria-label="Advertisement"
+            />
           </footer>
         </div>
 
@@ -1147,15 +1144,14 @@ export default function ArcadeHub() {
             </section>
           </div>
 
-          {/* Slim bottom row */}
-          <footer className="mt-1 flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/10 pt-2">
-            <Link
-              href="/mining"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/40 bg-emerald-600/90 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500"
-            >
-              <span>⬅️</span>
-              <span>Back to Main Games</span>
-            </Link>
+          {/* Reserved fixed-height slot for desktop banner ads (inject e.g. AdSense here) */}
+          <footer className="mt-1 flex shrink-0 flex-col items-stretch justify-center border-t border-white/10 pt-2">
+            <div
+              id="arcade-desktop-ad-slot"
+              data-ad-slot="arcade-desktop-footer"
+              className="mx-auto flex h-[90px] w-full max-w-[728px] shrink-0 items-center justify-center rounded-lg border border-dashed border-white/25 bg-black/25"
+              aria-label="Advertisement"
+            />
           </footer>
         </div>
       </main>

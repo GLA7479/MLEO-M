@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useOv2UiPreviewOptional } from "../lib/online-v2/dev/Ov2UiPreviewContext";
 import {
   fetchOv2ColorClashSnapshot,
   OV2_COLORCLASH_PRODUCT_GAME_ID,
@@ -62,8 +61,6 @@ function surgeUsedForMeFromSnapshot(snap) {
 
 /** @param {null|undefined|{ room?: object, members?: unknown[], self?: { participant_key?: string } }} baseContext */
 export function useOv2ColorClashSession(baseContext) {
-  const preview = useOv2UiPreviewOptional("colorclash");
-  if (preview) return preview;
   const room = baseContext?.room && typeof baseContext.room === "object" ? baseContext.room : null;
   const roomId = room?.id != null ? String(room.id) : null;
   const roomProductId = room?.product_game_id != null ? String(room.product_game_id) : null;
