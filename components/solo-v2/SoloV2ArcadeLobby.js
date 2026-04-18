@@ -93,7 +93,7 @@ export default function SoloV2ArcadeLobby() {
         key: g.key,
         title: g.title,
         emoji: g.emoji,
-        description: g.shortDescription,
+        description: g.aboutHint ?? g.shortDescription,
         reward: g.rewardHint,
         href: g.route,
         color: g.accent,
