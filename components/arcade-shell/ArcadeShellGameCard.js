@@ -24,6 +24,30 @@ const DEFAULT_SESSION_COST = "Varies by game";
 const DEFAULT_HOW_TO_PLAY =
   "Tap PLAY to open the game, read the on-board rules, and start a Solo V2 session. Stakes and payouts are defined inside each game.";
 
+const DEFAULT_REWARD_MODAL = "pays about ×1.92";
+
+/** Session Cost modal: row1 label + row2 numbers (aligned with reward column). */
+function parseModalSessionLines(sessionCostText) {
+  const raw = String(sessionCostText ?? "").trim();
+  if (!raw) return { line1: "Minimum", line2: "25 coins." };
+  const parts = raw.split(/\n/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) return { line1: parts[0], line2: parts.slice(1).join(" ") };
+  if (/^minimum\b/i.test(raw)) {
+    const rest = raw.replace(/^minimum\s*/i, "").trim();
+    return { line1: "Minimum", line2: rest || "25 coins." };
+  }
+  return { line1: "", line2: raw };
+}
+
+/** Top Reward modal: "pays about" and "×…" on separate rows (aligned with session column). */
+function parseModalRewardLines(rewardText) {
+  const raw = String(rewardText ?? "").trim();
+  if (!raw) return { line1: "pays about", line2: "×1.92" };
+  const m = raw.match(/^(pays about)\s*(×.+)$/i);
+  if (m) return { line1: m[1], line2: m[2].trim() };
+  return { line1: "", line2: raw };
+}
+
 /**
  * Presentation-only game tile (markup/classes aligned with `pages/arcade.js` GameCard).
  * Copy is supplied by the Solo V2 lobby mapper — no legacy arcade imports.
@@ -42,6 +66,9 @@ export default function ArcadeShellGameCard({
   howToPlayText = DEFAULT_HOW_TO_PLAY,
 }) {
   const [showInfo, setShowInfo] = useState(false);
+  const sessionModal = parseModalSessionLines(sessionCostText);
+  const rewardStr = typeof reward === "string" ? reward.trim() : "";
+  const rewardModal = parseModalRewardLines(rewardStr || DEFAULT_REWARD_MODAL);
 
   return (
     <>
@@ -235,13 +262,17 @@ export default function ArcadeShellGameCard({
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-center">
                 <div className="mb-1 text-sm opacity-70">Session Cost</div>
-                <div className="whitespace-pre-line text-xl font-bold leading-tight text-amber-400">
-                  {sessionCostText}
+                <div className="space-y-0.5 text-xl font-bold leading-tight text-amber-400">
+                  <div>{sessionModal.line1 || "\u00A0"}</div>
+                  <div>{sessionModal.line2}</div>
                 </div>
               </div>
               <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-center">
                 <div className="mb-1 text-sm opacity-70">Top Reward Tier</div>
-                <div className="text-xl font-bold text-green-400">{reward || "pays about ×1.92"}</div>
+                <div className="space-y-0.5 text-xl font-bold leading-tight text-green-400">
+                  <div>{rewardModal.line1 || "\u00A0"}</div>
+                  <div>{rewardModal.line2}</div>
+                </div>
               </div>
             </div>
             <div>
