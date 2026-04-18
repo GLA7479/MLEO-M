@@ -78,16 +78,16 @@ export default function ArcadeShellGameCard({
 
         {lobby ? (
           <>
-            <div className="pointer-events-none shrink-0 select-none pb-1 pt-1 text-center text-4xl leading-none lg:text-5xl xl:text-[3.35rem]">
+            <div className="pointer-events-none shrink-0 select-none pb-0.5 pt-0.5 text-center text-3xl leading-none lg:text-4xl">
               {emoji}
             </div>
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-center">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-center">
               {comingSoon ? (
-                <h2 className="line-clamp-2 text-sm font-extrabold leading-snug text-amber-300 lg:text-base">
+                <h2 className="line-clamp-2 text-base font-extrabold leading-snug text-amber-300 lg:text-lg">
                   COMING SOON
                 </h2>
               ) : (
-                <h2 className="line-clamp-2 text-sm font-extrabold leading-snug lg:text-base">{title}</h2>
+                <h2 className="line-clamp-2 text-base font-extrabold leading-snug lg:text-lg">{title}</h2>
               )}
               {!comingSoon && reward ? (
                 <p
@@ -126,9 +126,9 @@ export default function ArcadeShellGameCard({
         ) : compact ? (
           <>
             <div className="flex h-full min-h-0 flex-col px-1 pb-1 pl-1 pr-2.5 pt-1.5">
-              <div className="mt-1 flex shrink-0 justify-center leading-none">
+              <div className="mt-0.5 flex shrink-0 justify-center leading-none">
                 <span
-                  className="inline-block translate-y-0.5 select-none text-[2.9rem] leading-none sm:text-[3.1rem]"
+                  className="inline-block translate-y-0.5 select-none text-[2.35rem] leading-none sm:text-[2.5rem]"
                   aria-hidden
                 >
                   {arcadeShellCompactCardEmoji(emoji)}
@@ -136,11 +136,11 @@ export default function ArcadeShellGameCard({
               </div>
               <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-0 px-0.5 text-center">
                 {comingSoon ? (
-                  <h2 className="line-clamp-2 text-[11px] font-bold leading-tight text-amber-300">
+                  <h2 className="line-clamp-2 text-[13px] font-extrabold leading-tight text-amber-300 sm:text-[14px]">
                     COMING SOON
                   </h2>
                 ) : (
-                  <h2 className="line-clamp-2 text-[11px] font-bold leading-tight">{title}</h2>
+                  <h2 className="line-clamp-2 text-[13px] font-extrabold leading-tight sm:text-[14px]">{title}</h2>
                 )}
                 {reward ? (
                   <p
@@ -179,19 +179,19 @@ export default function ArcadeShellGameCard({
           </>
         ) : (
           <>
-            <div className="absolute left-0 right-0 text-center" style={{ top: "18px" }}>
-              <div className="text-[2.75rem] leading-none">{emoji}</div>
+            <div className="absolute left-0 right-0 text-center" style={{ top: "12px" }}>
+              <div className="text-[2.4rem] leading-none">{emoji}</div>
             </div>
             <div
               className="absolute left-0 right-0 flex items-center justify-center px-3 text-center"
-              style={{ top: "86px", height: "52px" }}
+              style={{ top: "72px", height: "56px" }}
             >
               {comingSoon ? (
-                <h2 className="line-clamp-2 text-[15px] font-bold leading-snug text-amber-300">
+                <h2 className="line-clamp-2 text-[17px] font-extrabold leading-snug text-amber-300">
                   COMING SOON
                 </h2>
               ) : (
-                <h2 className="line-clamp-2 text-[15px] font-bold leading-snug">{title}</h2>
+                <h2 className="line-clamp-2 text-[17px] font-extrabold leading-snug">{title}</h2>
               )}
             </div>
             <div className="absolute bottom-[14px] left-4 right-4">
@@ -224,8 +224,8 @@ export default function ArcadeShellGameCard({
       {showInfo && (
         <ArcadeShellModal open={showInfo} onClose={() => setShowInfo(false)}>
           <div className="mb-4 text-center">
-            <div className="mb-3 text-6xl">{emoji}</div>
-            <h2 className="mb-2 text-2xl font-bold">{title}</h2>
+            <div className="mb-2 text-5xl leading-none">{emoji}</div>
+            <h2 className="mb-2 text-3xl font-extrabold leading-tight">{title}</h2>
           </div>
           <div className="space-y-4">
             <div>
@@ -239,7 +239,7 @@ export default function ArcadeShellGameCard({
               </div>
               <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-center">
                 <div className="mb-1 text-sm opacity-70">Top Reward Tier</div>
-                <div className="text-xl font-bold text-green-400">{reward || "Solo V2"}</div>
+                <div className="text-xl font-bold text-green-400">{reward || "pays about ×1.92"}</div>
               </div>
             </div>
             <div>
