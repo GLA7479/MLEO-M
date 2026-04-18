@@ -12,6 +12,7 @@ import { QUICK_FLIP_CONFIG } from "../lib/solo-v2/quickFlipConfig";
 import { ECHO_SEQUENCE_MIN_WAGER } from "../lib/solo-v2/echoSequenceConfig";
 import { applyEchoSequenceSettlementOnce, readQuickFlipSharedVaultBalance, subscribeQuickFlipSharedVault } from "../lib/solo-v2/quickFlipLocalVault";
 import { SOLO_V2_API_RESULT, buildSoloV2ApiErrorMessage, classifySoloV2ApiResult, isSoloV2EventRejectedStaleSessionMessage } from "../lib/solo-v2/soloV2ApiResult";
+import { navigateBackToArcadeV2 } from "../lib/solo-v2/arcadeV2LobbyMobileTab";
 
 const GAME_KEY = "echo_sequence";
 const PLAYER_HEADER = "echo-sequence-client";
@@ -443,7 +444,7 @@ export default function EchoSequencePage() {
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
       hideActionBar
-      onBack={() => { if (typeof window !== "undefined") window.location.href = "/arcade-v2"; }}
+      onBack={navigateBackToArcadeV2}
       topGameStatsSlot={<><span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500"><span>Play</span><span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(play)}</span></span><span className="shrink-0 text-zinc-600" aria-hidden>·</span><span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500"><span>Win</span><span className="font-semibold tabular-nums text-lime-200/90">{formatCompact(win)}</span></span></>}
       soloV2Footer={{
         betPresets: BET_PRESETS,

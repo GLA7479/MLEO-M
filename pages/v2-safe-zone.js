@@ -11,6 +11,7 @@ import { QUICK_FLIP_CONFIG, QUICK_FLIP_MIN_WAGER } from "../lib/solo-v2/quickFli
 import { SAFE_ZONE_MIN_SECURED_MS, SAFE_ZONE_TIER_MS, safeZoneMultiplierForSecuredMs } from "../lib/solo-v2/safeZoneConfig";
 import { applySafeZoneSettlementOnce, readQuickFlipSharedVaultBalance, subscribeQuickFlipSharedVault } from "../lib/solo-v2/quickFlipLocalVault";
 import { SOLO_V2_API_RESULT, buildSoloV2ApiErrorMessage, classifySoloV2ApiResult } from "../lib/solo-v2/soloV2ApiResult";
+import { navigateBackToArcadeV2 } from "../lib/solo-v2/arcadeV2LobbyMobileTab";
 
 const GAME_KEY = "safe_zone";
 const PLAYER_HEADER = "v2-safe-zone-client";
@@ -539,7 +540,7 @@ export default function SafeZonePage() {
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
       hideActionBar
-      onBack={() => { if (typeof window !== "undefined") window.location.href = "/arcade-v2"; }}
+      onBack={navigateBackToArcadeV2}
       topGameStatsSlot={
         <>
           <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500"><span>Play</span><span className="font-semibold tabular-nums text-emerald-200/90">{formatCompact(summaryPlay)}</span></span>

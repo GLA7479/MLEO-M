@@ -32,6 +32,7 @@ import {
   classifySoloV2ApiResult,
   isSoloV2EventRejectedStaleSessionMessage,
 } from "../lib/solo-v2/soloV2ApiResult";
+import { navigateBackToArcadeV2 } from "../lib/solo-v2/arcadeV2LobbyMobileTab";
 
 const GAME_KEY = "diamonds";
 const PLAYER_HEADER = "v2-diamonds-client";
@@ -962,9 +963,7 @@ export default function V2DiamondsPage() {
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
       hideActionBar
-      onBack={() => {
-        if (typeof window !== "undefined") window.location.href = "/arcade-v2";
-      }}
+      onBack={navigateBackToArcadeV2}
       topGameStatsSlot={
         <>
           <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">

@@ -235,7 +235,9 @@ export default function ArcadeShellGameCard({
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-center">
                 <div className="mb-1 text-sm opacity-70">Session Cost</div>
-                <div className="text-xl font-bold text-amber-400">{sessionCostText}</div>
+                <div className="whitespace-pre-line text-xl font-bold leading-tight text-amber-400">
+                  {sessionCostText}
+                </div>
               </div>
               <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-center">
                 <div className="mb-1 text-sm opacity-70">Top Reward Tier</div>

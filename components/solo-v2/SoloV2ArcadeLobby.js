@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Layout from "../Layout";
 import ArcadeShellGameCard from "../arcade-shell/ArcadeShellGameCard";
@@ -11,6 +11,11 @@ import {
   ARCADE_SHELL_SWIPE_INTENT_RATIO,
   ARCADE_SHELL_SWIPE_THRESHOLD_PX,
 } from "../arcade-shell/ArcadeShellConstants";
+import {
+  readArcadeV2MobileLobbyGroup,
+  saveArcadeV2MobileLobbyGroup,
+  shouldPersistArcadeV2MobileLobbyGroup,
+} from "../../lib/solo-v2/arcadeV2LobbyMobileTab";
 import { isSoloV2Enabled } from "../../lib/solo-v2/featureFlags";
 import { formatCompactNumber } from "../../lib/solo-v2/formatCompactNumber";
 import { formatMsAsMmSs } from "../../lib/solo-v2/formatMsAsMmSs";
@@ -41,6 +46,25 @@ export default function SoloV2ArcadeLobby() {
   const [giftTick, setGiftTick] = useState(0);
 
   const touchStartRef = useRef({ x: 0, y: 0, active: false, blocked: false });
+  const skipNextMobileTabPersist = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!shouldPersistArcadeV2MobileLobbyGroup()) return;
+    const saved = readArcadeV2MobileLobbyGroup();
+    if (saved != null) {
+      skipNextMobileTabPersist.current = true;
+      setMobileGroupIndex(Math.max(0, Math.min(MAX_GROUP_INDEX, saved)));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!shouldPersistArcadeV2MobileLobbyGroup()) return;
+    if (skipNextMobileTabPersist.current) {
+      skipNextMobileTabPersist.current = false;
+      return;
+    }
+    saveArcadeV2MobileLobbyGroup(mobileGroupIndex);
+  }, [mobileGroupIndex]);
 
   const refreshVault = useCallback(async () => {
     const result = await readQuickFlipSharedVaultBalance();

@@ -31,6 +31,7 @@ import {
   classifySoloV2ApiResult,
   isSoloV2EventRejectedStaleSessionMessage,
 } from "../lib/solo-v2/soloV2ApiResult";
+import { navigateBackToArcadeV2 } from "../lib/solo-v2/arcadeV2LobbyMobileTab";
 
 const GAME_KEY = "vault_doors";
 const PLAYER_HEADER = "vault-doors-client";
@@ -1047,9 +1048,7 @@ export default function VaultDoorsPage() {
       gift={{ ...giftShell, onGiftClick: handleGiftPlay }}
       hideStatusPanel
       hideActionBar
-      onBack={() => {
-        if (typeof window !== "undefined") window.location.href = "/arcade-v2";
-      }}
+      onBack={navigateBackToArcadeV2}
       topGameStatsSlot={
         <>
           <span className="inline-flex shrink-0 items-baseline gap-0.5 whitespace-nowrap text-zinc-500">
