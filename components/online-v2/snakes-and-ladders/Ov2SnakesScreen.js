@@ -445,15 +445,15 @@ function Ov2SnakesEdgeOverlay({ edges }) {
   );
 }
 
-/** Compact 1–6 pip readout (visual only). Fixed outer size so turn / canRoll toggles do not shift HUD layout. */
+/** 1–6 pip readout (visual only). Outer box h-9 w-9 matches HUD pawn tiles. */
 function Ov2SnakesDiceFace({ value, emphasized }) {
   const n = value != null && Number.isFinite(Number(value)) ? Math.floor(Number(value)) : null;
   const active = n != null && n >= 1 && n <= 6;
   const pipCls =
     "block h-1.5 w-1.5 rounded-[1px] bg-zinc-100 shadow-[inset_0_-1px_1px_rgba(0,0,0,0.45)] sm:h-[7px] sm:w-[7px]";
   const grid = emphasized
-    ? "grid h-9 w-9 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-md border border-amber-400/50 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1 shadow-[0_0_12px_rgba(251,191,36,0.22)] sm:h-10 sm:w-10 sm:rounded-lg sm:p-1.5"
-    : "grid h-9 w-9 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-md border border-white/15 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1 sm:h-10 sm:w-10 sm:rounded-lg sm:p-1.5";
+    ? "grid h-9 w-9 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-md border border-amber-400/50 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1 shadow-[0_0_12px_rgba(251,191,36,0.22)] sm:h-9 sm:w-9 sm:rounded-md sm:p-1"
+    : "grid h-9 w-9 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-md border border-white/15 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1 sm:h-9 sm:w-9 sm:rounded-md sm:p-1";
   const patterns = {
     1: [null, null, null, null, "c", null, null, null, null],
     2: ["c", null, null, null, null, null, null, null, "c"],
@@ -470,6 +470,38 @@ function Ov2SnakesDiceFace({ value, emphasized }) {
           {cell ? <span className={pipCls} /> : null}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Single HUD seat: pawn tile h-9 w-9 (same outer size as `Ov2SnakesDiceFace`) + tiny name/pos. */
+function Ov2SnakesHudSeatChip({ si, memberBySeat, positions, turnSeat, pk }) {
+  const m = memberBySeat.get(si);
+  const posRaw = positions[String(si)] ?? positions[si];
+  const pos = posRaw != null ? Number(posRaw) : null;
+  const occupied = Boolean(m) || Number.isFinite(pos);
+  const isTurn = turnSeat === si;
+  const rawName = m?.display_name != null ? String(m.display_name).trim() : "";
+  const label = rawName || (occupied ? `Seat ${si}` : "");
+  if (!occupied) {
+    return <div className="h-9 w-[4.25rem] shrink-0 sm:w-[4.5rem]" aria-hidden />;
+  }
+  const isYou = pk && m?.participant_key && String(m.participant_key) === pk;
+  const nameLine = isYou ? `${label || `Seat ${si}`} (you)` : label;
+  return (
+    <div
+      className={`flex h-9 max-w-[5.75rem] shrink-0 items-center gap-0.5 rounded-md bg-black/35 py-0.5 pl-0.5 pr-1 ring-2 ring-inset sm:max-w-[6.25rem] ${
+        isTurn ? SEAT_TURN_RING[si] ?? "ring-amber-300/80" : "ring-transparent"
+      }`}
+      title={m?.display_name || `Seat ${si}`}
+    >
+      <img src={ludoPawnSrc(si)} alt="" className="h-9 w-9 shrink-0 object-contain" draggable={false} />
+      <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
+        <span className="truncate text-[7px] font-medium text-zinc-200 sm:text-[8px]">{nameLine}</span>
+        <span className="font-mono text-[8px] tabular-nums text-zinc-300 sm:text-[9px]">
+          {Number.isFinite(pos) ? pos : "—"}
+        </span>
+      </div>
     </div>
   );
 }
@@ -545,7 +577,6 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
     winnerSeat != null && memberBySeat.has(winnerSeat) ? String(memberBySeat.get(winnerSeat)?.participant_key || "") : "";
 
   const turnSeat = snap?.turnSeat != null ? snap.turnSeat : null;
-  const mySeat = snap?.mySeat != null ? snap.mySeat : null;
   const lastRoll = snap?.lastRoll != null ? snap.lastRoll : null;
 
   const boardCells = useMemo(() => {
@@ -650,47 +681,30 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-visible px-0.5 pb-0.5 pt-0.5 sm:gap-1 sm:px-1">
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 rounded-md border border-white/[0.07] bg-zinc-950/55 px-1 py-0.5 sm:px-1.5">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[8px] text-zinc-300 sm:text-[9px]">
-            <span className="shrink-0 text-zinc-500">Turn</span>
-            <span className="font-mono font-semibold text-zinc-50">{turnSeat != null ? turnSeat : "—"}</span>
-            {mySeat != null ? (
-              <>
-                <span className="text-zinc-600">·</span>
-                <span className="text-zinc-500">You</span>
-                <span className="font-mono font-semibold text-zinc-50">{mySeat}</span>
-              </>
-            ) : null}
-            <span className="text-zinc-600">·</span>
-            <span className="text-zinc-500">Last</span>
+        <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-1 gap-y-0.5 rounded-md border border-white/[0.07] bg-zinc-950/55 px-1 py-0.5 sm:gap-x-1.5 sm:px-1.5">
+          {[0, 1].map(si => (
+            <Ov2SnakesHudSeatChip
+              key={`hud-seat-${si}`}
+              si={si}
+              memberBySeat={memberBySeat}
+              positions={positions}
+              turnSeat={turnSeat}
+              pk={pk}
+            />
+          ))}
+          <div className="flex h-9 shrink-0 items-center px-0.5">
             <Ov2SnakesDiceFace value={lastRoll} emphasized={Boolean(snap?.canRoll)} />
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-            {[0, 1, 2, 3].map(si => {
-              const m = memberBySeat.get(si);
-              const posRaw = positions[String(si)] ?? positions[si];
-              const pos = posRaw != null ? Number(posRaw) : null;
-              if (!m && !Number.isFinite(pos)) return null;
-              const isTurn = turnSeat === si;
-              return (
-                <div
-                  key={`hud-seat-${si}`}
-                  className={`flex items-center gap-0.5 rounded-full bg-black/35 pl-0.5 pr-0.5 ring-2 ring-inset sm:pr-1 ${
-                    isTurn ? SEAT_TURN_RING[si] ?? "ring-amber-300/80" : "ring-transparent"
-                  }`}
-                  title={m?.display_name || `Seat ${si}`}
-                >
-                  <img
-                    src={ludoPawnSrc(si)}
-                    alt=""
-                    className="h-4 w-4 shrink-0 object-contain sm:h-5 sm:w-5"
-                    draggable={false}
-                  />
-                  <span className="font-mono text-[8px] text-zinc-200 sm:text-[9px]">{Number.isFinite(pos) ? pos : "—"}</span>
-                </div>
-              );
-            })}
-          </div>
+          {[2, 3].map(si => (
+            <Ov2SnakesHudSeatChip
+              key={`hud-seat-${si}`}
+              si={si}
+              memberBySeat={memberBySeat}
+              positions={positions}
+              turnSeat={turnSeat}
+              pk={pk}
+            />
+          ))}
         </div>
 
         <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-visible p-0.5 max-sm:items-stretch max-sm:justify-center">
