@@ -17,6 +17,11 @@ import {
   ov2SnakesClassifyEdge,
 } from "../lib/online-v2/snakes-and-ladders/ov2SnakesBoardEdges";
 
+/** Hold on ladder foot / snake head before showing the slide endpoint (ms). */
+const OV2_SNAKES_EDGE_HOLD_MS = 980;
+/** Keep pawn on final cell after edge before clearing motion overlay (ms). */
+const OV2_SNAKES_EDGE_LAND_MS = 1200;
+
 /** @param {any} snap */
 function readSeatPos(snap, seat) {
   const b = snap?.board?.positions;
@@ -83,14 +88,12 @@ export function useOv2SnakesSession(baseContext) {
     const m = pawnStepMotion;
     if (!m || m.stage !== 1) return undefined;
     const key = m.key;
-    const PHASE1_MS = 340;
-    const TOTAL_MS = 720;
     const t1 = window.setTimeout(() => {
       setPawnStepMotion(cur => (cur && cur.key === key ? { ...cur, stage: 2 } : cur));
-    }, PHASE1_MS);
+    }, OV2_SNAKES_EDGE_HOLD_MS);
     const t2 = window.setTimeout(() => {
       setPawnStepMotion(cur => (cur && cur.key === key ? null : cur));
-    }, TOTAL_MS);
+    }, OV2_SNAKES_EDGE_HOLD_MS + OV2_SNAKES_EDGE_LAND_MS);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);

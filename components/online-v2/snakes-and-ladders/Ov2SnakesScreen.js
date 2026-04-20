@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useId, useMemo } from "react";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { useOv2SnakesSession } from "../../../hooks/useOv2SnakesSession";
 
@@ -13,7 +13,7 @@ const SEAT_TURN_FILTER = [
   "drop-shadow(0 0 12px rgba(232,121,249,0.82)) drop-shadow(0 0 3px rgba(232,121,249,0.55))",
 ];
 
-/** HUD seat chips still use thin inset rings (unchanged pattern). */
+/** HUD seat chips: always `ring-2` width; color vs transparent so turn changes do not shift layout. */
 const SEAT_TURN_RING = ["ring-sky-400/90", "ring-amber-400/90", "ring-emerald-400/90", "ring-fuchsia-400/90"];
 
 /** Center of cell `n` in unified 0–100 viewBox space (matches `cellNumberAt` serpentine layout). */
@@ -447,7 +447,7 @@ function Ov2SnakesEdgeOverlay({ edges }) {
   );
 }
 
-/** Compact 1–6 pip readout (visual only). */
+/** Compact 1–6 pip readout (visual only). Fixed outer size so turn / canRoll toggles do not shift HUD layout. */
 function Ov2SnakesDiceFace({ value, emphasized }) {
   const n = value != null && Number.isFinite(Number(value)) ? Math.floor(Number(value)) : null;
   const active = n != null && n >= 1 && n <= 6;
@@ -455,7 +455,7 @@ function Ov2SnakesDiceFace({ value, emphasized }) {
     "block h-1.5 w-1.5 rounded-[1px] bg-zinc-100 shadow-[inset_0_-1px_1px_rgba(0,0,0,0.45)] sm:h-2 sm:w-2";
   const grid = emphasized
     ? "grid h-11 w-11 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-lg border border-amber-400/50 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1.5 shadow-[0_0_16px_rgba(251,191,36,0.25)] sm:h-12 sm:w-12"
-    : "grid h-9 w-9 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-md border border-white/15 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1 sm:h-10 sm:w-10";
+    : "grid h-11 w-11 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-lg border border-white/15 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1.5 sm:h-12 sm:w-12";
   const patterns = {
     1: [null, null, null, null, "c", null, null, null, null],
     2: ["c", null, null, null, null, null, null, null, "c"],
@@ -480,19 +480,17 @@ function PawnWithTurnRing({ seat, turnSeat, dense, edgeHang }) {
   const isTurn = turnSeat === seat;
   const filt = SEAT_TURN_FILTER[seat] ?? SEAT_TURN_FILTER[1];
   const idle = "drop-shadow(0 2px 4px rgba(0,0,0,0.72))";
-  const scIdle = dense ? "scale-[1.08]" : "scale-[1.12]";
-  const scTurn = dense ? "scale-[1.14]" : "scale-[1.18]";
+  const sc = dense ? "scale-[1.09]" : "scale-[1.12]";
+  const hangFilter = edgeHang ? "brightness(1.06) saturate(1.08)" : "";
+  const combinedFilter = [isTurn ? filt : idle, hangFilter].filter(Boolean).join(" ");
   return (
-    <span
-      className={`relative flex h-full w-full max-h-full max-w-full items-center justify-center ${edgeHang ? "animate-ov2-snakes-edge-hang" : ""}`}
-      style={{ filter: isTurn ? filt : idle }}
-    >
+    <span className="relative flex h-full w-full max-h-full max-w-full items-center justify-center" style={{ filter: combinedFilter || idle }}>
       <img
         src={ludoPawnSrc(seat)}
         alt=""
         title={`Seat ${seat}`}
         draggable={false}
-        className={`m-auto block h-full w-full max-h-full max-w-full origin-center object-contain ${isTurn ? scTurn : scIdle}`}
+        className={`m-auto block h-full w-full max-h-full max-w-full origin-center object-contain ${sc}`}
       />
     </span>
   );
@@ -511,23 +509,6 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
   const onLeaveToLobby = typeof contextInput?.onLeaveToLobby === "function" ? contextInput.onLeaveToLobby : null;
   const leaveToLobbyBusy = Boolean(contextInput?.leaveToLobbyBusy);
-
-  const boardFitRef = useRef(null);
-  const [boardSide, setBoardSide] = useState(260);
-
-  useLayoutEffect(() => {
-    const el = boardFitRef.current;
-    if (!el) return undefined;
-    const measure = () => {
-      const r = el.getBoundingClientRect();
-      const s = Math.max(168, Math.floor(Math.min(r.width, r.height) - 1));
-      setBoardSide(s);
-    };
-    measure();
-    const ro = new ResizeObserver(() => measure());
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   const memberBySeat = useMemo(() => {
     /** @type {Map<number, { participant_key?: string, display_name?: string }>} */
@@ -730,8 +711,8 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
               return (
                 <div
                   key={`hud-seat-${si}`}
-                  className={`flex items-center gap-0.5 rounded-full bg-black/35 pl-0.5 pr-1 ring-inset ${
-                    isTurn ? `ring-2 ${SEAT_TURN_RING[si] ?? "ring-amber-300/80"}` : "ring-1 ring-white/10"
+                  className={`flex items-center gap-0.5 rounded-full bg-black/35 pl-0.5 pr-1 ring-2 ring-inset ${
+                    isTurn ? SEAT_TURN_RING[si] ?? "ring-amber-300/80" : "ring-transparent"
                   }`}
                   title={m?.display_name || `Seat ${si}`}
                 >
@@ -745,27 +726,28 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
                 </div>
               );
             })}
-            {!finished && snap?.canRoll ? (
-              <button
-                type="button"
-                disabled={rollBusy}
-                onClick={() => void roll()}
-                className="ml-0.5 rounded-md border border-emerald-500/45 bg-emerald-900/50 px-2 py-0.5 text-[9px] font-bold text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] disabled:opacity-45 sm:text-[10px]"
-              >
-                {rollBusy ? "…" : "Roll"}
-              </button>
-            ) : !finished && snap ? (
-              <span className="text-[9px] text-zinc-500 sm:text-[10px]">Wait…</span>
-            ) : !snap ? (
-              <span className="text-[9px] text-zinc-500 sm:text-[10px]">Load…</span>
-            ) : null}
+            <div className="ml-0.5 flex h-7 min-w-[3.25rem] items-center justify-center sm:h-8 sm:min-w-[3.5rem]">
+              {!finished && snap?.canRoll ? (
+                <button
+                  type="button"
+                  disabled={rollBusy}
+                  onClick={() => void roll()}
+                  className="rounded-md border border-emerald-500/45 bg-emerald-900/50 px-2 py-0.5 text-[9px] font-bold text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] disabled:opacity-45 sm:text-[10px]"
+                >
+                  {rollBusy ? "…" : "Roll"}
+                </button>
+              ) : !finished && snap ? (
+                <span className="inline-flex w-full justify-center text-[9px] tabular-nums text-zinc-500 sm:text-[10px]">Wait…</span>
+              ) : !snap ? (
+                <span className="inline-flex w-full justify-center text-[9px] tabular-nums text-zinc-500 sm:text-[10px]">Load…</span>
+              ) : null}
+            </div>
           </div>
         </div>
 
-        <div ref={boardFitRef} className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-visible">
+        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-visible p-0.5">
           <div
-            className="relative overflow-visible rounded-xl border border-amber-800/50 bg-gradient-to-br from-amber-950/62 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_16px_48px_rgba(0,0,0,0.52)] ring-2 ring-amber-700/28"
-            style={{ width: boardSide, height: boardSide }}
+            className="relative isolate aspect-square h-full max-h-full min-h-[168px] w-auto max-w-full min-w-0 overflow-visible rounded-xl border border-amber-800/50 bg-gradient-to-br from-amber-950/62 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_16px_48px_rgba(0,0,0,0.52)] ring-2 ring-amber-700/28"
           >
             {/* Cell fills under SVG so paths read through semi-transparent tiles. */}
             <div className="pointer-events-none absolute inset-0 z-[1] grid h-full w-full grid-cols-10 grid-rows-10 gap-px bg-zinc-950/85 p-px">
@@ -781,19 +763,18 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
               {boardCells.map(c => (
                 <div
                   key={c.key}
-                  className={`relative flex min-h-0 min-w-0 overflow-visible rounded-sm bg-transparent text-[6px] font-bold leading-none sm:text-[7px] ${
-                    c.edgePreBeat
-                      ? c.edgeKind === "snake"
-                        ? "ring-2 ring-rose-400/55 shadow-[0_0_14px_rgba(251,113,133,0.22)]"
-                        : "ring-2 ring-amber-300/60 shadow-[0_0_14px_rgba(251,191,129,0.25)]"
-                      : ""
-                  } ${
+                  className={[
+                    "relative flex min-h-0 min-w-0 overflow-visible rounded-sm bg-transparent text-[6px] font-bold leading-none sm:text-[7px]",
                     c.edgeLandFlash
                       ? c.edgeKind === "snake"
-                        ? "ring-2 ring-rose-300/45"
-                        : "ring-2 ring-lime-300/50"
-                      : ""
-                  }`}
+                        ? "ring-2 ring-rose-300/45 shadow-[0_0_12px_rgba(251,113,133,0.18)]"
+                        : "ring-2 ring-lime-300/50 shadow-[0_0_12px_rgba(190,242,100,0.2)]"
+                      : c.edgePreBeat
+                        ? c.edgeKind === "snake"
+                          ? "ring-2 ring-rose-400/55 shadow-[0_0_14px_rgba(251,113,133,0.22)]"
+                          : "ring-2 ring-amber-300/60 shadow-[0_0_14px_rgba(251,191,129,0.25)]"
+                        : "ring-0 ring-transparent shadow-none",
+                  ].join(" ")}
                 >
                   <span
                     className="pointer-events-none absolute right-0 top-0 z-[6] px-0.5 py-px pr-0.5 text-[8px] font-bold tabular-nums leading-none sm:text-[9px]"
