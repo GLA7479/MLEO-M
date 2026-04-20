@@ -660,22 +660,40 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
                                 : lt
                                   ? "bg-gradient-to-br from-lime-900/28 to-zinc-950/58"
                                   : "bg-zinc-950/50";
+                    const cellNumberStyle =
+                      isEnd
+                        ? {
+                            color: "rgb(192 132 252)",
+                            textShadow: "0 1px 3px rgb(12 4 28 / 0.92), 0 0 1px rgb(0 0 0 / 0.55)",
+                          }
+                        : isStart
+                          ? {
+                              color: "rgb(45 212 191)",
+                              textShadow: "0 1px 3px rgb(4 24 28 / 0.92), 0 0 1px rgb(0 0 0 / 0.5)",
+                            }
+                          : {
+                              color: "rgb(196 181 253)",
+                              textShadow: "0 1px 3px rgb(8 6 22 / 0.92), 0 0 1px rgb(0 0 0 / 0.5)",
+                            };
                     return (
                       <div
                         key={`c-${row}-${col}`}
                         className={`relative flex min-h-0 min-w-0 overflow-hidden rounded-sm border text-[6px] font-bold leading-none sm:text-[7px] ${
                           isEnd
-                            ? "border-emerald-500/45 text-emerald-100/95 [text-shadow:0_1px_2px_rgba(0,0,0,0.85)]"
+                            ? "border-emerald-500/45"
                             : isStart
-                              ? "border-sky-500/40 text-sky-100/95 [text-shadow:0_1px_2px_rgba(0,0,0,0.85)]"
-                              : "border-white/[0.06] text-zinc-400 [text-shadow:0_1px_2px_rgba(0,0,0,0.75)]"
+                              ? "border-sky-500/40"
+                              : "border-white/[0.06]"
                         } ${edgeBg}`}
                       >
-                        <span className="pointer-events-none absolute left-0 right-0 top-0 z-[4] flex h-[5px] items-center justify-center text-[4px] leading-none sm:h-[6px] sm:text-[5px]">
+                        <span
+                          className="pointer-events-none absolute right-0 top-0 z-[6] px-0.5 py-px pr-0.5 text-[8px] font-bold tabular-nums leading-none sm:text-[9px]"
+                          style={cellNumberStyle}
+                        >
                           {n}
                         </span>
                         {occupants.length > 0 ? (
-                          <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[5px] z-[3] flex items-center justify-center sm:top-[6px]">
+                          <div className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center">
                             {occupants.length === 1 ? (
                               <div className="flex h-full w-full min-h-0 min-w-0 items-center justify-center p-0">
                                 <PawnWithTurnRing seat={occupants[0]} turnSeat={turnSeat} />
