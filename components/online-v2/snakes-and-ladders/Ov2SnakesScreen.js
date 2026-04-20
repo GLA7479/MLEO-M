@@ -5,34 +5,6 @@ import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { useOv2SnakesSession } from "../../../hooks/useOv2SnakesSession";
 
-/** Display-only mirror of `public.ov2_snakes_board_edges()` (Appendix A). */
-const SNAKES_BOARD_EDGES = {
-  ladders: {
-    2: 15,
-    7: 28,
-    22: 43,
-    27: 55,
-    41: 63,
-    50: 69,
-    57: 76,
-    65: 82,
-    68: 90,
-    71: 91,
-  },
-  snakes: {
-    99: 80,
-    94: 70,
-    89: 52,
-    86: 53,
-    74: 35,
-    62: 19,
-    56: 40,
-    49: 12,
-    45: 23,
-    16: 6,
-  },
-};
-
 /** Turn highlight on board pawns: colored drop-shadow (no ring — maximizes piece area). */
 const SEAT_TURN_FILTER = [
   "drop-shadow(0 0 12px rgba(56,189,248,0.82)) drop-shadow(0 0 3px rgba(56,189,248,0.55))",
@@ -100,9 +72,30 @@ function ladderGeometry(fromN, toN) {
   };
 }
 
+function cubicBezierPoint(t, ax, ay, bx, by, cx, cy, dx, dy) {
+  const m = 1 - t;
+  const m2 = m * m;
+  const t2 = t * t;
+  return {
+    x: m2 * m * ax + 3 * m2 * t * bx + 3 * m * t2 * cx + t2 * t * dx,
+    y: m2 * m * ay + 3 * m2 * t * by + 3 * m * t2 * cy + t2 * t * dy,
+  };
+}
+
+function cubicBezierTangent(t, ax, ay, bx, by, cx, cy, dx, dy) {
+  const m = 1 - t;
+  const m2 = m * m;
+  const t2 = t * t;
+  return {
+    tx: 3 * m2 * (bx - ax) + 6 * m * t * (cx - bx) + 3 * t2 * (dx - cx),
+    ty: 3 * m2 * (by - ay) + 6 * m * t * (cy - by) + 3 * t2 * (dy - cy),
+  };
+}
+
+const SNAKE_RAIL_OFF = 0.34;
+
 /**
- * Cubic snake spine (head at fromN → tail at toN) + geometry for head marker.
- * @returns {{ d: string, hx: number, hy: number, tx: number; ty: number; tipX: number; tipY: number; bx1: number; by1: number; bx2: number; by2: number }}
+ * Cubic snake spine (head at fromN → tail at toN) + parallel “rails”, scales, head/tail angles.
  */
 function snakeSpineGeometry(fromN, toN) {
   const u1 = cellCenterUv(fromN).u;
@@ -120,48 +113,59 @@ function snakeSpineGeometry(fromN, toN) {
   const c2x = u1 + dx * 0.68 - nx * sag * 0.58;
   const c2y = v1 + dy * 0.68 - ny * sag * 0.58;
   const d = `M ${u1} ${v1} C ${c1x} ${c1y} ${c2x} ${c2y} ${u2} ${v2}`;
+  const ko = SNAKE_RAIL_OFF;
+  const u1L = u1 - nx * ko;
+  const v1L = v1 - ny * ko;
+  const c1xL = c1x - nx * ko;
+  const c1yL = c1y - ny * ko;
+  const c2xL = c2x - nx * ko;
+  const c2yL = c2y - ny * ko;
+  const u2L = u2 - nx * ko;
+  const v2L = v2 - ny * ko;
+  const dRailL = `M ${u1L} ${v1L} C ${c1xL} ${c1yL} ${c2xL} ${c2yL} ${u2L} ${v2L}`;
+  const u1R = u1 + nx * ko;
+  const v1R = v1 + ny * ko;
+  const c1xR = c1x + nx * ko;
+  const c1yR = c1y + ny * ko;
+  const c2xR = c2x + nx * ko;
+  const c2yR = c2y + ny * ko;
+  const u2R = u2 + nx * ko;
+  const v2R = v2 + ny * ko;
+  const dRailR = `M ${u1R} ${v1R} C ${c1xR} ${c1yR} ${c2xR} ${c2yR} ${u2R} ${v2R}`;
+
   const tux = c1x - u1;
   const tuy = c1y - v1;
   const tlen = Math.hypot(tux, tuy) || 1;
   const tx = tux / tlen;
   const ty = tuy / tlen;
-  const tipX = u1 + tx * 2.35;
-  const tipY = v1 + ty * 2.35;
-  const bx = u1 - tx * 0.75;
-  const by = v1 - ty * 0.75;
-  const px = -ty * 0.62;
-  const py = tx * 0.62;
+  const headAngleDeg = (Math.atan2(ty, tx) * 180) / Math.PI;
+
   const t2x = u2 - c2x;
   const t2y = v2 - c2y;
   const t2l = Math.hypot(t2x, t2y) || 1;
   const wx = t2x / t2l;
   const wy = t2y / t2l;
-  const tailTipX = u2 + wx * 1.85;
-  const tailTipY = v2 + wy * 1.85;
-  const tailBx = u2 - wx * 0.72;
-  const tailBy = v2 - wy * 0.72;
-  const tpx = -wy * 0.52;
-  const tpy = wx * 0.52;
+  const tailAngleDeg = (Math.atan2(wy, wx) * 180) / Math.PI;
+
+  const scaleTs = [0.15, 0.26, 0.37, 0.48, 0.59, 0.7, 0.81];
+  const scales = [];
+  for (const t of scaleTs) {
+    const p = cubicBezierPoint(t, u1, v1, c1x, c1y, c2x, c2y, u2, v2);
+    const tg = cubicBezierTangent(t, u1, v1, c1x, c1y, c2x, c2y, u2, v2);
+    scales.push({ x: p.x, y: p.y, deg: (Math.atan2(tg.ty, tg.tx) * 180) / Math.PI });
+  }
+
   return {
     d,
+    dRailL,
+    dRailR,
     hx: u1,
     hy: v1,
-    tx,
-    ty,
-    tipX,
-    tipY,
-    bx1: bx + px,
-    by1: by + py,
-    bx2: bx - px,
-    by2: by - py,
+    headAngleDeg,
     tailUx: u2,
     tailUy: v2,
-    tailTipX,
-    tailTipY,
-    tailBx1: tailBx + tpx,
-    tailBy1: tailBy + tpy,
-    tailBx2: tailBx - tpx,
-    tailBy2: tailBy - tpy,
+    tailAngleDeg,
+    scales,
     approxLen: len,
   };
 }
@@ -180,37 +184,39 @@ function cellNumberAt(row, col) {
   return rowFromBottom * 10 + c + 1;
 }
 
-function useEdgeLookups() {
+/** @param {{ ladders: Record<number, number>, snakes: Record<number, number> }} edges from `public.ov2_snakes_board_edges()` (via session) */
+function useEdgeLookups(edges) {
   return useMemo(() => {
-    const ladderFoot = new Set(Object.keys(SNAKES_BOARD_EDGES.ladders).map(Number));
-    const ladderTop = new Set(Object.values(SNAKES_BOARD_EDGES.ladders));
-    const snakeHead = new Set(Object.keys(SNAKES_BOARD_EDGES.snakes).map(Number));
-    const snakeTail = new Set(Object.values(SNAKES_BOARD_EDGES.snakes));
+    const ladderFoot = new Set(Object.keys(edges.ladders).map(Number));
+    const ladderTop = new Set(Object.values(edges.ladders));
+    const snakeHead = new Set(Object.keys(edges.snakes).map(Number));
+    const snakeTail = new Set(Object.values(edges.snakes));
     return { ladderFoot, ladderTop, snakeHead, snakeTail };
-  }, []);
+  }, [edges]);
 }
 
-function Ov2SnakesEdgeOverlay() {
+/** @param {{ edges: { ladders: Record<number, number>, snakes: Record<number, number> } }} props */
+function Ov2SnakesEdgeOverlay({ edges }) {
   const uid = useId().replace(/:/g, "");
   const gidRail = `ov2-sn-ladder-rail-${uid}`;
   const gidBelly = `ov2-sn-snake-belly-${uid}`;
   const { ladders, snakesSorted } = useMemo(() => {
     const lad = [];
-    for (const [from, to] of Object.entries(SNAKES_BOARD_EDGES.ladders)) {
+    for (const [from, to] of Object.entries(edges.ladders)) {
       const f = Number(from);
       const t = Number(to);
       lad.push({ key: `l-${from}`, fromN: f, ...ladderGeometry(f, t) });
     }
     lad.sort((a, b) => a.fromN - b.fromN);
     const sn = [];
-    for (const [from, to] of Object.entries(SNAKES_BOARD_EDGES.snakes)) {
+    for (const [from, to] of Object.entries(edges.snakes)) {
       const f = Number(from);
       const t = Number(to);
       sn.push({ key: `s-${from}`, fromN: f, ...snakeSpineGeometry(f, t) });
     }
     sn.sort((a, b) => b.approxLen - a.approxLen || a.fromN - b.fromN);
     return { ladders: lad, snakesSorted: sn };
-  }, []);
+  }, [edges]);
 
   return (
     <svg
@@ -237,6 +243,22 @@ function Ov2SnakesEdgeOverlay() {
         {snakesSorted.map(s => (
           <g key={`${s.key}-spine`}>
             <path
+              d={s.dRailL}
+              fill="none"
+              stroke="rgba(8,4,4,0.88)"
+              strokeWidth="1.22"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d={s.dRailR}
+              fill="none"
+              stroke="rgba(8,4,4,0.88)"
+              strokeWidth="1.22"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
               d={s.d}
               fill="none"
               stroke="rgba(0,0,0,0.78)"
@@ -262,6 +284,20 @@ function Ov2SnakesEdgeOverlay() {
               strokeLinejoin="round"
               opacity="0.86"
             />
+            {s.scales.map((sc, i) => (
+              <ellipse
+                key={`${s.key}-sc-${i}`}
+                cx={sc.x}
+                cy={sc.y}
+                rx="0.44"
+                ry="0.76"
+                fill="#4a1510"
+                stroke="rgba(252,211,211,0.22)"
+                strokeWidth="0.06"
+                opacity="0.9"
+                transform={`rotate(${sc.deg} ${sc.x} ${sc.y})`}
+              />
+            ))}
           </g>
         ))}
       </g>
@@ -372,22 +408,38 @@ function Ov2SnakesEdgeOverlay() {
       <g className="ov2-snakes-endpoints">
         {snakesSorted.map(s => (
           <g key={`${s.key}-ht`}>
-            <circle cx={s.hx} cy={s.hy} r="1.52" fill="#3f0d12" stroke="#fecdd3" strokeWidth="0.14" />
-            <polygon
-              points={`${s.tipX},${s.tipY} ${s.bx1},${s.by1} ${s.bx2},${s.by2}`}
-              fill="#2b070a"
-              stroke="#fecdd3"
-              strokeWidth="0.11"
-              strokeLinejoin="round"
-            />
-            <circle cx={s.tailUx} cy={s.tailUy} r="1.12" fill="#1a0507" stroke="#a8a29e" strokeWidth="0.12" />
-            <polygon
-              points={`${s.tailTipX},${s.tailTipY} ${s.tailBx1},${s.tailBy1} ${s.tailBx2},${s.tailBy2}`}
-              fill="#292524"
-              stroke="#d6d3d1"
-              strokeWidth="0.09"
-              strokeLinejoin="round"
-            />
+            <g transform={`translate(${s.hx},${s.hy}) rotate(${s.headAngleDeg})`}>
+              <ellipse
+                cx="0.85"
+                cy="0"
+                rx="2.05"
+                ry="1.22"
+                fill="#2c0a0e"
+                stroke="#fca5a5"
+                strokeWidth="0.14"
+              />
+              <polygon points="2.45,0 3.55,-0.62 3.55,0.62" fill="#1a0507" stroke="#fecdd3" strokeWidth="0.1" strokeLinejoin="round" />
+              <circle cx="1.15" cy="-0.48" r="0.38" fill="#0c0a0a" stroke="#44403c" strokeWidth="0.07" />
+              <circle cx="1.22" cy="-0.52" r="0.14" fill="#fde68a" />
+              <path
+                d="M 3.55 0 L 4.15 -0.22 L 4.05 0 L 4.15 0.22 Z"
+                fill="#9f1239"
+                stroke="#fecaca"
+                strokeWidth="0.05"
+              />
+            </g>
+            <g transform={`translate(${s.tailUx},${s.tailUy}) rotate(${s.tailAngleDeg})`}>
+              <ellipse cx="-0.55" cy="0" rx="1.18" ry="0.82" fill="#1c1412" stroke="#a8a29e" strokeWidth="0.11" />
+              <path
+                d="M -1.05 0 Q -1.75 0.42 -2.05 0.08"
+                fill="none"
+                stroke="#57534e"
+                strokeWidth="0.24"
+                strokeLinecap="round"
+              />
+              <circle cx="-1.95" cy="0.02" r="0.28" fill="#292524" stroke="#78716c" strokeWidth="0.06" />
+              <circle cx="-2.32" cy="0.05" r="0.2" fill="#1c1917" stroke="#57534e" strokeWidth="0.05" />
+            </g>
           </g>
         ))}
       </g>
@@ -424,7 +476,7 @@ function Ov2SnakesDiceFace({ value, emphasized }) {
   );
 }
 
-function PawnWithTurnRing({ seat, turnSeat, dense }) {
+function PawnWithTurnRing({ seat, turnSeat, dense, edgeHang }) {
   const isTurn = turnSeat === seat;
   const filt = SEAT_TURN_FILTER[seat] ?? SEAT_TURN_FILTER[1];
   const idle = "drop-shadow(0 2px 4px rgba(0,0,0,0.72))";
@@ -432,7 +484,7 @@ function PawnWithTurnRing({ seat, turnSeat, dense }) {
   const scTurn = dense ? "scale-[1.14]" : "scale-[1.18]";
   return (
     <span
-      className="relative flex h-full w-full max-h-full max-w-full items-center justify-center"
+      className={`relative flex h-full w-full max-h-full max-w-full items-center justify-center ${edgeHang ? "animate-ov2-snakes-edge-hang" : ""}`}
       style={{ filter: isTurn ? filt : idle }}
     >
       <img
@@ -451,7 +503,8 @@ function PawnWithTurnRing({ seat, turnSeat, dense }) {
  */
 export default function Ov2SnakesScreen({ contextInput = null }) {
   const session = useOv2SnakesSession(contextInput ?? undefined);
-  const { snap, err, rollBusy, roll, vaultClaimBusy, vaultClaimError, retryVaultClaim } = session;
+  const { snap, err, rollBusy, roll, vaultClaimBusy, vaultClaimError, retryVaultClaim, pawnStepMotion, boardEdges } =
+    session;
 
   const room = contextInput?.room;
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
@@ -492,9 +545,22 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
     return m;
   }, [members]);
 
-  const { ladderFoot, ladderTop, snakeHead, snakeTail } = useEdgeLookups();
+  const { ladderFoot, ladderTop, snakeHead, snakeTail } = useEdgeLookups(boardEdges);
 
-  const positions = snap?.board && typeof snap.board === "object" && snap.board.positions && typeof snap.board.positions === "object" ? snap.board.positions : {};
+  const basePositions =
+    snap?.board && typeof snap.board === "object" && snap.board.positions && typeof snap.board.positions === "object"
+      ? snap.board.positions
+      : {};
+  const positions = useMemo(() => {
+    const m = pawnStepMotion;
+    if (!m) return basePositions;
+    const out = { ...basePositions };
+    const seatKey = String(m.seat);
+    const cell = m.stage === 1 ? m.preCell : m.finalCell;
+    out[seatKey] = cell;
+    out[m.seat] = cell;
+    return out;
+  }, [basePositions, pawnStepMotion]);
   const phase = snap ? String(snap.phase || "").toLowerCase() : "";
   const finished = phase === "finished";
   const winnerSeat = snap?.winnerSeat != null ? snap.winnerSeat : null;
@@ -522,6 +588,16 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
         const lt = ladderTop.has(n);
         const sh = snakeHead.has(n);
         const st = snakeTail.has(n);
+        const edgePreBeat =
+          pawnStepMotion &&
+          pawnStepMotion.stage === 1 &&
+          n === pawnStepMotion.preCell &&
+          occupants.includes(pawnStepMotion.seat);
+        const edgeLandFlash =
+          pawnStepMotion &&
+          pawnStepMotion.stage === 2 &&
+          n === pawnStepMotion.finalCell &&
+          occupants.includes(pawnStepMotion.seat);
         const edgeBg =
           isEnd
             ? "bg-gradient-to-br from-emerald-900/50 to-emerald-950/72"
@@ -551,11 +627,20 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
                   color: "rgb(196 181 253)",
                   textShadow: "0 1px 3px rgb(8 6 22 / 0.92), 0 0 1px rgb(0 0 0 / 0.5)",
                 };
-        out.push({ key: `c-${row}-${col}`, n, occupants, edgeBg, cellNumberStyle });
+        out.push({
+          key: `c-${row}-${col}`,
+          n,
+          occupants,
+          edgeBg,
+          cellNumberStyle,
+          edgePreBeat,
+          edgeLandFlash,
+          edgeKind: pawnStepMotion?.kind ?? null,
+        });
       }
     }
     return out;
-  }, [positions, ladderFoot, ladderTop, snakeHead, snakeTail]);
+  }, [positions, ladderFoot, ladderTop, snakeHead, snakeTail, pawnStepMotion]);
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
@@ -690,13 +775,25 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
             </div>
             {/* Snakes & ladders above cell paint, below numbers/pawns — avoids border “cuts”. */}
             <div className="pointer-events-none absolute inset-0 z-[2] overflow-visible">
-              <Ov2SnakesEdgeOverlay />
+              <Ov2SnakesEdgeOverlay edges={boardEdges} />
             </div>
             <div className="pointer-events-none absolute inset-0 z-[3] grid h-full w-full grid-cols-10 grid-rows-10 gap-px p-px">
               {boardCells.map(c => (
                 <div
                   key={c.key}
-                  className="relative flex min-h-0 min-w-0 overflow-visible rounded-sm bg-transparent text-[6px] font-bold leading-none sm:text-[7px]"
+                  className={`relative flex min-h-0 min-w-0 overflow-visible rounded-sm bg-transparent text-[6px] font-bold leading-none sm:text-[7px] ${
+                    c.edgePreBeat
+                      ? c.edgeKind === "snake"
+                        ? "ring-2 ring-rose-400/55 shadow-[0_0_14px_rgba(251,113,133,0.22)]"
+                        : "ring-2 ring-amber-300/60 shadow-[0_0_14px_rgba(251,191,129,0.25)]"
+                      : ""
+                  } ${
+                    c.edgeLandFlash
+                      ? c.edgeKind === "snake"
+                        ? "ring-2 ring-rose-300/45"
+                        : "ring-2 ring-lime-300/50"
+                      : ""
+                  }`}
                 >
                   <span
                     className="pointer-events-none absolute right-0 top-0 z-[6] px-0.5 py-px pr-0.5 text-[8px] font-bold tabular-nums leading-none sm:text-[9px]"
@@ -708,13 +805,22 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
                     <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center">
                       {c.occupants.length === 1 ? (
                         <div className="flex h-full w-full min-h-0 min-w-0 items-center justify-center p-0">
-                          <PawnWithTurnRing seat={c.occupants[0]} turnSeat={turnSeat} />
+                          <PawnWithTurnRing
+                            seat={c.occupants[0]}
+                            turnSeat={turnSeat}
+                            edgeHang={Boolean(c.edgePreBeat && c.occupants[0] === pawnStepMotion?.seat)}
+                          />
                         </div>
                       ) : (
                         <div className="grid h-full w-full min-h-0 min-w-0 grid-cols-2 grid-rows-2 place-items-center gap-0 p-0">
                           {c.occupants.map(s => (
                             <div key={`o-${c.n}-${s}`} className="flex h-full w-full min-h-0 min-w-0 items-center justify-center">
-                              <PawnWithTurnRing seat={s} turnSeat={turnSeat} dense />
+                              <PawnWithTurnRing
+                                seat={s}
+                                turnSeat={turnSeat}
+                                dense
+                                edgeHang={Boolean(c.edgePreBeat && s === pawnStepMotion?.seat)}
+                              />
                             </div>
                           ))}
                         </div>

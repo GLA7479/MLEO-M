@@ -1,4 +1,8 @@
 -- OV2 Snakes & Ladders: immutable board helpers (Appendix A map). Apply after 150.
+--
+-- Appendix A MUST stay identical to:
+--   lib/online-v2/snakes-and-ladders/ov2SnakesBoardEdges.js  (OV2_SNAKES_BOARD_EDGES)
+-- and to 157_ov2_snakes_board_edges_tune.sql (idempotent re-apply for DBs that ran an older 151).
 
 BEGIN;
 
@@ -10,9 +14,9 @@ SET search_path = public
 AS $$
   SELECT jsonb_build_object(
     'ladders',
-    '{"2":"15","7":"28","22":"41","28":"55","41":"63","50":"69","57":"76","65":"82","68":"90","71":"91"}'::jsonb,
+    '{"2":"15","7":"28","22":"43","27":"55","41":"63","50":"69","57":"76","65":"82","68":"90","71":"91"}'::jsonb,
     'snakes',
-    '{"99":"80","94":"71","89":"52","74":"35","62":"19","49":"12","16":"6"}'::jsonb
+    '{"99":"80","94":"70","89":"52","86":"53","74":"35","62":"19","56":"40","49":"12","45":"23","16":"6"}'::jsonb
   );
 $$;
 
