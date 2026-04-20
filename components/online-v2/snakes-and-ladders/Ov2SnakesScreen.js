@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import { useId, useMemo } from "react";
-import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { useOv2SnakesSession } from "../../../hooks/useOv2SnakesSession";
 
 /** Turn highlight on board pawns: colored drop-shadow (no ring — maximizes piece area). */
@@ -452,10 +450,10 @@ function Ov2SnakesDiceFace({ value, emphasized }) {
   const n = value != null && Number.isFinite(Number(value)) ? Math.floor(Number(value)) : null;
   const active = n != null && n >= 1 && n <= 6;
   const pipCls =
-    "block h-1.5 w-1.5 rounded-[1px] bg-zinc-100 shadow-[inset_0_-1px_1px_rgba(0,0,0,0.45)] sm:h-2 sm:w-2";
+    "block h-1.5 w-1.5 rounded-[1px] bg-zinc-100 shadow-[inset_0_-1px_1px_rgba(0,0,0,0.45)] sm:h-[7px] sm:w-[7px]";
   const grid = emphasized
-    ? "grid h-11 w-11 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-lg border border-amber-400/50 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1.5 shadow-[0_0_16px_rgba(251,191,36,0.25)] sm:h-12 sm:w-12"
-    : "grid h-11 w-11 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-lg border border-white/15 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1.5 sm:h-12 sm:w-12";
+    ? "grid h-9 w-9 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-md border border-amber-400/50 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1 shadow-[0_0_12px_rgba(251,191,36,0.22)] sm:h-10 sm:w-10 sm:rounded-lg sm:p-1.5"
+    : "grid h-9 w-9 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-md border border-white/15 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1 sm:h-10 sm:w-10 sm:rounded-lg sm:p-1.5";
   const patterns = {
     1: [null, null, null, null, "c", null, null, null, null],
     2: ["c", null, null, null, null, null, null, null, "c"],
@@ -623,38 +621,6 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center justify-between gap-1 border-b border-white/[0.06] px-0.5 py-0.5 sm:px-1">
-        <p className="truncate text-[10px] font-semibold leading-tight text-zinc-200 sm:text-[11px]">
-          Snakes &amp; Ladders
-          {snap?.sessionId ? <span className="font-normal text-zinc-500"> · {snap.sessionId.slice(0, 8)}…</span> : null}
-        </p>
-        <div className="flex shrink-0 items-center gap-1">
-          {onLeaveToLobby ? (
-            <button
-              type="button"
-              disabled={leaveToLobbyBusy}
-              onClick={() => void onLeaveToLobby()}
-              className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[9px] font-semibold text-zinc-200 disabled:opacity-45 sm:text-[10px]"
-            >
-              {leaveToLobbyBusy ? "…" : "Leave"}
-            </button>
-          ) : null}
-          <Link
-            href="/online-v2/rooms"
-            className="rounded border border-sky-500/25 bg-sky-950/30 px-1.5 py-0.5 text-[9px] font-semibold text-sky-200/90 sm:text-[10px]"
-            onClick={() => {
-              try {
-                window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
-              } catch {
-                /* ignore */
-              }
-            }}
-          >
-            Lobby
-          </Link>
-        </div>
-      </div>
-
       {err ? <p className="shrink-0 truncate px-0.5 text-[10px] text-red-300">{err}</p> : null}
 
       {finished ? (
@@ -685,7 +651,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-visible px-0.5 pb-0.5 pt-0.5 sm:gap-1 sm:px-1">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 rounded-md border border-white/[0.07] bg-zinc-950/55 px-1 py-0.5 sm:px-1.5">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9px] text-zinc-300 sm:text-[10px]">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[8px] text-zinc-300 sm:text-[9px]">
             <span className="shrink-0 text-zinc-500">Turn</span>
             <span className="font-mono font-semibold text-zinc-50">{turnSeat != null ? turnSeat : "—"}</span>
             {mySeat != null ? (
@@ -699,7 +665,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
             <span className="text-zinc-500">Last</span>
             <Ov2SnakesDiceFace value={lastRoll} emphasized={Boolean(snap?.canRoll)} />
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
             {[0, 1, 2, 3].map(si => {
               const m = memberBySeat.get(si);
               const posRaw = positions[String(si)] ?? positions[si];
@@ -709,7 +675,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
               return (
                 <div
                   key={`hud-seat-${si}`}
-                  className={`flex items-center gap-0.5 rounded-full bg-black/35 pl-0.5 pr-1 ring-2 ring-inset ${
+                  className={`flex items-center gap-0.5 rounded-full bg-black/35 pl-0.5 pr-0.5 ring-2 ring-inset sm:pr-1 ${
                     isTurn ? SEAT_TURN_RING[si] ?? "ring-amber-300/80" : "ring-transparent"
                   }`}
                   title={m?.display_name || `Seat ${si}`}
@@ -717,29 +683,13 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
                   <img
                     src={ludoPawnSrc(si)}
                     alt=""
-                    className="h-5 w-5 shrink-0 object-contain sm:h-6 sm:w-6"
+                    className="h-4 w-4 shrink-0 object-contain sm:h-5 sm:w-5"
                     draggable={false}
                   />
-                  <span className="font-mono text-[9px] text-zinc-200 sm:text-[10px]">{Number.isFinite(pos) ? pos : "—"}</span>
+                  <span className="font-mono text-[8px] text-zinc-200 sm:text-[9px]">{Number.isFinite(pos) ? pos : "—"}</span>
                 </div>
               );
             })}
-            <div className="ml-0.5 flex h-7 min-w-[3.25rem] items-center justify-center sm:h-8 sm:min-w-[3.5rem]">
-              {!finished && snap?.canRoll ? (
-                <button
-                  type="button"
-                  disabled={rollBusy}
-                  onClick={() => void roll()}
-                  className="rounded-md border border-emerald-500/45 bg-emerald-900/50 px-2 py-0.5 text-[9px] font-bold text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] disabled:opacity-45 sm:text-[10px]"
-                >
-                  {rollBusy ? "…" : "Roll"}
-                </button>
-              ) : !finished && snap ? (
-                <span className="inline-flex w-full justify-center text-[9px] tabular-nums text-zinc-500 sm:text-[10px]">Wait…</span>
-              ) : !snap ? (
-                <span className="inline-flex w-full justify-center text-[9px] tabular-nums text-zinc-500 sm:text-[10px]">Load…</span>
-              ) : null}
-            </div>
           </div>
         </div>
 
@@ -749,7 +699,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
             stretch with the same 10×10 grid as the CSS cells. sm+: square board for larger viewports.
           */}
           <div
-            className="relative isolate min-w-0 overflow-visible rounded-xl border border-amber-800/50 bg-gradient-to-br from-amber-950/62 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_16px_48px_rgba(0,0,0,0.52)] ring-2 ring-amber-700/28 max-sm:h-full max-sm:w-full max-sm:min-h-0 max-sm:max-h-full sm:aspect-square sm:h-auto sm:max-h-full sm:w-full sm:max-w-full sm:min-h-[168px] sm:shrink-0"
+            className="relative isolate min-w-0 overflow-visible rounded-lg border border-amber-800/50 bg-gradient-to-br from-amber-950/62 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_12px_36px_rgba(0,0,0,0.52)] ring-2 ring-amber-700/28 max-sm:h-full max-sm:w-full max-sm:min-h-0 max-sm:max-h-[min(100%,calc(100dvh-13.5rem))] sm:aspect-square sm:h-auto sm:max-h-full sm:w-full sm:max-w-full sm:min-h-[148px] sm:shrink-0 sm:rounded-xl sm:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_16px_48px_rgba(0,0,0,0.52)]"
           >
             {/* Cell fills under SVG so paths read through semi-transparent tiles. */}
             <div className="pointer-events-none absolute inset-0 z-[1] grid h-full w-full grid-cols-10 grid-rows-10 gap-px bg-zinc-950/85 p-px">
@@ -816,7 +766,35 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-2 gap-y-0.5 border-t border-white/[0.05] pt-0.5 text-[9px] text-zinc-500 sm:text-[10px]">
+        {onLeaveToLobby || !finished ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/[0.08] bg-zinc-950/40 px-1 py-1.5 sm:gap-3 sm:py-2">
+            {onLeaveToLobby ? (
+              <button
+                type="button"
+                disabled={leaveToLobbyBusy}
+                onClick={() => void onLeaveToLobby()}
+                className="min-w-[4.5rem] rounded-md border border-white/18 bg-white/8 px-2.5 py-1 text-[10px] font-semibold text-zinc-100 shadow-sm disabled:opacity-45 sm:min-w-[5rem] sm:px-3 sm:py-1.5 sm:text-[11px]"
+              >
+                {leaveToLobbyBusy ? "…" : "Leave"}
+              </button>
+            ) : null}
+            {!finished ? (
+              <button
+                type="button"
+                disabled={Boolean(!snap || rollBusy || !snap.canRoll)}
+                onClick={() => void roll()}
+                title={
+                  !snap ? "Loading…" : !snap.canRoll ? "Not your turn" : rollBusy ? "Rolling…" : "Roll the dice"
+                }
+                className="min-w-[4.5rem] rounded-md border border-emerald-500/50 bg-emerald-900/55 px-2.5 py-1 text-[10px] font-bold text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-emerald-800/55 active:bg-emerald-950/55 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-emerald-900/55 sm:min-w-[5rem] sm:px-3 sm:py-1.5 sm:text-[11px]"
+              >
+                {!snap ? "Roll" : rollBusy ? "…" : "Roll"}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-2 gap-y-0.5 border-t border-white/[0.05] pt-0.5 text-[8px] text-zinc-500 sm:text-[9px]">
           {room?.pot_locked != null ? (
             <span>Pot {Math.floor(Number(room.pot_locked) || 0).toLocaleString()}</span>
           ) : (
