@@ -18,13 +18,13 @@ import {
 } from "../lib/online-v2/snakes-and-ladders/ov2SnakesBoardEdges";
 
 /** Hold on ladder foot / snake head before showing the slide endpoint (ms). */
-const OV2_SNAKES_EDGE_HOLD_MS = 980;
+const OV2_SNAKES_EDGE_HOLD_MS = 1180;
 /** Keep pawn on final cell after edge before clearing motion overlay (ms). */
-const OV2_SNAKES_EDGE_LAND_MS = 1200;
+const OV2_SNAKES_EDGE_LAND_MS = 1480;
 /** Delay between each step along the dice path (ms). */
-const OV2_SNAKES_WALK_STEP_MS = 88;
+const OV2_SNAKES_WALK_STEP_MS = 132;
 /** Pause on final dice cell when there is no ladder/snake (ms). */
-const OV2_SNAKES_WALK_SETTLE_MS = 160;
+const OV2_SNAKES_WALK_SETTLE_MS = 300;
 
 /** @param {any} snap */
 function readSeatPos(snap, seat) {
