@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { useOv2SnakesSession } from "../../../hooks/useOv2SnakesSession";
 
@@ -30,8 +30,38 @@ const SNAKES_BOARD_EDGES = {
   },
 };
 
-/** Turn / identity accent (ring only — avoid stacking duplicate `ring-*` utilities). */
+/** Turn / identity accent (ring only). */
 const SEAT_TURN_RING = ["ring-sky-400/90", "ring-amber-400/90", "ring-emerald-400/90", "ring-fuchsia-400/90"];
+
+/** Center of cell `n` in unified 0–100 viewBox space (matches `cellNumberAt` serpentine layout). */
+function cellCenterUv(n) {
+  if (!Number.isFinite(n) || n < 1 || n > 100) return { u: 0, v: 0 };
+  const rowFromBottom = Math.floor((n - 1) / 10);
+  const row = 9 - rowFromBottom;
+  const idx = (n - 1) % 10;
+  const leftToRight = rowFromBottom % 2 === 0;
+  const col = leftToRight ? idx : 9 - idx;
+  return { u: (col + 0.5) * 10, v: (row + 0.5) * 10 };
+}
+
+function ladderPathD(u1, v1, u2, v2) {
+  return `M ${u1} ${v1} L ${u2} ${v2}`;
+}
+
+/** Curved snake path (head → tail) for a readable S-bend. */
+function snakePathD(u1, v1, u2, v2) {
+  const mx = (u1 + u2) / 2;
+  const my = (v1 + v2) / 2;
+  const dx = u2 - u1;
+  const dy = v2 - v1;
+  const len = Math.hypot(dx, dy) || 1;
+  const sag = Math.min(11, Math.max(3.2, len * 0.14));
+  const nx = -dy / len;
+  const ny = dx / len;
+  const cx = mx + nx * sag;
+  const cy = my + ny * sag;
+  return `M ${u1} ${v1} Q ${cx} ${cy} ${u2} ${v2}`;
+}
 
 /** Ludo soldier assets (same paths as `ov2LudoBoardView.js`). */
 function ludoPawnSrc(seat) {
@@ -55,6 +85,97 @@ function useEdgeLookups() {
     const snakeTail = new Set(Object.values(SNAKES_BOARD_EDGES.snakes));
     return { ladderFoot, ladderTop, snakeHead, snakeTail };
   }, []);
+}
+
+function Ov2SnakesEdgeOverlay() {
+  const uid = useId().replace(/:/g, "");
+  const flL = `ov2-snakes-ladder-glow-${uid}`;
+  const flS = `ov2-snakes-snake-glow-${uid}`;
+  const { ladderPaths, snakePaths } = useMemo(() => {
+    const ladders = [];
+    for (const [from, to] of Object.entries(SNAKES_BOARD_EDGES.ladders)) {
+      const a = cellCenterUv(Number(from));
+      const b = cellCenterUv(Number(to));
+      ladders.push({ key: `l-${from}`, d: ladderPathD(a.u, a.v, b.u, b.v) });
+    }
+    const snakes = [];
+    for (const [from, to] of Object.entries(SNAKES_BOARD_EDGES.snakes)) {
+      const a = cellCenterUv(Number(from));
+      const b = cellCenterUv(Number(to));
+      snakes.push({ key: `s-${from}`, d: snakePathD(a.u, a.v, b.u, b.v) });
+    }
+    return { ladderPaths: ladders, snakePaths: snakes };
+  }, []);
+
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="xMidYMid meet"
+      aria-hidden
+    >
+      <defs>
+        <filter id={flL} x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="0.55" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id={flS} x="-25%" y="-25%" width="150%" height="150%">
+          <feGaussianBlur stdDeviation="0.65" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      {ladderPaths.map(({ key, d }) => (
+        <path
+          key={key}
+          d={d}
+          fill="none"
+          stroke="rgba(250,250,250,0.22)"
+          strokeWidth={1.15}
+          strokeLinecap="round"
+        />
+      ))}
+      {ladderPaths.map(({ key, d }) => (
+        <path
+          key={`${key}-lime`}
+          d={d}
+          fill="none"
+          stroke="#a3e635"
+          strokeWidth={0.85}
+          strokeLinecap="round"
+          strokeOpacity={0.95}
+          filter={`url(#${flL})`}
+        />
+      ))}
+      {snakePaths.map(({ key, d }) => (
+        <path
+          key={key}
+          d={d}
+          fill="none"
+          stroke="rgba(15,15,18,0.55)"
+          strokeWidth={1.55}
+          strokeLinecap="round"
+        />
+      ))}
+      {snakePaths.map(({ key, d }) => (
+        <path
+          key={`${key}-rose`}
+          d={d}
+          fill="none"
+          stroke="#fb7185"
+          strokeWidth={1.05}
+          strokeLinecap="round"
+          strokeOpacity={0.94}
+          filter={`url(#${flS})`}
+        />
+      ))}
+    </svg>
+  );
 }
 
 /** Compact 1–6 pip readout (visual only). */
@@ -86,6 +207,28 @@ function Ov2SnakesDiceFace({ value, emphasized }) {
   );
 }
 
+function PawnWithTurnRing({ seat, turnSeat }) {
+  const isTurn = turnSeat === seat;
+  const ring = SEAT_TURN_RING[seat] ?? "ring-amber-300/85";
+  return (
+    <span
+      className={`flex h-full w-full max-h-full max-w-full items-center justify-center rounded-full ${
+        isTurn
+          ? `scale-[1.05] shadow-[0_0_14px_rgba(255,255,255,0.14)] ring-[3px] ring-offset-[2px] ring-offset-black/45 ${ring}`
+          : "shadow-[0_2px_8px_rgba(0,0,0,0.55)] ring-1 ring-black/35"
+      }`}
+    >
+      <img
+        src={ludoPawnSrc(seat)}
+        alt=""
+        title={`Seat ${seat}`}
+        draggable={false}
+        className="block h-full w-full max-h-full max-w-full object-contain"
+      />
+    </span>
+  );
+}
+
 /**
  * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string }, onLeaveToLobby?: () => void|Promise<void>, leaveToLobbyBusy?: boolean } | null }} props
  */
@@ -107,7 +250,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
     if (!el) return undefined;
     const measure = () => {
       const r = el.getBoundingClientRect();
-      const s = Math.max(168, Math.floor(Math.min(r.width, r.height) - 6));
+      const s = Math.max(168, Math.floor(Math.min(r.width, r.height) - 2));
       setBoardSide(s);
     };
     measure();
@@ -267,10 +410,11 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
 
         <div ref={boardFitRef} className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
           <div
-            className="overflow-hidden rounded-xl border border-amber-900/35 bg-gradient-to-br from-amber-950/50 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05),0_8px_28px_rgba(0,0,0,0.45)]"
+            className="relative overflow-hidden rounded-xl border border-amber-800/40 bg-gradient-to-br from-amber-950/55 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06),0_14px_44px_rgba(0,0,0,0.5)] ring-2 ring-amber-700/20"
             style={{ width: boardSide, height: boardSide }}
           >
-            <div className="grid h-full w-full grid-cols-10 grid-rows-10 gap-px p-px">
+            <Ov2SnakesEdgeOverlay />
+            <div className="relative z-[2] grid h-full w-full grid-cols-10 grid-rows-10 gap-px p-px">
               {Array.from({ length: 10 }, (_, row) => (
                 <div key={`row-${row}`} className="contents">
                   {Array.from({ length: 10 }, (_, col) => {
@@ -289,71 +433,47 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
                     const st = snakeTail.has(n);
                     const edgeBg =
                       isEnd
-                        ? "bg-gradient-to-br from-emerald-900/55 to-emerald-950/80"
+                        ? "bg-gradient-to-br from-emerald-900/50 to-emerald-950/72"
                         : isStart
-                          ? "bg-gradient-to-br from-sky-900/45 to-sky-950/75"
+                          ? "bg-gradient-to-br from-sky-900/42 to-sky-950/68"
                           : sh
-                            ? "bg-gradient-to-br from-rose-950/55 to-zinc-900"
+                            ? "bg-gradient-to-br from-rose-950/48 to-zinc-950/58"
                             : lf
-                              ? "bg-gradient-to-br from-lime-950/40 to-zinc-900"
+                              ? "bg-gradient-to-br from-lime-950/38 to-zinc-950/58"
                               : st
-                                ? "bg-gradient-to-br from-rose-900/25 to-zinc-900"
+                                ? "bg-gradient-to-br from-rose-900/28 to-zinc-950/58"
                                 : lt
-                                  ? "bg-gradient-to-br from-lime-900/25 to-zinc-900"
-                                  : "bg-zinc-900/85";
-                    const edgeMark =
-                      lf || sh ? (
-                        <span
-                          className={`pointer-events-none absolute left-0.5 top-0.5 text-[7px] leading-none sm:text-[8px] ${sh ? "text-rose-200/90" : "text-lime-200/90"}`}
-                          aria-hidden
-                        >
-                          {sh ? "⌇" : "⌗"}
-                        </span>
-                      ) : null;
+                                  ? "bg-gradient-to-br from-lime-900/28 to-zinc-950/58"
+                                  : "bg-zinc-950/50";
                     return (
                       <div
                         key={`c-${row}-${col}`}
-                        className={`relative flex min-h-0 min-w-0 flex-col items-center justify-between rounded-sm border px-px pb-px pt-0.5 text-[6px] font-semibold leading-none text-zinc-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:text-[7px] ${
+                        className={`relative flex min-h-0 min-w-0 overflow-hidden rounded-sm border text-[6px] font-bold leading-none sm:text-[7px] ${
                           isEnd
-                            ? "border-emerald-500/50 text-emerald-100/90"
+                            ? "border-emerald-500/45 text-emerald-100/95 [text-shadow:0_1px_2px_rgba(0,0,0,0.85)]"
                             : isStart
-                              ? "border-sky-500/45 text-sky-100/90"
-                              : "border-white/[0.05]"
+                              ? "border-sky-500/40 text-sky-100/95 [text-shadow:0_1px_2px_rgba(0,0,0,0.85)]"
+                              : "border-white/[0.06] text-zinc-400 [text-shadow:0_1px_2px_rgba(0,0,0,0.75)]"
                         } ${edgeBg}`}
                       >
-                        {edgeMark}
-                        <span className={`z-[1] ${isEnd || isStart ? "opacity-95" : "opacity-70"}`}>{n}</span>
-                        <div
-                          className={`z-[1] flex w-full flex-1 items-center justify-center ${
-                            occupants.length > 1 ? "grid grid-cols-2 place-items-center gap-px px-px" : ""
-                          }`}
-                        >
-                          {occupants.length <= 1
-                            ? occupants.map(s => (
-                                <img
-                                  key={`o-${n}-${s}`}
-                                  src={ludoPawnSrc(s)}
-                                  alt=""
-                                  title={`Seat ${s}`}
-                                  draggable={false}
-                                  className={`max-h-[42%] max-w-[55%] object-contain ${
-                                    turnSeat === s ? `rounded-full ring-2 ${SEAT_TURN_RING[s] ?? "ring-amber-300/80"}` : ""
-                                  }`}
-                                />
-                              ))
-                            : occupants.map(s => (
-                                <img
-                                  key={`o-${n}-${s}`}
-                                  src={ludoPawnSrc(s)}
-                                  alt=""
-                                  title={`Seat ${s}`}
-                                  draggable={false}
-                                  className={`h-[38%] w-[38%] max-w-[48%] object-contain ${
-                                    turnSeat === s ? `rounded-full ring-2 ${SEAT_TURN_RING[s] ?? "ring-amber-300/80"}` : ""
-                                  }`}
-                                />
-                              ))}
-                        </div>
+                        <span className="pointer-events-none absolute left-0 right-0 top-0.5 z-[4] text-center">{n}</span>
+                        {occupants.length > 0 ? (
+                          <div className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center pt-[11px] sm:pt-[12px]">
+                            {occupants.length === 1 ? (
+                              <div className="flex h-[92%] w-[92%] items-center justify-center">
+                                <PawnWithTurnRing seat={occupants[0]} turnSeat={turnSeat} />
+                              </div>
+                            ) : (
+                              <div className="grid h-[90%] w-[90%] max-w-full grid-cols-2 grid-rows-2 place-items-center gap-[1px] px-px">
+                                {occupants.map(s => (
+                                  <div key={`o-${n}-${s}`} className="flex h-[92%] w-[92%] items-center justify-center">
+                                    <PawnWithTurnRing seat={s} turnSeat={turnSeat} />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -367,7 +487,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
           {room?.pot_locked != null ? (
             <span>Pot {Math.floor(Number(room.pot_locked) || 0).toLocaleString()}</span>
           ) : (
-            <span className="text-zinc-600">1–100 · ladders climb · snakes slide</span>
+            <span className="text-zinc-600">Lime rails = ladders · Rose curves = snakes</span>
           )}
         </div>
       </div>
