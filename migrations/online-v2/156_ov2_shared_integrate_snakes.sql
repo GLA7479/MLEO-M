@@ -88,164 +88,234 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_pk text := trim(COALESCE(p_participant_key, ''));
-  v_product_game_id text;
-  v_shared_schema_version integer;
-  v_room_status text;
-  v_active_session_id uuid;
-  v_host_participant_key text;
-  v_host_member_id uuid;
-  v_cnt int;
-  v_new_host uuid;
-  v_in_ludo_match boolean := false;
-  v_in_r51_match boolean := false;
-  v_in_bg_match boolean := false;
-  v_in_ck_match boolean := false;
-  v_in_ch_match boolean := false;
-  v_in_dom_match boolean := false;
-  v_in_fl_match boolean := false;
-  v_in_fg_match boolean := false;
-  v_in_mm_match boolean := false;
-  v_in_cc_match boolean := false;
-  v_in_fh_match boolean := false;
-  v_in_gd_match boolean := false;
-  v_in_snakes_match boolean := false;
-  v_ff jsonb;
-  v_refund jsonb;
-  v_hint jsonb;
+  x_pk text := trim(COALESCE(p_participant_key, ''));
+  x_cnt int;
+  x_new_host uuid;
+
+  x_product_game_id text;
+  x_shared_schema_version integer;
+  x_status text;
+  x_active_session_id uuid;
+  x_host_participant_key text;
+
+  x_in_ludo_match boolean := false;
+  x_in_r51_match boolean := false;
+  x_in_bg_match boolean := false;
+  x_in_ck_match boolean := false;
+  x_in_ch_match boolean := false;
+  x_in_dom_match boolean := false;
+  x_in_fl_match boolean := false;
+  x_in_fg_match boolean := false;
+  x_in_mm_match boolean := false;
+  x_in_cc_match boolean := false;
+  x_in_fh_match boolean := false;
+  x_in_gd_match boolean := false;
+  x_in_snakes_match boolean := false;
+
+  x_ff jsonb;
+  x_refund jsonb;
+  x_hint jsonb;
 BEGIN
-  IF p_room_id IS NULL OR length(v_pk) = 0 THEN
-    RETURN jsonb_build_object('ok', false, 'code', 'INVALID_ARGUMENT', 'message', 'room_id and participant_key are required.');
+  IF p_room_id IS NULL OR length(x_pk) = 0 THEN
+    RETURN jsonb_build_object(
+      'ok', false,
+      'code', 'INVALID_ARGUMENT',
+      'message', 'room_id and participant_key are required.'
+    );
   END IF;
 
-  SELECT
-    r.product_game_id,
-    r.shared_schema_version,
-    r.status,
-    r.active_session_id,
-    r.host_participant_key,
-    r.host_member_id
-  INTO
-    v_product_game_id,
-    v_shared_schema_version,
-    v_room_status,
-    v_active_session_id,
-    v_host_participant_key,
-    v_host_member_id
+  PERFORM 1
   FROM public.ov2_rooms r
   WHERE r.id = p_room_id
   FOR UPDATE;
 
-  IF NOT FOUND OR v_shared_schema_version IS DISTINCT FROM 1 THEN
+  IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'code', 'ROOM_NOT_FOUND', 'message', 'Room not found.');
   END IF;
 
-  IF v_room_status NOT IN ('OPEN', 'STARTING', 'IN_GAME') THEN
+  x_shared_schema_version := (
+    SELECT r.shared_schema_version
+    FROM public.ov2_rooms r
+    WHERE r.id = p_room_id
+  );
+
+  IF x_shared_schema_version IS DISTINCT FROM 1 THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'ROOM_NOT_FOUND', 'message', 'Room not found.');
+  END IF;
+
+  x_status := COALESCE((
+    SELECT r.status
+    FROM public.ov2_rooms r
+    WHERE r.id = p_room_id
+  ), '');
+
+  IF x_status NOT IN ('OPEN', 'STARTING', 'IN_GAME') THEN
     RETURN jsonb_build_object('ok', false, 'code', 'INVALID_STATE', 'message', 'Cannot leave in this room state.');
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM public.ov2_room_members m
-    WHERE m.room_id = p_room_id AND m.participant_key = v_pk
+    SELECT 1
+    FROM public.ov2_room_members m
+    WHERE m.room_id = p_room_id
+      AND m.participant_key = x_pk
       AND COALESCE(m.member_state, 'joined') IN ('joined', 'disconnected')
   ) THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NOT_MEMBER', 'message', 'You are not in this room.');
   END IF;
 
-  IF v_room_status = 'IN_GAME' THEN
-    v_in_ludo_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_ludo'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_ludo_sessions WHERE id = v_active_session_id), '') = 'playing'
+  x_product_game_id := (
+    SELECT r.product_game_id
+    FROM public.ov2_rooms r
+    WHERE r.id = p_room_id
+  );
+
+  x_active_session_id := (
+    SELECT r.active_session_id
+    FROM public.ov2_rooms r
+    WHERE r.id = p_room_id
+  );
+
+  x_host_participant_key := (
+    SELECT r.host_participant_key
+    FROM public.ov2_rooms r
+    WHERE r.id = p_room_id
+  );
+
+  IF x_status = 'IN_GAME' THEN
+    x_in_ludo_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_ludo'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_ludo_sessions s WHERE s.id = x_active_session_id), '') = 'playing'
       AND EXISTS (
-        SELECT 1 FROM public.ov2_ludo_seats ls
-        WHERE ls.session_id = v_active_session_id AND ls.participant_key = v_pk
-      );
-    v_in_r51_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_rummy51'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_rummy51_sessions WHERE id = v_active_session_id), '') = 'playing'
-      AND coalesce(
-        (SELECT (player_state -> v_pk ->> 'isEliminated')::boolean FROM public.ov2_rummy51_sessions WHERE id = v_active_session_id),
-        false
-      ) IS NOT TRUE;
-    v_in_bg_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_backgammon'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_backgammon_sessions WHERE id = v_active_session_id), '') = 'playing'
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_backgammon_seats bs
-        WHERE bs.session_id = v_active_session_id AND bs.participant_key = v_pk
-      );
-    v_in_ck_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_checkers'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_checkers_sessions WHERE id = v_active_session_id), '') = 'playing'
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_checkers_seats cs
-        WHERE cs.session_id = v_active_session_id AND cs.participant_key = v_pk
-      );
-    v_in_ch_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_chess'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_chess_sessions WHERE id = v_active_session_id), '') = 'playing'
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_chess_seats chs
-        WHERE chs.session_id = v_active_session_id AND chs.participant_key = v_pk
-      );
-    v_in_dom_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_dominoes'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_dominoes_sessions WHERE id = v_active_session_id), '') = 'playing'
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_dominoes_seats ds
-        WHERE ds.session_id = v_active_session_id AND ds.participant_key = v_pk
-      );
-    v_in_fl_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_fourline'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_fourline_sessions WHERE id = v_active_session_id), '') = 'playing'
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_fourline_seats fs
-        WHERE fs.session_id = v_active_session_id AND fs.participant_key = v_pk
-      );
-    v_in_fg_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_flipgrid'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_flipgrid_sessions WHERE id = v_active_session_id), '') = 'playing'
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_flipgrid_seats fgs
-        WHERE fgs.session_id = v_active_session_id AND fgs.participant_key = v_pk
-      );
-    v_in_mm_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_meldmatch'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_meldmatch_sessions WHERE id = v_active_session_id), '') IN ('playing', 'layoff')
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_meldmatch_seats mms
-        WHERE mms.session_id = v_active_session_id AND mms.participant_key = v_pk
-      );
-    v_in_cc_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_colorclash'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_colorclash_sessions WHERE id = v_active_session_id), '') = 'playing'
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_colorclash_seats ccs
-        WHERE ccs.session_id = v_active_session_id AND ccs.participant_key = v_pk
-      );
-    v_in_fh_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_fleet_hunt'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_fleet_hunt_sessions WHERE id = v_active_session_id), '') IN ('placement', 'battle')
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_fleet_hunt_seats fhs
-        WHERE fhs.session_id = v_active_session_id AND fhs.participant_key = v_pk
-      );
-    v_in_gd_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_goal_duel'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_goal_duel_sessions WHERE id = v_active_session_id), '') = 'playing'
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_goal_duel_seats gds
-        WHERE gds.session_id = v_active_session_id AND gds.participant_key = v_pk
-      );
-    v_in_snakes_match := v_product_game_id IS NOT DISTINCT FROM 'ov2_snakes_and_ladders'
-      AND v_active_session_id IS NOT NULL
-      AND coalesce((SELECT phase FROM public.ov2_snakes_sessions WHERE id = v_active_session_id), '') = 'playing'
-      AND EXISTS (
-        SELECT 1 FROM public.ov2_snakes_seats ss
-        WHERE ss.session_id = v_active_session_id AND ss.participant_key = v_pk
+        SELECT 1
+        FROM public.ov2_ludo_seats ls
+        WHERE ls.session_id = x_active_session_id
+          AND ls.participant_key = x_pk
       );
 
-    IF v_in_ludo_match OR v_in_r51_match OR v_in_bg_match OR v_in_ck_match OR v_in_ch_match OR v_in_dom_match OR v_in_fl_match OR v_in_fg_match OR v_in_mm_match OR v_in_cc_match OR v_in_fh_match OR v_in_gd_match OR v_in_snakes_match THEN
+    x_in_r51_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_rummy51'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_rummy51_sessions s WHERE s.id = x_active_session_id), '') = 'playing'
+      AND COALESCE(
+        (SELECT (s.player_state -> x_pk ->> 'isEliminated')::boolean
+         FROM public.ov2_rummy51_sessions s
+         WHERE s.id = x_active_session_id),
+        false
+      ) IS NOT TRUE;
+
+    x_in_bg_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_backgammon'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_backgammon_sessions s WHERE s.id = x_active_session_id), '') = 'playing'
+      AND EXISTS (
+        SELECT 1
+        FROM public.ov2_backgammon_seats bs
+        WHERE bs.session_id = x_active_session_id
+          AND bs.participant_key = x_pk
+      );
+
+    x_in_ck_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_checkers'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_checkers_sessions s WHERE s.id = x_active_session_id), '') = 'playing'
+      AND EXISTS (
+        SELECT 1
+        FROM public.ov2_checkers_seats cs
+        WHERE cs.session_id = x_active_session_id
+          AND cs.participant_key = x_pk
+      );
+
+    x_in_ch_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_chess'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_chess_sessions s WHERE s.id = x_active_session_id), '') = 'playing'
+      AND EXISTS (
+        SELECT 1
+        FROM public.ov2_chess_seats chs
+        WHERE chs.session_id = x_active_session_id
+          AND chs.participant_key = x_pk
+      );
+
+    x_in_dom_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_dominoes'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_dominoes_sessions s WHERE s.id = x_active_session_id), '') = 'playing'
+      AND EXISTS (
+        SELECT 1
+        FROM public.ov2_dominoes_seats ds
+        WHERE ds.session_id = x_active_session_id
+          AND ds.participant_key = x_pk
+      );
+
+    x_in_fl_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_fourline'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_fourline_sessions s WHERE s.id = x_active_session_id), '') = 'playing'
+      AND EXISTS (
+        SELECT 1
+        FROM public.ov2_fourline_seats fs
+        WHERE fs.session_id = x_active_session_id
+          AND fs.participant_key = x_pk
+      );
+
+    x_in_fg_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_flipgrid'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_flipgrid_sessions s WHERE s.id = x_active_session_id), '') = 'playing'
+      AND EXISTS (
+        SELECT 1
+        FROM public.ov2_flipgrid_seats fgs
+        WHERE fgs.session_id = x_active_session_id
+          AND fgs.participant_key = x_pk
+      );
+
+    x_in_mm_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_meldmatch'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_meldmatch_sessions s WHERE s.id = x_active_session_id), '') IN ('playing', 'layoff')
+      AND EXISTS (
+        SELECT 1
+        FROM public.ov2_meldmatch_seats mms
+        WHERE mms.session_id = x_active_session_id
+          AND mms.participant_key = x_pk
+      );
+
+    x_in_cc_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_colorclash'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_colorclash_sessions s WHERE s.id = x_active_session_id), '') = 'playing'
+      AND EXISTS (
+        SELECT 1
+        FROM public.ov2_colorclash_seats ccs
+        WHERE ccs.session_id = x_active_session_id
+          AND ccs.participant_key = x_pk
+      );
+
+    x_in_fh_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_fleet_hunt'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_fleet_hunt_sessions s WHERE s.id = x_active_session_id), '') IN ('placement', 'battle')
+      AND EXISTS (
+        SELECT 1
+        FROM public.ov2_fleet_hunt_seats fhs
+        WHERE fhs.session_id = x_active_session_id
+          AND fhs.participant_key = x_pk
+      );
+
+    x_in_gd_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_goal_duel'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_goal_duel_sessions s WHERE s.id = x_active_session_id), '') = 'playing'
+      AND EXISTS (
+        SELECT 1
+        FROM public.ov2_goal_duel_seats gds
+        WHERE gds.session_id = x_active_session_id
+          AND gds.participant_key = x_pk
+      );
+
+    x_in_snakes_match := x_product_game_id IS NOT DISTINCT FROM 'ov2_snakes_and_ladders'
+      AND x_active_session_id IS NOT NULL
+      AND COALESCE((SELECT s.phase FROM public.ov2_snakes_sessions s WHERE s.id = x_active_session_id), '') = 'playing'
+      AND EXISTS (
+        SELECT 1
+        FROM public.ov2_snakes_seats ss
+        WHERE ss.session_id = x_active_session_id
+          AND ss.participant_key = x_pk
+      );
+
+    IF x_in_ludo_match OR x_in_r51_match OR x_in_bg_match OR x_in_ck_match OR x_in_ch_match
+       OR x_in_dom_match OR x_in_fl_match OR x_in_fg_match OR x_in_mm_match
+       OR x_in_cc_match OR x_in_fh_match OR x_in_gd_match OR x_in_snakes_match THEN
+
       IF NOT COALESCE(p_forfeit_game, false) THEN
         RETURN jsonb_build_object(
           'ok', false,
@@ -253,99 +323,78 @@ BEGIN
           'message', 'Leave during an active match requires forfeit. Call again with p_forfeit_game := true.'
         );
       END IF;
-      IF v_in_ludo_match THEN
-        v_ff := public.ov2_ludo_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_r51_match THEN
-        v_ff := public.ov2_rummy51_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_bg_match THEN
-        v_ff := public.ov2_backgammon_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_ck_match THEN
-        v_ff := public.ov2_checkers_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_ch_match THEN
-        v_ff := public.ov2_chess_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_dom_match THEN
-        v_ff := public.ov2_dominoes_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_fl_match THEN
-        v_ff := public.ov2_fourline_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_fg_match THEN
-        v_ff := public.ov2_flipgrid_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_mm_match THEN
-        v_ff := public.ov2_meldmatch_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_cc_match THEN
-        v_ff := public.ov2_colorclash_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_fh_match THEN
-        v_ff := public.ov2_fleet_hunt_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_gd_match THEN
-        v_ff := public.ov2_goal_duel_voluntary_forfeit(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
-      ELSIF v_in_snakes_match THEN
-        v_ff := public.ov2_snakes_leave_game(p_room_id, v_pk);
-        IF coalesce((v_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
-          RETURN v_ff;
-        END IF;
+
+      IF x_in_ludo_match THEN
+        x_ff := public.ov2_ludo_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_r51_match THEN
+        x_ff := public.ov2_rummy51_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_bg_match THEN
+        x_ff := public.ov2_backgammon_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_ck_match THEN
+        x_ff := public.ov2_checkers_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_ch_match THEN
+        x_ff := public.ov2_chess_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_dom_match THEN
+        x_ff := public.ov2_dominoes_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_fl_match THEN
+        x_ff := public.ov2_fourline_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_fg_match THEN
+        x_ff := public.ov2_flipgrid_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_mm_match THEN
+        x_ff := public.ov2_meldmatch_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_cc_match THEN
+        x_ff := public.ov2_colorclash_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_fh_match THEN
+        x_ff := public.ov2_fleet_hunt_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_gd_match THEN
+        x_ff := public.ov2_goal_duel_voluntary_forfeit(p_room_id, x_pk);
+      ELSIF x_in_snakes_match THEN
+        x_ff := public.ov2_snakes_leave_game(p_room_id, x_pk);
       END IF;
-      SELECT
-        r.product_game_id,
-        r.shared_schema_version,
-        r.status,
-        r.active_session_id,
-        r.host_participant_key,
-        r.host_member_id
-      INTO
-        v_product_game_id,
-        v_shared_schema_version,
-        v_room_status,
-        v_active_session_id,
-        v_host_participant_key,
-        v_host_member_id
+
+      IF COALESCE((x_ff ->> 'ok')::boolean, false) IS NOT TRUE THEN
+        RETURN x_ff;
+      END IF;
+
+      PERFORM 1
       FROM public.ov2_rooms r
       WHERE r.id = p_room_id
       FOR UPDATE;
+
+      x_product_game_id := (
+        SELECT r.product_game_id
+        FROM public.ov2_rooms r
+        WHERE r.id = p_room_id
+      );
+
+      x_status := COALESCE((
+        SELECT r.status
+        FROM public.ov2_rooms r
+        WHERE r.id = p_room_id
+      ), '');
+
+      x_active_session_id := (
+        SELECT r.active_session_id
+        FROM public.ov2_rooms r
+        WHERE r.id = p_room_id
+      );
+
+      x_host_participant_key := (
+        SELECT r.host_participant_key
+        FROM public.ov2_rooms r
+        WHERE r.id = p_room_id
+      );
     END IF;
   END IF;
 
-  v_refund := public.ov2_shared_try_pre_ingame_stake_refund(p_room_id, v_pk, 'leave');
-  v_hint := NULL;
-  IF v_refund IS NOT NULL AND COALESCE((v_refund ->> 'refunded')::boolean, false) THEN
-    v_hint := jsonb_build_object(
-      'amount', v_refund -> 'amount',
-      'idempotency_key', to_jsonb(v_refund ->> 'idempotency_key'),
-      'product_game_id', to_jsonb(v_product_game_id)
+  x_refund := public.ov2_shared_try_pre_ingame_stake_refund(p_room_id, x_pk, 'leave');
+  x_hint := NULL;
+
+  IF x_refund IS NOT NULL AND COALESCE((x_refund ->> 'refunded')::boolean, false) THEN
+    x_hint := jsonb_build_object(
+      'amount', x_refund -> 'amount',
+      'idempotency_key', to_jsonb(x_refund ->> 'idempotency_key'),
+      'product_game_id', to_jsonb(x_product_game_id)
     );
   END IF;
 
@@ -355,15 +404,18 @@ BEGIN
     member_state = 'left',
     left_at = now(),
     updated_at = now()
-  WHERE room_id = p_room_id AND participant_key = v_pk;
+  WHERE room_id = p_room_id
+    AND participant_key = x_pk;
 
-  SELECT count(*)::int INTO v_cnt
-  FROM public.ov2_room_members m
-  WHERE m.room_id = p_room_id
-    AND COALESCE(m.member_state, 'joined') IN ('joined', 'disconnected');
+  x_cnt := COALESCE((
+    SELECT count(*)::int
+    FROM public.ov2_room_members m
+    WHERE m.room_id = p_room_id
+      AND COALESCE(m.member_state, 'joined') IN ('joined', 'disconnected')
+  ), 0);
 
-  IF v_cnt <= 0 THEN
-    IF coalesce(upper(trim(v_room_status)), '') = 'OPEN' THEN
+  IF x_cnt <= 0 THEN
+    IF COALESCE(upper(trim(x_status)), '') = 'OPEN' THEN
       UPDATE public.ov2_rooms
       SET
         host_member_id = NULL,
@@ -376,8 +428,10 @@ BEGIN
       RETURN jsonb_build_object(
         'ok', true,
         'closed', false,
-        'stake_refund', v_hint,
-        'room', (SELECT public.ov2_shared_room_to_public_jsonb(r) FROM public.ov2_rooms r WHERE r.id = p_room_id),
+        'stake_refund', x_hint,
+        'room', public.ov2_shared_room_to_public_jsonb(
+          (SELECT r FROM public.ov2_rooms r WHERE r.id = p_room_id LIMIT 1)
+        ),
         'members', public.ov2_shared_members_to_public_jsonb(p_room_id)
       );
     END IF;
@@ -396,22 +450,26 @@ BEGIN
     RETURN jsonb_build_object(
       'ok', true,
       'closed', true,
-      'stake_refund', v_hint,
-      'room', (SELECT public.ov2_shared_room_to_public_jsonb(r) FROM public.ov2_rooms r WHERE r.id = p_room_id),
+      'stake_refund', x_hint,
+      'room', public.ov2_shared_room_to_public_jsonb(
+        (SELECT r FROM public.ov2_rooms r WHERE r.id = p_room_id LIMIT 1)
+      ),
       'members', '[]'::jsonb
     );
   END IF;
 
-  IF v_host_participant_key IS NOT DISTINCT FROM v_pk THEN
-    SELECT m.id INTO v_new_host
-    FROM public.ov2_room_members m
-    WHERE m.room_id = p_room_id
-      AND m.participant_key IS DISTINCT FROM v_pk
-      AND COALESCE(m.member_state, 'joined') IN ('joined', 'disconnected')
-    ORDER BY m.joined_at ASC NULLS LAST, m.id ASC
-    LIMIT 1;
+  IF x_host_participant_key IS NOT DISTINCT FROM x_pk THEN
+    x_new_host := (
+      SELECT m.id
+      FROM public.ov2_room_members m
+      WHERE m.room_id = p_room_id
+        AND m.participant_key IS DISTINCT FROM x_pk
+        AND COALESCE(m.member_state, 'joined') IN ('joined', 'disconnected')
+      ORDER BY m.joined_at ASC NULLS LAST, m.id ASC
+      LIMIT 1
+    );
 
-    IF v_new_host IS NULL THEN
+    IF x_new_host IS NULL THEN
       RETURN jsonb_build_object('ok', false, 'code', 'INVALID_STATE', 'message', 'Could not transfer host.');
     END IF;
 
@@ -420,30 +478,19 @@ BEGIN
     WHERE room_id = p_room_id
       AND COALESCE(member_state, 'joined') IN ('joined', 'disconnected');
 
-    UPDATE public.ov2_room_members SET role = 'host' WHERE id = v_new_host;
+    UPDATE public.ov2_room_members
+    SET role = 'host'
+    WHERE id = x_new_host;
 
     UPDATE public.ov2_rooms r
     SET
-      host_member_id = v_new_host,
-      host_participant_key = (SELECT participant_key FROM public.ov2_room_members WHERE id = v_new_host),
+      host_member_id = x_new_host,
+      host_participant_key = (
+        SELECT m.participant_key
+        FROM public.ov2_room_members m
+        WHERE m.id = x_new_host
+      ),
       updated_at = now()
-    WHERE r.id = p_room_id;
-  ELSE
-    SELECT
-      r.product_game_id,
-      r.shared_schema_version,
-      r.status,
-      r.active_session_id,
-      r.host_participant_key,
-      r.host_member_id
-    INTO
-      v_product_game_id,
-      v_shared_schema_version,
-      v_room_status,
-      v_active_session_id,
-      v_host_participant_key,
-      v_host_member_id
-    FROM public.ov2_rooms r
     WHERE r.id = p_room_id;
   END IF;
 
@@ -452,8 +499,10 @@ BEGIN
   RETURN jsonb_build_object(
     'ok', true,
     'closed', false,
-    'stake_refund', v_hint,
-    'room', (SELECT public.ov2_shared_room_to_public_jsonb(r) FROM public.ov2_rooms r WHERE r.id = p_room_id),
+    'stake_refund', x_hint,
+    'room', public.ov2_shared_room_to_public_jsonb(
+      (SELECT r FROM public.ov2_rooms r WHERE r.id = p_room_id LIMIT 1)
+    ),
     'members', public.ov2_shared_members_to_public_jsonb(p_room_id)
   );
 END;
