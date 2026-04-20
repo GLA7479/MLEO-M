@@ -501,8 +501,7 @@ function PawnWithTurnRing({ seat, turnSeat, dense, edgeHang }) {
  */
 export default function Ov2SnakesScreen({ contextInput = null }) {
   const session = useOv2SnakesSession(contextInput ?? undefined);
-  const { snap, err, rollBusy, roll, vaultClaimBusy, vaultClaimError, retryVaultClaim, pawnStepMotion, boardEdges } =
-    session;
+  const { snap, err, rollBusy, roll, vaultClaimBusy, vaultClaimError, retryVaultClaim, pawnMotion, boardEdges } = session;
 
   const room = contextInput?.room;
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
@@ -533,15 +532,14 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
       ? snap.board.positions
       : {};
   const positions = useMemo(() => {
-    const m = pawnStepMotion;
+    const m = pawnMotion;
     if (!m) return basePositions;
     const out = { ...basePositions };
     const seatKey = String(m.seat);
-    const cell = m.stage === 1 ? m.preCell : m.finalCell;
-    out[seatKey] = cell;
-    out[m.seat] = cell;
+    out[seatKey] = m.displayCell;
+    out[m.seat] = m.displayCell;
     return out;
-  }, [basePositions, pawnStepMotion]);
+  }, [basePositions, pawnMotion]);
   const phase = snap ? String(snap.phase || "").toLowerCase() : "";
   const finished = phase === "finished";
   const winnerSeat = snap?.winnerSeat != null ? snap.winnerSeat : null;
@@ -570,15 +568,15 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
         const sh = snakeHead.has(n);
         const st = snakeTail.has(n);
         const edgePreBeat =
-          pawnStepMotion &&
-          pawnStepMotion.stage === 1 &&
-          n === pawnStepMotion.preCell &&
-          occupants.includes(pawnStepMotion.seat);
+          pawnMotion &&
+          pawnMotion.phase === "edge_hold" &&
+          n === pawnMotion.preCell &&
+          occupants.includes(pawnMotion.seat);
         const edgeLandFlash =
-          pawnStepMotion &&
-          pawnStepMotion.stage === 2 &&
-          n === pawnStepMotion.finalCell &&
-          occupants.includes(pawnStepMotion.seat);
+          pawnMotion &&
+          pawnMotion.phase === "edge_land" &&
+          n === pawnMotion.finalCell &&
+          occupants.includes(pawnMotion.seat);
         const edgeBg =
           isEnd
             ? "bg-gradient-to-br from-emerald-900/50 to-emerald-950/72"
@@ -616,12 +614,12 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
           cellNumberStyle,
           edgePreBeat,
           edgeLandFlash,
-          edgeKind: pawnStepMotion?.kind ?? null,
+          edgeKind: pawnMotion?.kind ?? null,
         });
       }
     }
     return out;
-  }, [positions, ladderFoot, ladderTop, snakeHead, snakeTail, pawnStepMotion]);
+  }, [positions, ladderFoot, ladderTop, snakeHead, snakeTail, pawnMotion]);
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
@@ -789,7 +787,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
                           <PawnWithTurnRing
                             seat={c.occupants[0]}
                             turnSeat={turnSeat}
-                            edgeHang={Boolean(c.edgePreBeat && c.occupants[0] === pawnStepMotion?.seat)}
+                            edgeHang={Boolean(c.edgePreBeat && c.occupants[0] === pawnMotion?.seat)}
                           />
                         </div>
                       ) : (
@@ -800,7 +798,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
                                 seat={s}
                                 turnSeat={turnSeat}
                                 dense
-                                edgeHang={Boolean(c.edgePreBeat && s === pawnStepMotion?.seat)}
+                                edgeHang={Boolean(c.edgePreBeat && s === pawnMotion?.seat)}
                               />
                             </div>
                           ))}

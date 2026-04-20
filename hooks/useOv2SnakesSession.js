@@ -21,6 +21,10 @@ import {
 const OV2_SNAKES_EDGE_HOLD_MS = 980;
 /** Keep pawn on final cell after edge before clearing motion overlay (ms). */
 const OV2_SNAKES_EDGE_LAND_MS = 1200;
+/** Delay between each step along the dice path (ms). */
+const OV2_SNAKES_WALK_STEP_MS = 88;
+/** Pause on final dice cell when there is no ladder/snake (ms). */
+const OV2_SNAKES_WALK_SETTLE_MS = 160;
 
 /** @param {any} snap */
 function readSeatPos(snap, seat) {
@@ -29,6 +33,18 @@ function readSeatPos(snap, seat) {
   const v = b[String(seat)] ?? b[seat];
   const n = Number(v);
   return Number.isFinite(n) ? Math.floor(n) : null;
+}
+
+/** @returns {number|null} seat index if exactly one position changed between snapshots */
+function findSingleMovedSeat(prev, next) {
+  /** @type {number[]} */
+  const changed = [];
+  for (let si = 0; si <= 3; si += 1) {
+    const a = readSeatPos(prev, si);
+    const b = readSeatPos(next, si);
+    if (a !== b) changed.push(si);
+  }
+  return changed.length === 1 ? changed[0] : null;
 }
 
 /** @param {null|undefined|{ room?: object, members?: unknown[], self?: { participant_key?: string } }} baseContext */
@@ -50,17 +66,105 @@ export function useOv2SnakesSession(baseContext) {
   const [vaultClaimBusy, setVaultClaimBusy] = useState(false);
   const [vaultClaimError, setVaultClaimError] = useState("");
   const [vaultClaimRetryTick, setVaultClaimRetryTick] = useState(0);
-  const [pawnStepMotion, setPawnStepMotion] = useState(/** @type {null | { key: number, seat: number, stage: 1 | 2, preCell: number, finalCell: number, kind: 'ladder' | 'snake' }} */ (null));
+  const [pawnMotion, setPawnMotion] = useState(
+    /** @type {null | { key: number, seat: number, displayCell: number, phase: 'walk' | 'edge_hold' | 'edge_land', preCell: number, finalCell: number, kind: 'ladder' | 'snake' | null }} */ (null)
+  );
+  const pawnWalkTimersRef = useRef(/** @type {number[]} */ ([]));
   const vaultFinishedRef = useRef(/** @type {string|null} */ (null));
   const vaultLinesAppliedForSessionRef = useRef(/** @type {Set<string>} */ (new Set()));
   const snapRef = useRef(/** @type {typeof snap} */ (null));
   const vaultClaimInFlightRef = useRef(false);
   const rollInFlightRef = useRef(false);
+  /** Dedupes local roll + realtime both scheduling walk for the same `revision`. */
+  const lastWalkRevisionRef = useRef(/** @type {number|null} */ (null));
+
+  const clearPawnWalkTimers = useCallback(() => {
+    pawnWalkTimersRef.current.forEach(id => window.clearTimeout(id));
+    pawnWalkTimersRef.current = [];
+  }, []);
 
   const applySnapIfNewer = useCallback((/** @type {any} */ nextSnap) => {
     if (!nextSnap) return;
-    setSnap(prev => ov2PreferNewerSnapshot(prev, nextSnap));
+    setSnap(prev => {
+      const merged = ov2PreferNewerSnapshot(prev, nextSnap);
+      snapRef.current = merged;
+      return merged;
+    });
   }, []);
+
+  const schedulePawnWalkFromPrevNext = useCallback(
+    (/** @type {any} */ prev, /** @type {any} */ next, /** @type {number} */ seat) => {
+      if (!prev || !next || seat < 0 || seat > 3) return;
+      const nextRev = next.revision != null ? Number(next.revision) : NaN;
+      if (!Number.isFinite(nextRev)) return;
+      if (lastWalkRevisionRef.current === nextRev) return;
+
+      const dice = next.lastRoll != null ? Math.floor(Number(next.lastRoll)) : null;
+      if (dice == null || dice < 1 || dice > 6) return;
+      const oldP = readSeatPos(prev, seat);
+      const newP = readSeatPos(next, seat);
+      if (oldP == null || newP == null || oldP === newP) return;
+      const preCell = ov2SnakesCellAfterDice(oldP, dice);
+      if (preCell == null) return;
+
+      lastWalkRevisionRef.current = nextRev;
+      clearPawnWalkTimers();
+
+      /** @type {number[]} */
+      const path = [];
+      for (let c = oldP + 1; c <= preCell; c += 1) path.push(c);
+      const kind =
+        preCell !== newP ? ov2SnakesClassifyEdge(preCell, newP, boardEdgesRef.current) : null;
+      const key = Date.now();
+      const pushTid = /** @param {number} tid */ tid => {
+        pawnWalkTimersRef.current.push(tid);
+      };
+      setPawnMotion({
+        key,
+        seat,
+        displayCell: oldP,
+        phase: "walk",
+        preCell,
+        finalCell: newP,
+        kind,
+      });
+      path.forEach((cell, i) => {
+        const tid = window.setTimeout(() => {
+          setPawnMotion(cur => (cur && cur.key === key ? { ...cur, displayCell: cell, phase: "walk" } : cur));
+        }, (i + 1) * OV2_SNAKES_WALK_STEP_MS);
+        pushTid(tid);
+      });
+      const afterWalk = path.length * OV2_SNAKES_WALK_STEP_MS;
+      if (kind && preCell !== newP) {
+        pushTid(
+          window.setTimeout(() => {
+            setPawnMotion(cur =>
+              cur && cur.key === key ? { ...cur, displayCell: preCell, phase: "edge_hold" } : cur
+            );
+          }, afterWalk)
+        );
+        pushTid(
+          window.setTimeout(() => {
+            setPawnMotion(cur =>
+              cur && cur.key === key ? { ...cur, displayCell: newP, phase: "edge_land" } : cur
+            );
+          }, afterWalk + OV2_SNAKES_EDGE_HOLD_MS)
+        );
+        pushTid(
+          window.setTimeout(() => {
+            setPawnMotion(cur => (cur && cur.key === key ? null : cur));
+          }, afterWalk + OV2_SNAKES_EDGE_HOLD_MS + OV2_SNAKES_EDGE_LAND_MS)
+        );
+      } else {
+        pushTid(
+          window.setTimeout(() => {
+            setPawnMotion(cur => (cur && cur.key === key ? null : cur));
+          }, afterWalk + OV2_SNAKES_WALK_SETTLE_MS)
+        );
+      }
+    },
+    [clearPawnWalkTimers]
+  );
 
   useEffect(() => {
     setSnap(null);
@@ -71,10 +175,12 @@ export function useOv2SnakesSession(baseContext) {
     setVaultClaimRetryTick(0);
     vaultClaimInFlightRef.current = false;
     rollInFlightRef.current = false;
-    setPawnStepMotion(null);
+    lastWalkRevisionRef.current = null;
+    clearPawnWalkTimers();
+    setPawnMotion(null);
     setBoardEdges(OV2_SNAKES_BOARD_EDGES);
     boardEdgesRef.current = OV2_SNAKES_BOARD_EDGES;
-  }, [roomId, activeSessionKey]);
+  }, [roomId, activeSessionKey, clearPawnWalkTimers]);
 
   useEffect(() => {
     boardEdgesRef.current = boardEdges;
@@ -85,24 +191,10 @@ export function useOv2SnakesSession(baseContext) {
   }, [snap]);
 
   useEffect(() => {
-    const m = pawnStepMotion;
-    if (!m || m.stage !== 1) return undefined;
-    const key = m.key;
-    const t1 = window.setTimeout(() => {
-      setPawnStepMotion(cur => (cur && cur.key === key ? { ...cur, stage: 2 } : cur));
-    }, OV2_SNAKES_EDGE_HOLD_MS);
-    const t2 = window.setTimeout(() => {
-      setPawnStepMotion(cur => (cur && cur.key === key ? null : cur));
-    }, OV2_SNAKES_EDGE_HOLD_MS + OV2_SNAKES_EDGE_LAND_MS);
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
-  }, [pawnStepMotion?.key]);
-
-  useEffect(() => {
     if (!roomId || roomProductId !== OV2_SNAKES_PRODUCT_GAME_ID) {
       setSnap(null);
+      clearPawnWalkTimers();
+      setPawnMotion(null);
       setBoardEdges(OV2_SNAKES_BOARD_EDGES);
       boardEdgesRef.current = OV2_SNAKES_BOARD_EDGES;
       return undefined;
@@ -131,14 +223,37 @@ export function useOv2SnakesSession(baseContext) {
       participantKey: selfKey ?? "",
       activeSessionId: activeSessionKey || null,
       onSnapshot: s => {
-        if (!cancelled) applySnapIfNewer(s);
+        if (cancelled) return;
+        const prev = snapRef.current;
+        if (
+          prev &&
+          s &&
+          prev.revision != null &&
+          s.revision != null &&
+          Number(s.revision) > Number(prev.revision) &&
+          String(prev.phase || "").toLowerCase() === "playing" &&
+          String(s.phase || "").toLowerCase() === "playing"
+        ) {
+          const movedSeat = findSingleMovedSeat(prev, s);
+          if (movedSeat != null) {
+            schedulePawnWalkFromPrevNext(prev, s, movedSeat);
+          }
+        }
+        applySnapIfNewer(s);
       },
     });
     return () => {
       cancelled = true;
       unsub();
     };
-  }, [roomId, roomProductId, selfKey, activeSessionKey, applySnapIfNewer]);
+  }, [roomId, roomProductId, selfKey, activeSessionKey, applySnapIfNewer, clearPawnWalkTimers, schedulePawnWalkFromPrevNext]);
+
+  useEffect(
+    () => () => {
+      clearPawnWalkTimers();
+    },
+    [clearPawnWalkTimers]
+  );
 
   useEffect(() => {
     if (!snap || String(snap.phase || "").toLowerCase() !== "finished" || !roomId || !selfKey) return;
@@ -187,6 +302,7 @@ export function useOv2SnakesSession(baseContext) {
 
   const roll = useCallback(async () => {
     if (!roomId || !selfKey || rollInFlightRef.current) return { ok: false, error: "busy" };
+    clearPawnWalkTimers();
     rollInFlightRef.current = true;
     setRollBusy(true);
     setErr("");
@@ -207,27 +323,9 @@ export function useOv2SnakesSession(baseContext) {
         const prev = snapRef.current;
         const next = r.snapshot;
         if (!r.idempotent && prev && next && next.lastRoll != null) {
-          const dice = Math.floor(Number(next.lastRoll));
           const roller = prev.turnSeat != null ? Math.floor(Number(prev.turnSeat)) : null;
-          if (roller != null && roller >= 0 && roller <= 3 && dice >= 1 && dice <= 6) {
-            const oldP = readSeatPos(prev, roller);
-            const newP = readSeatPos(next, roller);
-            if (oldP != null && newP != null && oldP !== newP) {
-              const preCell = ov2SnakesCellAfterDice(oldP, dice);
-              if (preCell != null && preCell !== newP) {
-                const kind = ov2SnakesClassifyEdge(preCell, newP, boardEdgesRef.current);
-                if (kind) {
-                  setPawnStepMotion({
-                    key: Date.now(),
-                    seat: roller,
-                    stage: 1,
-                    preCell,
-                    finalCell: newP,
-                    kind,
-                  });
-                }
-              }
-            }
+          if (roller != null && roller >= 0 && roller <= 3) {
+            schedulePawnWalkFromPrevNext(prev, next, roller);
           }
         }
         applySnapIfNewer(r.snapshot);
@@ -241,7 +339,7 @@ export function useOv2SnakesSession(baseContext) {
       rollInFlightRef.current = false;
       setRollBusy(false);
     }
-  }, [roomId, selfKey, applySnapIfNewer]);
+  }, [roomId, selfKey, applySnapIfNewer, clearPawnWalkTimers, schedulePawnWalkFromPrevNext]);
 
   const out = useMemo(
     () => ({
@@ -252,10 +350,10 @@ export function useOv2SnakesSession(baseContext) {
       vaultClaimBusy,
       vaultClaimError,
       retryVaultClaim,
-      pawnStepMotion,
+      pawnMotion,
       boardEdges,
     }),
-    [snap, err, rollBusy, roll, vaultClaimBusy, vaultClaimError, retryVaultClaim, pawnStepMotion, boardEdges]
+    [snap, err, rollBusy, roll, vaultClaimBusy, vaultClaimError, retryVaultClaim, pawnMotion, boardEdges]
   );
 
   return out;
