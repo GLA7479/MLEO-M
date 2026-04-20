@@ -1166,7 +1166,8 @@ export default function Ov2SharedRoomScreen({
 
   useEffect(() => {
     if (didRouteToLiveRef.current) return;
-    if (room?.status !== "IN_GAME") return;
+    // Must match `sharedStatusUpper` / banner logic: DB JSON often returns lowercase enum strings (e.g. "in_game").
+    if (String(room?.status || "").toUpperCase() !== "IN_GAME") return;
 
     if (isRummy51Room) {
       let cancelled = false;
