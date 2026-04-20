@@ -65,6 +65,10 @@ import {
   requestOv2GoalDuelOpenSession,
 } from "../../../lib/online-v2/goal-duel/ov2GoalDuelSessionAdapter";
 import {
+  fetchOv2SnakesSnapshot,
+  requestOv2SnakesOpenSession,
+} from "../../../lib/online-v2/snakes-and-ladders/ov2SnakesSessionApi";
+import {
   commitOv2RoomStake,
   fetchOv2RoomById,
   fetchOv2RoomLedgerForViewer,
@@ -172,6 +176,7 @@ export default function Ov2SharedRoomScreen({
   const isFleetHuntRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.FLEET_HUNT;
   const isGoalDuelRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.GOAL_DUEL;
   const isSnakesLaddersRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.SNAKES_LADDERS;
+  const isSnakesRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.SNAKES_AND_LADDERS;
   const isStakeSharedRoom =
     isRummy51Room ||
     isLudoRoom ||
@@ -186,7 +191,8 @@ export default function Ov2SharedRoomScreen({
     isColorClashRoom ||
     isFleetHuntRoom ||
     isGoalDuelRoom ||
-    isSnakesLaddersRoom;
+    isSnakesLaddersRoom ||
+    isSnakesRoom;
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
 
   const ledgerByParticipant = useMemo(() => {
@@ -568,6 +574,21 @@ export default function Ov2SharedRoomScreen({
           await router.push(`/ov2-goal-duel?room=${encodeURIComponent(roomId)}`);
           return;
         }
+        if (isSnakesRoom) {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: qmAuthorityHostPk });
+          if (cancelled || !canon) return;
+          const ms = Number(canon.match_seq);
+          if (!Number.isFinite(ms)) return;
+          const open = await requestOv2SnakesOpenSession(roomId, qmAuthorityHostPk, {
+            expectedRoomMatchSeq: Math.floor(ms),
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-snakes-and-ladders?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
       } catch {
         /* retry on next snapshot */
       }
@@ -594,6 +615,7 @@ export default function Ov2SharedRoomScreen({
     isColorClashRoom,
     isFleetHuntRoom,
     isGoalDuelRoom,
+    isSnakesRoom,
     roomId,
     router,
     // Re-run on each shared snapshot poll so a transient open failure (e.g. first tick after IN_GAME) retries.
@@ -922,7 +944,8 @@ export default function Ov2SharedRoomScreen({
         isMeldMatchRoom ||
         isColorClashRoom ||
         isFleetHuntRoom ||
-        isGoalDuelRoom
+        isGoalDuelRoom ||
+        isSnakesRoom
       ) {
         const prep = await prepareSharedHostPreStartStakes();
         if (!prep.ok) {
@@ -1100,6 +1123,25 @@ export default function Ov2SharedRoomScreen({
         didRouteToLiveRef.current = true;
         setLaunchingLive(true);
         await router.push(`/ov2-goal-duel?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isSnakesRoom) {
+        const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+        const ms = Number(canon?.match_seq);
+        if (!Number.isFinite(ms)) {
+          setMsg("Could not read room match sequence. Refresh and retry.");
+          return;
+        }
+        const open = await requestOv2SnakesOpenSession(roomId, participantId, {
+          expectedRoomMatchSeq: Math.floor(ms),
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Snakes & Ladders session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-snakes-and-ladders?room=${encodeURIComponent(roomId)}`);
         return;
       }
       await reload();
@@ -1545,6 +1587,47 @@ export default function Ov2SharedRoomScreen({
       };
     }
 
+    if (isSnakesRoom) {
+      const snakesSid = room?.active_session_id || null;
+      if (snakesSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-snakes-and-ladders?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledSn = false;
+      void fetchOv2SnakesSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledSn || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-snakes-and-ladders?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      let intervalSn = null;
+      const tickSn = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledSn || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalSn) clearInterval(intervalSn);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-snakes-and-ladders?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickSn();
+      intervalSn = setInterval(() => void tickSn(), 2500);
+      return () => {
+        cancelledSn = true;
+        if (intervalSn) clearInterval(intervalSn);
+      };
+    }
+
     if (!liveRuntimeId) return;
     if (isLudoRoom) {
       const ludoSid = room?.active_session_id || null;
@@ -1627,6 +1710,7 @@ export default function Ov2SharedRoomScreen({
     isColorClashRoom,
     isFleetHuntRoom,
     isGoalDuelRoom,
+    isSnakesRoom,
     room?.status,
     room?.active_session_id,
     liveRuntimeId,
@@ -1842,7 +1926,8 @@ export default function Ov2SharedRoomScreen({
           !isMeldMatchRoom &&
           !isColorClashRoom &&
           !isFleetHuntRoom &&
-          !isGoalDuelRoom ? (
+          !isGoalDuelRoom &&
+          !isSnakesRoom ? (
             <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
               <div className="font-bold">Runtime handoff ready</div>
               <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
@@ -1864,7 +1949,8 @@ export default function Ov2SharedRoomScreen({
           isMeldMatchRoom ||
           isColorClashRoom ||
           isFleetHuntRoom ||
-          isGoalDuelRoom) &&
+          isGoalDuelRoom ||
+          isSnakesRoom) &&
         !launchingLive ? (
           <div className="mt-3 rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
             <p className="font-semibold text-teal-50">Match starting</p>
@@ -1977,7 +2063,9 @@ export default function Ov2SharedRoomScreen({
                                   ? "Opening live Fleet Hunt..."
                                   : isGoalDuelRoom
                                     ? "Opening live Goal Duel..."
-                                    : "Opening live Ludo game..."}
+                                    : isSnakesRoom
+                                      ? "Opening live Snakes & Ladders..."
+                                      : "Opening live Ludo game..."}
           </p>
         ) : null}
         {error ? <p className="text-[11px] text-red-300">{error}</p> : null}
