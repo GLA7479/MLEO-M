@@ -682,18 +682,18 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-visible px-0.5 pb-0.5 pt-0.5 sm:gap-1 sm:px-1">
         {/*
-          Grid: dedicated center column for dice (no overlap). Side columns minmax(0,1fr) + overflow-hidden
-          pin seat groups to corners on one row; items-center aligns dice with chips vertically.
+          One “balloon”: left (0,2) | dice | right (1,3). flex-1 + justify-end + pr on the right wing
+          pins the right pair to the inner edge of the pill so the second seat sits flush on that side.
         */}
-        <div className="grid w-full min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_minmax(3rem,auto)_minmax(0,1fr)] grid-rows-1 items-center gap-x-1 rounded-lg border border-white/[0.08] bg-zinc-950/55 px-1 py-1.5 sm:gap-x-2 sm:px-2 sm:py-2">
-          <div className="col-start-1 flex min-h-12 min-w-0 items-center justify-start gap-1 overflow-hidden pl-0.5 sm:gap-1.5 sm:pl-1">
+        <div className="flex w-full min-w-0 shrink-0 items-center rounded-full border border-white/[0.14] bg-zinc-950/75 py-1 pl-1.5 pr-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:py-1.5 sm:pl-2 sm:pr-1.5">
+          <div className="flex min-h-12 min-w-0 flex-1 items-center justify-start gap-1 overflow-hidden pl-0 sm:gap-1.5">
             <Ov2SnakesHudSeatChip si={0} memberBySeat={memberBySeat} positions={positions} turnSeat={turnSeat} pk={pk} />
             <Ov2SnakesHudSeatChip si={2} memberBySeat={memberBySeat} positions={positions} turnSeat={turnSeat} pk={pk} />
           </div>
-          <div className="col-start-2 flex min-h-12 min-w-[3rem] items-center justify-center justify-self-center px-0.5 sm:min-w-[3.25rem]">
+          <div className="flex w-12 shrink-0 items-center justify-center sm:w-[3.25rem]">
             <Ov2SnakesDiceFace value={lastRoll} emphasized={Boolean(snap?.canRoll)} />
           </div>
-          <div className="col-start-3 flex min-h-12 min-w-0 items-center justify-end gap-1 overflow-hidden pr-0.5 sm:gap-1.5 sm:pr-1">
+          <div className="flex min-h-12 min-w-0 flex-1 items-center justify-end gap-1 overflow-hidden pr-0.5 sm:gap-1.5 sm:pr-0">
             <Ov2SnakesHudSeatChip si={1} memberBySeat={memberBySeat} positions={positions} turnSeat={turnSeat} pk={pk} />
             <Ov2SnakesHudSeatChip si={3} memberBySeat={memberBySeat} positions={positions} turnSeat={turnSeat} pk={pk} />
           </div>
