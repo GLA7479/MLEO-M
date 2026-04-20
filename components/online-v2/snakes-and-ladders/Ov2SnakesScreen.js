@@ -222,7 +222,7 @@ function Ov2SnakesEdgeOverlay({ edges }) {
     <svg
       className="pointer-events-none z-[1] block h-full w-full overflow-visible"
       viewBox="0 0 100 100"
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="none"
       overflow="visible"
       aria-hidden
     >
@@ -743,9 +743,13 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
           </div>
         </div>
 
-        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-visible p-0.5">
+        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-visible p-0.5 max-sm:items-stretch max-sm:justify-center">
+          {/*
+            Mobile: fill the flex band (tall rectangle). SVG uses preserveAspectRatio="none" so edges
+            stretch with the same 10×10 grid as the CSS cells. sm+: square board for larger viewports.
+          */}
           <div
-            className="relative isolate aspect-square h-full max-h-full min-h-[168px] w-auto max-w-full min-w-0 overflow-visible rounded-xl border border-amber-800/50 bg-gradient-to-br from-amber-950/62 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_16px_48px_rgba(0,0,0,0.52)] ring-2 ring-amber-700/28"
+            className="relative isolate min-w-0 overflow-visible rounded-xl border border-amber-800/50 bg-gradient-to-br from-amber-950/62 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_16px_48px_rgba(0,0,0,0.52)] ring-2 ring-amber-700/28 max-sm:h-full max-sm:w-full max-sm:min-h-0 max-sm:max-h-full sm:aspect-square sm:h-auto sm:max-h-full sm:w-full sm:max-w-full sm:min-h-[168px] sm:shrink-0"
           >
             {/* Cell fills under SVG so paths read through semi-transparent tiles. */}
             <div className="pointer-events-none absolute inset-0 z-[1] grid h-full w-full grid-cols-10 grid-rows-10 gap-px bg-zinc-950/85 p-px">
