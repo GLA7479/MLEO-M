@@ -30,7 +30,15 @@ const SNAKES_BOARD_EDGES = {
   },
 };
 
-/** Turn / identity accent (ring only). */
+/** Turn highlight on board pawns: colored drop-shadow (no ring — maximizes piece area). */
+const SEAT_TURN_FILTER = [
+  "drop-shadow(0 0 12px rgba(56,189,248,0.82)) drop-shadow(0 0 3px rgba(56,189,248,0.55))",
+  "drop-shadow(0 0 12px rgba(251,191,36,0.82)) drop-shadow(0 0 3px rgba(251,191,36,0.55))",
+  "drop-shadow(0 0 12px rgba(52,211,153,0.82)) drop-shadow(0 0 3px rgba(52,211,153,0.55))",
+  "drop-shadow(0 0 12px rgba(232,121,249,0.82)) drop-shadow(0 0 3px rgba(232,121,249,0.55))",
+];
+
+/** HUD seat chips still use thin inset rings (unchanged pattern). */
 const SEAT_TURN_RING = ["ring-sky-400/90", "ring-amber-400/90", "ring-emerald-400/90", "ring-fuchsia-400/90"];
 
 /** Center of cell `n` in unified 0–100 viewBox space (matches `cellNumberAt` serpentine layout). */
@@ -75,10 +83,19 @@ function ladderGeometry(fromN, toN) {
     const pv = A.v + s * dv;
     rungs.push({ x1: pu + nu, y1: pv + nv, x2: pu - nu, y2: pv - nv });
   }
+  const dirU = tu;
+  const dirV = tv;
   return {
     left: `M ${Lu0} ${Lv0} L ${Lu1} ${Lv1}`,
     right: `M ${Ru0} ${Rv0} L ${Ru1} ${Rv1}`,
     rungs,
+    footU: A.u,
+    footV: A.v,
+    topU: B.u,
+    topV: B.v,
+    dirU,
+    dirV,
+    spanLen: len,
   };
 }
 
@@ -113,7 +130,39 @@ function snakeSpineGeometry(fromN, toN) {
   const by = v1 - ty * 0.75;
   const px = -ty * 0.62;
   const py = tx * 0.62;
-  return { d, hx: u1, hy: v1, tx, ty, tipX, tipY, bx1: bx + px, by1: by + py, bx2: bx - px, by2: by - py };
+  const t2x = u2 - c2x;
+  const t2y = v2 - c2y;
+  const t2l = Math.hypot(t2x, t2y) || 1;
+  const wx = t2x / t2l;
+  const wy = t2y / t2l;
+  const tailTipX = u2 + wx * 1.85;
+  const tailTipY = v2 + wy * 1.85;
+  const tailBx = u2 - wx * 0.72;
+  const tailBy = v2 - wy * 0.72;
+  const tpx = -wy * 0.52;
+  const tpy = wx * 0.52;
+  return {
+    d,
+    hx: u1,
+    hy: v1,
+    tx,
+    ty,
+    tipX,
+    tipY,
+    bx1: bx + px,
+    by1: by + py,
+    bx2: bx - px,
+    by2: by - py,
+    tailUx: u2,
+    tailUy: v2,
+    tailTipX,
+    tailTipY,
+    tailBx1: tailBx + tpx,
+    tailBy1: tailBy + tpy,
+    tailBx2: tailBx - tpx,
+    tailBy2: tailBy - tpy,
+    approxLen: len,
+  };
 }
 
 /** Ludo soldier assets (same paths as `ov2LudoBoardView.js`). */
@@ -144,20 +193,22 @@ function Ov2SnakesEdgeOverlay() {
   const uid = useId().replace(/:/g, "");
   const gidRail = `ov2-sn-ladder-rail-${uid}`;
   const gidBelly = `ov2-sn-snake-belly-${uid}`;
-  const { ladders, snakes } = useMemo(() => {
+  const { ladders, snakesSorted } = useMemo(() => {
     const lad = [];
     for (const [from, to] of Object.entries(SNAKES_BOARD_EDGES.ladders)) {
       const f = Number(from);
       const t = Number(to);
-      lad.push({ key: `l-${from}`, ...ladderGeometry(f, t) });
+      lad.push({ key: `l-${from}`, fromN: f, ...ladderGeometry(f, t) });
     }
+    lad.sort((a, b) => a.fromN - b.fromN);
     const sn = [];
     for (const [from, to] of Object.entries(SNAKES_BOARD_EDGES.snakes)) {
       const f = Number(from);
       const t = Number(to);
-      sn.push({ key: `s-${from}`, ...snakeSpineGeometry(f, t) });
+      sn.push({ key: `s-${from}`, fromN: f, ...snakeSpineGeometry(f, t) });
     }
-    return { ladders: lad, snakes: sn };
+    sn.sort((a, b) => b.approxLen - a.approxLen || a.fromN - b.fromN);
+    return { ladders: lad, snakesSorted: sn };
   }, []);
 
   return (
@@ -174,81 +225,170 @@ function Ov2SnakesEdgeOverlay() {
           <stop offset="100%" stopColor="#8b6f47" />
         </linearGradient>
         <linearGradient id={gidBelly} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#fecdd3" stopOpacity="0.95" />
-          <stop offset="100%" stopColor="#7f1d1d" stopOpacity="0.98" />
+          <stop offset="0%" stopColor="#fecdd3" stopOpacity="0.92" />
+          <stop offset="100%" stopColor="#7f1d1d" stopOpacity="0.96" />
         </linearGradient>
       </defs>
 
-      {ladders.map(l => (
-        <g key={l.key}>
-          <path d={l.left} fill="none" stroke="rgba(0,0,0,0.48)" strokeWidth="0.82" strokeLinecap="butt" />
-          <path d={l.right} fill="none" stroke="rgba(0,0,0,0.48)" strokeWidth="0.82" strokeLinecap="butt" />
-          <path d={l.left} fill="none" stroke={`url(#${gidRail})`} strokeWidth="0.62" strokeLinecap="butt" />
-          <path d={l.right} fill="none" stroke={`url(#${gidRail})`} strokeWidth="0.62" strokeLinecap="butt" />
-          {l.rungs.map((r, i) => (
-            <line
-              key={`${l.key}-r-${i}`}
-              x1={r.x1}
-              y1={r.y1}
-              x2={r.x2}
-              y2={r.y2}
-              stroke="rgba(0,0,0,0.4)"
-              strokeWidth="0.52"
-              strokeLinecap="butt"
+      {/* Crossing: snake bodies under ladders (ladders read as crossing “over”). */}
+      <g className="ov2-snakes-spine-under">
+        {snakesSorted.map(s => (
+          <g key={`${s.key}-spine`}>
+            <path
+              d={s.d}
+              fill="none"
+              stroke="rgba(0,0,0,0.78)"
+              strokeWidth="3.05"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
-          ))}
-          {l.rungs.map((r, i) => (
-            <line
-              key={`${l.key}-rf-${i}`}
-              x1={r.x1}
-              y1={r.y1}
-              x2={r.x2}
-              y2={r.y2}
-              stroke="#d4c4a8"
-              strokeWidth="0.4"
-              strokeLinecap="butt"
+            <path
+              d={s.d}
+              fill="none"
+              stroke="#5c1a14"
+              strokeWidth="2.25"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.96"
             />
-          ))}
-        </g>
-      ))}
+            <path
+              d={s.d}
+              fill="none"
+              stroke={`url(#${gidBelly})`}
+              strokeWidth="1.38"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.86"
+            />
+          </g>
+        ))}
+      </g>
 
-      {snakes.map(s => (
-        <g key={s.key}>
-          <path
-            d={s.d}
-            fill="none"
-            stroke="rgba(0,0,0,0.72)"
-            strokeWidth="3.15"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d={s.d}
-            fill="none"
-            stroke="#7f1d1d"
-            strokeWidth="2.35"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d={s.d}
-            fill="none"
-            stroke={`url(#${gidBelly})`}
-            strokeWidth="1.45"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity="0.92"
-          />
-          <circle cx={s.hx} cy={s.hy} r="1.42" fill="#3f0d12" stroke="#fecdd3" strokeWidth="0.12" />
-          <polygon
-            points={`${s.tipX},${s.tipY} ${s.bx1},${s.by1} ${s.bx2},${s.by2}`}
-            fill="#2b070a"
-            stroke="#fecdd3"
-            strokeWidth="0.1"
-            strokeLinejoin="round"
-          />
-        </g>
-      ))}
+      <g className="ov2-snakes-ladders-bridge">
+        {ladders.map(l => (
+          <g key={l.key}>
+            <path d={l.left} fill="none" stroke="rgba(0,0,0,0.48)" strokeWidth="0.82" strokeLinecap="butt" />
+            <path d={l.right} fill="none" stroke="rgba(0,0,0,0.48)" strokeWidth="0.82" strokeLinecap="butt" />
+            <path d={l.left} fill="none" stroke={`url(#${gidRail})`} strokeWidth="0.62" strokeLinecap="butt" />
+            <path d={l.right} fill="none" stroke={`url(#${gidRail})`} strokeWidth="0.62" strokeLinecap="butt" />
+            {l.rungs.map((r, i) => (
+              <line
+                key={`${l.key}-r-${i}`}
+                x1={r.x1}
+                y1={r.y1}
+                x2={r.x2}
+                y2={r.y2}
+                stroke="rgba(0,0,0,0.4)"
+                strokeWidth="0.52"
+                strokeLinecap="butt"
+              />
+            ))}
+            {l.rungs.map((r, i) => (
+              <line
+                key={`${l.key}-rf-${i}`}
+                x1={r.x1}
+                y1={r.y1}
+                x2={r.x2}
+                y2={r.y2}
+                stroke="#d4c4a8"
+                strokeWidth="0.4"
+                strokeLinecap="butt"
+              />
+            ))}
+            <path
+              d={l.left}
+              fill="none"
+              stroke="rgba(255,255,255,0.14)"
+              strokeWidth="0.16"
+              strokeLinecap="butt"
+            />
+            <path
+              d={l.right}
+              fill="none"
+              stroke="rgba(255,255,255,0.14)"
+              strokeWidth="0.16"
+              strokeLinecap="butt"
+            />
+          </g>
+        ))}
+      </g>
+
+      {/* Ladder endpoints: foot vs top readable at a glance. */}
+      <g className="ov2-snakes-ladder-anchors">
+        {ladders.map(l => {
+          const { footU, footV, topU, topV, dirU, dirV } = l;
+          const pu = -dirV * 0.58;
+          const pv = dirU * 0.58;
+          const fTipX = footU + dirU * 2.75;
+          const fTipY = footV + dirV * 2.75;
+          const fB1x = footU + dirU * 0.95 + pu;
+          const fB1y = footV + dirV * 0.95 + pv;
+          const fB2x = footU + dirU * 0.95 - pu;
+          const fB2y = footV + dirV * 0.95 - pv;
+          const tTipX = topU - dirU * 2.45;
+          const tTipY = topV - dirV * 2.45;
+          const tB1x = topU - dirU * 0.92 + pu;
+          const tB1y = topV - dirV * 0.92 + pv;
+          const tB2x = topU - dirU * 0.92 - pu;
+          const tB2y = topV - dirV * 0.92 - pv;
+          return (
+            <g key={`${l.key}-cap`}>
+              <circle
+                cx={footU}
+                cy={footV}
+                r="2.38"
+                fill="rgba(234,179,8,0.1)"
+                stroke="rgba(202,138,4,0.55)"
+                strokeWidth="0.2"
+              />
+              <polygon
+                points={`${fTipX},${fTipY} ${fB1x},${fB1y} ${fB2x},${fB2y}`}
+                fill="rgba(253,224,71,0.22)"
+                stroke="rgba(202,138,4,0.45)"
+                strokeWidth="0.1"
+              />
+              <circle
+                cx={topU}
+                cy={topV}
+                r="2.12"
+                fill="rgba(163,230,53,0.08)"
+                stroke="rgba(190,242,100,0.42)"
+                strokeWidth="0.18"
+              />
+              <polygon
+                points={`${tTipX},${tTipY} ${tB1x},${tB1y} ${tB2x},${tB2y}`}
+                fill="rgba(217,249,157,0.16)"
+                stroke="rgba(132,204,22,0.35)"
+                strokeWidth="0.09"
+              />
+            </g>
+          );
+        })}
+      </g>
+
+      {/* Heads / tails above ladder art so endpoints stay legible where paths meet. */}
+      <g className="ov2-snakes-endpoints">
+        {snakesSorted.map(s => (
+          <g key={`${s.key}-ht`}>
+            <circle cx={s.hx} cy={s.hy} r="1.52" fill="#3f0d12" stroke="#fecdd3" strokeWidth="0.14" />
+            <polygon
+              points={`${s.tipX},${s.tipY} ${s.bx1},${s.by1} ${s.bx2},${s.by2}`}
+              fill="#2b070a"
+              stroke="#fecdd3"
+              strokeWidth="0.11"
+              strokeLinejoin="round"
+            />
+            <circle cx={s.tailUx} cy={s.tailUy} r="1.12" fill="#1a0507" stroke="#a8a29e" strokeWidth="0.12" />
+            <polygon
+              points={`${s.tailTipX},${s.tailTipY} ${s.tailBx1},${s.tailBy1} ${s.tailBx2},${s.tailBy2}`}
+              fill="#292524"
+              stroke="#d6d3d1"
+              strokeWidth="0.09"
+              strokeLinejoin="round"
+            />
+          </g>
+        ))}
+      </g>
     </svg>
   );
 }
@@ -282,23 +422,23 @@ function Ov2SnakesDiceFace({ value, emphasized }) {
   );
 }
 
-function PawnWithTurnRing({ seat, turnSeat }) {
+function PawnWithTurnRing({ seat, turnSeat, dense }) {
   const isTurn = turnSeat === seat;
-  const ring = SEAT_TURN_RING[seat] ?? "ring-amber-300/85";
+  const filt = SEAT_TURN_FILTER[seat] ?? SEAT_TURN_FILTER[1];
+  const idle = "drop-shadow(0 2px 4px rgba(0,0,0,0.72))";
+  const scIdle = dense ? "scale-[1.08]" : "scale-[1.12]";
+  const scTurn = dense ? "scale-[1.14]" : "scale-[1.18]";
   return (
     <span
-      className={`box-border flex h-full w-full max-h-full max-w-full items-center justify-center rounded-full ${
-        isTurn
-          ? `scale-[1.03] shadow-[0_0_12px_rgba(255,255,255,0.12)] ring-2 ring-offset-1 ring-offset-black/55 ${ring}`
-          : "shadow-[0_2px_8px_rgba(0,0,0,0.55)] ring-1 ring-black/40"
-      }`}
+      className="relative flex h-full w-full max-h-full max-w-full items-center justify-center"
+      style={{ filter: isTurn ? filt : idle }}
     >
       <img
         src={ludoPawnSrc(seat)}
         alt=""
         title={`Seat ${seat}`}
         draggable={false}
-        className="m-auto block h-full w-full max-h-[98%] max-w-[98%] object-contain"
+        className={`m-auto block h-full w-full max-h-full max-w-full origin-center object-contain ${isTurn ? scTurn : scIdle}`}
       />
     </span>
   );
@@ -531,20 +671,20 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
                               : "border-white/[0.06] text-zinc-400 [text-shadow:0_1px_2px_rgba(0,0,0,0.75)]"
                         } ${edgeBg}`}
                       >
-                        <span className="pointer-events-none absolute left-0 right-0 top-0 z-[4] flex h-[8px] items-center justify-center text-[5px] sm:h-[9px] sm:text-[6px]">
+                        <span className="pointer-events-none absolute left-0 right-0 top-0 z-[4] flex h-[5px] items-center justify-center text-[4px] leading-none sm:h-[6px] sm:text-[5px]">
                           {n}
                         </span>
                         {occupants.length > 0 ? (
-                          <div className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center pt-[8px] sm:pt-[9px]">
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[5px] z-[3] flex items-center justify-center sm:top-[6px]">
                             {occupants.length === 1 ? (
-                              <div className="flex h-[98%] w-[98%] items-center justify-center pb-px">
+                              <div className="flex h-full w-full min-h-0 min-w-0 items-center justify-center p-0">
                                 <PawnWithTurnRing seat={occupants[0]} turnSeat={turnSeat} />
                               </div>
                             ) : (
-                              <div className="grid h-[97%] w-[97%] max-w-full grid-cols-2 grid-rows-2 place-items-center gap-0 px-0">
+                              <div className="grid h-full w-full min-h-0 min-w-0 grid-cols-2 grid-rows-2 place-items-center gap-0 p-0">
                                 {occupants.map(s => (
-                                  <div key={`o-${n}-${s}`} className="flex h-full w-full min-h-0 min-w-0 items-center justify-center p-px">
-                                    <PawnWithTurnRing seat={s} turnSeat={turnSeat} />
+                                  <div key={`o-${n}-${s}`} className="flex h-full w-full min-h-0 min-w-0 items-center justify-center">
+                                    <PawnWithTurnRing seat={s} turnSeat={turnSeat} dense />
                                   </div>
                                 ))}
                               </div>
@@ -564,7 +704,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
           {room?.pot_locked != null ? (
             <span>Pot {Math.floor(Number(room.pot_locked) || 0).toLocaleString()}</span>
           ) : (
-            <span className="text-zinc-600">Rails + rungs = ladders · Thick path + head = snakes</span>
+            <span className="text-zinc-600">Gold chevron = climb start · Lime chevron = climb end</span>
           )}
         </div>
       </div>
