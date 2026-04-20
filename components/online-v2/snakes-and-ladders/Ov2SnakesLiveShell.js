@@ -100,6 +100,13 @@ export default function Ov2SnakesLiveShell() {
     }
   }, [roomId, participantId]);
 
+  const onSessionRefresh = useCallback(
+    async (_previousSessionId, _rpcNewSessionId, _options) => {
+      await reloadContext();
+    },
+    [reloadContext]
+  );
+
   const debouncedReloadContext = useOv2DebouncedReload(() => {
     void reloadContext();
   }, 400);
@@ -381,7 +388,11 @@ export default function Ov2SnakesLiveShell() {
             </div>
           ) : null}
           <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col justify-start overflow-x-hidden overflow-y-hidden">
-            <Ov2SnakesScreen key={room?.active_session_id ? String(room.active_session_id) : "ov2-snakes-no-session"} contextInput={contextInput} />
+            <Ov2SnakesScreen
+              key={room?.active_session_id ? String(room.active_session_id) : "ov2-snakes-no-session"}
+              contextInput={contextInput}
+              onSessionRefresh={onSessionRefresh}
+            />
           </div>
         </div>
       )}

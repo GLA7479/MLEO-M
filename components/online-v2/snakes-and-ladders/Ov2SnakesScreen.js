@@ -1,7 +1,32 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import { useRouter } from "next/router";
+import { useCallback, useId, useMemo, useState } from "react";
 import { useOv2SnakesSession } from "../../../hooks/useOv2SnakesSession";
+import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
+import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
+import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
+
+const finishDismissStorageKey = sid => `ov2_snakes_finish_dismiss_${sid}`;
+
+const BTN_PRIMARY =
+  "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+const BTN_SECONDARY =
+  "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+const BTN_FINISH_DANGER =
+  "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+
+/** Same shape as Ludo `member.meta.ludo.rematch_requested` — also checks `snakes` / `ov2_snakes` for future parity. */
+function readOv2MemberRematchRequested(meta) {
+  const raw = meta && typeof meta === "object" ? meta : null;
+  if (!raw) return false;
+  for (const key of ["ludo", "snakes", "ov2_snakes"]) {
+    const bucket = raw[key];
+    if (!bucket || typeof bucket !== "object") continue;
+    if (bucket.rematch_requested === true || bucket.rematch_requested === "true" || bucket.rematch_requested === 1) return true;
+  }
+  return false;
+}
 
 /** Turn highlight on board pawns: colored drop-shadow (no ring — maximizes piece area). */
 const SEAT_TURN_FILTER = [
@@ -527,17 +552,27 @@ function PawnWithTurnRing({ seat, turnSeat, dense, edgeHang }) {
 }
 
 /**
- * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string }, onLeaveToLobby?: () => void|Promise<void>, leaveToLobbyBusy?: boolean } | null }} props
+ * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string }, onLeaveToLobby?: () => void|Promise<void>, leaveToLobbyBusy?: boolean } | null, onSessionRefresh?: (previousActiveSessionId: string, rpcNewSessionId?: string, options?: { expectClearedSession?: boolean }) => void | Promise<unknown> }} props
  */
-export default function Ov2SnakesScreen({ contextInput = null }) {
+export default function Ov2SnakesScreen({ contextInput = null, onSessionRefresh }) {
+  const router = useRouter();
   const session = useOv2SnakesSession(contextInput ?? undefined);
   const { snap, err, rollBusy, roll, vaultClaimBusy, vaultClaimError, retryVaultClaim, pawnMotion, boardEdges } = session;
 
   const room = contextInput?.room;
+  const roomId =
+    room && typeof room === "object" && room.id != null ? String(room.id).trim() : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
+  const selfKey = pk;
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
   const onLeaveToLobby = typeof contextInput?.onLeaveToLobby === "function" ? contextInput.onLeaveToLobby : null;
   const leaveToLobbyBusy = Boolean(contextInput?.leaveToLobbyBusy);
+
+  const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
+  const [exitBusy, setExitBusy] = useState(false);
+  const [exitErr, setExitErr] = useState("");
+  const [rematchIntentBusy, setRematchIntentBusy] = useState(false);
+  const [startNextBusy, setStartNextBusy] = useState(false);
 
   const memberBySeat = useMemo(() => {
     /** @type {Map<number, { participant_key?: string, display_name?: string }>} */
@@ -554,6 +589,25 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
     }
     return m;
   }, [members]);
+
+  const roomMembers = members;
+  const roomHostKey = String(room?.host_participant_key || "").trim();
+  const isHost = Boolean(selfKey && roomHostKey && selfKey === roomHostKey);
+  const seatedCount = roomMembers.filter(m => m?.seat_index != null).length;
+  const myMemberRow = useMemo(
+    () => roomMembers.find(m => m && typeof m === "object" && String(m.participant_key || "").trim() === selfKey),
+    [roomMembers, selfKey]
+  );
+  const seatedCommitted = useMemo(
+    () => roomMembers.filter(m => m?.seat_index != null && String(m?.wallet_state || "").trim() === "committed"),
+    [roomMembers]
+  );
+  const eligibleRematch = seatedCommitted.length;
+  const readyRematch = useMemo(
+    () => seatedCommitted.filter(m => readOv2MemberRematchRequested(m?.meta)).length,
+    [seatedCommitted]
+  );
+  const myRematchRequested = (() => readOv2MemberRematchRequested(myMemberRow?.meta))();
 
   const { ladderFoot, ladderTop, snakeHead, snakeTail } = useEdgeLookups(boardEdges);
 
@@ -573,8 +627,128 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
   const phase = snap ? String(snap.phase || "").toLowerCase() : "";
   const finished = phase === "finished";
   const winnerSeat = snap?.winnerSeat != null ? snap.winnerSeat : null;
-  const winnerPk =
-    winnerSeat != null && memberBySeat.has(winnerSeat) ? String(memberBySeat.get(winnerSeat)?.participant_key || "") : "";
+
+  const mySeat = snap?.mySeat != null ? snap.mySeat : null;
+  const result = snap?.result && typeof snap.result === "object" ? snap.result : null;
+  const winnerFromResult =
+    result?.winner != null ? Number(result.winner) : winnerSeat != null ? Number(winnerSeat) : null;
+  const didIWin = finished && mySeat != null && winnerFromResult != null && Number(mySeat) === Number(winnerFromResult);
+  const lossPerSeat =
+    result?.lossPerSeat != null && Number.isFinite(Number(result.lossPerSeat)) ? Math.floor(Number(result.lossPerSeat)) : null;
+  let prizeTotal =
+    result?.prize != null && Number.isFinite(Number(result.prize)) ? Math.floor(Number(result.prize)) : null;
+  if (
+    prizeTotal != null &&
+    lossPerSeat != null &&
+    prizeTotal > 0 &&
+    lossPerSeat > 0 &&
+    prizeTotal <= lossPerSeat &&
+    seatedCount >= 2
+  ) {
+    prizeTotal = lossPerSeat * seatedCount;
+  }
+  const winnerNet =
+    prizeTotal != null && lossPerSeat != null ? Math.max(0, Math.floor(prizeTotal - lossPerSeat)) : null;
+
+  const isFinished = finished;
+  const baseRematchEligible =
+    isFinished &&
+    mySeat != null &&
+    String(myMemberRow?.wallet_state || "").trim() === "committed" &&
+    eligibleRematch >= 2 &&
+    eligibleRematch <= 4;
+  const finishActionsLocked = vaultClaimBusy;
+  const canHostStartNextMatch =
+    isFinished && isHost && eligibleRematch >= 2 && readyRematch >= eligibleRematch && !startNextBusy;
+
+  const finishSessionId = isFinished
+    ? String(snap?.sessionId || "").trim() ||
+      String(room && typeof room === "object" && room.active_session_id != null ? room.active_session_id : "").trim() ||
+      (roomId ? `room:${roomId}` : "")
+    : "";
+  const finishModalDismissed =
+    finishSessionId.length > 0 &&
+    (finishModalDismissedSessionId === finishSessionId ||
+      (typeof window !== "undefined" &&
+        (() => {
+          try {
+            return window.sessionStorage.getItem(finishDismissStorageKey(finishSessionId)) === "1";
+          } catch {
+            return false;
+          }
+        })()));
+  const showResultModal = isFinished && !finishModalDismissed;
+
+  const dismissFinishModal = useCallback(() => {
+    if (!finishSessionId) return;
+    setFinishModalDismissedSessionId(finishSessionId);
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(finishDismissStorageKey(finishSessionId), "1");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [finishSessionId]);
+
+  const requestRematch = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false, error: "missing" };
+    return { ok: false, error: "Snakes rematch RPC not wired yet" };
+  }, [roomId, selfKey]);
+  const cancelRematch = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false, error: "missing" };
+    return { ok: false, error: "Snakes rematch RPC not wired yet" };
+  }, [roomId, selfKey]);
+  const startNextMatch = useCallback(async () => {
+    if (!roomId || !selfKey) return { ok: false, error: "missing" };
+    return { ok: false, error: "Snakes start-next RPC not wired yet" };
+  }, [roomId, selfKey]);
+
+  const finishOutcome = useMemo(() => {
+    if (!isFinished) return "unknown";
+    if (winnerFromResult == null) return "unknown";
+    if (mySeat == null) return "unknown";
+    if (Number(mySeat) === Number(winnerFromResult)) return "win";
+    return "loss";
+  }, [isFinished, winnerFromResult, mySeat]);
+
+  const finishTitle = useMemo(() => {
+    if (!isFinished) return "";
+    if (finishOutcome === "unknown") return "Match finished";
+    if (finishOutcome === "win") return "Victory";
+    return "Defeat";
+  }, [isFinished, finishOutcome]);
+
+  const finishReasonLine = useMemo(() => {
+    if (!isFinished) return "";
+    if (winnerFromResult != null) return `Winner: Seat ${winnerFromResult + 1}`;
+    return "Match complete";
+  }, [isFinished, winnerFromResult]);
+
+  const finishAmountLine = useMemo(() => {
+    if (!isFinished) return { text: "—", className: "text-zinc-500" };
+    if (didIWin && winnerNet != null && prizeTotal != null) {
+      return {
+        text: `+${winnerNet.toLocaleString()} MLEO (pot ${prizeTotal.toLocaleString()})`,
+        className: "font-semibold tabular-nums text-amber-200/95",
+      };
+    }
+    if (didIWin && prizeTotal != null) {
+      return {
+        text: `Pot ${prizeTotal.toLocaleString()}`,
+        className: "font-semibold tabular-nums text-amber-200/95",
+      };
+    }
+    if (!didIWin && mySeat != null && winnerFromResult != null && lossPerSeat != null) {
+      return {
+        text: `−${lossPerSeat.toLocaleString()} MLEO`,
+        className: "font-semibold tabular-nums text-rose-300/95",
+      };
+    }
+    return { text: "—", className: "text-zinc-500" };
+  }, [isFinished, didIWin, winnerNet, prizeTotal, mySeat, winnerFromResult, lossPerSeat]);
+
+  const currentMultiplier = 1;
 
   const turnSeat = snap?.turnSeat != null ? snap.turnSeat : null;
   const lastRoll = snap?.lastRoll != null ? snap.lastRoll : null;
@@ -653,31 +827,13 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
       {err ? <p className="shrink-0 truncate px-0.5 text-[10px] text-red-300">{err}</p> : null}
-
-      {finished ? (
-        <div className="shrink-0 rounded-md border border-emerald-500/30 bg-emerald-950/25 px-1.5 py-1 text-[10px] text-emerald-100">
-          <span className="font-semibold text-emerald-50">Finished</span>
-          <span className="text-emerald-200/90">
-            {" "}
-            ·
-            {winnerSeat != null
-              ? ` Seat ${winnerSeat}${winnerPk && winnerPk === pk ? " (you)" : ""}`
-              : " Result recorded."}
-          </span>
-          {vaultClaimBusy ? <span className="text-emerald-200/75"> · Vault…</span> : null}
-          {vaultClaimError ? (
-            <span className="ml-1 inline-flex flex-wrap items-center gap-1">
-              <span className="text-amber-200/95">{vaultClaimError}</span>
-              <button
-                type="button"
-                className="rounded border border-amber-400/40 bg-amber-950/40 px-1 py-0 text-[9px] font-semibold text-amber-50"
-                onClick={() => retryVaultClaim()}
-              >
-                Retry
-              </button>
-            </span>
-          ) : null}
-        </div>
+      {snap && vaultClaimError && !vaultClaimBusy ? (
+        <p className="shrink-0 px-0.5 text-[10px] text-red-300/95">
+          {vaultClaimError}{" "}
+          <button type="button" className="underline" onClick={() => void retryVaultClaim()}>
+            Retry
+          </button>
+        </p>
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-visible px-0.5 pb-0.5 pt-0.5 sm:gap-1 sm:px-1">
@@ -772,7 +928,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
           </div>
         </div>
 
-        {onLeaveToLobby || !finished ? (
+        {(onLeaveToLobby || !finished) && !(finished && showResultModal) ? (
           <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/[0.08] bg-zinc-950/40 px-1 py-1.5 sm:gap-3 sm:py-2">
             {onLeaveToLobby ? (
               <button
@@ -808,6 +964,181 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
           )}
         </div>
       </div>
+
+      {showResultModal ? (
+        <Ov2SharedFinishModalFrame titleId="ov2-snakes-finish-title">
+          <div
+            className={[
+              "border-b px-4 pb-3 pt-4",
+              finishOutcome === "win"
+                ? "border-emerald-500/20 bg-gradient-to-br from-emerald-950/45 to-zinc-950/80"
+                : finishOutcome === "loss"
+                  ? "border-rose-500/20 bg-gradient-to-br from-rose-950/40 to-zinc-950/80"
+                  : "border-white/[0.07] bg-zinc-950/60",
+            ].join(" ")}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className={[
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl shadow-inner",
+                  finishOutcome === "win" && "border-emerald-500/45 bg-emerald-950/60 text-emerald-200",
+                  finishOutcome === "loss" && "border-rose-500/45 bg-rose-950/55 text-rose-200",
+                  finishOutcome === "unknown" && "border-white/10 bg-zinc-900/80 text-zinc-200",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-hidden
+              >
+                {finishOutcome === "win" ? "🏆" : finishOutcome === "loss" ? "✕" : "⎔"}
+              </span>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Round result</p>
+                <h2
+                  id="ov2-snakes-finish-title"
+                  className={[
+                    "mt-0.5 text-2xl font-extrabold leading-tight tracking-tight",
+                    finishOutcome === "win" && "text-emerald-400",
+                    finishOutcome === "loss" && "text-rose-400",
+                    finishOutcome === "unknown" && "text-zinc-100",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {finishTitle}
+                </h2>
+                <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Table multiplier</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">×{currentMultiplier}</p>
+                <div className="mt-3 rounded-lg border border-white/[0.1] bg-black/25 px-2.5 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Settlement</p>
+                  <p className={`mt-2 text-center text-xl font-bold tabular-nums leading-tight sm:text-2xl ${finishAmountLine.className}`}>
+                    {finishAmountLine.text}
+                  </p>
+                </div>
+                <p className="mt-3 text-center text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
+                {mySeat == null && prizeTotal != null && winnerFromResult != null ? (
+                  <p className="mt-2 text-center text-[10px] text-zinc-500">
+                    Spectator · winner S{winnerFromResult + 1} · pot {prizeTotal.toLocaleString()}
+                  </p>
+                ) : null}
+                <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
+                  {finishActionsLocked
+                    ? "Sending results to your balance…"
+                    : eligibleRematch >= 2
+                      ? `Rematch ready: ${readyRematch}/${eligibleRematch} seated players — then host starts next.`
+                      : "Round complete — rematch, then host starts next."}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 px-4 py-4">
+            <button
+              type="button"
+              disabled={rematchIntentBusy || myRematchRequested || !baseRematchEligible || finishActionsLocked}
+              onClick={async () => {
+                if (!baseRematchEligible || finishActionsLocked) return;
+                setRematchIntentBusy(true);
+                try {
+                  const r = await requestRematch();
+                  if (!r?.ok && r?.error) console.warn("[Snakes rematch intent]", r.error);
+                } finally {
+                  setRematchIntentBusy(false);
+                }
+              }}
+              className={BTN_PRIMARY + " w-full"}
+            >
+              {rematchIntentBusy && !myRematchRequested ? "Requesting…" : "Request rematch"}
+            </button>
+            <button
+              type="button"
+              disabled={rematchIntentBusy || !myRematchRequested || !baseRematchEligible}
+              onClick={async () => {
+                if (!baseRematchEligible) return;
+                setRematchIntentBusy(true);
+                try {
+                  const r = await cancelRematch();
+                  if (!r?.ok && r?.error) console.warn("[Snakes rematch cancel]", r.error);
+                } finally {
+                  setRematchIntentBusy(false);
+                }
+              }}
+              className={BTN_SECONDARY + " w-full"}
+            >
+              Cancel rematch
+            </button>
+            <div className="w-full overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-950/15 pt-2">
+              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">Host only</p>
+              <button
+                type="button"
+                className={BTN_PRIMARY + " w-full rounded-none"}
+                disabled={!isHost || startNextBusy || finishActionsLocked || !canHostStartNextMatch}
+                title={!isHost ? "Only the host can start the next match" : undefined}
+                onClick={async () => {
+                  if (!canHostStartNextMatch || finishActionsLocked) return;
+                  const prevSessionId =
+                    contextInput?.room?.active_session_id != null ? String(contextInput.room.active_session_id) : "";
+                  setStartNextBusy(true);
+                  try {
+                    const r = await startNextMatch();
+                    if (r?.ok) {
+                      try {
+                        window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_SESSION_KEY, roomId);
+                      } catch {
+                        /* ignore */
+                      }
+                      if (onSessionRefresh) {
+                        await onSessionRefresh(prevSessionId, "", { expectClearedSession: true });
+                      }
+                      await router.push(`/online-v2/rooms?room=${encodeURIComponent(roomId)}`);
+                    } else if (r?.error) {
+                      console.warn("[Snakes start next match]", r.error);
+                    }
+                  } finally {
+                    setStartNextBusy(false);
+                  }
+                }}
+              >
+                {startNextBusy ? "Starting…" : "Start next (host)"}
+              </button>
+              <p className="px-2 py-1.5 text-center text-[11px] text-zinc-500">
+                Host starts the next match when all seated players rematch.
+              </p>
+            </div>
+            <button type="button" className={BTN_SECONDARY + " w-full"} onClick={dismissFinishModal}>
+              Dismiss
+            </button>
+            <button
+              type="button"
+              disabled={exitBusy || !selfKey}
+              className={BTN_FINISH_DANGER + " w-full"}
+              onClick={async () => {
+                if (!selfKey) return;
+                setExitErr("");
+                setExitBusy(true);
+                try {
+                  await leaveOv2RoomWithForfeitRetry({
+                    room: contextInput?.room,
+                    room_id: roomId,
+                    participant_key: selfKey,
+                  });
+                  try {
+                    window.sessionStorage.removeItem(OV2_SHARED_LAST_ROOM_SESSION_KEY);
+                  } catch {
+                    /* ignore */
+                  }
+                  await router.replace("/online-v2/rooms");
+                } catch (e) {
+                  setExitErr(e?.message || "Could not leave room.");
+                } finally {
+                  setExitBusy(false);
+                }
+              }}
+            >
+              {exitBusy ? "Leaving…" : "Leave table"}
+            </button>
+            {exitErr ? <p className="text-center text-[11px] text-red-300">{exitErr}</p> : null}
+          </div>
+        </Ov2SharedFinishModalFrame>
+      ) : null}
     </div>
   );
 }
