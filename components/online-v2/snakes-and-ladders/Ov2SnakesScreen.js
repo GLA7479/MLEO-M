@@ -445,15 +445,15 @@ function Ov2SnakesEdgeOverlay({ edges }) {
   );
 }
 
-/** 1–6 pip readout (visual only). Outer box h-9 w-9 matches HUD pawn tiles. */
+/** 1–6 pip readout (visual only). HUD uses h-12 w-12 to match pawn tiles. */
 function Ov2SnakesDiceFace({ value, emphasized }) {
   const n = value != null && Number.isFinite(Number(value)) ? Math.floor(Number(value)) : null;
   const active = n != null && n >= 1 && n <= 6;
   const pipCls =
-    "block h-1.5 w-1.5 rounded-[1px] bg-zinc-100 shadow-[inset_0_-1px_1px_rgba(0,0,0,0.45)] sm:h-[7px] sm:w-[7px]";
+    "block h-2 w-2 rounded-[1px] bg-zinc-100 shadow-[inset_0_-1px_1px_rgba(0,0,0,0.45)] sm:h-2.5 sm:w-2.5";
   const grid = emphasized
-    ? "grid h-9 w-9 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-md border border-amber-400/50 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1 shadow-[0_0_12px_rgba(251,191,36,0.22)] sm:h-9 sm:w-9 sm:rounded-md sm:p-1"
-    : "grid h-9 w-9 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-md border border-white/15 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1 sm:h-9 sm:w-9 sm:rounded-md sm:p-1";
+    ? "grid h-12 w-12 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-lg border border-amber-400/50 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1.5 shadow-[0_0_14px_rgba(251,191,36,0.26)] sm:h-12 sm:w-12 sm:p-2"
+    : "grid h-12 w-12 shrink-0 grid-cols-3 grid-rows-3 gap-0.5 rounded-lg border border-white/15 bg-gradient-to-b from-zinc-800 to-zinc-950 p-1.5 sm:h-12 sm:w-12 sm:p-2";
   const patterns = {
     1: [null, null, null, null, "c", null, null, null, null],
     2: ["c", null, null, null, null, null, null, null, "c"],
@@ -474,7 +474,7 @@ function Ov2SnakesDiceFace({ value, emphasized }) {
   );
 }
 
-/** Single HUD seat: pawn tile h-9 w-9 (same outer size as `Ov2SnakesDiceFace`) + tiny name/pos. */
+/** HUD seat: pawn h-12 w-12 (same as dice) + name/pos; empty slot reserves space for grid corners. */
 function Ov2SnakesHudSeatChip({ si, memberBySeat, positions, turnSeat, pk }) {
   const m = memberBySeat.get(si);
   const posRaw = positions[String(si)] ?? positions[si];
@@ -484,21 +484,21 @@ function Ov2SnakesHudSeatChip({ si, memberBySeat, positions, turnSeat, pk }) {
   const rawName = m?.display_name != null ? String(m.display_name).trim() : "";
   const label = rawName || (occupied ? `Seat ${si}` : "");
   if (!occupied) {
-    return <div className="h-9 w-[4.25rem] shrink-0 sm:w-[4.5rem]" aria-hidden />;
+    return <div className="h-12 min-h-12 w-[4.5rem] min-w-0 max-w-full shrink sm:w-[5rem]" aria-hidden />;
   }
   const isYou = pk && m?.participant_key && String(m.participant_key) === pk;
   const nameLine = isYou ? `${label || `Seat ${si}`} (you)` : label;
   return (
     <div
-      className={`flex h-9 max-w-[5.75rem] shrink-0 items-center gap-0.5 rounded-md bg-black/35 py-0.5 pl-0.5 pr-1 ring-2 ring-inset sm:max-w-[6.25rem] ${
+      className={`flex h-12 min-w-0 max-w-[min(100%,9rem)] shrink items-center gap-1 rounded-lg bg-black/35 py-1 pl-1 pr-1.5 ring-2 ring-inset ${
         isTurn ? SEAT_TURN_RING[si] ?? "ring-amber-300/80" : "ring-transparent"
       }`}
       title={m?.display_name || `Seat ${si}`}
     >
-      <img src={ludoPawnSrc(si)} alt="" className="h-9 w-9 shrink-0 object-contain" draggable={false} />
+      <img src={ludoPawnSrc(si)} alt="" className="h-12 w-12 shrink-0 object-contain" draggable={false} />
       <div className="flex min-w-0 flex-1 flex-col justify-center leading-tight">
-        <span className="truncate text-[7px] font-medium text-zinc-200 sm:text-[8px]">{nameLine}</span>
-        <span className="font-mono text-[8px] tabular-nums text-zinc-300 sm:text-[9px]">
+        <span className="truncate text-[8px] font-medium text-zinc-200 sm:text-[9px]">{nameLine}</span>
+        <span className="font-mono text-[10px] font-semibold tabular-nums text-zinc-200 sm:text-[11px]">
           {Number.isFinite(pos) ? pos : "—"}
         </span>
       </div>
@@ -681,30 +681,22 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-visible px-0.5 pb-0.5 pt-0.5 sm:gap-1 sm:px-1">
-        <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-1 gap-y-0.5 rounded-md border border-white/[0.07] bg-zinc-950/55 px-1 py-0.5 sm:gap-x-1.5 sm:px-1.5">
-          {[0, 1].map(si => (
-            <Ov2SnakesHudSeatChip
-              key={`hud-seat-${si}`}
-              si={si}
-              memberBySeat={memberBySeat}
-              positions={positions}
-              turnSeat={turnSeat}
-              pk={pk}
-            />
-          ))}
-          <div className="flex h-9 shrink-0 items-center px-0.5">
+        {/*
+          Grid: dedicated center column for dice (no overlap). Side columns minmax(0,1fr) + overflow-hidden
+          pin seat groups to corners on one row; items-center aligns dice with chips vertically.
+        */}
+        <div className="grid w-full min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_minmax(3rem,auto)_minmax(0,1fr)] grid-rows-1 items-center gap-x-1 rounded-lg border border-white/[0.08] bg-zinc-950/55 px-1 py-1.5 sm:gap-x-2 sm:px-2 sm:py-2">
+          <div className="col-start-1 flex min-h-12 min-w-0 items-center justify-start gap-1 overflow-hidden pl-0.5 sm:gap-1.5 sm:pl-1">
+            <Ov2SnakesHudSeatChip si={0} memberBySeat={memberBySeat} positions={positions} turnSeat={turnSeat} pk={pk} />
+            <Ov2SnakesHudSeatChip si={2} memberBySeat={memberBySeat} positions={positions} turnSeat={turnSeat} pk={pk} />
+          </div>
+          <div className="col-start-2 flex min-h-12 min-w-[3rem] items-center justify-center justify-self-center px-0.5 sm:min-w-[3.25rem]">
             <Ov2SnakesDiceFace value={lastRoll} emphasized={Boolean(snap?.canRoll)} />
           </div>
-          {[2, 3].map(si => (
-            <Ov2SnakesHudSeatChip
-              key={`hud-seat-${si}`}
-              si={si}
-              memberBySeat={memberBySeat}
-              positions={positions}
-              turnSeat={turnSeat}
-              pk={pk}
-            />
-          ))}
+          <div className="col-start-3 flex min-h-12 min-w-0 items-center justify-end gap-1 overflow-hidden pr-0.5 sm:gap-1.5 sm:pr-1">
+            <Ov2SnakesHudSeatChip si={1} memberBySeat={memberBySeat} positions={positions} turnSeat={turnSeat} pk={pk} />
+            <Ov2SnakesHudSeatChip si={3} memberBySeat={memberBySeat} positions={positions} turnSeat={turnSeat} pk={pk} />
+          </div>
         </div>
 
         <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-visible p-0.5 max-sm:items-stretch max-sm:justify-center">
@@ -713,7 +705,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
             stretch with the same 10×10 grid as the CSS cells. sm+: square board for larger viewports.
           */}
           <div
-            className="relative isolate min-w-0 overflow-visible rounded-lg border border-amber-800/50 bg-gradient-to-br from-amber-950/62 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_12px_36px_rgba(0,0,0,0.52)] ring-2 ring-amber-700/28 max-sm:h-full max-sm:w-full max-sm:min-h-0 max-sm:max-h-[min(100%,calc(100dvh-13.5rem))] sm:aspect-square sm:h-auto sm:max-h-full sm:w-full sm:max-w-full sm:min-h-[148px] sm:shrink-0 sm:rounded-xl sm:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_16px_48px_rgba(0,0,0,0.52)]"
+            className="relative isolate min-w-0 overflow-visible rounded-lg border border-amber-800/50 bg-gradient-to-br from-amber-950/62 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_12px_36px_rgba(0,0,0,0.52)] ring-2 ring-amber-700/28 max-sm:h-full max-sm:w-full max-sm:min-h-0 max-sm:max-h-[min(100%,calc(100dvh-15rem))] sm:aspect-square sm:h-auto sm:max-h-full sm:w-full sm:max-w-full sm:min-h-[148px] sm:shrink-0 sm:rounded-xl sm:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_16px_48px_rgba(0,0,0,0.52)]"
           >
             {/* Cell fills under SVG so paths read through semi-transparent tiles. */}
             <div className="pointer-events-none absolute inset-0 z-[1] grid h-full w-full grid-cols-10 grid-rows-10 gap-px bg-zinc-950/85 p-px">
