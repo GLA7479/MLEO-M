@@ -44,23 +44,76 @@ function cellCenterUv(n) {
   return { u: (col + 0.5) * 10, v: (row + 0.5) * 10 };
 }
 
-function ladderPathD(u1, v1, u2, v2) {
-  return `M ${u1} ${v1} L ${u2} ${v2}`;
+const LADDER_RAIL_HALF = 0.92;
+
+/**
+ * @returns {{ left: string, right: string, rungs: { x1: number; y1: number; x2: number; y2: number }[] }}
+ */
+function ladderGeometry(fromN, toN) {
+  const A = cellCenterUv(fromN);
+  const B = cellCenterUv(toN);
+  const du = B.u - A.u;
+  const dv = B.v - A.v;
+  const len = Math.hypot(du, dv) || 1;
+  const tu = du / len;
+  const tv = dv / len;
+  const nu = -tv * LADDER_RAIL_HALF;
+  const nv = tu * LADDER_RAIL_HALF;
+  const Lu0 = A.u + nu;
+  const Lv0 = A.v + nv;
+  const Lu1 = B.u + nu;
+  const Lv1 = B.v + nv;
+  const Ru0 = A.u - nu;
+  const Rv0 = A.v - nv;
+  const Ru1 = B.u - nu;
+  const Rv1 = B.v - nv;
+  const rungCount = Math.max(7, Math.min(16, Math.round(len / 1.25)));
+  const rungs = [];
+  for (let i = 1; i < rungCount; i += 1) {
+    const s = i / rungCount;
+    const pu = A.u + s * du;
+    const pv = A.v + s * dv;
+    rungs.push({ x1: pu + nu, y1: pv + nv, x2: pu - nu, y2: pv - nv });
+  }
+  return {
+    left: `M ${Lu0} ${Lv0} L ${Lu1} ${Lv1}`,
+    right: `M ${Ru0} ${Rv0} L ${Ru1} ${Rv1}`,
+    rungs,
+  };
 }
 
-/** Curved snake path (head → tail) for a readable S-bend. */
-function snakePathD(u1, v1, u2, v2) {
-  const mx = (u1 + u2) / 2;
-  const my = (v1 + v2) / 2;
+/**
+ * Cubic snake spine (head at fromN → tail at toN) + geometry for head marker.
+ * @returns {{ d: string, hx: number, hy: number, tx: number; ty: number; tipX: number; tipY: number; bx1: number; by1: number; bx2: number; by2: number }}
+ */
+function snakeSpineGeometry(fromN, toN) {
+  const u1 = cellCenterUv(fromN).u;
+  const v1 = cellCenterUv(fromN).v;
+  const u2 = cellCenterUv(toN).u;
+  const v2 = cellCenterUv(toN).v;
   const dx = u2 - u1;
   const dy = v2 - v1;
   const len = Math.hypot(dx, dy) || 1;
-  const sag = Math.min(11, Math.max(3.2, len * 0.14));
   const nx = -dy / len;
   const ny = dx / len;
-  const cx = mx + nx * sag;
-  const cy = my + ny * sag;
-  return `M ${u1} ${v1} Q ${cx} ${cy} ${u2} ${v2}`;
+  const sag = Math.min(13, Math.max(4.2, len * 0.19));
+  const c1x = u1 + dx * 0.32 + nx * sag;
+  const c1y = v1 + dy * 0.32 + ny * sag;
+  const c2x = u1 + dx * 0.68 - nx * sag * 0.58;
+  const c2y = v1 + dy * 0.68 - ny * sag * 0.58;
+  const d = `M ${u1} ${v1} C ${c1x} ${c1y} ${c2x} ${c2y} ${u2} ${v2}`;
+  const tux = c1x - u1;
+  const tuy = c1y - v1;
+  const tlen = Math.hypot(tux, tuy) || 1;
+  const tx = tux / tlen;
+  const ty = tuy / tlen;
+  const tipX = u1 + tx * 2.35;
+  const tipY = v1 + ty * 2.35;
+  const bx = u1 - tx * 0.75;
+  const by = v1 - ty * 0.75;
+  const px = -ty * 0.62;
+  const py = tx * 0.62;
+  return { d, hx: u1, hy: v1, tx, ty, tipX, tipY, bx1: bx + px, by1: by + py, bx2: bx - px, by2: by - py };
 }
 
 /** Ludo soldier assets (same paths as `ov2LudoBoardView.js`). */
@@ -89,22 +142,22 @@ function useEdgeLookups() {
 
 function Ov2SnakesEdgeOverlay() {
   const uid = useId().replace(/:/g, "");
-  const flL = `ov2-snakes-ladder-glow-${uid}`;
-  const flS = `ov2-snakes-snake-glow-${uid}`;
-  const { ladderPaths, snakePaths } = useMemo(() => {
-    const ladders = [];
+  const gidRail = `ov2-sn-ladder-rail-${uid}`;
+  const gidBelly = `ov2-sn-snake-belly-${uid}`;
+  const { ladders, snakes } = useMemo(() => {
+    const lad = [];
     for (const [from, to] of Object.entries(SNAKES_BOARD_EDGES.ladders)) {
-      const a = cellCenterUv(Number(from));
-      const b = cellCenterUv(Number(to));
-      ladders.push({ key: `l-${from}`, d: ladderPathD(a.u, a.v, b.u, b.v) });
+      const f = Number(from);
+      const t = Number(to);
+      lad.push({ key: `l-${from}`, ...ladderGeometry(f, t) });
     }
-    const snakes = [];
+    const sn = [];
     for (const [from, to] of Object.entries(SNAKES_BOARD_EDGES.snakes)) {
-      const a = cellCenterUv(Number(from));
-      const b = cellCenterUv(Number(to));
-      snakes.push({ key: `s-${from}`, d: snakePathD(a.u, a.v, b.u, b.v) });
+      const f = Number(from);
+      const t = Number(to);
+      sn.push({ key: `s-${from}`, ...snakeSpineGeometry(f, t) });
     }
-    return { ladderPaths: ladders, snakePaths: snakes };
+    return { ladders: lad, snakes: sn };
   }, []);
 
   return (
@@ -115,64 +168,86 @@ function Ov2SnakesEdgeOverlay() {
       aria-hidden
     >
       <defs>
-        <filter id={flL} x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="0.55" result="b" />
-          <feMerge>
-            <feMergeNode in="b" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-        <filter id={flS} x="-25%" y="-25%" width="150%" height="150%">
-          <feGaussianBlur stdDeviation="0.65" result="b" />
-          <feMerge>
-            <feMergeNode in="b" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
+        <linearGradient id={gidRail} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#f3e8d4" />
+          <stop offset="50%" stopColor="#c9b18a" />
+          <stop offset="100%" stopColor="#8b6f47" />
+        </linearGradient>
+        <linearGradient id={gidBelly} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#fecdd3" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="#7f1d1d" stopOpacity="0.98" />
+        </linearGradient>
       </defs>
-      {ladderPaths.map(({ key, d }) => (
-        <path
-          key={key}
-          d={d}
-          fill="none"
-          stroke="rgba(250,250,250,0.22)"
-          strokeWidth={1.15}
-          strokeLinecap="round"
-        />
+
+      {ladders.map(l => (
+        <g key={l.key}>
+          <path d={l.left} fill="none" stroke="rgba(0,0,0,0.48)" strokeWidth="0.82" strokeLinecap="butt" />
+          <path d={l.right} fill="none" stroke="rgba(0,0,0,0.48)" strokeWidth="0.82" strokeLinecap="butt" />
+          <path d={l.left} fill="none" stroke={`url(#${gidRail})`} strokeWidth="0.62" strokeLinecap="butt" />
+          <path d={l.right} fill="none" stroke={`url(#${gidRail})`} strokeWidth="0.62" strokeLinecap="butt" />
+          {l.rungs.map((r, i) => (
+            <line
+              key={`${l.key}-r-${i}`}
+              x1={r.x1}
+              y1={r.y1}
+              x2={r.x2}
+              y2={r.y2}
+              stroke="rgba(0,0,0,0.4)"
+              strokeWidth="0.52"
+              strokeLinecap="butt"
+            />
+          ))}
+          {l.rungs.map((r, i) => (
+            <line
+              key={`${l.key}-rf-${i}`}
+              x1={r.x1}
+              y1={r.y1}
+              x2={r.x2}
+              y2={r.y2}
+              stroke="#d4c4a8"
+              strokeWidth="0.4"
+              strokeLinecap="butt"
+            />
+          ))}
+        </g>
       ))}
-      {ladderPaths.map(({ key, d }) => (
-        <path
-          key={`${key}-lime`}
-          d={d}
-          fill="none"
-          stroke="#a3e635"
-          strokeWidth={0.85}
-          strokeLinecap="round"
-          strokeOpacity={0.95}
-          filter={`url(#${flL})`}
-        />
-      ))}
-      {snakePaths.map(({ key, d }) => (
-        <path
-          key={key}
-          d={d}
-          fill="none"
-          stroke="rgba(15,15,18,0.55)"
-          strokeWidth={1.55}
-          strokeLinecap="round"
-        />
-      ))}
-      {snakePaths.map(({ key, d }) => (
-        <path
-          key={`${key}-rose`}
-          d={d}
-          fill="none"
-          stroke="#fb7185"
-          strokeWidth={1.05}
-          strokeLinecap="round"
-          strokeOpacity={0.94}
-          filter={`url(#${flS})`}
-        />
+
+      {snakes.map(s => (
+        <g key={s.key}>
+          <path
+            d={s.d}
+            fill="none"
+            stroke="rgba(0,0,0,0.72)"
+            strokeWidth="3.15"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d={s.d}
+            fill="none"
+            stroke="#7f1d1d"
+            strokeWidth="2.35"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d={s.d}
+            fill="none"
+            stroke={`url(#${gidBelly})`}
+            strokeWidth="1.45"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.92"
+          />
+          <circle cx={s.hx} cy={s.hy} r="1.42" fill="#3f0d12" stroke="#fecdd3" strokeWidth="0.12" />
+          <polygon
+            points={`${s.tipX},${s.tipY} ${s.bx1},${s.by1} ${s.bx2},${s.by2}`}
+            fill="#2b070a"
+            stroke="#fecdd3"
+            strokeWidth="0.1"
+            strokeLinejoin="round"
+          />
+        </g>
       ))}
     </svg>
   );
@@ -212,10 +287,10 @@ function PawnWithTurnRing({ seat, turnSeat }) {
   const ring = SEAT_TURN_RING[seat] ?? "ring-amber-300/85";
   return (
     <span
-      className={`flex h-full w-full max-h-full max-w-full items-center justify-center rounded-full ${
+      className={`box-border flex h-full w-full max-h-full max-w-full items-center justify-center rounded-full ${
         isTurn
-          ? `scale-[1.05] shadow-[0_0_14px_rgba(255,255,255,0.14)] ring-[3px] ring-offset-[2px] ring-offset-black/45 ${ring}`
-          : "shadow-[0_2px_8px_rgba(0,0,0,0.55)] ring-1 ring-black/35"
+          ? `scale-[1.03] shadow-[0_0_12px_rgba(255,255,255,0.12)] ring-2 ring-offset-1 ring-offset-black/55 ${ring}`
+          : "shadow-[0_2px_8px_rgba(0,0,0,0.55)] ring-1 ring-black/40"
       }`}
     >
       <img
@@ -223,7 +298,7 @@ function PawnWithTurnRing({ seat, turnSeat }) {
         alt=""
         title={`Seat ${seat}`}
         draggable={false}
-        className="block h-full w-full max-h-full max-w-full object-contain"
+        className="m-auto block h-full w-full max-h-[98%] max-w-[98%] object-contain"
       />
     </span>
   );
@@ -250,7 +325,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
     if (!el) return undefined;
     const measure = () => {
       const r = el.getBoundingClientRect();
-      const s = Math.max(168, Math.floor(Math.min(r.width, r.height) - 2));
+      const s = Math.max(168, Math.floor(Math.min(r.width, r.height) - 1));
       setBoardSide(s);
     };
     measure();
@@ -410,7 +485,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
 
         <div ref={boardFitRef} className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
           <div
-            className="relative overflow-hidden rounded-xl border border-amber-800/40 bg-gradient-to-br from-amber-950/55 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06),0_14px_44px_rgba(0,0,0,0.5)] ring-2 ring-amber-700/20"
+            className="relative overflow-hidden rounded-xl border border-amber-800/50 bg-gradient-to-br from-amber-950/62 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_16px_48px_rgba(0,0,0,0.52)] ring-2 ring-amber-700/28"
             style={{ width: boardSide, height: boardSide }}
           >
             <Ov2SnakesEdgeOverlay />
@@ -456,17 +531,19 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
                               : "border-white/[0.06] text-zinc-400 [text-shadow:0_1px_2px_rgba(0,0,0,0.75)]"
                         } ${edgeBg}`}
                       >
-                        <span className="pointer-events-none absolute left-0 right-0 top-0.5 z-[4] text-center">{n}</span>
+                        <span className="pointer-events-none absolute left-0 right-0 top-0 z-[4] flex h-[8px] items-center justify-center text-[5px] sm:h-[9px] sm:text-[6px]">
+                          {n}
+                        </span>
                         {occupants.length > 0 ? (
-                          <div className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center pt-[11px] sm:pt-[12px]">
+                          <div className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center pt-[8px] sm:pt-[9px]">
                             {occupants.length === 1 ? (
-                              <div className="flex h-[92%] w-[92%] items-center justify-center">
+                              <div className="flex h-[98%] w-[98%] items-center justify-center pb-px">
                                 <PawnWithTurnRing seat={occupants[0]} turnSeat={turnSeat} />
                               </div>
                             ) : (
-                              <div className="grid h-[90%] w-[90%] max-w-full grid-cols-2 grid-rows-2 place-items-center gap-[1px] px-px">
+                              <div className="grid h-[97%] w-[97%] max-w-full grid-cols-2 grid-rows-2 place-items-center gap-0 px-0">
                                 {occupants.map(s => (
-                                  <div key={`o-${n}-${s}`} className="flex h-[92%] w-[92%] items-center justify-center">
+                                  <div key={`o-${n}-${s}`} className="flex h-full w-full min-h-0 min-w-0 items-center justify-center p-px">
                                     <PawnWithTurnRing seat={s} turnSeat={turnSeat} />
                                   </div>
                                 ))}
@@ -487,7 +564,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
           {room?.pot_locked != null ? (
             <span>Pot {Math.floor(Number(room.pot_locked) || 0).toLocaleString()}</span>
           ) : (
-            <span className="text-zinc-600">Lime rails = ladders · Rose curves = snakes</span>
+            <span className="text-zinc-600">Rails + rungs = ladders · Thick path + head = snakes</span>
           )}
         </div>
       </div>
