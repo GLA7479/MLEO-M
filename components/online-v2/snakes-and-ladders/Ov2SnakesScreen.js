@@ -83,8 +83,6 @@ function ladderGeometry(fromN, toN) {
     const pv = A.v + s * dv;
     rungs.push({ x1: pu + nu, y1: pv + nv, x2: pu - nu, y2: pv - nv });
   }
-  const dirU = tu;
-  const dirV = tv;
   return {
     left: `M ${Lu0} ${Lv0} L ${Lu1} ${Lv1}`,
     right: `M ${Ru0} ${Rv0} L ${Ru1} ${Rv1}`,
@@ -93,8 +91,8 @@ function ladderGeometry(fromN, toN) {
     footV: A.v,
     topU: B.u,
     topV: B.v,
-    dirU,
-    dirV,
+    dirU: tu,
+    dirV: tv,
     spanLen: len,
   };
 }
@@ -213,9 +211,10 @@ function Ov2SnakesEdgeOverlay() {
 
   return (
     <svg
-      className="pointer-events-none absolute inset-0 z-[1] h-full w-full"
+      className="pointer-events-none z-[1] block h-full w-full overflow-visible"
       viewBox="0 0 100 100"
       preserveAspectRatio="xMidYMid meet"
+      overflow="visible"
       aria-hidden
     >
       <defs>
@@ -503,6 +502,58 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
   const mySeat = snap?.mySeat != null ? snap.mySeat : null;
   const lastRoll = snap?.lastRoll != null ? snap.lastRoll : null;
 
+  const boardCells = useMemo(() => {
+    const out = [];
+    for (let row = 0; row < 10; row += 1) {
+      for (let col = 0; col < 10; col += 1) {
+        const n = cellNumberAt(row, col);
+        const occupants = [];
+        for (let s = 0; s <= 3; s += 1) {
+          const posRaw = positions[String(s)] ?? positions[s];
+          const pos = posRaw != null ? Number(posRaw) : NaN;
+          if (Number.isFinite(pos) && Math.floor(pos) === n) occupants.push(s);
+        }
+        const isStart = n === 1;
+        const isEnd = n === 100;
+        const lf = ladderFoot.has(n);
+        const lt = ladderTop.has(n);
+        const sh = snakeHead.has(n);
+        const st = snakeTail.has(n);
+        const edgeBg =
+          isEnd
+            ? "bg-gradient-to-br from-emerald-900/50 to-emerald-950/72"
+            : isStart
+              ? "bg-gradient-to-br from-sky-900/42 to-sky-950/68"
+              : sh
+                ? "bg-gradient-to-br from-rose-950/48 to-zinc-950/58"
+                : lf
+                  ? "bg-gradient-to-br from-lime-950/38 to-zinc-950/58"
+                  : st
+                    ? "bg-gradient-to-br from-rose-900/28 to-zinc-950/58"
+                    : lt
+                      ? "bg-gradient-to-br from-lime-900/28 to-zinc-950/58"
+                      : "bg-zinc-950/50";
+        const cellNumberStyle =
+          isEnd
+            ? {
+                color: "rgb(192 132 252)",
+                textShadow: "0 1px 3px rgb(12 4 28 / 0.92), 0 0 1px rgb(0 0 0 / 0.55)",
+              }
+            : isStart
+              ? {
+                  color: "rgb(45 212 191)",
+                  textShadow: "0 1px 3px rgb(4 24 28 / 0.92), 0 0 1px rgb(0 0 0 / 0.5)",
+                }
+              : {
+                  color: "rgb(196 181 253)",
+                  textShadow: "0 1px 3px rgb(8 6 22 / 0.92), 0 0 1px rgb(0 0 0 / 0.5)",
+                };
+        out.push({ key: `c-${row}-${col}`, n, occupants, edgeBg, cellNumberStyle });
+      }
+    }
+    return out;
+  }, [positions, ladderFoot, ladderTop, snakeHead, snakeTail]);
+
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center justify-between gap-1 border-b border-white/[0.06] px-0.5 py-0.5 sm:px-1">
@@ -565,7 +616,7 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden px-0.5 pb-0.5 pt-0.5 sm:gap-1 sm:px-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-visible px-0.5 pb-0.5 pt-0.5 sm:gap-1 sm:px-1">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5 rounded-md border border-white/[0.07] bg-zinc-950/55 px-1 py-0.5 sm:px-1.5">
           <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9px] text-zinc-300 sm:text-[10px]">
             <span className="shrink-0 text-zinc-500">Turn</span>
@@ -623,95 +674,50 @@ export default function Ov2SnakesScreen({ contextInput = null }) {
           </div>
         </div>
 
-        <div ref={boardFitRef} className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden">
+        <div ref={boardFitRef} className="flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-visible">
           <div
-            className="relative overflow-hidden rounded-xl border border-amber-800/50 bg-gradient-to-br from-amber-950/62 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_16px_48px_rgba(0,0,0,0.52)] ring-2 ring-amber-700/28"
+            className="relative overflow-visible rounded-xl border border-amber-800/50 bg-gradient-to-br from-amber-950/62 via-zinc-900 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07),0_16px_48px_rgba(0,0,0,0.52)] ring-2 ring-amber-700/28"
             style={{ width: boardSide, height: boardSide }}
           >
-            <Ov2SnakesEdgeOverlay />
-            <div className="relative z-[2] grid h-full w-full grid-cols-10 grid-rows-10 gap-px p-px">
-              {Array.from({ length: 10 }, (_, row) => (
-                <div key={`row-${row}`} className="contents">
-                  {Array.from({ length: 10 }, (_, col) => {
-                    const n = cellNumberAt(row, col);
-                    const occupants = [];
-                    for (let s = 0; s <= 3; s += 1) {
-                      const posRaw = positions[String(s)] ?? positions[s];
-                      const pos = posRaw != null ? Number(posRaw) : NaN;
-                      if (Number.isFinite(pos) && Math.floor(pos) === n) occupants.push(s);
-                    }
-                    const isStart = n === 1;
-                    const isEnd = n === 100;
-                    const lf = ladderFoot.has(n);
-                    const lt = ladderTop.has(n);
-                    const sh = snakeHead.has(n);
-                    const st = snakeTail.has(n);
-                    const edgeBg =
-                      isEnd
-                        ? "bg-gradient-to-br from-emerald-900/50 to-emerald-950/72"
-                        : isStart
-                          ? "bg-gradient-to-br from-sky-900/42 to-sky-950/68"
-                          : sh
-                            ? "bg-gradient-to-br from-rose-950/48 to-zinc-950/58"
-                            : lf
-                              ? "bg-gradient-to-br from-lime-950/38 to-zinc-950/58"
-                              : st
-                                ? "bg-gradient-to-br from-rose-900/28 to-zinc-950/58"
-                                : lt
-                                  ? "bg-gradient-to-br from-lime-900/28 to-zinc-950/58"
-                                  : "bg-zinc-950/50";
-                    const cellNumberStyle =
-                      isEnd
-                        ? {
-                            color: "rgb(192 132 252)",
-                            textShadow: "0 1px 3px rgb(12 4 28 / 0.92), 0 0 1px rgb(0 0 0 / 0.55)",
-                          }
-                        : isStart
-                          ? {
-                              color: "rgb(45 212 191)",
-                              textShadow: "0 1px 3px rgb(4 24 28 / 0.92), 0 0 1px rgb(0 0 0 / 0.5)",
-                            }
-                          : {
-                              color: "rgb(196 181 253)",
-                              textShadow: "0 1px 3px rgb(8 6 22 / 0.92), 0 0 1px rgb(0 0 0 / 0.5)",
-                            };
-                    return (
-                      <div
-                        key={`c-${row}-${col}`}
-                        className={`relative flex min-h-0 min-w-0 overflow-hidden rounded-sm border text-[6px] font-bold leading-none sm:text-[7px] ${
-                          isEnd
-                            ? "border-emerald-500/45"
-                            : isStart
-                              ? "border-sky-500/40"
-                              : "border-white/[0.06]"
-                        } ${edgeBg}`}
-                      >
-                        <span
-                          className="pointer-events-none absolute right-0 top-0 z-[6] px-0.5 py-px pr-0.5 text-[8px] font-bold tabular-nums leading-none sm:text-[9px]"
-                          style={cellNumberStyle}
-                        >
-                          {n}
-                        </span>
-                        {occupants.length > 0 ? (
-                          <div className="pointer-events-none absolute inset-0 z-[3] flex items-center justify-center">
-                            {occupants.length === 1 ? (
-                              <div className="flex h-full w-full min-h-0 min-w-0 items-center justify-center p-0">
-                                <PawnWithTurnRing seat={occupants[0]} turnSeat={turnSeat} />
-                              </div>
-                            ) : (
-                              <div className="grid h-full w-full min-h-0 min-w-0 grid-cols-2 grid-rows-2 place-items-center gap-0 p-0">
-                                {occupants.map(s => (
-                                  <div key={`o-${n}-${s}`} className="flex h-full w-full min-h-0 min-w-0 items-center justify-center">
-                                    <PawnWithTurnRing seat={s} turnSeat={turnSeat} dense />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+            {/* Cell fills under SVG so paths read through semi-transparent tiles. */}
+            <div className="pointer-events-none absolute inset-0 z-[1] grid h-full w-full grid-cols-10 grid-rows-10 gap-px bg-zinc-950/85 p-px">
+              {boardCells.map(c => (
+                <div key={`bg-${c.key}`} className={`min-h-0 min-w-0 rounded-sm ${c.edgeBg}`} />
+              ))}
+            </div>
+            {/* Snakes & ladders above cell paint, below numbers/pawns — avoids border “cuts”. */}
+            <div className="pointer-events-none absolute inset-0 z-[2] overflow-visible">
+              <Ov2SnakesEdgeOverlay />
+            </div>
+            <div className="pointer-events-none absolute inset-0 z-[3] grid h-full w-full grid-cols-10 grid-rows-10 gap-px p-px">
+              {boardCells.map(c => (
+                <div
+                  key={c.key}
+                  className="relative flex min-h-0 min-w-0 overflow-visible rounded-sm bg-transparent text-[6px] font-bold leading-none sm:text-[7px]"
+                >
+                  <span
+                    className="pointer-events-none absolute right-0 top-0 z-[6] px-0.5 py-px pr-0.5 text-[8px] font-bold tabular-nums leading-none sm:text-[9px]"
+                    style={c.cellNumberStyle}
+                  >
+                    {c.n}
+                  </span>
+                  {c.occupants.length > 0 ? (
+                    <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center">
+                      {c.occupants.length === 1 ? (
+                        <div className="flex h-full w-full min-h-0 min-w-0 items-center justify-center p-0">
+                          <PawnWithTurnRing seat={c.occupants[0]} turnSeat={turnSeat} />
+                        </div>
+                      ) : (
+                        <div className="grid h-full w-full min-h-0 min-w-0 grid-cols-2 grid-rows-2 place-items-center gap-0 p-0">
+                          {c.occupants.map(s => (
+                            <div key={`o-${c.n}-${s}`} className="flex h-full w-full min-h-0 min-w-0 items-center justify-center">
+                              <PawnWithTurnRing seat={s} turnSeat={turnSeat} dense />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
