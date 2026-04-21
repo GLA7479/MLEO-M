@@ -115,6 +115,50 @@ export function useOv2BomberArenaSession(baseContext) {
     return mySeat === turnSeat;
   }, [mySeat, isPlaying, turnSeat]);
 
+  const simTicksRemaining = useMemo(() => {
+    const raw = authoritativeSnapshot?.simTicksRemaining;
+    if (raw === null || raw === undefined || raw === "") return null;
+    const n = Math.floor(Number(raw));
+    return Number.isFinite(n) ? Math.max(0, n) : null;
+  }, [authoritativeSnapshot]);
+
+  const rulesPhase = useMemo(() => {
+    const s = String(authoritativeSnapshot?.rulesPhase ?? "").replace(/^"+|"+$/g, "").trim();
+    if (s === "sudden_death" || s === "normal" || s === "finished") return s;
+    const b = authoritativeSnapshot?.board;
+    if (b && typeof b === "object" && "rulesPhase" in b) {
+      const t = String(/** @type {Record<string, unknown>} */ (b).rulesPhase || "").trim();
+      if (t === "sudden_death" || t === "normal") return t;
+    }
+    return "normal";
+  }, [authoritativeSnapshot]);
+
+  const suddenDeathBombRadius = useMemo(() => {
+    const raw = authoritativeSnapshot?.suddenDeathBombRadius;
+    const n = Math.floor(Number(raw));
+    return n === 1 || n === 2 ? n : null;
+  }, [authoritativeSnapshot]);
+
+  const canWait = useMemo(() => authoritativeSnapshot?.canWait === true, [authoritativeSnapshot]);
+
+  const legalMoveCount = useMemo(() => {
+    const raw = authoritativeSnapshot?.legalMoveCount;
+    const n = Math.floor(Number(raw));
+    return Number.isFinite(n) ? Math.max(0, Math.min(4, n)) : null;
+  }, [authoritativeSnapshot]);
+
+  const lastAction = useMemo(() => {
+    const la = authoritativeSnapshot?.lastAction;
+    return la && typeof la === "object" ? /** @type {Record<string, unknown>} */ (la) : null;
+  }, [authoritativeSnapshot]);
+
+  const finishReason = useMemo(() => {
+    if (!isFinished) return "";
+    const fr = authoritativeSnapshot?.finishReason;
+    const s = typeof fr === "string" ? fr.replace(/^"+|"+$/g, "").trim() : "";
+    return s || "";
+  }, [authoritativeSnapshot, isFinished]);
+
   const sendStep = useCallback(
     async action => {
       if (!roomId || !selfKey || !sessionId) {
@@ -136,7 +180,11 @@ export function useOv2BomberArenaSession(baseContext) {
           setAuthoritativeSnapshot(prev => /** @type {Record<string, unknown>|null} */ (ov2PreferNewerSnapshot(prev, res.snapshot)));
         } else {
           const errMsg = String(res.error || "Move rejected");
-          setStepError(errMsg);
+          if (res.code === "BAD_WAIT") {
+            setStepError("You still have a legal move — cannot pass.");
+          } else {
+            setStepError(errMsg);
+          }
           if (res.code === "NOT_PLAYING" || errMsg.toLowerCase().includes("not active")) {
             const snap = await fetchOv2BomberArenaAuthoritativeSnapshot(roomId, { participantKey: selfKey ?? "" });
             if (snap) {
@@ -236,6 +284,13 @@ export function useOv2BomberArenaSession(baseContext) {
     mySeat,
     turnSeat,
     isMyTurn,
+    simTicksRemaining,
+    rulesPhase,
+    suddenDeathBombRadius,
+    canWait,
+    legalMoveCount,
+    lastAction,
+    finishReason,
     stepBusy,
     stepError,
     setStepError,

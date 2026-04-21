@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOv2BomberArenaSession } from "../../../hooks/useOv2BomberArenaSession";
 import { useOv2MatchSnapshotWait } from "../../../hooks/useOv2MatchSnapshotWait";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
@@ -11,8 +11,6 @@ import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 
 const finishDismissStorageKey = sid => `ov2_bomber_finish_dismiss_${sid}`;
 
-const BTN_PRIMARY =
-  "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_SECONDARY =
   "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_FINISH_DANGER =
@@ -27,26 +25,72 @@ function cellInPairs(arr, x, y) {
   return false;
 }
 
-/** Same pawn art as OV2 Snakes & Ladders + Ludo (`Ov2SnakesScreen` `ludoPawnSrc`, `ov2LudoBoardView` dog tiles). */
-function ov2LudoDogPawnSrc(seat) {
-  return `/images/ludo/dog_${seat}.png`;
+/** Matches server spawn-bubble (Manhattan ≤3 from each corner spawn). */
+function isSpawnBubbleTile(x, y) {
+  const d0 = Math.abs(x - 1) + Math.abs(y - 1);
+  const d1 = Math.abs(x - 7) + Math.abs(y - 7);
+  return d0 <= 3 || d1 <= 3;
 }
 
-/** Subtle turn hint on the active seat’s piece (kept light — no heavy halo). */
-const PAWN_TURN_GLOW = [
-  "drop-shadow(0 0 6px rgba(56,189,248,0.45)) drop-shadow(0 0 2px rgba(125,211,252,0.35))",
-  "drop-shadow(0 0 6px rgba(251,191,36,0.45)) drop-shadow(0 0 2px rgba(253,224,71,0.35))",
-];
+/**
+ * @param {unknown[]} members
+ * @param {unknown} seatsRaw
+ * @param {string} _selfKey
+ * @param {number|null} mySeat
+ */
+function resolveOpponentDisplayName(members, seatsRaw, _selfKey, mySeat) {
+  if (mySeat !== 0 && mySeat !== 1) return "Opponent";
+  const other = mySeat === 0 ? 1 : 0;
+  const seats = Array.isArray(seatsRaw) ? seatsRaw : [];
+  const row = seats.find(s => {
+    const o = /** @type {Record<string, unknown>} */ (s);
+    const si = o.seatIndex ?? o.seat_index;
+    return Number(si) === other;
+  });
+  const ro = row && typeof row === "object" ? /** @type {Record<string, unknown>} */ (row) : null;
+  const pk = String(ro?.participantKey ?? ro?.participant_key ?? "").trim();
+  if (!pk) return `Player ${other + 1}`;
+  const m = members.find(x => String(/** @type {Record<string, unknown>} */ (x)?.participant_key || "").trim() === pk);
+  const name = String(/** @type {Record<string, unknown>} */ (m)?.display_name || "").trim();
+  return name || `Player ${other + 1}`;
+}
+
+/**
+ * Bomber-local pilot token (no shared Ludo dog art).
+ * @param {{ seat: 0|1, isTurnActive: boolean }} props
+ */
+function BomberPawnAvatar({ seat, isTurnActive }) {
+  const shell =
+    seat === 0
+      ? "bg-gradient-to-br from-sky-200/95 via-sky-500 to-sky-950 shadow-[inset_0_2px_3px_rgba(255,255,255,0.38)]"
+      : "bg-gradient-to-br from-amber-200/95 via-orange-500 to-amber-950 shadow-[inset_0_2px_3px_rgba(255,255,255,0.32)]";
+  const ring = isTurnActive
+    ? seat === 0
+      ? "ring-2 ring-sky-100/90 shadow-[0_0_14px_rgba(56,189,248,0.55)]"
+      : "ring-2 ring-amber-100/88 shadow-[0_0_14px_rgba(251,146,60,0.5)]"
+    : "ring-1 ring-black/30";
+  return (
+    <span
+      className={`pointer-events-none absolute inset-[8%] z-[3] block rounded-full ${shell} ${ring}`}
+      aria-hidden
+    >
+      <span className="absolute left-1/2 top-[16%] h-[24%] w-[55%] -translate-x-1/2 rounded-full bg-black/40" />
+    </span>
+  );
+}
 
 const BTN =
-  "rounded-lg border border-emerald-500/30 bg-emerald-950/50 px-3 py-2 text-[11px] font-semibold text-emerald-100 disabled:opacity-45";
+  "rounded-md border border-emerald-500/35 bg-emerald-950/55 px-2 py-1.5 text-[10px] font-semibold leading-tight text-emerald-100 disabled:opacity-45 min-h-[2.5rem] sm:min-h-[2.625rem] sm:px-2.5 sm:py-2 sm:text-[11px]";
+
+const BTN_BOMB =
+  "rounded-md border border-orange-500/45 bg-gradient-to-b from-orange-950/75 to-zinc-950 px-2 py-1.5 text-[11px] font-bold leading-tight text-orange-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_3px_12px_rgba(234,88,12,0.22)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-40 min-h-[2.65rem] sm:rounded-lg sm:min-h-[2.75rem] sm:px-3 sm:py-2";
 
 /** Match OV2 live shells: page body does not scroll; only bounded inner bands may. */
 const BTN_PAD =
   "touch-none select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] disabled:opacity-45";
 
 /**
- * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string, display_name?: string }, onLeaveToLobby?: () => void | Promise<void>, leaveToLobbyBusy?: boolean } | null }} props
+ * @param {{ contextInput?: { room?: object, members?: unknown[], self?: { participant_key?: string, display_name?: string }, onLeaveToLobby?: () => void | Promise<void>, leaveToLobbyBusy?: boolean } | null }} props — `members` used for duel strip names.
  */
 export default function Ov2BomberArenaScreen({ contextInput = null }) {
   const router = useRouter();
@@ -59,6 +103,13 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
     mySeat,
     turnSeat,
     isMyTurn,
+    simTicksRemaining,
+    rulesPhase,
+    suddenDeathBombRadius,
+    canWait,
+    legalMoveCount,
+    lastAction,
+    finishReason,
     stepBusy,
     stepError,
     submitMove,
@@ -74,6 +125,11 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
   const roomId = room?.id != null ? String(room.id) : "";
   const roomProductId = room?.product_game_id != null ? String(room.product_game_id) : "";
   const selfKey = String(contextInput?.self?.participant_key || "").trim();
+  const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
+  const seatsRaw = authoritativeSnapshot?.seats;
+
+  const [boardFlash, setBoardFlash] = useState(false);
+  const prevRevisionRef = useRef(/** @type {number|null} */ (null));
 
   const roomHasActiveOv2Session = Boolean(
     room && room.active_session_id != null && String(room.active_session_id).trim() !== ""
@@ -89,8 +145,6 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
   const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
   const [exitBusy, setExitBusy] = useState(false);
   const [exitErr, setExitErr] = useState("");
-  const [rematchIntentBusy, setRematchIntentBusy] = useState(false);
-  const [startNextBusy, setStartNextBusy] = useState(false);
 
   useEffect(() => {
     if (!isFinished) setFinishModalDismissedSessionId("");
@@ -99,6 +153,20 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
   useEffect(() => {
     setLeaveConfirmOpen(false);
   }, [sessionId]);
+
+  useEffect(() => {
+    const rev = Number(authoritativeSnapshot?.revision);
+    if (!Number.isFinite(rev)) return undefined;
+    const prev = prevRevisionRef.current;
+    prevRevisionRef.current = rev;
+    if (prev == null || !isPlaying) return undefined;
+    if (rev > prev) {
+      setBoardFlash(true);
+      const t = window.setTimeout(() => setBoardFlash(false), 140);
+      return () => window.clearTimeout(t);
+    }
+    return undefined;
+  }, [authoritativeSnapshot?.revision, isPlaying]);
 
   const finishModalDismissed = useMemo(() => {
     const sid = String(sessionId || "").trim();
@@ -172,6 +240,7 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
     : null;
   const w = board && Number(board.w) > 0 ? Math.floor(Number(board.w)) : 9;
   const h = board && Number(board.h) > 0 ? Math.floor(Number(board.h)) : 9;
+  const fuseTicksDefault = Math.min(30, Math.max(1, Math.floor(Number(board?.fuseTicksDefault) || 6)));
   const walls = board?.walls;
   const breakables = board?.breakables;
   const bombsRaw = board?.bombs;
@@ -209,6 +278,42 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
     }
     return m;
   }, [bombsRaw]);
+
+  const maxBombsPerPlayer = Math.min(4, Math.max(1, Math.floor(Number(board?.maxBombsPerPlayer) || 2)));
+
+  const myBombCount = useMemo(() => {
+    if (mySeat == null || !Array.isArray(bombsRaw)) return 0;
+    let c = 0;
+    for (const b of bombsRaw) {
+      if (!b || typeof b !== "object") continue;
+      const o = /** @type {Record<string, unknown>} */ (b);
+      if (Math.floor(Number(o.owner)) === mySeat) c += 1;
+    }
+    return c;
+  }, [bombsRaw, mySeat]);
+
+  const bombAtLimit = myBombCount >= maxBombsPerPlayer;
+
+  const opponentDisplayName = useMemo(
+    () => resolveOpponentDisplayName(members, seatsRaw, selfKey, mySeat),
+    [members, seatsRaw, selfKey, mySeat]
+  );
+
+  const selfDisplayName = String(contextInput?.self?.display_name || "").trim() || "You";
+
+  const lastPulseKey = useMemo(() => {
+    if (!lastAction || typeof lastAction !== "object") return "";
+    const seat = Number(/** @type {Record<string, unknown>} */ (lastAction).seat);
+    if (seat !== 0 && seat !== 1) return "";
+    if (mySeat != null && seat === mySeat) return "";
+    if (String(/** @type {Record<string, unknown>} */ (lastAction).type) !== "move") return "";
+    const pl = players?.[String(seat)];
+    if (!pl || typeof pl !== "object") return "";
+    const x = Math.floor(Number(/** @type {Record<string, unknown>} */ (pl).x));
+    const y = Math.floor(Number(/** @type {Record<string, unknown>} */ (pl).y));
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return "";
+    return `${x},${y}`;
+  }, [lastAction, players, mySeat]);
 
   const winnerSeat =
     authoritativeSnapshot?.winnerSeat != null && authoritativeSnapshot.winnerSeat !== ""
@@ -253,10 +358,30 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
     return "unknown";
   }, [finishOutcome]);
 
-  const roomHostKey = String(room?.host_participant_key || "").trim();
-  const isHost = Boolean(selfKey && roomHostKey && selfKey === roomHostKey);
   const prizeTotal = room?.pot_locked != null ? Math.floor(Number(room.pot_locked) || 0) : null;
   const stakePerSeat = room?.stake_per_seat != null ? Math.floor(Number(room.stake_per_seat) || 0) : null;
+
+  const finishSubtitleBomber = useMemo(() => {
+    const fr = String(finishReason || "")
+      .replace(/^"+|"+$/g, "")
+      .trim()
+      .toLowerCase();
+    if (fr === "double_ko") return "Double K.O.";
+    if (fr === "time_limit") return "Time limit — draw";
+    if (fr === "forfeit") return "Forfeit";
+    if (fr === "elimination") return "K.O.";
+    if (isDraw) return "Draw";
+    return "Match complete";
+  }, [finishReason, isDraw]);
+
+  const rulesPhaseNorm = useMemo(() => {
+    const s = String(rulesPhase ?? "normal")
+      .replace(/^"+|"+$/g, "")
+      .trim()
+      .toLowerCase();
+    if (s === "sudden_death" || s === "sudden death") return "sudden_death";
+    return s || "normal";
+  }, [rulesPhase]);
 
   const finishReasonLine = useMemo(() => {
     if (!isFinished) return "";
@@ -283,13 +408,7 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
     return { text: "—", className: "text-zinc-500" };
   }, [isFinished, isDraw, didIWin, didILose, prizeTotal, stakePerSeat]);
 
-  const currentMultiplier = 1;
   const finishActionsLocked = vaultClaimBusy;
-  const baseRematchEligible = false;
-  const eligibleRematch = 0;
-  const readyRematch = 0;
-  const myRematchRequested = false;
-  const canHostStartNextMatch = false;
 
   const showInMatchLeaveChrome = Boolean(
     roomId && selfKey && roomHasActiveOv2Session && !isFinished && authoritativeSnapshot
@@ -297,62 +416,87 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
 
   const showBoardLoadingOverlay = Boolean(roomHasActiveOv2Session && !authoritativeSnapshot);
 
+  const hudAlertLine = useMemo(() => {
+    if (matchSnapshotTimedOut && !showBoardLoadingOverlay) {
+      return (
+        <span className="text-amber-200/95">
+          Snapshot slow — check connection. Use <span className="font-semibold">Leave</span> below if needed.
+        </span>
+      );
+    }
+    if (vaultClaimError) {
+      return (
+        <span className="text-rose-200/95">
+          {vaultClaimError}{" "}
+          <button type="button" className="text-sky-300 underline" onClick={() => retryVaultClaim()}>
+            Retry
+          </button>
+        </span>
+      );
+    }
+    if (vaultClaimBusy) return <span className="text-zinc-500">Updating vault…</span>;
+    if (stepError) return <span className="text-amber-200">{stepError}</span>;
+    return null;
+  }, [matchSnapshotTimedOut, showBoardLoadingOverlay, vaultClaimError, vaultClaimBusy, stepError, retryVaultClaim]);
+
+  const boardBoxStyle = useMemo(
+    () => ({
+      gridTemplateColumns: `repeat(${w}, minmax(0, 1fr))`,
+      aspectRatio: `${w} / ${h}`,
+      width: "min(100%, min(96vmin, calc(100dvh - 5.5rem)))",
+      maxWidth: "100%",
+      maxHeight: "min(96vmin, calc(100dvh - 5.5rem), 100%)",
+    }),
+    [w, h]
+  );
+
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-1 overflow-x-hidden overflow-y-hidden overscroll-none p-2 text-zinc-100">
-      <div className="flex min-h-[1.75rem] shrink-0 items-center text-[11px] text-zinc-400">
-        {mySeat != null ? (
-          <span className="truncate">
-            You: seat {mySeat + 1}
-            {isPlaying ? (isMyTurn ? " — your turn" : ` — seat ${turnSeat + 1} to move`) : null}
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-x-hidden overflow-y-hidden overscroll-none px-1 pb-[max(0.125rem,env(safe-area-inset-bottom))] pt-0.5 text-zinc-100 sm:px-2">
+      <header className="shrink-0 border-b border-white/[0.06] pb-1 pt-0.5">
+        <div className="flex items-center justify-between gap-1.5 text-[10px] font-semibold leading-tight tracking-tight text-zinc-200 sm:text-[11px]">
+          <span className="min-w-0 truncate text-sky-200/95">{selfDisplayName}</span>
+          <span className="shrink-0 rounded bg-zinc-800/90 px-1 py-0.5 text-[8px] font-extrabold uppercase tracking-[0.18em] text-zinc-500">
+            vs
           </span>
-        ) : (
-          <span>Spectating</span>
-        )}
-      </div>
-
-      {/* Fixed-height alert band (Snakes-style thin HUD): avoids layout jump when errors / vault / snapshot state flip. */}
-      <div className="flex min-h-[4.25rem] shrink-0 flex-col justify-center gap-0.5 overflow-hidden py-0.5">
-        <div className="flex min-h-[1.35rem] max-h-[1.35rem] shrink-0 items-center overflow-hidden">
-          {matchSnapshotTimedOut && !showBoardLoadingOverlay ? (
-            <p className="truncate text-[10px] leading-tight text-amber-200/95 sm:text-[11px]">
-              Snapshot is slow to load. Check your connection, use Leave if you need to exit, then rejoin from the hub room list.
-            </p>
-          ) : (
-            <span className="block min-h-[1.35rem] w-full" aria-hidden />
-          )}
+          <span className="min-w-0 truncate text-right text-amber-200/95">{opponentDisplayName}</span>
         </div>
-        <div className="flex min-h-[1.35rem] max-h-[1.35rem] shrink-0 items-center overflow-hidden text-[10px] sm:text-[11px]">
-          {vaultClaimError ? (
-            <span className="truncate text-rose-200/95">
-              {vaultClaimError}{" "}
-              <button type="button" className="text-sky-300 underline" onClick={() => retryVaultClaim()}>
-                Retry
-              </button>
+        <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[9px] leading-tight text-zinc-500 sm:text-[10px]">
+          <span className={isPlaying && mySeat != null && isMyTurn ? "font-bold uppercase tracking-wide text-orange-200/95" : ""}>
+            {mySeat != null
+              ? isPlaying
+                ? isMyTurn
+                  ? "Your turn"
+                  : "Their turn"
+                : isFinished
+                  ? "Finished"
+                  : "—"
+              : "Spectating"}
+          </span>
+          {isPlaying && simTicksRemaining != null ? (
+            <span className="max-w-[min(100%,14rem)] text-right tabular-nums">
+              <span className="font-semibold text-zinc-300">{simTicksRemaining}</span> ticks
+              {rulesPhaseNorm === "sudden_death" ? <span className="font-semibold text-orange-300/95"> · SD</span> : null}
+              {suddenDeathBombRadius != null ? <span className="text-zinc-600"> · r{suddenDeathBombRadius}</span> : null}
+              {legalMoveCount != null && mySeat != null ? (
+                <span className="text-zinc-600"> · mv{legalMoveCount}</span>
+              ) : null}
             </span>
-          ) : vaultClaimBusy ? (
-            <span className="truncate text-zinc-500">Updating vault…</span>
-          ) : (
-            <span className="block min-h-[1.35rem] w-full" aria-hidden />
-          )}
+          ) : null}
         </div>
-        <div className="flex min-h-[1.35rem] max-h-[1.35rem] shrink-0 items-center overflow-hidden">
-          {stepError ? (
-            <p className="truncate text-[10px] leading-tight text-amber-200 sm:text-[11px]">{stepError}</p>
-          ) : (
-            <span className="block min-h-[1.35rem] w-full" aria-hidden />
-          )}
-        </div>
-      </div>
+      </header>
 
-      <div className="relative mx-auto flex min-h-0 w-full min-w-0 max-w-[360px] flex-1 flex-col justify-center overflow-hidden py-1">
-        <div className="relative mx-auto flex min-h-0 w-full min-w-0 flex-1 items-center justify-center">
+      {hudAlertLine ? (
+        <div className="shrink-0 border-b border-white/[0.05] py-0.5 text-[9px] leading-snug sm:text-[10px]">{hudAlertLine}</div>
+      ) : null}
+
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col items-stretch justify-center overflow-hidden">
+        <div className="relative flex min-h-0 w-full flex-1 items-center justify-center px-0.5 py-0">
           <div
-            className="grid w-full min-w-0 gap-px rounded-lg border border-zinc-700/55 bg-zinc-900 p-1 shadow-sm"
-            style={{
-              gridTemplateColumns: `repeat(${w}, minmax(0, 1fr))`,
-              maxHeight: "100%",
-              aspectRatio: `${w} / ${h}`,
-            }}
+            className={[
+              "grid min-h-0 min-w-0 gap-px rounded-md border border-zinc-700/55 bg-zinc-900 p-0.5 shadow-md transition-[box-shadow,filter] duration-150",
+              boardFlash ? "shadow-[0_0_0_2px_rgba(251,146,60,0.38),0_8px_28px_rgba(0,0,0,0.35)]" : "",
+            ].join(" ")}
+            style={boardBoxStyle}
           >
           {Array.from({ length: h * w }, (_, i) => {
             const x = i % w;
@@ -361,20 +505,37 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
             const brk = !wall && cellInPairs(breakables, x, y);
             const pl = playerCell.get(`${x},${y}`);
             const bomb = bombsAt.get(`${x},${y}`);
-            let floor = "bg-zinc-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]";
+            const spawnHint = !wall && !brk && isSpawnBubbleTile(x, y);
+            let floor =
+              "bg-zinc-800/92 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]";
             if (wall) {
-              floor = "bg-zinc-950 ring-1 ring-inset ring-black/35";
+              floor =
+                "bg-gradient-to-br from-zinc-900 to-zinc-950 ring-1 ring-inset ring-black/50 shadow-[inset_0_-2px_0_rgba(0,0,0,0.35)]";
             } else if (brk) {
-              floor = "bg-zinc-800 ring-1 ring-inset ring-amber-900/28";
+              floor =
+                "bg-amber-950/28 bg-[repeating-linear-gradient(135deg,rgba(245,158,11,0.14)_0px,rgba(245,158,11,0.14)_3px,transparent_3px,transparent_7px)] ring-1 ring-inset ring-amber-900/32";
+            } else if (spawnHint) {
+              floor =
+                "bg-zinc-800/92 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.14),inset_0_1px_0_rgba(255,255,255,0.04)]";
             }
             const detonating = Boolean(bomb && bomb.fuse <= 0);
-            const pawnTurnGlow =
-              isPlaying && pl != null && (pl === 0 || pl === 1) && pl === turnSeat ? PAWN_TURN_GLOW[pl] : undefined;
+            const oppMovePulse = lastPulseKey === `${x},${y}`;
+            const fuseRingOpacity =
+              bomb && bomb.fuse > 0 && fuseTicksDefault > 0
+                ? 0.28 + 0.62 * Math.min(1, bomb.fuse / fuseTicksDefault)
+                : 0.45;
+            const pawnTurnActive = isPlaying && pl != null && (pl === 0 || pl === 1) && pl === turnSeat;
             return (
               <div
                 key={`${x}-${y}`}
                 className={`relative flex min-h-0 min-w-0 items-center justify-center text-[9px] font-bold ${floor}`}
               >
+                {oppMovePulse ? (
+                  <span
+                    className="pointer-events-none absolute inset-0 z-0 ring-2 ring-inset ring-sky-400/40 animate-pulse"
+                    aria-hidden
+                  />
+                ) : null}
                 {detonating ? (
                   <span
                     className="pointer-events-none absolute inset-0 z-[1] ring-1 ring-inset ring-orange-500/35"
@@ -383,27 +544,26 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
                 ) : null}
                 {bomb && !wall ? (
                   <span className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center">
-                    <span
-                      className={`font-mono tabular-nums leading-none ${
-                        bomb.fuse > 0
-                          ? "text-[9px] font-semibold text-orange-300"
-                          : "rounded-sm px-0.5 text-[10px] font-bold text-amber-100 ring-1 ring-orange-400/40"
-                      }`}
-                    >
-                      {bomb.fuse > 0 ? bomb.fuse : "!"}
-                    </span>
+                    {bomb.fuse > 0 ? (
+                      <span className="relative flex h-[44%] min-h-[0.95rem] w-[44%] min-w-[0.95rem] items-center justify-center">
+                        <span
+                          className="absolute inset-0 rounded-full border-2 border-orange-400/60 animate-pulse"
+                          style={{ opacity: fuseRingOpacity }}
+                          aria-hidden
+                        />
+                        <span className="relative z-[1] font-mono text-[10px] font-bold tabular-nums leading-none text-orange-100">
+                          {bomb.fuse}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="rounded-sm px-0.5 text-[10px] font-bold text-amber-100 ring-1 ring-orange-400/40">
+                        !
+                      </span>
+                    )}
                   </span>
                 ) : null}
                 {!wall && pl != null && (pl === 0 || pl === 1) ? (
-                  <span className="pointer-events-none absolute inset-px z-[3] block min-h-0 min-w-0 overflow-hidden">
-                    <img
-                      src={ov2LudoDogPawnSrc(pl)}
-                      alt=""
-                      draggable={false}
-                      className="box-border h-full w-full object-contain object-center select-none"
-                      style={pawnTurnGlow ? { filter: pawnTurnGlow } : undefined}
-                    />
-                  </span>
+                  <BomberPawnAvatar seat={/** @type {0|1} */ (pl)} isTurnActive={pawnTurnActive} />
                 ) : null}
               </div>
             );
@@ -457,12 +617,17 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
         </div>
       </div>
 
-      <div className="mx-auto flex min-h-[11rem] w-full max-w-sm shrink-0 flex-col justify-end touch-none pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+      <div className="mx-auto flex w-full max-w-lg shrink-0 touch-none flex-col gap-1 pt-1">
         <div
-          className={isPlaying && mySeat != null ? "" : "invisible pointer-events-none select-none"}
+          className={[
+            !(isPlaying && mySeat != null) ? "invisible pointer-events-none select-none" : "",
+            isPlaying && mySeat != null && !isMyTurn ? "opacity-[0.42]" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           aria-hidden={!(isPlaying && mySeat != null)}
         >
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1 sm:gap-1.5">
             <div />
             <button
               type="button"
@@ -481,14 +646,18 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
             >
               Left
             </button>
-            <button
-              type="button"
-              disabled={!isMyTurn || stepBusy}
-              className={`${BTN} ${BTN_PAD}`}
-              onClick={() => submitWait()}
-            >
-              Wait
-            </button>
+            {isMyTurn && canWait ? (
+              <button
+                type="button"
+                disabled={stepBusy}
+                className={`${BTN} ${BTN_PAD} text-[9px] sm:text-[10px]`}
+                onClick={() => submitWait()}
+              >
+                Pass
+              </button>
+            ) : (
+              <div className="min-h-[2.5rem]" aria-hidden />
+            )}
             <button
               type="button"
               disabled={!isMyTurn || stepBusy}
@@ -510,29 +679,33 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
           </div>
           <button
             type="button"
-            disabled={!isMyTurn || stepBusy}
-            className={`${BTN} ${BTN_PAD}`}
+            disabled={!isMyTurn || stepBusy || bombAtLimit}
+            title={bombAtLimit ? `At most ${maxBombsPerPlayer} of your bombs on the field` : undefined}
+            className={`${BTN_BOMB} ${BTN_PAD} flex w-full items-center justify-center gap-2`}
             onClick={() => submitBomb()}
           >
-            Drop bomb
+            <span>Drop bomb</span>
+            {mySeat != null ? (
+              <span className="rounded border border-orange-400/35 bg-black/30 px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-orange-100/90">
+                {myBombCount}/{maxBombsPerPlayer}
+              </span>
+            ) : null}
           </button>
         </div>
       </div>
 
-      <div className="flex min-h-[2.65rem] shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/[0.08] bg-zinc-950/40 px-1 py-1.5 sm:gap-3 sm:py-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/[0.07] bg-zinc-950/35 px-1 py-0.5">
         {showInMatchLeaveChrome ? (
           <button
             type="button"
             title="Leave the match — may count as forfeit in shared stake rooms."
             disabled={exitBusy || !selfKey}
             onClick={() => setLeaveConfirmOpen(true)}
-            className="min-w-[4.5rem] rounded-md border border-white/18 bg-white/8 px-2.5 py-1 text-[10px] font-semibold text-zinc-100 shadow-sm disabled:opacity-45 sm:min-w-[5rem] sm:px-3 sm:py-1.5 sm:text-[11px]"
+            className="min-w-[4.25rem] rounded border border-white/16 bg-white/8 px-2 py-0.5 text-[10px] font-semibold text-zinc-100 shadow-sm disabled:opacity-45 sm:min-w-[4.5rem] sm:px-2.5 sm:py-1"
           >
             {exitBusy ? "…" : "Leave"}
           </button>
-        ) : (
-          <span className="min-h-[1.25rem] min-w-[4.5rem]" aria-hidden />
-        )}
+        ) : null}
       </div>
 
       {showResultModal ? (
@@ -562,7 +735,7 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
                 {snakesFinishVisual === "win" ? "🏆" : snakesFinishVisual === "loss" ? "✕" : "⎔"}
               </span>
               <div className="min-w-0 flex-1 text-left">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Round result</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Match result</p>
                 <h2
                   id="ov2-bomber-finish-title"
                   className={[
@@ -576,86 +749,26 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
                 >
                   {finishTitleSnakes}
                 </h2>
-                <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Table multiplier</p>
-                <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">×{currentMultiplier}</p>
+                <p className="mt-2 text-center text-[12px] font-semibold leading-snug text-zinc-200">{finishSubtitleBomber}</p>
                 <div className="mt-3 rounded-lg border border-white/[0.1] bg-black/25 px-2.5 py-2.5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Settlement</p>
                   <p className={`mt-2 text-center text-xl font-bold tabular-nums leading-tight sm:text-2xl ${finishAmountLine.className}`}>
                     {finishAmountLine.text}
                   </p>
                 </div>
-                <p className="mt-3 text-center text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
+                <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">{finishReasonLine}</p>
                 {mySeat == null && prizeTotal != null && winnerSeat != null ? (
                   <p className="mt-2 text-center text-[10px] text-zinc-500">
                     Spectator · winner S{winnerSeat + 1} · pot {prizeTotal.toLocaleString()}
                   </p>
                 ) : null}
                 <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
-                  {finishActionsLocked
-                    ? "Sending results to your balance…"
-                    : eligibleRematch >= 2
-                      ? `Rematch ready: ${readyRematch}/${eligibleRematch} seated players — then host starts next.`
-                      : "Round complete — rematch, then host starts next."}
+                  {finishActionsLocked ? "Sending results to your balance…" : "You can dismiss and stay at the table, or leave when you are done."}
                 </p>
               </div>
             </div>
           </div>
           <div className="flex flex-col gap-2 px-4 py-4">
-            <button
-              type="button"
-              disabled={rematchIntentBusy || myRematchRequested || !baseRematchEligible || finishActionsLocked}
-              onClick={async () => {
-                if (!baseRematchEligible || finishActionsLocked) return;
-                setRematchIntentBusy(true);
-                try {
-                  /* Bomber rematch RPC not wired — UI matches Snakes modal. */
-                } finally {
-                  setRematchIntentBusy(false);
-                }
-              }}
-              className={BTN_PRIMARY + " w-full"}
-            >
-              {rematchIntentBusy && !myRematchRequested ? "Requesting…" : "Request rematch"}
-            </button>
-            <button
-              type="button"
-              disabled={rematchIntentBusy || !myRematchRequested || !baseRematchEligible}
-              onClick={async () => {
-                if (!baseRematchEligible) return;
-                setRematchIntentBusy(true);
-                try {
-                  /* Bomber rematch cancel not wired. */
-                } finally {
-                  setRematchIntentBusy(false);
-                }
-              }}
-              className={BTN_SECONDARY + " w-full"}
-            >
-              Cancel rematch
-            </button>
-            <div className="w-full overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-950/15 pt-2">
-              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">Host only</p>
-              <button
-                type="button"
-                className={BTN_PRIMARY + " w-full rounded-none"}
-                disabled={!isHost || startNextBusy || finishActionsLocked || !canHostStartNextMatch}
-                title={!isHost ? "Only the host can start the next match" : undefined}
-                onClick={async () => {
-                  if (!canHostStartNextMatch || finishActionsLocked) return;
-                  setStartNextBusy(true);
-                  try {
-                    /* Bomber start-next not wired from this screen. */
-                  } finally {
-                    setStartNextBusy(false);
-                  }
-                }}
-              >
-                {startNextBusy ? "Starting…" : "Start next (host)"}
-              </button>
-              <p className="px-2 py-1.5 text-center text-[11px] text-zinc-500">
-                Host starts the next match when all seated players rematch.
-              </p>
-            </div>
             <button type="button" className={BTN_SECONDARY + " w-full"} onClick={dismissFinishModal}>
               Dismiss
             </button>

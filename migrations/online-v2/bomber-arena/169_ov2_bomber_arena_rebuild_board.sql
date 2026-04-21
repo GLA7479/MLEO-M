@@ -1,5 +1,5 @@
--- OV2 Bomber Arena — initial board factory (gameplay). Apply after 166.
--- Superseded in content by 169_ov2_bomber_arena_rebuild_board.sql for greenfield parity.
+-- OV2 Bomber Arena — rebuild v2 board factory (plan §11): 3-step Manhattan spawn bubbles,
+-- interior lane cross (no breakables), locked numerics. Apply after 168.
 
 BEGIN;
 
@@ -33,8 +33,10 @@ AS $$
     WHERE NOT EXISTS (SELECT 1 FROM wall_cells w WHERE w.gx = bx AND w.gy = by)
       AND NOT (bx = 1 AND by = 1)
       AND NOT (bx = 7 AND by = 7)
+      -- 3-step Manhattan open bubbles from each spawn (symmetric under 180°).
       AND NOT ((bx - 1) + (by - 1) <= 3)
       AND NOT ((7 - bx) + (7 - by) <= 3)
+      -- Interior cross lanes (structured paths toward mid).
       AND NOT (bx = 4 AND by IN (2, 3, 5, 6))
       AND NOT (by = 4 AND bx IN (2, 3, 5, 6))
   ),
@@ -65,7 +67,7 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.ov2_bomber_arena_initial_board_json() IS
-  'Rebuild v2 board: spawn bubbles, lane cross, fuse=6, max bombs=2, anti-stall constants.';
+  'Rebuild v2: 9×9, spawn bubbles (Manhattan≤3), lane cross, fuse=6, max bombs=2, anti-stall meta on board.';
 
 REVOKE ALL ON FUNCTION public.ov2_bomber_arena_initial_board_json() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.ov2_bomber_arena_initial_board_json() TO anon, authenticated, service_role;
