@@ -295,11 +295,13 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
     roomId && selfKey && roomHasActiveOv2Session && !isFinished && authoritativeSnapshot
   );
 
+  const showBoardLoadingOverlay = Boolean(roomHasActiveOv2Session && !authoritativeSnapshot);
+
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-hidden overscroll-none p-2 text-zinc-100">
-      <div className="shrink-0 text-[11px] text-zinc-400">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-1 overflow-x-hidden overflow-y-hidden overscroll-none p-2 text-zinc-100">
+      <div className="flex min-h-[1.75rem] shrink-0 items-center text-[11px] text-zinc-400">
         {mySeat != null ? (
-          <span>
+          <span className="truncate">
             You: seat {mySeat + 1}
             {isPlaying ? (isMyTurn ? " — your turn" : ` — seat ${turnSeat + 1} to move`) : null}
           </span>
@@ -308,33 +310,50 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
         )}
       </div>
 
-      {matchSnapshotTimedOut ? (
-        <div className="shrink-0 rounded-lg border border-amber-500/35 bg-amber-950/25 p-2 text-[11px] text-amber-100">
-          Snapshot is slow to load. Check your connection, use Leave if you need to exit, then rejoin from the hub room list.
+      {/* Fixed-height alert band (Snakes-style thin HUD): avoids layout jump when errors / vault / snapshot state flip. */}
+      <div className="flex min-h-[4.25rem] shrink-0 flex-col justify-center gap-0.5 overflow-hidden py-0.5">
+        <div className="flex min-h-[1.35rem] max-h-[1.35rem] shrink-0 items-center overflow-hidden">
+          {matchSnapshotTimedOut && !showBoardLoadingOverlay ? (
+            <p className="truncate text-[10px] leading-tight text-amber-200/95 sm:text-[11px]">
+              Snapshot is slow to load. Check your connection, use Leave if you need to exit, then rejoin from the hub room list.
+            </p>
+          ) : (
+            <span className="block min-h-[1.35rem] w-full" aria-hidden />
+          )}
         </div>
-      ) : null}
-
-      {vaultClaimError ? (
-        <div className="shrink-0 rounded-lg border border-rose-500/35 bg-rose-950/25 p-2 text-[11px] text-rose-100">
-          {vaultClaimError}
-          <button type="button" className="ml-2 text-sky-300 underline" onClick={() => retryVaultClaim()}>
-            Retry
-          </button>
+        <div className="flex min-h-[1.35rem] max-h-[1.35rem] shrink-0 items-center overflow-hidden text-[10px] sm:text-[11px]">
+          {vaultClaimError ? (
+            <span className="truncate text-rose-200/95">
+              {vaultClaimError}{" "}
+              <button type="button" className="text-sky-300 underline" onClick={() => retryVaultClaim()}>
+                Retry
+              </button>
+            </span>
+          ) : vaultClaimBusy ? (
+            <span className="truncate text-zinc-500">Updating vault…</span>
+          ) : (
+            <span className="block min-h-[1.35rem] w-full" aria-hidden />
+          )}
         </div>
-      ) : null}
-      {vaultClaimBusy ? <p className="shrink-0 text-[10px] text-zinc-500">Updating vault…</p> : null}
+        <div className="flex min-h-[1.35rem] max-h-[1.35rem] shrink-0 items-center overflow-hidden">
+          {stepError ? (
+            <p className="truncate text-[10px] leading-tight text-amber-200 sm:text-[11px]">{stepError}</p>
+          ) : (
+            <span className="block min-h-[1.35rem] w-full" aria-hidden />
+          )}
+        </div>
+      </div>
 
-      {stepError ? <p className="shrink-0 text-[11px] text-amber-200">{stepError}</p> : null}
-
-      <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-[360px] flex-1 items-center justify-center overflow-hidden py-1">
-        <div
-          className="grid w-full min-w-0 gap-px rounded-lg border border-zinc-700/55 bg-zinc-900 p-1 shadow-sm"
-          style={{
-            gridTemplateColumns: `repeat(${w}, minmax(0, 1fr))`,
-            maxHeight: "100%",
-            aspectRatio: `${w} / ${h}`,
-          }}
-        >
+      <div className="relative mx-auto flex min-h-0 w-full min-w-0 max-w-[360px] flex-1 flex-col justify-center overflow-hidden py-1">
+        <div className="relative mx-auto flex min-h-0 w-full min-w-0 flex-1 items-center justify-center">
+          <div
+            className="grid w-full min-w-0 gap-px rounded-lg border border-zinc-700/55 bg-zinc-900 p-1 shadow-sm"
+            style={{
+              gridTemplateColumns: `repeat(${w}, minmax(0, 1fr))`,
+              maxHeight: "100%",
+              aspectRatio: `${w} / ${h}`,
+            }}
+          >
           {Array.from({ length: h * w }, (_, i) => {
             const x = i % w;
             const y = Math.floor(i / w);
@@ -389,52 +408,60 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
               </div>
             );
           })}
+          </div>
+
+          {showBoardLoadingOverlay ? (
+            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-zinc-950/86 px-2 backdrop-blur-[1px]">
+              <div className="w-full max-w-[17rem] space-y-2 rounded-lg border border-zinc-600/45 bg-zinc-900/95 p-3 text-center text-[11px] text-zinc-200 shadow-lg">
+                {matchSnapshotTimedOut ? (
+                  <>
+                    <p className="text-amber-100/95">Could not load match.</p>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                      <button
+                        type="button"
+                        disabled={exitBusy || !selfKey}
+                        className={BTN_SECONDARY}
+                        onClick={() => setLeaveConfirmOpen(true)}
+                      >
+                        Leave
+                      </button>
+                      <button
+                        type="button"
+                        className={BTN_SECONDARY}
+                        onClick={() => {
+                          if (typeof window !== "undefined") window.location.reload();
+                        }}
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p>Loading match…</p>
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        disabled={exitBusy || !selfKey}
+                        className={BTN_SECONDARY}
+                        onClick={() => setLeaveConfirmOpen(true)}
+                      >
+                        Leave
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
-      {roomHasActiveOv2Session && !authoritativeSnapshot && !matchSnapshotTimedOut ? (
-        <div className="shrink-0 space-y-2 rounded-lg border border-zinc-600/40 bg-zinc-900/50 p-3 text-center text-[11px] text-zinc-300">
-          <p>Loading match…</p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <button
-              type="button"
-              disabled={exitBusy || !selfKey}
-              className={BTN_SECONDARY}
-              onClick={() => setLeaveConfirmOpen(true)}
-            >
-              Leave
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {roomHasActiveOv2Session && !authoritativeSnapshot && matchSnapshotTimedOut ? (
-        <div className="shrink-0 space-y-2 rounded-lg border border-amber-500/30 bg-amber-950/20 p-3 text-center text-[11px] text-amber-100">
-          <p>Could not load match.</p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <button
-              type="button"
-              disabled={exitBusy || !selfKey}
-              className={BTN_SECONDARY}
-              onClick={() => setLeaveConfirmOpen(true)}
-            >
-              Leave
-            </button>
-            <button
-              type="button"
-              className={BTN_SECONDARY}
-              onClick={() => {
-                if (typeof window !== "undefined") window.location.reload();
-              }}
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {isPlaying && mySeat != null ? (
-        <div className="mx-auto flex w-full max-w-sm shrink-0 flex-col gap-2 touch-none pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+      <div className="mx-auto flex min-h-[11rem] w-full max-w-sm shrink-0 flex-col justify-end touch-none pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+        <div
+          className={isPlaying && mySeat != null ? "" : "invisible pointer-events-none select-none"}
+          aria-hidden={!(isPlaying && mySeat != null)}
+        >
           <div className="grid grid-cols-3 gap-2">
             <div />
             <button
@@ -490,10 +517,10 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
             Drop bomb
           </button>
         </div>
-      ) : null}
+      </div>
 
-      {showInMatchLeaveChrome ? (
-        <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/[0.08] bg-zinc-950/40 px-1 py-1.5 sm:gap-3 sm:py-2">
+      <div className="flex min-h-[2.65rem] shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/[0.08] bg-zinc-950/40 px-1 py-1.5 sm:gap-3 sm:py-2">
+        {showInMatchLeaveChrome ? (
           <button
             type="button"
             title="Leave the match — may count as forfeit in shared stake rooms."
@@ -503,8 +530,10 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
           >
             {exitBusy ? "…" : "Leave"}
           </button>
-        </div>
-      ) : null}
+        ) : (
+          <span className="min-h-[1.25rem] min-w-[4.5rem]" aria-hidden />
+        )}
+      </div>
 
       {showResultModal ? (
         <Ov2SharedFinishModalFrame titleId="ov2-bomber-finish-title">

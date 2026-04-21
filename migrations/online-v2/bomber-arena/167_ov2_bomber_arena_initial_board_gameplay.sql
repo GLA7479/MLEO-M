@@ -1,4 +1,5 @@
--- OV2 Bomber Arena — read-only board factory. Apply after 159.
+-- OV2 Bomber Arena — initial board factory (gameplay): spawn pockets + fuseTicksDefault.
+-- Apply after 166_ov2_bomber_arena_get_snapshot_after_room_clear.sql.
 
 BEGIN;
 
@@ -32,7 +33,6 @@ AS $$
     WHERE NOT EXISTS (SELECT 1 FROM wall_cells w WHERE w.gx = bx AND w.gy = by)
       AND NOT (bx = 1 AND by = 1)
       AND NOT (bx = 7 AND by = 7)
-      -- Spawn pockets: two orthogonal open exits per corner (symmetric).
       AND NOT (bx = 2 AND by = 1)
       AND NOT (bx = 1 AND by = 2)
       AND NOT (bx = 6 AND by = 7)
