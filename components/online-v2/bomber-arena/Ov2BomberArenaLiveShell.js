@@ -300,7 +300,7 @@ export default function Ov2BomberArenaLiveShell() {
 
   if (!roomId) {
     return (
-      <OnlineV2GamePageShell title="Bomber Arena" showSubtitle={false} infoPanel={null}>
+      <OnlineV2GamePageShell title="Bomber Arena" showSubtitle={false} chromePreset="ov2_board" infoPanel={null}>
         <div className="flex min-h-0 flex-1 items-center justify-center px-2 text-center text-sm text-zinc-400">
           {router.isReady ? "Opening rooms…" : "Loading…"}
         </div>
@@ -312,6 +312,7 @@ export default function Ov2BomberArenaLiveShell() {
     <OnlineV2GamePageShell
       title="Bomber Arena"
       showSubtitle={false}
+      chromePreset="ov2_board"
       infoPanel={
         <>
           <div className="space-y-2 text-[11px] leading-snug text-zinc-300">
