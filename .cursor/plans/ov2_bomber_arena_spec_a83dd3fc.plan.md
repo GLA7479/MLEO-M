@@ -4,13 +4,13 @@ overview: "Architecture-only plan for **Bomber Arena** as a new OV2 shared-room 
 todos:
   - id: approve-spec-decisions
     content: "Approve: product id `ov2_bomber_arena`, MVP 2P rooms-only, discrete-tick authority, tie-break/disconnect policy, full-pot settlement."
-    status: pending
+    status: cancelled
   - id: approve-ownership-list
     content: Approve shared/core touch list (economy policy, leave_room branch, optional room_start min guard) vs game-private bomber-arena folder migrations.
-    status: pending
+    status: cancelled
   - id: post-approve-impl-wave1
     content: "Wave 1 execution: shared 158_integrate + bomber-arena migrations 159–163 + registry + shell/hook per blueprint; SQL block-by-block apply + disk sync."
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -225,7 +225,7 @@ Spec/signoff → shared integration **plan** → game schema → RLS/realtime �
 
 # Wave 1 — execution blueprint (first playable slice)
 
-**Locked decisions:** `ov2_bomber_arena`; MVP 2P; rooms only; no QM; discrete-tick server authority; shared stake flow; full pot to last survivor; no mid-game refunds; no powerups; no 3–8 UI flow; host `open_session` after all commits.
+**Locked decisions:** `ov2_bomber_arena`; MVP 2P; rooms only; no QM; discrete-tick server authority; shared stake flow; **win:** full pot to last survivor; **draw:** simultaneous terminal kill → equal split of locked pot (see “Locked — simultaneous death”); no mid-game refunds; no powerups; no 3–8 UI flow; host `open_session` after all commits; **no disconnect grace** (Wave 1); **`p_action` contract** frozen below.
 
 ## Wave 1 — exact files to create / update / leave untouched
 
@@ -324,7 +324,7 @@ Spec/signoff → shared integration **plan** → game schema → RLS/realtime �
 | `public.ov2_bomber_arena_authoritative_snapshot(p_room_id uuid, p_viewer_participant_key text)` | `161_` | Return one JSON bundle: room subset + session + seats + redacted opponent secrets if any | **read-only** (stable/security definer) |
 | `public.ov2_bomber_arena_player_step(p_room_id uuid, p_session_id uuid, p_participant_key text, p_action jsonb, p_client_tick bigint)` | `162_` | Validate turn/sim gate; apply move / bomb / wait; fuse decrement; explosions; damage; win detect; bump `revision` | **mutating** |
 | `public.ov2_bomber_arena_leave_or_forfeit(p_room_id uuid, p_participant_key text, p_forfeit_game boolean)` | `162_` or `163_` | Mark seat dead / award win to other in 2P; idempotent | **mutating** |
-| `public.ov2_bomber_arena_after_finish_emit_settlement()` | `163_` | Trigger fn: on terminal session → insert full-pot line `line_kind = 'ov2_bomber_arena_win'` | **mutating** (trigger) |
+| `public.ov2_bomber_arena_after_finish_emit_settlement()` | `163_` | Trigger fn: on terminal session → insert settlement lines: **one** `ov2_bomber_arena_win` (full pot) **or two** `ov2_bomber_arena_draw` (half pot each) per locked draw rule | **mutating** (trigger) |
 | `public.ov2_bomber_arena_claim_settlement(p_room_id uuid, p_participant_key text)` | `163_` | Mirror Snakes/Ludo claim: return undelivered lines for participant | **mutating** (claim cursor / two-phase pattern per `149_`) |
 
 **Optional (file `160_` only):** small pure helpers, e.g. `public.ov2_bomber_arena_expand_blast(p_walls jsonb, p_origin text, p_radius int)` — **read-only**.
@@ -338,8 +338,8 @@ Spec/signoff → shared integration **plan** → game schema → RLS/realtime �
 | Object | Purpose | MVP need | Defer |
 |--------|---------|----------|-------|
 | `public.ov2_bomber_arena_sessions` | One row per `match_seq`; holds `status`, `phase`, `revision`, `sim_tick`, arena + bombs + breakables in `jsonb` (or typed columns) | **Required** | Event-sourced replay log |
-| `public.ov2_bomber_arena_seats` | `session_id`, `seat_index` 0..1, `participant_key`, `alive`, optional `meta` | **Required** for winner mapping to `participant_key` | Seats 2..7 |
-| `public.ov2_bomber_arena_step_idempotency` | Primary key `(session_id, idempotency_key)` | **Required** if client retries steps | Omit only if strict no-retry policy + safe replay |
+| `public.ov2_bomber_arena_seats` | `session_id`, `seat_index` 0..1, `participant_key`, **`is_alive`**, optional `meta` | **Required** for winner mapping to `participant_key` | Seats 2..7 |
+| `public.ov2_bomber_arena_step_idempotency` | Primary key `(session_id, participant_key, idempotency_key)` | **Required** for `p_client_tick` dedup per player | Omit only if strict no-retry policy + safe replay |
 | **View** | None required | — | Materialized views / leaderboards |
 
 **No extra tables** for powerups, chat, or QM in Wave 1.
@@ -392,19 +392,74 @@ Spec/signoff → shared integration **plan** → game schema → RLS/realtime �
 4. **Stake commit** — both call `ov2_stake_commit`; room → `active`; `pot_locked` correct (×1 liability).
 5. **Host open session** — `ov2_bomber_arena_open_session`; `ov2_rooms.active_session_id` set; snapshot shows `live` session.
 6. **Interact** — both clients call `ov2_bomber_arena_player_step` alternating or as rules allow; `revision` increases; realtime updates visible.
-7. **End match** — one player eliminated by blast **or** `leave` with forfeit → session `finished`; winner seat maps to `participant_key`.
-8. **Settlement** — `ov2_settlement_lines` row with `line_kind = 'ov2_bomber_arena_win'` and full `pot_locked` amount.
-9. **Winner claim + vault** — `ov2_bomber_arena_claim_settlement` → vault credit + confirm delivery; loser gets empty claim.
+7. **End match** — forfeit / last survivor **or** simultaneous kill → session `finished`; winner seat set **or** `is_draw` true.
+8. **Settlement** — one line `ov2_bomber_arena_win` (full pot) **or** two lines `ov2_bomber_arena_draw` (half pot each, odd pot rule above).
+9. **Claim + vault** — each entitled participant runs claim → vault credit + confirm.
 10. **Rematch readiness** — room returns to post-settle state; **new** match requires new `match_seq` session (host opens again) — verify no stale `active_session_id` without settlement.
 
 ---
 
-## Wave 1 — open risks before coding (need explicit signoff)
+## Wave 1 — locked final decisions (no longer open)
 
-1. **Simultaneous elimination (2P)** — draw vs deterministic winner; MVP full-pot implies **must pick one** before `player_step` logic is written.
-2. **Disconnect grace** — none vs N seconds; affects `leave_or_forfeit` only if grace added later.
-3. **`158` vs `leave_room` dependency** — confirm ordering: apply shared leave patch **only after** `ov2_bomber_arena_leave_or_forfeit` exists.
-4. **Settlement `line_kind`** — confirm `ov2_bomber_arena_win` is acceptable to downstream `149` claim/confirm (text kind, no enum conflict); align with any server-side filters.
-5. **Vault delivery helper naming** — `board-path` module name is misleading for Bomber; Wave 1 may **reuse** for speed; signoff on **tech debt** vs small neutral wrapper re-export.
-6. **Action JSON contract** for `player_step` — exact keys for move/bomb/wait (spec document one page before implementation).
-7. **Row-lock strategy** — confirm every mutating RPC does `SELECT … FROM ov2_bomber_arena_sessions WHERE id = p_session_id FOR UPDATE` first.
+### Disconnect (MVP)
+
+- **No disconnect grace** in Wave 1 (no timed reconnection window).
+- **Disconnect or leave during an active Bomber session** = **authoritative forfeit** path (via `leave_or_forfeit` when integrated with `ov2_shared_leave_room` in `158_`).
+- Do **not** add grace timers until a later product pass.
+
+### Simultaneous terminal kill (2P)
+
+- **Rule:** If both players are eliminated in the **same authoritative resolution boundary** (same discrete tick / same blast resolution pass), the match is a **DRAW**.
+- **Settlement:** **Equal split** of `ov2_rooms.pot_locked` between the two seated participants (two settlement lines).
+- **Odd pot:** `amount_seat0 = CEIL(pot/2)`, `amount_seat1 = FLOOR(pot/2)` (deterministic).
+- **`159` columns:** `sessions.is_draw boolean NOT NULL DEFAULT false`, `sessions.winner_seat` remains **NULL** on draw.
+
+### `158` execution order (operational)
+
+- **Single canonical file on disk:** `migrations/online-v2/158_ov2_shared_integrate_bomber_arena.sql`.
+- **DB apply order:** **`ov2_shared_resolve_economy_entry_policy`** may be applied early; **`ov2_shared_leave_room`** replacement **only after** `public.ov2_bomber_arena_leave_or_forfeit` exists in DB.
+- After **each** successful executed block: **update the repo file** so disk matches DB.
+
+### Settlement delivery helper (Wave 1)
+
+- **Reuse** existing OV2 two-phase settlement → vault path (`ov2BoardPathSettlementDelivery` + confirm API). **No** new vault bridge; **no** neutral rename in Wave 1 unless blocking.
+
+---
+
+## Wave 1 — `p_action` contract (`ov2_bomber_arena_player_step`)
+
+**RPC signature (frozen):** `public.ov2_bomber_arena_player_step(p_room_id uuid, p_session_id uuid, p_participant_key text, p_action jsonb, p_client_tick bigint)`.
+
+### Global rules
+
+- **`p_client_tick`:** Strictly positive **int64**; **monotonic non-decreasing per `(session_id, participant_key)`** for accepted steps. Table `ov2_bomber_arena_step_idempotency` stores `(session_id, participant_key, idempotency_key)` where `idempotency_key = p_client_tick`. **Replay** of the same triple → same JSON outcome, no double-apply. **Lower tick after higher applied** → reject without mutation.
+- **`p_action`:** JSON **object**; one logical action per RPC for MVP.
+
+### Allowed `type` values
+
+| `type` | Required keys | Optional keys | Semantics |
+|--------|---------------|----------------|-----------|
+| `move` | `type`, `dx`, `dy` | none | Integers; **orthogonal only:** exactly one of `dx`,`dy` is ±1 and the other is 0. |
+| `bomb` | `type` | none | Place bomb per sim rules (enforced in RPC body in `162_`). |
+| `wait` | `type` | none | No move/bomb; sim may still advance fuses in same tick rules (`162_`). |
+
+### Invalid (no state change; idempotency row only if contract specifies in RPC later)
+
+- Missing/unknown `type`, bad `dx`/`dy` shape, session not live, wrong turn, dead player → reject.
+
+### Examples
+
+`{"type":"move","dx":1,"dy":0}` — `{"type":"bomb"}` — `{"type":"wait"}`
+
+---
+
+## Wave 1 — remaining before `161` / `162` / `163`
+
+- Apply **`159`** to target DB. RPC bodies **not started** until after `159` is green.
+
+---
+
+## Wave 1 — open risks before coding (narrow)
+
+1. **Settlement `line_kind`** — use **`ov2_bomber_arena_win`** and **`ov2_bomber_arena_draw`**; confirm `149` paths accept these text kinds.
+2. **Row-lock strategy** — every mutating RPC locks `ov2_bomber_arena_sessions` (`FOR UPDATE`) before mutating.
