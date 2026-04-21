@@ -8,6 +8,7 @@ function defaultMaxPlayersForProduct(productId) {
   if (productId === ONLINE_V2_GAME_KINDS.BINGO) return 8;
   if (productId === ONLINE_V2_GAME_KINDS.FLEET_HUNT) return 2;
   if (productId === ONLINE_V2_GAME_KINDS.GOAL_DUEL) return 2;
+  if (productId === ONLINE_V2_GAME_KINDS.TANKS) return 2;
   return 4;
 }
 

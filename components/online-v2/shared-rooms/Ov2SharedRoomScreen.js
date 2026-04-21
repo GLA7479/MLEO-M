@@ -65,6 +65,10 @@ import {
   requestOv2GoalDuelOpenSession,
 } from "../../../lib/online-v2/goal-duel/ov2GoalDuelSessionAdapter";
 import {
+  fetchOv2TanksSnapshot,
+  requestOv2TanksOpenSession,
+} from "../../../lib/online-v2/tanks/ov2TanksSessionAdapter";
+import {
   fetchOv2SnakesSnapshot,
   requestOv2SnakesOpenSession,
 } from "../../../lib/online-v2/snakes-and-ladders/ov2SnakesSessionApi";
@@ -175,6 +179,7 @@ export default function Ov2SharedRoomScreen({
   const isColorClashRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.COLOR_CLASH;
   const isFleetHuntRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.FLEET_HUNT;
   const isGoalDuelRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.GOAL_DUEL;
+  const isTanksRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.TANKS;
   const isSnakesLaddersRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.SNAKES_LADDERS;
   const isSnakesRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.SNAKES_AND_LADDERS;
   const isStakeSharedRoom =
@@ -191,6 +196,7 @@ export default function Ov2SharedRoomScreen({
     isColorClashRoom ||
     isFleetHuntRoom ||
     isGoalDuelRoom ||
+    isTanksRoom ||
     isSnakesLaddersRoom ||
     isSnakesRoom;
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
@@ -574,6 +580,17 @@ export default function Ov2SharedRoomScreen({
           await router.push(`/ov2-goal-duel?room=${encodeURIComponent(roomId)}`);
           return;
         }
+        if (isTanksRoom) {
+          const open = await requestOv2TanksOpenSession(roomId, qmAuthorityHostPk, {
+            presenceLeaderKey: qmAuthorityHostPk,
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-tanks?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
         if (isSnakesRoom) {
           const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: qmAuthorityHostPk });
           if (cancelled || !canon) return;
@@ -615,6 +632,7 @@ export default function Ov2SharedRoomScreen({
     isColorClashRoom,
     isFleetHuntRoom,
     isGoalDuelRoom,
+    isTanksRoom,
     isSnakesRoom,
     roomId,
     router,
@@ -945,6 +963,7 @@ export default function Ov2SharedRoomScreen({
         isColorClashRoom ||
         isFleetHuntRoom ||
         isGoalDuelRoom ||
+        isTanksRoom ||
         isSnakesRoom
       ) {
         const prep = await prepareSharedHostPreStartStakes();
@@ -1123,6 +1142,19 @@ export default function Ov2SharedRoomScreen({
         didRouteToLiveRef.current = true;
         setLaunchingLive(true);
         await router.push(`/ov2-goal-duel?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      if (isTanksRoom) {
+        const open = await requestOv2TanksOpenSession(roomId, participantId, {
+          presenceLeaderKey: participantId,
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Tanks session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-tanks?room=${encodeURIComponent(roomId)}`);
         return;
       }
       if (isSnakesRoom) {
@@ -1588,6 +1620,47 @@ export default function Ov2SharedRoomScreen({
       };
     }
 
+    if (isTanksRoom) {
+      const tanksSid = room?.active_session_id || null;
+      if (tanksSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-tanks?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledTk = false;
+      void fetchOv2TanksSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledTk || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-tanks?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      let intervalTk = null;
+      const tickTk = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledTk || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalTk) clearInterval(intervalTk);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-tanks?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickTk();
+      intervalTk = setInterval(() => void tickTk(), 2500);
+      return () => {
+        cancelledTk = true;
+        if (intervalTk) clearInterval(intervalTk);
+      };
+    }
+
     if (isSnakesRoom) {
       const snakesSid = room?.active_session_id || null;
       if (snakesSid) {
@@ -1711,6 +1784,7 @@ export default function Ov2SharedRoomScreen({
     isColorClashRoom,
     isFleetHuntRoom,
     isGoalDuelRoom,
+    isTanksRoom,
     isSnakesRoom,
     room?.status,
     room?.active_session_id,
@@ -1928,6 +2002,7 @@ export default function Ov2SharedRoomScreen({
           !isColorClashRoom &&
           !isFleetHuntRoom &&
           !isGoalDuelRoom &&
+          !isTanksRoom &&
           !isSnakesRoom ? (
             <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
               <div className="font-bold">Runtime handoff ready</div>
@@ -1951,6 +2026,7 @@ export default function Ov2SharedRoomScreen({
           isColorClashRoom ||
           isFleetHuntRoom ||
           isGoalDuelRoom ||
+          isTanksRoom ||
           isSnakesRoom) &&
         !launchingLive ? (
           <div className="mt-3 rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
@@ -2064,9 +2140,11 @@ export default function Ov2SharedRoomScreen({
                                   ? "Opening live Fleet Hunt..."
                                   : isGoalDuelRoom
                                     ? "Opening live Goal Duel..."
-                                    : isSnakesRoom
-                                      ? "Opening live Snakes & Ladders..."
-                                      : "Opening live Ludo game..."}
+                                    : isTanksRoom
+                                      ? "Opening live Tanks..."
+                                      : isSnakesRoom
+                                        ? "Opening live Snakes & Ladders..."
+                                        : "Opening live Ludo game..."}
           </p>
         ) : null}
         {error ? <p className="text-[11px] text-red-300">{error}</p> : null}
