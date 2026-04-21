@@ -25,6 +25,17 @@ function cellInPairs(arr, x, y) {
   return false;
 }
 
+/** Same pawn art as OV2 Snakes & Ladders + Ludo (`Ov2SnakesScreen` `ludoPawnSrc`, `ov2LudoBoardView` dog tiles). */
+function ov2LudoDogPawnSrc(seat) {
+  return `/images/ludo/dog_${seat}.png`;
+}
+
+/** Subtle turn hint on the active seat’s piece (kept light — no heavy halo). */
+const PAWN_TURN_GLOW = [
+  "drop-shadow(0 0 6px rgba(56,189,248,0.45)) drop-shadow(0 0 2px rgba(125,211,252,0.35))",
+  "drop-shadow(0 0 6px rgba(251,191,36,0.45)) drop-shadow(0 0 2px rgba(253,224,71,0.35))",
+];
+
 const BTN =
   "rounded-lg border border-emerald-500/30 bg-emerald-950/50 px-3 py-2 text-[11px] font-semibold text-emerald-100 disabled:opacity-45";
 
@@ -259,7 +270,7 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
 
       <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-[360px] flex-1 items-center justify-center overflow-hidden py-1">
         <div
-          className="grid w-full min-w-0 gap-px rounded-lg border border-zinc-700 bg-zinc-900 p-1"
+          className="grid w-full min-w-0 gap-px rounded-lg border border-zinc-700/55 bg-zinc-900 p-1 shadow-sm"
           style={{
             gridTemplateColumns: `repeat(${w}, minmax(0, 1fr))`,
             maxHeight: "100%",
@@ -273,26 +284,48 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
             const brk = !wall && cellInPairs(breakables, x, y);
             const pl = playerCell.get(`${x},${y}`);
             const bomb = bombsAt.get(`${x},${y}`);
-            let bg = "bg-zinc-800/90";
-            if (wall) bg = "bg-zinc-950";
-            else if (brk) bg = "bg-amber-900/35";
+            let floor = "bg-zinc-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]";
+            if (wall) {
+              floor = "bg-zinc-950 ring-1 ring-inset ring-black/35";
+            } else if (brk) {
+              floor = "bg-zinc-800 ring-1 ring-inset ring-amber-900/28";
+            }
+            const detonating = Boolean(bomb && bomb.fuse <= 0);
+            const pawnTurnGlow =
+              isPlaying && pl != null && (pl === 0 || pl === 1) && pl === turnSeat ? PAWN_TURN_GLOW[pl] : undefined;
             return (
               <div
                 key={`${x}-${y}`}
-                className={`relative flex min-h-0 min-w-0 items-center justify-center text-[9px] font-bold ${bg}`}
+                className={`relative flex min-h-0 min-w-0 items-center justify-center text-[9px] font-bold ${floor}`}
               >
-                {!wall && pl === 0 ? (
-                  <span className="h-2.5 w-2.5 rounded-full bg-indigo-400 shadow-[0_0_6px_rgba(129,140,248,0.7)]" />
-                ) : null}
-                {!wall && pl === 1 ? (
-                  <span className="h-2.5 w-2.5 rounded-full bg-rose-400 shadow-[0_0_6px_rgba(251,113,133,0.7)]" />
-                ) : null}
-                {bomb ? (
+                {detonating ? (
                   <span
-                    className="absolute inset-0 flex items-center justify-center font-mono text-[10px] text-orange-200/95"
-                    title="Bomb"
-                  >
-                    {bomb.fuse > 0 ? bomb.fuse : "!"}
+                    className="pointer-events-none absolute inset-0 z-[1] ring-1 ring-inset ring-orange-500/35"
+                    aria-hidden
+                  />
+                ) : null}
+                {bomb && !wall ? (
+                  <span className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center">
+                    <span
+                      className={`font-mono tabular-nums leading-none ${
+                        bomb.fuse > 0
+                          ? "text-[9px] font-semibold text-orange-300"
+                          : "rounded-sm px-0.5 text-[10px] font-bold text-amber-100 ring-1 ring-orange-400/40"
+                      }`}
+                    >
+                      {bomb.fuse > 0 ? bomb.fuse : "!"}
+                    </span>
+                  </span>
+                ) : null}
+                {!wall && pl != null && (pl === 0 || pl === 1) ? (
+                  <span className="pointer-events-none absolute inset-px z-[3] block min-h-0 min-w-0 overflow-hidden">
+                    <img
+                      src={ov2LudoDogPawnSrc(pl)}
+                      alt=""
+                      draggable={false}
+                      className="box-border h-full w-full object-contain object-center select-none"
+                      style={pawnTurnGlow ? { filter: pawnTurnGlow } : undefined}
+                    />
                   </span>
                 ) : null}
               </div>
