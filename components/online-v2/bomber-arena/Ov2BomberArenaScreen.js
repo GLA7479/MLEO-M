@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useOv2BomberArenaSession } from "../../../hooks/useOv2BomberArenaSession";
@@ -229,43 +228,20 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-hidden overscroll-none p-2 text-zinc-100">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-400">
-        <div>
-          {mySeat != null ? (
-            <span>
-              You: seat {mySeat + 1}
-              {isPlaying ? (isMyTurn ? " — your turn" : ` — seat ${turnSeat + 1} to move`) : null}
-            </span>
-          ) : (
-            <span>Spectating</span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/online-v2/rooms" className="text-sky-300 underline">
-            Lobby
-          </Link>
-          {typeof window !== "undefined" ? (
-            <button
-              type="button"
-              className="text-sky-300 underline"
-              onClick={() => {
-                try {
-                  if (roomId) window.sessionStorage.setItem(OV2_SHARED_LAST_ROOM_SESSION_KEY, roomId);
-                } catch {
-                  /* ignore */
-                }
-                void window.location.assign(`/online-v2/rooms?room=${encodeURIComponent(roomId)}`);
-              }}
-            >
-              Room
-            </button>
-          ) : null}
-        </div>
+      <div className="shrink-0 text-[11px] text-zinc-400">
+        {mySeat != null ? (
+          <span>
+            You: seat {mySeat + 1}
+            {isPlaying ? (isMyTurn ? " — your turn" : ` — seat ${turnSeat + 1} to move`) : null}
+          </span>
+        ) : (
+          <span>Spectating</span>
+        )}
       </div>
 
       {matchSnapshotTimedOut ? (
         <div className="shrink-0 rounded-lg border border-amber-500/35 bg-amber-950/25 p-2 text-[11px] text-amber-100">
-          Snapshot is slow to load. Check your connection or tap Lobby and re-enter the room.
+          Snapshot is slow to load. Check your connection, use Leave if you need to exit, then rejoin from the hub room list.
         </div>
       ) : null}
 
@@ -337,9 +313,6 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
             >
               Leave
             </button>
-            <Link href="/online-v2/rooms" className="self-center text-sky-300 underline">
-              Lobby
-            </Link>
           </div>
         </div>
       ) : null}
@@ -502,20 +475,6 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
               onClick={() => void onExitToLobby()}
             >
               {exitBusy ? "Leaving…" : "Leave table"}
-            </button>
-            <button
-              type="button"
-              disabled={exitBusy}
-              className="w-full text-[11px] font-medium text-zinc-500 underline disabled:opacity-45"
-              onClick={() =>
-                void router.replace(
-                  { pathname: "/online-v2/rooms", query: { room: roomId } },
-                  undefined,
-                  { shallow: true }
-                )
-              }
-            >
-              Room lobby
             </button>
             {exitErr ? <p className="text-center text-[11px] text-red-300">{exitErr}</p> : null}
           </div>

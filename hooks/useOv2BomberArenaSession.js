@@ -135,7 +135,16 @@ export function useOv2BomberArenaSession(baseContext) {
         if (res.ok && res.snapshot) {
           setAuthoritativeSnapshot(prev => /** @type {Record<string, unknown>|null} */ (ov2PreferNewerSnapshot(prev, res.snapshot)));
         } else {
-          setStepError(String(res.error || "Move rejected"));
+          const errMsg = String(res.error || "Move rejected");
+          setStepError(errMsg);
+          if (res.code === "NOT_PLAYING" || errMsg.toLowerCase().includes("not active")) {
+            const snap = await fetchOv2BomberArenaAuthoritativeSnapshot(roomId, { participantKey: selfKey ?? "" });
+            if (snap) {
+              setAuthoritativeSnapshot(prev => /** @type {Record<string, unknown>|null} */ (ov2PreferNewerSnapshot(prev, snap)));
+              const ph = String(snap.phase || "").trim().toLowerCase();
+              if (ph === "finished") setStepError("");
+            }
+          }
         }
       } catch (e) {
         setStepError(e instanceof Error ? e.message : String(e));

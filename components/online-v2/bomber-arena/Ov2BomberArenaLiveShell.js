@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -336,16 +335,12 @@ export default function Ov2BomberArenaLiveShell() {
             <section>
               <p className="font-semibold text-zinc-100">Stake</p>
               <p className="mt-0.5">
-                Two seated players commit stakes in the shared room; the host starts the match there. When finished, settlement
-                credits the vault automatically.
+                Two seated players commit stakes at the shared table; the host starts the match from there. When finished,
+                settlement credits the vault automatically.
               </p>
             </section>
           </div>
           <p className="mt-2 text-[11px] text-zinc-500">
-            <Link href="/online-v2/rooms" className="text-sky-300 underline">
-              Lobby
-            </Link>
-            {" · "}
             <button type="button" className="text-sky-300 underline" onClick={() => void reloadContext()}>
               Refresh
             </button>
@@ -366,9 +361,19 @@ export default function Ov2BomberArenaLiveShell() {
       {roomId && loadError && !room ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-2 text-center">
           <p className="text-sm text-red-200">{loadError}</p>
-          <Link href="/online-v2/rooms" className="text-xs text-sky-300 underline">
-            Back to rooms
-          </Link>
+          <button
+            type="button"
+            className="text-xs text-sky-300 underline"
+            onClick={() =>
+              void router.replace(
+                roomId
+                  ? { pathname: "/online-v2/rooms", query: { room: roomId } }
+                  : "/online-v2/rooms"
+              )
+            }
+          >
+            Continue to tables
+          </button>
         </div>
       ) : roomId && loading && !room ? (
         <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-zinc-400">Loading room…</div>
@@ -377,15 +382,22 @@ export default function Ov2BomberArenaLiveShell() {
           {showStakePhaseAfterRematchHint ? (
             <div className="flex shrink-0 flex-col gap-1.5 border-b border-amber-500/25 bg-amber-950/20 px-2 py-2">
               <p className="text-[10px] leading-snug text-amber-100/95 sm:text-[11px]">
-                <strong className="font-semibold">Next round:</strong> commit stakes again in the room lobby. When the room is
-                active, the host can open the table here.
+                <strong className="font-semibold">Next round:</strong> commit stakes again in the shared stake table. When it is
+                active, the host can open the match here.
               </p>
-              <Link
-                href="/online-v2/rooms"
+              <button
+                type="button"
                 className="inline-flex w-fit items-center rounded-md border border-amber-400/50 bg-amber-900/35 px-2.5 py-1 text-[10px] font-semibold text-amber-50 hover:bg-amber-900/50 sm:text-xs"
+                onClick={() =>
+                  void router.push(
+                    roomId
+                      ? { pathname: "/online-v2/rooms", query: { room: roomId } }
+                      : "/online-v2/rooms"
+                  )
+                }
               >
-                Open room lobby (commit stake)
-              </Link>
+                Commit stake (shared table)
+              </button>
             </div>
           ) : null}
           {canShellHostOpenBomber ? (
