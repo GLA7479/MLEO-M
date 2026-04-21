@@ -11,6 +11,8 @@ import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 
 const finishDismissStorageKey = sid => `ov2_bomber_finish_dismiss_${sid}`;
 
+const BTN_PRIMARY =
+  "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_SECONDARY =
   "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 const BTN_FINISH_DANGER =
@@ -87,6 +89,8 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
   const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
   const [exitBusy, setExitBusy] = useState(false);
   const [exitErr, setExitErr] = useState("");
+  const [rematchIntentBusy, setRematchIntentBusy] = useState(false);
+  const [startNextBusy, setStartNextBusy] = useState(false);
 
   useEffect(() => {
     if (!isFinished) setFinishModalDismissedSessionId("");
@@ -232,6 +236,60 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
     }
     return "Match over";
   }, [isFinished, isDraw, winnerSeat, mySeat]);
+
+  /** Headline copy aligned with `Ov2SnakesScreen` finish modal (`Victory` / `Defeat` / `Match finished`). */
+  const finishTitleSnakes = useMemo(() => {
+    if (!isFinished) return "";
+    if (isDraw) return "Match finished";
+    if (didIWin) return "Victory";
+    if (didILose) return "Defeat";
+    return "Match finished";
+  }, [isFinished, isDraw, didIWin, didILose]);
+
+  /** Snakes tri-state for ribbon / icon / title colors (draw maps to `unknown`). */
+  const snakesFinishVisual = useMemo(() => {
+    if (finishOutcome === "win") return "win";
+    if (finishOutcome === "loss") return "loss";
+    return "unknown";
+  }, [finishOutcome]);
+
+  const roomHostKey = String(room?.host_participant_key || "").trim();
+  const isHost = Boolean(selfKey && roomHostKey && selfKey === roomHostKey);
+  const prizeTotal = room?.pot_locked != null ? Math.floor(Number(room.pot_locked) || 0) : null;
+  const stakePerSeat = room?.stake_per_seat != null ? Math.floor(Number(room.stake_per_seat) || 0) : null;
+
+  const finishReasonLine = useMemo(() => {
+    if (!isFinished) return "";
+    if (isDraw) return "No winner — stakes refunded per settlement";
+    if (winnerSeat === 0 || winnerSeat === 1) return `Winner: Seat ${winnerSeat + 1}`;
+    return "Match complete";
+  }, [isFinished, isDraw, winnerSeat]);
+
+  const finishAmountLine = useMemo(() => {
+    if (!isFinished) return { text: "—", className: "text-zinc-500" };
+    if (isDraw) return { text: "—", className: "text-zinc-500" };
+    if (didIWin && prizeTotal != null && prizeTotal > 0) {
+      return {
+        text: `+${prizeTotal.toLocaleString()} MLEO`,
+        className: "font-semibold tabular-nums text-amber-200/95",
+      };
+    }
+    if (didILose && stakePerSeat > 0) {
+      return {
+        text: `−${stakePerSeat.toLocaleString()} MLEO`,
+        className: "font-semibold tabular-nums text-rose-300/95",
+      };
+    }
+    return { text: "—", className: "text-zinc-500" };
+  }, [isFinished, isDraw, didIWin, didILose, prizeTotal, stakePerSeat]);
+
+  const currentMultiplier = 1;
+  const finishActionsLocked = vaultClaimBusy;
+  const baseRematchEligible = false;
+  const eligibleRematch = 0;
+  const readyRematch = 0;
+  const myRematchRequested = false;
+  const canHostStartNextMatch = false;
 
   const showInMatchLeaveChrome = Boolean(
     roomId && selfKey && roomHasActiveOv2Session && !isFinished && authoritativeSnapshot
@@ -453,9 +511,9 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
           <div
             className={[
               "border-b px-4 pb-3 pt-4",
-              finishOutcome === "win"
+              snakesFinishVisual === "win"
                 ? "border-emerald-500/20 bg-gradient-to-br from-emerald-950/45 to-zinc-950/80"
-                : finishOutcome === "loss"
+                : snakesFinishVisual === "loss"
                   ? "border-rose-500/20 bg-gradient-to-br from-rose-950/40 to-zinc-950/80"
                   : "border-white/[0.07] bg-zinc-950/60",
             ].join(" ")}
@@ -464,40 +522,111 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
               <span
                 className={[
                   "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl shadow-inner",
-                  finishOutcome === "win" && "border-emerald-500/45 bg-emerald-950/60 text-emerald-200",
-                  finishOutcome === "loss" && "border-rose-500/45 bg-rose-950/55 text-rose-200",
-                  (finishOutcome === "draw" || finishOutcome === "unknown") && "border-white/10 bg-zinc-900/80 text-zinc-200",
+                  snakesFinishVisual === "win" && "border-emerald-500/45 bg-emerald-950/60 text-emerald-200",
+                  snakesFinishVisual === "loss" && "border-rose-500/45 bg-rose-950/55 text-rose-200",
+                  snakesFinishVisual === "unknown" && "border-white/10 bg-zinc-900/80 text-zinc-200",
                 ]
                   .filter(Boolean)
                   .join(" ")}
                 aria-hidden
               >
-                {finishOutcome === "win" ? "🏆" : finishOutcome === "loss" ? "✕" : "⎔"}
+                {snakesFinishVisual === "win" ? "🏆" : snakesFinishVisual === "loss" ? "✕" : "⎔"}
               </span>
               <div className="min-w-0 flex-1 text-left">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Match result</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Round result</p>
                 <h2
                   id="ov2-bomber-finish-title"
                   className={[
                     "mt-0.5 text-2xl font-extrabold leading-tight tracking-tight",
-                    finishOutcome === "win" && "text-emerald-400",
-                    finishOutcome === "loss" && "text-rose-400",
-                    finishOutcome === "draw" && "text-sky-300",
-                    finishOutcome === "unknown" && "text-zinc-100",
+                    snakesFinishVisual === "win" && "text-emerald-400",
+                    snakesFinishVisual === "loss" && "text-rose-400",
+                    snakesFinishVisual === "unknown" && "text-zinc-100",
                   ]
                     .filter(Boolean)
                     .join(" ")}
                 >
-                  {finishTitle}
+                  {finishTitleSnakes}
                 </h2>
-                <p className="mt-3 text-center text-[11px] leading-snug text-zinc-400">
-                  Payouts are applied through settlement.{" "}
-                  {vaultClaimBusy ? "Crediting vault…" : vaultClaimError ? "Tap Retry above if settlement stalls." : "Vault updated when ready."}
+                <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Table multiplier</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">×{currentMultiplier}</p>
+                <div className="mt-3 rounded-lg border border-white/[0.1] bg-black/25 px-2.5 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Settlement</p>
+                  <p className={`mt-2 text-center text-xl font-bold tabular-nums leading-tight sm:text-2xl ${finishAmountLine.className}`}>
+                    {finishAmountLine.text}
+                  </p>
+                </div>
+                <p className="mt-3 text-center text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
+                {mySeat == null && prizeTotal != null && winnerSeat != null ? (
+                  <p className="mt-2 text-center text-[10px] text-zinc-500">
+                    Spectator · winner S{winnerSeat + 1} · pot {prizeTotal.toLocaleString()}
+                  </p>
+                ) : null}
+                <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
+                  {finishActionsLocked
+                    ? "Sending results to your balance…"
+                    : eligibleRematch >= 2
+                      ? `Rematch ready: ${readyRematch}/${eligibleRematch} seated players — then host starts next.`
+                      : "Round complete — rematch, then host starts next."}
                 </p>
               </div>
             </div>
           </div>
           <div className="flex flex-col gap-2 px-4 py-4">
+            <button
+              type="button"
+              disabled={rematchIntentBusy || myRematchRequested || !baseRematchEligible || finishActionsLocked}
+              onClick={async () => {
+                if (!baseRematchEligible || finishActionsLocked) return;
+                setRematchIntentBusy(true);
+                try {
+                  /* Bomber rematch RPC not wired — UI matches Snakes modal. */
+                } finally {
+                  setRematchIntentBusy(false);
+                }
+              }}
+              className={BTN_PRIMARY + " w-full"}
+            >
+              {rematchIntentBusy && !myRematchRequested ? "Requesting…" : "Request rematch"}
+            </button>
+            <button
+              type="button"
+              disabled={rematchIntentBusy || !myRematchRequested || !baseRematchEligible}
+              onClick={async () => {
+                if (!baseRematchEligible) return;
+                setRematchIntentBusy(true);
+                try {
+                  /* Bomber rematch cancel not wired. */
+                } finally {
+                  setRematchIntentBusy(false);
+                }
+              }}
+              className={BTN_SECONDARY + " w-full"}
+            >
+              Cancel rematch
+            </button>
+            <div className="w-full overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-950/15 pt-2">
+              <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">Host only</p>
+              <button
+                type="button"
+                className={BTN_PRIMARY + " w-full rounded-none"}
+                disabled={!isHost || startNextBusy || finishActionsLocked || !canHostStartNextMatch}
+                title={!isHost ? "Only the host can start the next match" : undefined}
+                onClick={async () => {
+                  if (!canHostStartNextMatch || finishActionsLocked) return;
+                  setStartNextBusy(true);
+                  try {
+                    /* Bomber start-next not wired from this screen. */
+                  } finally {
+                    setStartNextBusy(false);
+                  }
+                }}
+              >
+                {startNextBusy ? "Starting…" : "Start next (host)"}
+              </button>
+              <p className="px-2 py-1.5 text-center text-[11px] text-zinc-500">
+                Host starts the next match when all seated players rematch.
+              </p>
+            </div>
             <button type="button" className={BTN_SECONDARY + " w-full"} onClick={dismissFinishModal}>
               Dismiss
             </button>
@@ -505,7 +634,10 @@ export default function Ov2BomberArenaScreen({ contextInput = null }) {
               type="button"
               disabled={exitBusy || !selfKey}
               className={BTN_FINISH_DANGER + " w-full"}
-              onClick={() => void onExitToLobby()}
+              onClick={async () => {
+                if (!selfKey) return;
+                await onExitToLobby();
+              }}
             >
               {exitBusy ? "Leaving…" : "Leave table"}
             </button>
