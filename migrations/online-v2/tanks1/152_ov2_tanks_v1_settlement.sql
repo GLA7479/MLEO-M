@@ -17,7 +17,7 @@ DECLARE
   v_pot bigint;
   v_winner_pk text;
   v_idem text;
-  r record;
+  v_loser record; -- not "r": PL/pgSQL resolves r.id to this RECORD before the FOR loop assigns it (shadows FROM ov2_rooms r).
 BEGIN
   IF NEW.phase IS DISTINCT FROM 'finished' THEN
     RETURN NULL;
@@ -76,27 +76,27 @@ BEGIN
   )
   ON CONFLICT (idempotency_key) DO NOTHING;
 
-  FOR r IN
+  FOR v_loser IN
     SELECT trim(s.participant_key) AS pk, s.seat_index
     FROM public.ov2_tanks_seats s
     WHERE s.session_id = v_sess_id
       AND s.seat_index IS DISTINCT FROM v_winner_seat
   LOOP
-    IF r.pk IS NULL OR length(r.pk) = 0 THEN
+    IF v_loser.pk IS NULL OR length(v_loser.pk) = 0 THEN
       CONTINUE;
     END IF;
-    v_idem := 'ov2:settle:' || v_room_id::text || ':' || v_match_seq::text || ':' || r.pk || ':ov2_tanks_loss:';
+    v_idem := 'ov2:settle:' || v_room_id::text || ':' || v_match_seq::text || ':' || v_loser.pk || ':ov2_tanks_loss:';
     INSERT INTO public.ov2_settlement_lines (
       room_id, match_seq, recipient_participant_key, line_kind, amount, idempotency_key, game_session_id, meta
     ) VALUES (
       v_room_id,
       v_match_seq,
-      r.pk,
+      v_loser.pk,
       'ov2_tanks_loss',
       0,
       v_idem,
       v_sess_id,
-      jsonb_build_object('gameId', 'ov2_tanks', 'sessionId', v_sess_id, 'seat', r.seat_index, 'lossAlreadyCommitted', true)
+      jsonb_build_object('gameId', 'ov2_tanks', 'sessionId', v_sess_id, 'seat', v_loser.seat_index, 'lossAlreadyCommitted', true)
     )
     ON CONFLICT (idempotency_key) DO NOTHING;
   END LOOP;
