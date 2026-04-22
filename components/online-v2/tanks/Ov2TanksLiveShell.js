@@ -207,7 +207,14 @@ export default function Ov2TanksLiveShell() {
         </div>
       ) : (
         <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
-          <Ov2TanksScreen roomId={roomId} participantId={participantId} room={room} />
+          <Ov2TanksScreen
+            roomId={roomId}
+            participantId={participantId}
+            room={room}
+            onLeaveTable={() => void onLeaveTable()}
+            leaveBusy={leaveBusy}
+            leaveErr={leaveErr}
+          />
         </div>
       )}
     </OnlineV2GamePageShell>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
 import { useOv2TanksSession } from "../../../hooks/useOv2TanksSession";
 import { ONLINE_V2_GAME_IDS } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { applyOv2SettlementClaimLinesToVaultAndConfirm } from "../../../lib/online-v2/ov2SettlementVaultDelivery";
@@ -17,6 +18,15 @@ import {
 } from "../../../lib/online-v2/tanks/ov2TanksRulesConstants";
 import Ov2TanksBattleCanvas from "./Ov2TanksBattleCanvas";
 
+const finishDismissStorageKey = sid => `ov2_tanks_finish_dismiss_${sid}`;
+
+const BTN_PRIMARY =
+  "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+const BTN_SECONDARY =
+  "rounded-lg border border-zinc-500/24 bg-gradient-to-b from-zinc-800/52 to-zinc-950 px-3 py-2 text-[11px] font-medium text-zinc-300/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_2px_10px_rgba(0,0,0,0.24)] transition-[transform,opacity] active:scale-[0.98]";
+const BTN_DANGER =
+  "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
+
 const WEAPONS = ["iron", "he", "burrower", "finisher"];
 
 const WEAPON_META = {
@@ -27,9 +37,23 @@ const WEAPON_META = {
 };
 
 /**
- * @param {{ roomId: string, participantId: string, room: object|null }} props
+ * @param {{
+ *   roomId: string,
+ *   participantId: string,
+ *   room: object|null,
+ *   onLeaveTable?: () => void | Promise<void>,
+ *   leaveBusy?: boolean,
+ *   leaveErr?: string,
+ * }} props
  */
-export default function Ov2TanksScreen({ roomId, participantId, room }) {
+export default function Ov2TanksScreen({
+  roomId,
+  participantId,
+  room,
+  onLeaveTable,
+  leaveBusy = false,
+  leaveErr: leaveTableErr = "",
+}) {
   const sessionId = room && typeof room === "object" && room.active_session_id ? String(room.active_session_id) : "";
   const hasSession = Boolean(sessionId);
   const { snapshot, loadError, reload } = useOv2TanksSession({
@@ -44,6 +68,8 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
   const [fireBusy, setFireBusy] = useState(false);
   const [fireErr, setFireErr] = useState("");
   const [claimMsg, setClaimMsg] = useState("");
+  const [claimBusy, setClaimBusy] = useState(false);
+  const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
 
   const productOk = useMemo(
     () => room && typeof room === "object" && String(room.product_game_id || "").trim() === ONLINE_V2_GAME_IDS.TANKS,
@@ -112,22 +138,42 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
     const pk = String(participantId || "").trim();
     if (!rid || !pk) return;
     setClaimMsg("");
-    const out = await requestOv2TanksClaimSettlement(rid, pk);
-    if (!out.ok) {
-      setClaimMsg(out.error || "Claim failed");
-      return;
-    }
-    if (Array.isArray(out.lines) && out.lines.length > 0) {
-      try {
-        await applyOv2SettlementClaimLinesToVaultAndConfirm(out.lines, ONLINE_V2_GAME_KINDS.TANKS, rid, pk);
-        await readOnlineV2Vault({ fresh: true }).catch(() => {});
-      } catch (e) {
-        setClaimMsg(e instanceof Error ? e.message : String(e));
+    setClaimBusy(true);
+    try {
+      const out = await requestOv2TanksClaimSettlement(rid, pk);
+      if (!out.ok) {
+        setClaimMsg(out.error || "Claim failed");
         return;
       }
+      if (Array.isArray(out.lines) && out.lines.length > 0) {
+        try {
+          await applyOv2SettlementClaimLinesToVaultAndConfirm(out.lines, ONLINE_V2_GAME_KINDS.TANKS, rid, pk);
+          await readOnlineV2Vault({ fresh: true }).catch(() => {});
+        } catch (e) {
+          setClaimMsg(e instanceof Error ? e.message : String(e));
+          return;
+        }
+      }
+      setClaimMsg(out.idempotent ? "Already claimed." : `Vault updated (credits ${out.totalAmount || 0}).`);
+    } finally {
+      setClaimBusy(false);
     }
-    setClaimMsg(out.idempotent ? "Already claimed." : `Vault updated (credits ${out.totalAmount || 0}).`);
   }, [roomId, participantId]);
+
+  const dismissFinishModal = useCallback(() => {
+    const snap = snapshot;
+    const sid = snap && typeof snap === "object" ? String(snap.sessionId || "").trim() : "";
+    const ph = snap && typeof snap === "object" ? String(snap.phase || "") : "";
+    if (!sid || ph !== "finished") return;
+    setFinishModalDismissedSessionId(sid);
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(finishDismissStorageKey(sid), "1");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [snapshot]);
 
   if (!productOk) {
     return <p className="px-2 text-sm text-red-200">This screen requires a Tanks room.</p>;
@@ -157,6 +203,78 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
   const mySeat = snapshot?.mySeat;
 
   const controlsLocked = !playing || !myTurn || fireBusy;
+
+  const didIWin = Boolean(finished && mySeat != null && winnerSeat != null && mySeat === winnerSeat);
+  const isDraw = false;
+
+  const finishSessionId = finished ? String(snapshot?.sessionId || "").trim() : "";
+  const finishModalDismissed =
+    finishSessionId.length > 0 &&
+    (finishModalDismissedSessionId === finishSessionId ||
+      (typeof window !== "undefined" &&
+        (() => {
+          try {
+            return window.sessionStorage.getItem(finishDismissStorageKey(finishSessionId)) === "1";
+          } catch {
+            return false;
+          }
+        })()));
+  const showResultModal = finished && finishSessionId.length > 0 && !finishModalDismissed;
+
+  const stakePerSeat =
+    room && typeof room === "object" && Number.isFinite(Number(room.stake_per_seat))
+      ? Math.floor(Number(room.stake_per_seat))
+      : null;
+  const potLocked =
+    room && typeof room === "object" && Number.isFinite(Number(room.pot_locked))
+      ? Math.floor(Number(room.pot_locked))
+      : null;
+
+  const isHost =
+    Boolean(room && typeof room === "object") &&
+    String(room.host_participant_key || "").trim() === String(participantId || "").trim();
+
+  const stakeMultiplier = 1;
+
+  const finishOutcome = !finished
+    ? "unknown"
+    : isDraw
+      ? "draw"
+      : winnerSeat == null || mySeat == null
+        ? "unknown"
+        : didIWin
+          ? "win"
+          : "loss";
+
+  const finishTitle = !finished
+    ? ""
+    : isDraw
+      ? "Draw"
+      : winnerSeat == null || mySeat == null
+        ? "Match finished"
+        : didIWin
+          ? "Victory"
+          : "Defeat";
+
+  const finishReasonLine = !finished
+    ? ""
+    : winnerSeat == null
+      ? "Match complete"
+      : didIWin
+        ? "Opponent tank destroyed"
+        : "Your tank was destroyed";
+
+  let finishAmountLine = { text: "", className: "text-zinc-500" };
+  if (finished) {
+    if (claimBusy) finishAmountLine = { text: "…", className: "text-zinc-400" };
+    else if (stakePerSeat == null || potLocked == null || winnerSeat == null || mySeat == null) {
+      finishAmountLine = { text: "—", className: "text-zinc-500" };
+    } else if (didIWin) {
+      finishAmountLine = { text: `+${potLocked} MLEO`, className: "font-semibold tabular-nums text-amber-200/95" };
+    } else {
+      finishAmountLine = { text: `−${stakePerSeat} MLEO`, className: "font-semibold tabular-nums text-rose-300/95" };
+    }
+  }
 
   let finishLine = "";
   if (finished) {
@@ -459,20 +577,101 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
         </section>
       </div>
 
-      {finished ? (
-        <div className="mx-auto mt-1 w-full max-w-4xl shrink-0 px-2 pb-4 md:px-3">
-          <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-4 text-center text-sm text-zinc-300">
-            <p className="text-xs text-zinc-500">Match finished — battlefield shows final state.</p>
+      {showResultModal ? (
+        <Ov2SharedFinishModalFrame titleId="ov2-tanks-finish-title">
+          <div
+            className={[
+              "border-b px-4 pb-3 pt-4",
+              finishOutcome === "win"
+                ? "border-emerald-500/20 bg-gradient-to-br from-emerald-950/45 to-zinc-950/80"
+                : finishOutcome === "loss"
+                  ? "border-rose-500/20 bg-gradient-to-br from-rose-950/40 to-zinc-950/80"
+                  : "border-white/[0.07] bg-zinc-950/60",
+            ].join(" ")}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className={[
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xl shadow-inner",
+                  finishOutcome === "win" && "border-emerald-500/45 bg-emerald-950/60 text-emerald-200",
+                  finishOutcome === "loss" && "border-rose-500/45 bg-rose-950/55 text-rose-200",
+                  (finishOutcome === "draw" || finishOutcome === "unknown") &&
+                    "border-white/10 bg-zinc-900/80 text-zinc-200",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-hidden
+              >
+                {finishOutcome === "win" ? "🏆" : finishOutcome === "loss" ? "✕" : "⎔"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Round result</p>
+                <h2
+                  id="ov2-tanks-finish-title"
+                  className={[
+                    "mt-0.5 text-2xl font-extrabold leading-tight tracking-tight",
+                    finishOutcome === "win" && "text-emerald-400",
+                    finishOutcome === "loss" && "text-rose-400",
+                    finishOutcome === "draw" && "text-sky-300",
+                    finishOutcome === "unknown" && "text-zinc-100",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {finishTitle}
+                </h2>
+                <p className="mt-2 text-[10px] font-medium uppercase tracking-wide text-zinc-500">Table multiplier</p>
+                <p className="mt-0.5 text-sm font-semibold tabular-nums text-zinc-400">×{stakeMultiplier}</p>
+                <div className="mt-3 rounded-lg border border-white/[0.1] bg-black/25 px-2.5 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Settlement</p>
+                  <p
+                    className={`mt-2 text-center text-xl font-bold tabular-nums leading-tight sm:text-2xl ${finishAmountLine.className}`}
+                  >
+                    {finishAmountLine.text}
+                  </p>
+                </div>
+                <p className="mt-3 text-center text-[11px] leading-snug text-zinc-400">{finishReasonLine}</p>
+                <p className="mt-2 text-center text-[10px] leading-snug text-zinc-500">
+                  {claimBusy ? "Sending results to your balance…" : "Round complete — rematch, then host starts next."}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 px-4 py-4">
+            <button type="button" className={BTN_PRIMARY} disabled>
+              Request rematch
+            </button>
+            <button type="button" className={BTN_SECONDARY} disabled>
+              Cancel rematch
+            </button>
+            {isHost ? (
+              <div className="w-full overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-950/15 pt-2">
+                <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-200/85">
+                  Host only
+                </p>
+                <button type="button" className={`${BTN_PRIMARY} w-full rounded-none`} disabled>
+                  Start next (host)
+                </button>
+              </div>
+            ) : (
+              <p className="rounded-lg border border-white/[0.06] bg-zinc-950/35 px-2 py-1.5 text-center text-[11px] text-zinc-500">
+                Host starts the next match when both players rematch.
+              </p>
+            )}
+            <button type="button" className={BTN_SECONDARY} onClick={dismissFinishModal}>
+              Dismiss
+            </button>
             <button
               type="button"
-              className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/20"
-              onClick={() => void onClaimManual()}
+              className={`${BTN_DANGER} w-full`}
+              disabled={leaveBusy || typeof onLeaveTable !== "function"}
+              onClick={() => void onLeaveTable?.()}
             >
-              Claim settlement
+              {leaveBusy ? "Leaving…" : "Leave table"}
             </button>
-            {claimMsg ? <p className="mt-2 text-xs text-emerald-300/90">{claimMsg}</p> : null}
+            {leaveTableErr ? <p className="text-center text-[11px] text-red-300">{leaveTableErr}</p> : null}
           </div>
-        </div>
+        </Ov2SharedFinishModalFrame>
       ) : null}
     </div>
   );
