@@ -2,7 +2,7 @@
 -- File: 150_ov2_tanks_v1_shared_policy_allowlist.sql (renumbered from 148 — do not reuse migration numbers).
 -- Apply after 147_ov2_tanks_v1_rpcs.sql and after the migration that currently owns `ov2_shared_leave_room`
 -- (today: 156_ov2_shared_integrate_snakes.sql). Re-run order: apply 156 first, then this file, OR merge manually.
--- This file intentionally does NOT replace `ov2_shared_leave_room` (Tanks mid-match forfeit wiring is a later pass).
+-- Mid-match leave/forfeit is extended in 153_ov2_shared_leave_room_add_tanks.sql (apply after Tanks gameplay RPCs).
 
 BEGIN;
 

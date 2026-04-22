@@ -170,7 +170,7 @@ export default function Ov2TanksLiveShell() {
       chromePreset="ov2_board"
       infoPanel={
         <div className="space-y-2 text-[11px] text-zinc-400">
-          <p>V1 scaffold — authoritative session + snapshot only. Fire and terrain sim are not wired yet.</p>
+          <p>V1 — side-view tanks, server sim, 30s turn timer, stakes settle via claim after the match.</p>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-white/[0.06] pt-2">
             <Link href="/online-v2/rooms" className="font-medium text-sky-300/90 underline">
               Lobby
