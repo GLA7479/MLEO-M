@@ -337,7 +337,7 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
 
       <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-2 px-2 pb-2 pt-1.5 md:flex-row md:items-stretch md:gap-4 md:px-3 md:pb-3 md:pt-2">
         {playing ? (
-          <aside className="flex w-full max-w-full shrink-0 flex-col md:w-[min(100%,300px)] md:max-w-[300px]">
+          <aside className="order-2 flex w-full max-w-full shrink-0 flex-col md:order-1 md:w-[min(100%,300px)] md:max-w-[300px]">
             <div
               className={`rounded-2xl border p-2.5 shadow-lg transition-colors sm:p-3 md:min-h-0 ${
                 controlsLocked
@@ -436,7 +436,7 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
         <section
           className={`relative flex min-h-0 w-full flex-1 flex-col rounded-2xl ${
             playing
-              ? "max-h-[min(34dvh,42svh)] shrink-0 md:max-h-none md:min-h-[min(48vh,460px)]"
+              ? "order-1 max-h-[min(34dvh,42svh)] shrink-0 md:order-2 md:max-h-none md:min-h-[min(48vh,460px)]"
               : "min-h-[min(36dvh,300px)] md:min-h-[min(48vh,420px)]"
           }`}
         >
