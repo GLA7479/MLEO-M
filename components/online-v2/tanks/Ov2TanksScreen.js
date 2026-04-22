@@ -336,19 +336,8 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
       ) : null}
 
       <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-2 px-2 pb-2 pt-1.5 md:flex-row md:items-stretch md:gap-4 md:px-3 md:pb-3 md:pt-2">
-        <section className="relative order-1 flex min-h-[min(52dvh,400px)] flex-1 flex-col md:order-2 md:min-h-[min(56vh,520px)]">
-          <Ov2TanksBattleCanvas
-            snapshot={snapshot}
-            aimAngleDeg={angleDeg}
-            mySeat={mySeat != null ? mySeat : null}
-            isMyTurn={myTurn}
-            activeTurnSeat={activeTurnSeat}
-            className="flex min-h-0 flex-1 rounded-2xl border border-amber-900/30 bg-gradient-to-b from-slate-900 to-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_48px_rgba(0,0,0,0.5)]"
-          />
-        </section>
-
         {playing ? (
-          <aside className="order-2 flex w-full max-w-full shrink-0 flex-col md:order-1 md:w-[min(100%,300px)] md:max-w-[300px]">
+          <aside className="flex w-full max-w-full shrink-0 flex-col md:w-[min(100%,300px)] md:max-w-[300px]">
             <div
               className={`rounded-2xl border p-2.5 shadow-lg transition-colors sm:p-3 md:min-h-0 ${
                 controlsLocked
@@ -381,7 +370,7 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                       disabled={disabled}
                       onClick={() => setWeapon(w)}
                       title={`${meta.label}${w === "iron" ? "" : ` (${ch})`}`}
-                      className={`flex min-h-[44px] flex-col items-center justify-center rounded-xl border px-0.5 py-1.5 transition active:scale-[0.98] sm:min-h-0 sm:py-2 ${
+                      className={`flex min-h-[36px] flex-col items-center justify-center rounded-xl border px-0.5 py-1 transition active:scale-[0.98] sm:min-h-0 sm:py-2 ${
                         selected
                           ? "border-amber-400/60 bg-amber-500/20 text-amber-50 shadow-[0_0_14px_rgba(251,191,36,0.2)]"
                           : "border-white/10 bg-black/30 text-zinc-400 hover:border-white/25 hover:bg-white/[0.06]"
@@ -437,13 +426,29 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                 type="button"
                 disabled={controlsLocked}
                 onClick={() => void onFire()}
-                className="mt-3 w-full rounded-xl bg-gradient-to-b from-rose-500 via-rose-600 to-rose-900 py-4 text-base font-black uppercase tracking-[0.2em] text-white shadow-[0_5px_0_rgb(127,29,29),0_14px_28px_rgba(0,0,0,0.4)] transition enabled:active:translate-y-0.5 enabled:active:shadow-[0_2px_0_rgb(127,29,29)] disabled:cursor-not-allowed disabled:from-zinc-700 disabled:via-zinc-800 disabled:to-zinc-900 disabled:text-zinc-500 disabled:shadow-none sm:mt-4 sm:py-3.5 sm:text-sm sm:tracking-widest"
+                className="mt-2 w-full rounded-xl bg-gradient-to-b from-rose-500 via-rose-600 to-rose-900 py-3 text-sm font-black uppercase tracking-[0.18em] text-white shadow-[0_4px_0_rgb(127,29,29),0_10px_22px_rgba(0,0,0,0.35)] transition enabled:active:translate-y-0.5 enabled:active:shadow-[0_2px_0_rgb(127,29,29)] disabled:cursor-not-allowed disabled:from-zinc-700 disabled:via-zinc-800 disabled:to-zinc-900 disabled:text-zinc-500 disabled:shadow-none sm:mt-4 sm:py-3.5 sm:text-base sm:tracking-widest"
               >
                 {fireBusy ? "Firing…" : controlsLocked ? "Wait" : "Fire"}
               </button>
             </div>
           </aside>
         ) : null}
+        <section
+          className={`relative flex min-h-0 w-full flex-1 flex-col rounded-2xl ${
+            playing
+              ? "max-h-[min(34dvh,42svh)] shrink-0 md:max-h-none md:min-h-[min(48vh,460px)]"
+              : "min-h-[min(36dvh,300px)] md:min-h-[min(48vh,420px)]"
+          }`}
+        >
+          <Ov2TanksBattleCanvas
+            snapshot={snapshot}
+            aimAngleDeg={angleDeg}
+            mySeat={mySeat != null ? mySeat : null}
+            isMyTurn={myTurn}
+            activeTurnSeat={activeTurnSeat}
+            className="flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-2xl border border-amber-900/30 bg-[#0b0f18] bg-gradient-to-b from-slate-900 to-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_48px_rgba(0,0,0,0.5)]"
+          />
+        </section>
       </div>
 
       {finished ? (

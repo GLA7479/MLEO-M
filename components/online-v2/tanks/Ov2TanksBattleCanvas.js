@@ -34,10 +34,14 @@ export default function Ov2TanksBattleCanvas({
     const mapH = pub && Number.isFinite(Number(pub.mapH)) ? Number(pub.mapH) : 540;
     const tanks = pub && Array.isArray(pub.tanks) ? pub.tanks : [];
 
-    const cssW = Math.max(320, wrap.clientWidth || 640);
-    const cssH = Math.round((cssW * mapH) / mapW);
+    const availW = Math.max(1, wrap.clientWidth || 320);
+    const availH = Math.max(1, wrap.clientHeight || Math.round((availW * mapH) / mapW));
+    /** Cover: fill the battle panel so there is no empty band under the canvas. */
+    const scale = Math.max(availW / mapW, availH / mapH);
+    const cssW = Math.max(160, Math.round(mapW * scale));
+    const cssH = Math.round(mapH * scale);
     const dpr = typeof window !== "undefined" ? Math.min(2, window.devicePixelRatio || 1) : 1;
-    const mobileBoost = cssW < 480 ? 1.12 : 1;
+    const mobileBoost = availW < 480 ? 1.12 : 1;
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
     canvas.style.width = `${cssW}px`;
@@ -48,9 +52,16 @@ export default function Ov2TanksBattleCanvas({
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
 
-    const sx = x => (x / mapW) * cssW;
-    const sy = y => (y / mapH) * cssH;
-    const px = (n, axis) => (axis === "x" ? (n / mapW) * cssW : (n / mapH) * cssH);
+    /** Vertical camera: stretch combat band so the frame is not mostly empty sky/soil. */
+    const viewY0 = mapH * 0.08;
+    const viewY1 = mapH * 0.92;
+    const viewH = Math.max(1, viewY1 - viewY0);
+    const sx = x => (Number(x) / mapW) * cssW;
+    const sy = y => {
+      const t = (Number(y) - viewY0) / viewH;
+      return Math.min(cssH, Math.max(0, t * cssH));
+    };
+    const px = (n, axis) => (axis === "x" ? (n / mapW) * cssW : (n / viewH) * cssH);
 
     const skyTop = ctx.createLinearGradient(0, 0, 0, cssH * 0.55);
     skyTop.addColorStop(0, "#152238");
@@ -565,14 +576,14 @@ export default function Ov2TanksBattleCanvas({
       ref={wrapRef}
       className={
         className ||
-        "relative w-full overflow-hidden rounded-2xl border border-amber-900/25 bg-gradient-to-b from-slate-900 to-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_12px_40px_rgba(0,0,0,0.45)]"
+        "relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-2xl border border-amber-900/25 bg-[#0b0f18] bg-gradient-to-b from-slate-900 to-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_12px_40px_rgba(0,0,0,0.45)]"
       }
     >
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-amber-500/5 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-10 bg-gradient-to-b from-amber-500/5 to-transparent sm:h-14"
         aria-hidden
       />
-      <canvas ref={canvasRef} className="relative z-[1] block w-full max-w-full" />
+      <canvas ref={canvasRef} className="relative z-[1] shrink-0" />
     </div>
   );
 }
