@@ -78,6 +78,15 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
     return Number.isFinite(n) ? n : 0;
   }, [snapshot]);
 
+  const activeTurnSeat = useMemo(() => {
+    const pk = String(snapshot?.parity?.activeParticipantKey || "").trim();
+    const p0 = String(snapshot?.parity?.participants?.[0] || "").trim();
+    const p1 = String(snapshot?.parity?.participants?.[1] || "").trim();
+    if (pk && p0 && pk === p0) return 0;
+    if (pk && p1 && pk === p1) return 1;
+    return null;
+  }, [snapshot]);
+
   const onFire = useCallback(async () => {
     const rid = String(roomId || "").trim();
     const pk = String(participantId || "").trim();
@@ -169,12 +178,14 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
   function HpBar({ label, value, accent }) {
     const pct = Math.min(100, Math.max(0, (value / OV2_TANKS_STARTING_HP) * 100));
     return (
-      <div className="min-w-[120px] flex-1 sm:min-w-[140px]">
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">{label}</span>
-          <span className={`font-mono text-xs font-bold tabular-nums ${accent}`}>{value}</span>
+      <div className="min-w-0 flex-1">
+        <div className="mb-0.5 flex items-center justify-between gap-1.5">
+          <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 sm:text-[10px]">
+            {label}
+          </span>
+          <span className={`font-mono text-[11px] font-black tabular-nums sm:text-xs ${accent}`}>{value}</span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-black/50 ring-1 ring-inset ring-white/10">
+        <div className="h-2 overflow-hidden rounded-full bg-black/55 ring-1 ring-inset ring-white/10 sm:h-2.5">
           <div
             className={`h-full rounded-full transition-[width] duration-300 ${
               value <= 25 ? "bg-gradient-to-r from-rose-600 to-amber-500" : "bg-gradient-to-r from-emerald-600 to-cyan-500"
@@ -188,69 +199,93 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-gradient-to-b from-slate-950 via-slate-900 to-[#070a0f] text-zinc-100">
-      <header className="shrink-0 border-b border-white/[0.07] bg-slate-950/90 px-3 py-2.5 shadow-sm backdrop-blur-md">
-        <div className="mx-auto flex max-w-4xl flex-col gap-3 sm:flex-row sm:items-stretch sm:justify-between sm:gap-4">
-          <div className="flex min-w-0 flex-1 flex-col gap-2 sm:max-w-md">
-            <div className="flex flex-wrap items-center gap-2">
+      <header className="shrink-0 border-b border-white/[0.08] bg-slate-950/95 px-2 py-2 shadow-md backdrop-blur-md sm:px-3 sm:py-2.5">
+        <div className="mx-auto max-w-4xl rounded-xl border border-white/[0.08] bg-gradient-to-b from-slate-900/90 to-slate-950/95 px-2.5 py-2 ring-1 ring-black/40 sm:px-3 sm:py-2.5">
+          <div className="flex flex-col gap-2.5 md:flex-row md:items-stretch md:gap-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-2 md:max-w-[52%]">
               {playing ? (
-                <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ring-1 ${
+                <div
+                  className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 ring-2 transition-shadow ${
                     myTurn
-                      ? "bg-emerald-500/20 text-emerald-100 ring-emerald-400/40"
-                      : "bg-slate-600/40 text-zinc-300 ring-white/10"
+                      ? "bg-emerald-950/85 ring-emerald-400/70 shadow-[0_0_20px_rgba(52,211,153,0.18)]"
+                      : "bg-slate-900/90 ring-amber-500/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                   }`}
                 >
-                  {myTurn ? "Your turn" : "Opponent turn"}
-                </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">Turn</p>
+                    <p
+                      className={`truncate text-sm font-black uppercase tracking-wide sm:text-base ${
+                        myTurn ? "text-emerald-100" : "text-amber-100"
+                      }`}
+                    >
+                      {myTurn ? "You — fire" : "Opponent"}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-zinc-500">
+                      Round {completedTurns}/{OV2_TANKS_MATCH_MAX_TOTAL_TURNS}
+                      {activeTurnSeat != null && mySeat != null ? (
+                        <span className="text-zinc-600">
+                          {" "}
+                          · {activeTurnSeat === mySeat ? "Your tank" : "Opponent tank"} live
+                        </span>
+                      ) : null}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Clock</p>
+                    <p className="font-mono text-2xl font-black tabular-nums leading-none text-white sm:text-3xl">
+                      {secLeft}
+                      <span className="text-sm font-bold text-zinc-500">s</span>
+                    </p>
+                    <p className="text-[9px] text-zinc-500">of {OV2_TANKS_TURN_SECONDS}s</p>
+                  </div>
+                </div>
               ) : finished ? (
-                <span className="inline-flex rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-100 ring-1 ring-amber-400/30">
-                  {finishLine}
-                </span>
+                <div className="flex items-center justify-between rounded-lg border border-amber-500/25 bg-amber-950/30 px-3 py-2">
+                  <span className="text-sm font-black uppercase tracking-wide text-amber-100">{finishLine}</span>
+                  <span className="text-[10px] text-zinc-500">Match ended</span>
+                </div>
               ) : (
                 <span className="text-xs text-zinc-500">{phase || "…"}</span>
               )}
-              <span className="text-[10px] text-zinc-500">
-                Turn {completedTurns}/{OV2_TANKS_MATCH_MAX_TOTAL_TURNS}
-              </span>
+              {playing ? (
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
+                    <span>Shot clock</span>
+                    <span className="font-mono text-[10px] tabular-nums text-zinc-400">
+                      {secLeft}s left
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-black/50 ring-1 ring-inset ring-white/10">
+                    <div
+                      className={`h-full rounded-full transition-[width] duration-500 ease-linear ${
+                        secLeft <= 8 ? "bg-gradient-to-r from-rose-500 to-amber-400" : "bg-gradient-to-r from-sky-500 to-cyan-400"
+                      }`}
+                      style={{ width: `${timerPct}%` }}
+                    />
+                  </div>
+                </div>
+              ) : null}
             </div>
-            {playing ? (
-              <div>
-                <div className="mb-1 flex items-center justify-between text-[10px] text-zinc-500">
-                  <span>Shot clock</span>
-                  <span className="font-mono tabular-nums text-zinc-200">
-                    {secLeft}s <span className="text-zinc-600">/</span> {OV2_TANKS_TURN_SECONDS}s
-                  </span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-black/40 ring-1 ring-inset ring-white/10">
-                  <div
-                    className={`h-full rounded-full transition-[width] duration-500 ease-linear ${
-                      secLeft <= 8 ? "bg-gradient-to-r from-rose-500 to-amber-400" : "bg-gradient-to-r from-sky-500 to-cyan-400"
-                    }`}
-                    style={{ width: `${timerPct}%` }}
-                  />
-                </div>
-              </div>
-            ) : null}
-          </div>
 
-          <div className="flex flex-1 flex-wrap items-end gap-3 sm:justify-end">
-            <HpBar label={hpLabel(0)} value={hp[0]} accent="text-sky-200" />
-            <HpBar label={hpLabel(1)} value={hp[1]} accent="text-orange-200" />
-            <div className="flex w-full shrink-0 items-center justify-between gap-3 sm:w-auto sm:flex-col sm:items-end">
-              <div className="text-[10px] text-zinc-500">
-                <span className="font-semibold text-zinc-400">Strikes</span>{" "}
-                <span className="font-mono text-zinc-300">
-                  {strikes[0]}·{strikes[1]}
-                </span>
-                <span className="text-zinc-600"> /3</span>
+            <div className="grid shrink-0 grid-cols-2 gap-2 sm:gap-3 md:flex md:min-w-0 md:flex-1 md:items-end md:justify-end">
+              <HpBar label={hpLabel(0)} value={hp[0]} accent="text-sky-200" />
+              <HpBar label={hpLabel(1)} value={hp[1]} accent="text-orange-200" />
+              <div className="col-span-2 flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-black/25 px-2.5 py-1.5 md:col-span-1 md:flex-col md:items-stretch md:justify-center md:border-0 md:bg-transparent md:px-0 md:py-0">
+                <div className="text-[10px] text-zinc-400">
+                  <span className="font-bold text-zinc-300">Strikes</span>{" "}
+                  <span className="font-mono font-semibold text-zinc-200">
+                    {strikes[0]} · {strikes[1]}
+                  </span>
+                  <span className="text-zinc-600"> /3</span>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-bold text-zinc-200 transition hover:bg-white/10 md:self-end"
+                  onClick={() => void reload()}
+                >
+                  Sync
+                </button>
               </div>
-              <button
-                type="button"
-                className="rounded-md border border-white/15 bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-zinc-300 transition hover:bg-white/10"
-                onClick={() => void reload()}
-              >
-                Sync
-              </button>
             </div>
           </div>
         </div>
@@ -263,27 +298,58 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
         <p className="shrink-0 px-3 py-1 text-center text-xs text-rose-300">{fireErr}</p>
       ) : null}
 
-      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-3 px-2 pb-3 pt-2 md:flex-row md:items-stretch md:gap-4 md:px-3">
-        <section className="order-1 flex min-h-[min(48vh,380px)] flex-1 flex-col md:order-2 md:min-h-[min(56vh,520px)]">
+      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-2 px-2 pb-2 pt-1.5 md:flex-row md:items-stretch md:gap-4 md:px-3 md:pb-3 md:pt-2">
+        <section className="relative order-1 flex min-h-[min(52dvh,400px)] flex-1 flex-col md:order-2 md:min-h-[min(56vh,520px)]">
+          {playing ? (
+            <div className="pointer-events-none absolute left-2 right-2 top-2 z-10 flex justify-center md:left-3 md:right-auto md:justify-start">
+              <div
+                className={`max-w-[95%] rounded-full border px-3 py-1.5 text-center shadow-lg backdrop-blur-sm sm:px-4 sm:py-2 ${
+                  myTurn
+                    ? "border-emerald-400/50 bg-emerald-950/90 text-emerald-50 ring-2 ring-emerald-400/35"
+                    : "border-amber-500/40 bg-slate-950/90 text-amber-50 ring-1 ring-amber-500/25"
+                }`}
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-zinc-400 sm:text-[11px]">
+                  {myTurn ? "Your turn" : "Opponent turn"}
+                </p>
+                <p className="text-[11px] font-bold leading-snug text-white sm:text-xs">
+                  {myTurn ? "Aim barrel, pick weapon, tap Fire." : "Their tank is live — wait for their shot."}
+                </p>
+              </div>
+            </div>
+          ) : null}
           <Ov2TanksBattleCanvas
             snapshot={snapshot}
             aimAngleDeg={angleDeg}
             mySeat={mySeat != null ? mySeat : null}
+            isMyTurn={myTurn}
+            activeTurnSeat={activeTurnSeat}
             className="flex min-h-0 flex-1 rounded-2xl border border-amber-900/30 bg-gradient-to-b from-slate-900 to-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_16px_48px_rgba(0,0,0,0.5)]"
           />
         </section>
 
         {playing ? (
-          <aside className="order-2 flex shrink-0 flex-col gap-3 md:order-1 md:w-[min(100%,300px)] md:max-w-[300px]">
+          <aside className="order-2 flex w-full max-w-full shrink-0 flex-col md:order-1 md:w-[min(100%,300px)] md:max-w-[300px]">
             <div
-              className={`rounded-2xl border p-3 shadow-lg transition-colors md:min-h-0 ${
+              className={`rounded-2xl border p-2.5 shadow-lg transition-colors sm:p-3 md:min-h-0 ${
                 controlsLocked
-                  ? "border-white/[0.06] bg-slate-900/40"
-                  : "border-emerald-500/25 bg-slate-900/70 ring-1 ring-emerald-500/15"
+                  ? "border-white/[0.08] bg-slate-950/50 opacity-[0.92]"
+                  : "border-emerald-500/35 bg-slate-900/80 ring-2 ring-emerald-500/20"
               }`}
             >
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Loadout</p>
-              <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">Weapons</p>
+                {controlsLocked ? (
+                  <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-400">
+                    Locked
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-200">
+                    Ready
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
                 {WEAPONS.map(w => {
                   const ch = chargesMine ? Number(chargesMine[w]) : 0;
                   const meta = WEAPON_META[w] || { abbr: w, label: w, hint: "" };
@@ -296,24 +362,28 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                       disabled={disabled}
                       onClick={() => setWeapon(w)}
                       title={`${meta.label}${w === "iron" ? "" : ` (${ch})`}`}
-                      className={`flex flex-col items-center rounded-xl border px-1 py-2 transition sm:py-2.5 ${
+                      className={`flex min-h-[44px] flex-col items-center justify-center rounded-xl border px-0.5 py-1.5 transition active:scale-[0.98] sm:min-h-0 sm:py-2 ${
                         selected
-                          ? "border-amber-400/50 bg-amber-500/15 text-amber-50 shadow-[0_0_12px_rgba(251,191,36,0.12)]"
-                          : "border-white/10 bg-black/25 text-zinc-400 hover:border-white/20 hover:bg-white/5"
-                      } disabled:cursor-not-allowed disabled:opacity-35`}
+                          ? "border-amber-400/60 bg-amber-500/20 text-amber-50 shadow-[0_0_14px_rgba(251,191,36,0.2)]"
+                          : "border-white/10 bg-black/30 text-zinc-400 hover:border-white/25 hover:bg-white/[0.06]"
+                      } disabled:cursor-not-allowed disabled:opacity-30`}
                     >
-                      <span className="font-mono text-[11px] font-bold tracking-tight">{meta.abbr}</span>
-                      <span className="mt-0.5 hidden text-[8px] uppercase text-zinc-500 sm:block">{meta.hint}</span>
+                      <span className="font-mono text-xs font-black tracking-tight sm:text-[11px]">{meta.abbr}</span>
+                      <span className="mt-0.5 text-[8px] font-semibold uppercase leading-none text-zinc-500">
+                        {meta.hint}
+                      </span>
                     </button>
                   );
                 })}
               </div>
 
-              <div className="mt-4 space-y-4">
+              <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
                 <div>
                   <div className="mb-1 flex items-center justify-between">
-                    <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Angle</label>
-                    <span className="font-mono text-xs text-zinc-200">{angleDeg}°</span>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Angle</label>
+                    <span className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-xs font-bold text-zinc-100">
+                      {angleDeg}°
+                    </span>
                   </div>
                   <input
                     type="range"
@@ -322,13 +392,15 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                     value={angleDeg}
                     disabled={controlsLocked}
                     onChange={e => setAngleDeg(Number(e.target.value))}
-                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-amber-400 disabled:cursor-not-allowed disabled:opacity-40 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-300 [&::-webkit-slider-thumb]:shadow"
+                    className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-amber-400 disabled:cursor-not-allowed disabled:opacity-35 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-amber-200/50 [&::-webkit-slider-thumb]:bg-amber-300 [&::-webkit-slider-thumb]:shadow"
                   />
                 </div>
                 <div>
                   <div className="mb-1 flex items-center justify-between">
-                    <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Power</label>
-                    <span className="font-mono text-xs text-zinc-200">{power}</span>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Power</label>
+                    <span className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-xs font-bold text-zinc-100">
+                      {power}
+                    </span>
                   </div>
                   <input
                     type="range"
@@ -337,7 +409,7 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                     value={power}
                     disabled={controlsLocked}
                     onChange={e => setPower(Number(e.target.value))}
-                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-orange-400 disabled:cursor-not-allowed disabled:opacity-40 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-orange-300 [&::-webkit-slider-thumb]:shadow"
+                    className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-orange-400 disabled:cursor-not-allowed disabled:opacity-35 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-orange-200/50 [&::-webkit-slider-thumb]:bg-orange-300 [&::-webkit-slider-thumb]:shadow"
                   />
                 </div>
               </div>
@@ -346,9 +418,9 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                 type="button"
                 disabled={controlsLocked}
                 onClick={() => void onFire()}
-                className="mt-5 w-full rounded-xl bg-gradient-to-b from-rose-600 to-rose-800 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-[0_4px_0_rgb(127,29,29),0_12px_24px_rgba(0,0,0,0.35)] transition enabled:active:translate-y-0.5 enabled:active:shadow-[0_2px_0_rgb(127,29,29)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+                className="mt-3 w-full rounded-xl bg-gradient-to-b from-rose-500 via-rose-600 to-rose-900 py-4 text-base font-black uppercase tracking-[0.2em] text-white shadow-[0_5px_0_rgb(127,29,29),0_14px_28px_rgba(0,0,0,0.4)] transition enabled:active:translate-y-0.5 enabled:active:shadow-[0_2px_0_rgb(127,29,29)] disabled:cursor-not-allowed disabled:from-zinc-700 disabled:via-zinc-800 disabled:to-zinc-900 disabled:text-zinc-500 disabled:shadow-none sm:mt-4 sm:py-3.5 sm:text-sm sm:tracking-widest"
               >
-                {fireBusy ? "Firing…" : "Fire"}
+                {fireBusy ? "Firing…" : controlsLocked ? "Wait" : "Fire"}
               </button>
             </div>
           </aside>
