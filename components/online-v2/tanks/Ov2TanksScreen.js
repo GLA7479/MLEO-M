@@ -156,7 +156,6 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
   const winnerSeat = snapshot?.winnerSeat;
   const mySeat = snapshot?.mySeat;
 
-  const timerPct = playing ? Math.min(100, Math.max(0, (secLeft / OV2_TANKS_TURN_SECONDS) * 100)) : 0;
   const controlsLocked = !playing || !myTurn || fireBusy;
 
   let finishLine = "";
@@ -181,9 +180,12 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
   function TurnSeatPanel({ seat, playing: playingPanel }) {
     const isLive = playingPanel && activeTurnSeat === seat;
     const isMe = mySeat === seat;
+    const curHp = hp[seat];
+    const st = strikes[seat];
+    const hpPct = Math.min(100, Math.max(0, (curHp / OV2_TANKS_STARTING_HP) * 100));
     return (
       <div
-        className={`flex min-w-0 flex-col justify-between gap-1 rounded-lg px-2 py-2 ring-2 transition-shadow sm:px-2.5 sm:py-2 ${
+        className={`flex min-w-0 flex-col gap-1.5 rounded-lg px-2 py-2 ring-2 transition-shadow sm:px-2.5 sm:py-2.5 ${
           isLive
             ? "bg-emerald-950/85 ring-emerald-400/70 shadow-[0_0_16px_rgba(52,211,153,0.14)]"
             : "bg-slate-900/90 ring-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
@@ -191,26 +193,53 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
       >
         <div className="min-w-0">
           <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-500 sm:text-[10px]">
-            Turn · {hpLabel(seat)}
+            Turn · {hpLabel(seat)} · seat {seat}
           </p>
           <p
             className={`truncate text-xs font-black uppercase tracking-wide sm:text-sm ${
               isLive ? (isMe ? "text-emerald-100" : "text-amber-100") : "text-zinc-500"
             }`}
           >
-            {isLive ? (isMe ? "You — fire" : "Opponent") : "Waiting"}
+            {isLive ? (isMe ? "You — fire" : "Opponent shooting") : "Waiting"}
           </p>
         </div>
+        <div className="space-y-0.5">
+          <div className="flex items-center justify-between gap-1 text-[9px] text-zinc-500 sm:text-[10px]">
+            <span className="font-semibold uppercase tracking-wider">Tank HP</span>
+            <span className={`font-mono font-black tabular-nums ${isMe ? "text-sky-200" : "text-orange-200"}`}>
+              {curHp}/{OV2_TANKS_STARTING_HP}
+            </span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-black/55 ring-1 ring-inset ring-white/10">
+            <div
+              className={`h-full rounded-full transition-[width] duration-300 ${
+                curHp <= 25 ? "bg-gradient-to-r from-rose-600 to-amber-500" : "bg-gradient-to-r from-emerald-600 to-cyan-500"
+              }`}
+              style={{ width: `${hpPct}%` }}
+            />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[9px] text-zinc-500 sm:text-[10px]">
+          <span>
+            <span className="font-semibold uppercase tracking-wider text-zinc-600">Strikes</span>{" "}
+            <span className="font-mono font-bold text-zinc-300">{st}</span>
+            <span className="text-zinc-600">/3</span>
+          </span>
+          <span>
+            <span className="font-semibold uppercase tracking-wider text-zinc-600">Round</span>{" "}
+            <span className="font-mono font-bold text-zinc-300">
+              {completedTurns}/{OV2_TANKS_MATCH_MAX_TOTAL_TURNS}
+            </span>
+          </span>
+        </div>
         <div className="flex items-end justify-between gap-1 border-t border-white/[0.06] pt-1">
-          <p className="text-[8px] font-semibold uppercase tracking-wider text-zinc-600">Seat {seat}</p>
-          {isLive ? (
-            <p className="shrink-0 font-mono text-lg font-black tabular-nums leading-none text-white sm:text-xl">
-              {secLeft}
-              <span className="text-[10px] font-bold text-zinc-500">s</span>
-            </p>
-          ) : (
-            <span className="font-mono text-sm font-bold text-zinc-600">—</span>
-          )}
+          <p className="text-[8px] font-semibold uppercase tracking-wider text-zinc-600">Turn timer</p>
+          <p className="shrink-0 font-mono text-lg font-black tabular-nums leading-none text-white sm:text-xl">
+            {playingPanel ? secLeft : "—"}
+            {playingPanel ? (
+              <span className="text-[10px] font-bold text-zinc-500">/{OV2_TANKS_TURN_SECONDS}s</span>
+            ) : null}
+          </p>
         </div>
       </div>
     );
@@ -250,10 +279,6 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                     <TurnSeatPanel seat={0} playing={playing} />
                     <TurnSeatPanel seat={1} playing={playing} />
                   </div>
-                  <p className="text-center text-[10px] text-zinc-500">
-                    Round {completedTurns}/{OV2_TANKS_MATCH_MAX_TOTAL_TURNS}
-                    <span className="text-zinc-600"> · {OV2_TANKS_TURN_SECONDS}s clock</span>
-                  </p>
                 </div>
               ) : finished ? (
                 <div className="flex items-center justify-between rounded-lg border border-amber-500/25 bg-amber-950/30 px-3 py-2">
@@ -263,37 +288,33 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
               ) : (
                 <span className="text-xs text-zinc-500">{phase || "…"}</span>
               )}
-              {playing ? (
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
-                    <span>Shot clock</span>
-                    <span className="font-mono text-[10px] tabular-nums text-zinc-400">
-                      {secLeft}s left
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-black/50 ring-1 ring-inset ring-white/10">
-                    <div
-                      className={`h-full rounded-full transition-[width] duration-500 ease-linear ${
-                        secLeft <= 8 ? "bg-gradient-to-r from-rose-500 to-amber-400" : "bg-gradient-to-r from-sky-500 to-cyan-400"
-                      }`}
-                      style={{ width: `${timerPct}%` }}
-                    />
-                  </div>
-                </div>
-              ) : null}
             </div>
 
-            <div className="grid shrink-0 grid-cols-2 gap-2 sm:gap-3 md:flex md:min-w-0 md:flex-1 md:items-end md:justify-end">
-              <HpBar label={hpLabel(0)} value={hp[0]} accent="text-sky-200" />
-              <HpBar label={hpLabel(1)} value={hp[1]} accent="text-orange-200" />
-              <div className="col-span-2 flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-black/25 px-2.5 py-1.5 md:col-span-1 md:flex-col md:items-stretch md:justify-center md:border-0 md:bg-transparent md:px-0 md:py-0">
-                <div className="text-[10px] text-zinc-400">
-                  <span className="font-bold text-zinc-300">Strikes</span>{" "}
-                  <span className="font-mono font-semibold text-zinc-200">
-                    {strikes[0]} · {strikes[1]}
-                  </span>
-                  <span className="text-zinc-600"> /3</span>
-                </div>
+            <div
+              className={`grid shrink-0 gap-2 sm:gap-3 md:flex md:min-w-0 md:flex-1 md:items-end md:justify-end ${
+                playing ? "grid-cols-1" : "grid-cols-2"
+              }`}
+            >
+              {playing ? null : (
+                <>
+                  <HpBar label={hpLabel(0)} value={hp[0]} accent="text-sky-200" />
+                  <HpBar label={hpLabel(1)} value={hp[1]} accent="text-orange-200" />
+                </>
+              )}
+              <div
+                className={`flex items-center justify-between gap-2 rounded-lg border border-white/[0.06] bg-black/25 px-2.5 py-1.5 md:flex-col md:items-stretch md:justify-center md:border-0 md:bg-transparent md:px-0 md:py-0 ${
+                  playing ? "col-span-1" : "col-span-2 md:col-span-1"
+                }`}
+              >
+                {playing ? null : (
+                  <div className="text-[10px] text-zinc-400">
+                    <span className="font-bold text-zinc-300">Strikes</span>{" "}
+                    <span className="font-mono font-semibold text-zinc-200">
+                      {strikes[0]} · {strikes[1]}
+                    </span>
+                    <span className="text-zinc-600"> /3</span>
+                  </div>
+                )}
                 <button
                   type="button"
                   className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-bold text-zinc-200 transition hover:bg-white/10 md:self-end"
@@ -317,33 +338,34 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
       <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-2 px-2 pb-2 pt-1.5 md:flex-row md:items-stretch md:gap-4 md:px-3 md:pb-3 md:pt-2">
         <section className="relative order-1 flex min-h-[min(52dvh,400px)] flex-1 flex-col md:order-2 md:min-h-[min(56vh,520px)]">
           {playing ? (
-            <div className="pointer-events-none absolute inset-x-2 top-2 z-10 flex justify-between gap-2 md:inset-x-3">
+            <div className="pointer-events-none absolute inset-x-1.5 top-1.5 z-10 flex justify-between gap-1.5 sm:inset-x-2 sm:top-2 md:inset-x-3">
               {[0, 1].map(seat => {
                 const isLive = activeTurnSeat === seat;
                 const isMe = mySeat === seat;
+                const curHp = hp[seat];
+                const st = strikes[seat];
                 return (
                   <div
                     key={seat}
-                    className={`max-w-[48%] min-w-0 flex-1 rounded-lg border px-2 py-1.5 text-center shadow-lg backdrop-blur-sm sm:rounded-xl sm:px-2.5 sm:py-2 ${
+                    className={`max-w-[49%] min-w-0 flex-1 rounded-lg border px-1.5 py-1 text-left shadow-lg backdrop-blur-sm sm:rounded-xl sm:px-2 sm:py-1.5 ${
                       isLive
                         ? isMe
                           ? "border-emerald-400/50 bg-emerald-950/90 text-emerald-50 ring-2 ring-emerald-400/35"
                           : "border-amber-500/45 bg-slate-950/90 text-amber-50 ring-1 ring-amber-500/30"
-                        : "border-white/[0.08] bg-slate-950/75 text-zinc-400 ring-1 ring-black/30"
+                        : "border-white/[0.08] bg-slate-950/80 text-zinc-300 ring-1 ring-black/30"
                     }`}
                   >
-                    <p className="text-[9px] font-black uppercase tracking-[0.1em] text-zinc-500 sm:text-[10px]">
-                      {hpLabel(seat)}
+                    <p className="text-[8px] font-black uppercase tracking-[0.08em] text-zinc-500 sm:text-[9px]">
+                      {hpLabel(seat)} · S{seat}
                     </p>
-                    <p className="truncate text-[10px] font-bold text-white sm:text-[11px]">
+                    <p className="truncate text-[9px] font-bold text-white sm:text-[10px]">
                       {isLive ? (isMe ? "Your turn" : "Their turn") : "Waiting"}
                     </p>
-                    <p className="mt-0.5 line-clamp-2 text-[9px] leading-snug text-zinc-400 sm:text-[10px]">
-                      {isLive
-                        ? isMe
-                          ? "Aim, weapon, Fire."
-                          : "Wait for their shot."
-                        : "—"}
+                    <p className="font-mono text-[9px] font-bold tabular-nums text-zinc-200 sm:text-[10px]">
+                      HP {curHp}/{OV2_TANKS_STARTING_HP} · Str {st}/3 · R{completedTurns}/{OV2_TANKS_MATCH_MAX_TOTAL_TURNS}
+                    </p>
+                    <p className="text-[9px] font-mono font-black tabular-nums text-white sm:text-[10px]">
+                      {secLeft}s / {OV2_TANKS_TURN_SECONDS}s
                     </p>
                   </div>
                 );
