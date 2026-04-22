@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  fetchOv2TanksSnapshot,
+  fetchOv2TanksSnapshotDetailed,
   requestOv2TanksClaimSettlement,
   requestOv2TanksPing,
   subscribeOv2TanksSnapshot,
@@ -29,9 +29,9 @@ export function useOv2TanksSession(params) {
     }
     setLoadError("");
     try {
-      const snap = await fetchOv2TanksSnapshot(rid, { participantKey: pk });
+      const { snapshot: snap, rpcError } = await fetchOv2TanksSnapshotDetailed(rid, { participantKey: pk });
       setSnapshot(snap);
-      if (!snap) setLoadError("");
+      setLoadError(rpcError || "");
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
       setSnapshot(null);
@@ -52,6 +52,9 @@ export function useOv2TanksSession(params) {
         setSnapshot(s);
         setLoadError("");
       },
+      onError: err => {
+        setLoadError(err?.message || String(err));
+      },
     });
   }, [roomId, participantKey, enabled]);
 
@@ -62,7 +65,12 @@ export function useOv2TanksSession(params) {
     const id = window.setInterval(() => {
       void (async () => {
         const out = await requestOv2TanksPing(rid, pk);
-        if (out.ok && out.snapshot) setSnapshot(out.snapshot);
+        if (out.ok && out.snapshot) {
+          setSnapshot(out.snapshot);
+          setLoadError("");
+        } else if (!out.ok) {
+          setLoadError(out.error || "Ping failed");
+        }
       })();
     }, 2500);
     return () => window.clearInterval(id);
