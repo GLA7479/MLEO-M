@@ -337,41 +337,6 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
 
       <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-2 px-2 pb-2 pt-1.5 md:flex-row md:items-stretch md:gap-4 md:px-3 md:pb-3 md:pt-2">
         <section className="relative order-1 flex min-h-[min(52dvh,400px)] flex-1 flex-col md:order-2 md:min-h-[min(56vh,520px)]">
-          {playing ? (
-            <div className="pointer-events-none absolute inset-x-1.5 top-1.5 z-10 flex justify-between gap-1.5 sm:inset-x-2 sm:top-2 md:inset-x-3">
-              {[0, 1].map(seat => {
-                const isLive = activeTurnSeat === seat;
-                const isMe = mySeat === seat;
-                const curHp = hp[seat];
-                const st = strikes[seat];
-                return (
-                  <div
-                    key={seat}
-                    className={`max-w-[49%] min-w-0 flex-1 rounded-lg border px-1.5 py-1 text-left shadow-lg backdrop-blur-sm sm:rounded-xl sm:px-2 sm:py-1.5 ${
-                      isLive
-                        ? isMe
-                          ? "border-emerald-400/50 bg-emerald-950/90 text-emerald-50 ring-2 ring-emerald-400/35"
-                          : "border-amber-500/45 bg-slate-950/90 text-amber-50 ring-1 ring-amber-500/30"
-                        : "border-white/[0.08] bg-slate-950/80 text-zinc-300 ring-1 ring-black/30"
-                    }`}
-                  >
-                    <p className="text-[8px] font-black uppercase tracking-[0.08em] text-zinc-500 sm:text-[9px]">
-                      {hpLabel(seat)} · S{seat}
-                    </p>
-                    <p className="truncate text-[9px] font-bold text-white sm:text-[10px]">
-                      {isLive ? (isMe ? "Your turn" : "Their turn") : "Waiting"}
-                    </p>
-                    <p className="font-mono text-[9px] font-bold tabular-nums text-zinc-200 sm:text-[10px]">
-                      HP {curHp}/{OV2_TANKS_STARTING_HP} · Str {st}/3 · R{completedTurns}/{OV2_TANKS_MATCH_MAX_TOTAL_TURNS}
-                    </p>
-                    <p className="text-[9px] font-mono font-black tabular-nums text-white sm:text-[10px]">
-                      {secLeft}s / {OV2_TANKS_TURN_SECONDS}s
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          ) : null}
           <Ov2TanksBattleCanvas
             snapshot={snapshot}
             aimAngleDeg={angleDeg}
