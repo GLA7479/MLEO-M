@@ -339,14 +339,16 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
         {playing ? (
           <aside className="order-2 flex w-full max-w-full shrink-0 flex-col md:order-1 md:w-[min(100%,300px)] md:max-w-[300px]">
             <div
-              className={`rounded-2xl border p-2.5 shadow-lg transition-colors sm:p-3 md:min-h-0 ${
+              className={`rounded-xl border p-1.5 shadow-lg transition-colors sm:rounded-2xl sm:p-2.5 md:p-3 md:min-h-0 ${
                 controlsLocked
                   ? "border-white/[0.08] bg-slate-950/50 opacity-[0.92]"
-                  : "border-emerald-500/35 bg-slate-900/80 ring-2 ring-emerald-500/20"
+                  : "border-emerald-500/35 bg-slate-900/80 ring-1 ring-emerald-500/20 md:ring-2"
               }`}
             >
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">Weapons</p>
+              <div className="mb-1 flex items-center justify-between gap-1.5 md:mb-2">
+                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-zinc-500 md:text-[10px] md:tracking-[0.18em]">
+                  Weapons
+                </p>
                 {controlsLocked ? (
                   <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-zinc-400">
                     Locked
@@ -357,7 +359,7 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                   </span>
                 )}
               </div>
-              <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
+              <div className="grid grid-cols-4 gap-0.5 sm:gap-1 md:gap-1.5">
                 {WEAPONS.map(w => {
                   const ch = chargesMine ? Number(chargesMine[w]) : 0;
                   const meta = WEAPON_META[w] || { abbr: w, label: w, hint: "" };
@@ -370,14 +372,16 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                       disabled={disabled}
                       onClick={() => setWeapon(w)}
                       title={`${meta.label}${w === "iron" ? "" : ` (${ch})`}`}
-                      className={`flex min-h-[36px] flex-col items-center justify-center rounded-xl border px-0.5 py-1 transition active:scale-[0.98] sm:min-h-0 sm:py-2 ${
+                      className={`flex min-h-[30px] flex-col items-center justify-center rounded-lg border px-0.5 py-0.5 transition active:scale-[0.98] sm:min-h-[34px] sm:rounded-xl sm:py-1 md:min-h-0 md:py-2 ${
                         selected
-                          ? "border-amber-400/60 bg-amber-500/20 text-amber-50 shadow-[0_0_14px_rgba(251,191,36,0.2)]"
+                          ? "border-amber-400/60 bg-amber-500/20 text-amber-50 shadow-[0_0_10px_rgba(251,191,36,0.18)]"
                           : "border-white/10 bg-black/30 text-zinc-400 hover:border-white/25 hover:bg-white/[0.06]"
                       } disabled:cursor-not-allowed disabled:opacity-30`}
                     >
-                      <span className="font-mono text-xs font-black tracking-tight sm:text-[11px]">{meta.abbr}</span>
-                      <span className="mt-0.5 text-[8px] font-semibold uppercase leading-none text-zinc-500">
+                      <span className="font-mono text-[11px] font-black leading-none sm:text-xs md:text-[11px]">
+                        {meta.abbr}
+                      </span>
+                      <span className="mt-0.5 hidden text-[7px] font-semibold uppercase leading-none text-zinc-500 sm:block sm:text-[8px]">
                         {meta.hint}
                       </span>
                     </button>
@@ -385,11 +389,13 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                 })}
               </div>
 
-              <div className="mt-3 space-y-3 sm:mt-4 sm:space-y-4">
+              <div className="mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 md:mt-4 md:grid-cols-1 md:gap-y-3">
                 <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Angle</label>
-                    <span className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-xs font-bold text-zinc-100">
+                  <div className="mb-0 flex items-center justify-between md:mb-1">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 md:text-[10px]">
+                      Angle
+                    </label>
+                    <span className="rounded bg-black/40 px-1 py-0.5 font-mono text-[10px] font-bold text-zinc-100 md:px-1.5 md:text-xs">
                       {angleDeg}°
                     </span>
                   </div>
@@ -400,13 +406,15 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                     value={angleDeg}
                     disabled={controlsLocked}
                     onChange={e => setAngleDeg(Number(e.target.value))}
-                    className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-amber-400 disabled:cursor-not-allowed disabled:opacity-35 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-amber-200/50 [&::-webkit-slider-thumb]:bg-amber-300 [&::-webkit-slider-thumb]:shadow"
+                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-amber-400 disabled:cursor-not-allowed disabled:opacity-35 md:h-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-amber-200/50 [&::-webkit-slider-thumb]:bg-amber-300 [&::-webkit-slider-thumb]:shadow md:[&::-webkit-slider-thumb]:h-4 md:[&::-webkit-slider-thumb]:w-4"
                   />
                 </div>
                 <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Power</label>
-                    <span className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-xs font-bold text-zinc-100">
+                  <div className="mb-0 flex items-center justify-between md:mb-1">
+                    <label className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 md:text-[10px]">
+                      Power
+                    </label>
+                    <span className="rounded bg-black/40 px-1 py-0.5 font-mono text-[10px] font-bold text-zinc-100 md:px-1.5 md:text-xs">
                       {power}
                     </span>
                   </div>
@@ -417,7 +425,7 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                     value={power}
                     disabled={controlsLocked}
                     onChange={e => setPower(Number(e.target.value))}
-                    className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-orange-400 disabled:cursor-not-allowed disabled:opacity-35 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-orange-200/50 [&::-webkit-slider-thumb]:bg-orange-300 [&::-webkit-slider-thumb]:shadow"
+                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-zinc-800 accent-orange-400 disabled:cursor-not-allowed disabled:opacity-35 md:h-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-orange-200/50 [&::-webkit-slider-thumb]:bg-orange-300 [&::-webkit-slider-thumb]:shadow md:[&::-webkit-slider-thumb]:h-4 md:[&::-webkit-slider-thumb]:w-4"
                   />
                 </div>
               </div>
@@ -426,7 +434,7 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
                 type="button"
                 disabled={controlsLocked}
                 onClick={() => void onFire()}
-                className="mt-2 w-full rounded-xl bg-gradient-to-b from-rose-500 via-rose-600 to-rose-900 py-3 text-sm font-black uppercase tracking-[0.18em] text-white shadow-[0_4px_0_rgb(127,29,29),0_10px_22px_rgba(0,0,0,0.35)] transition enabled:active:translate-y-0.5 enabled:active:shadow-[0_2px_0_rgb(127,29,29)] disabled:cursor-not-allowed disabled:from-zinc-700 disabled:via-zinc-800 disabled:to-zinc-900 disabled:text-zinc-500 disabled:shadow-none sm:mt-4 sm:py-3.5 sm:text-base sm:tracking-widest"
+                className="mt-1.5 w-full rounded-lg bg-gradient-to-b from-rose-500 via-rose-600 to-rose-900 py-2 text-xs font-black uppercase tracking-[0.14em] text-white shadow-[0_3px_0_rgb(127,29,29),0_8px_16px_rgba(0,0,0,0.3)] transition enabled:active:translate-y-0.5 enabled:active:shadow-[0_1px_0_rgb(127,29,29)] disabled:cursor-not-allowed disabled:from-zinc-700 disabled:via-zinc-800 disabled:to-zinc-900 disabled:text-zinc-500 disabled:shadow-none sm:mt-2 sm:rounded-xl sm:py-2.5 sm:text-sm md:mt-4 md:py-3.5 md:text-base md:tracking-widest"
               >
                 {fireBusy ? "Firing…" : controlsLocked ? "Wait" : "Fire"}
               </button>
@@ -436,7 +444,7 @@ export default function Ov2TanksScreen({ roomId, participantId, room }) {
         <section
           className={`relative flex min-h-0 w-full flex-1 flex-col rounded-2xl ${
             playing
-              ? "order-1 max-h-[min(34dvh,42svh)] shrink-0 md:order-2 md:max-h-none md:min-h-[min(48vh,460px)]"
+              ? "order-1 max-h-[min(40dvh,48svh)] shrink-0 md:order-2 md:max-h-none md:min-h-[min(48vh,460px)]"
               : "min-h-[min(36dvh,300px)] md:min-h-[min(48vh,420px)]"
           }`}
         >
