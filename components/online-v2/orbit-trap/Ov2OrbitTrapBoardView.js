@@ -102,14 +102,18 @@ export default function Ov2OrbitTrapBoardView({
   const rotateUiSlots = { outer: [3, 7], mid: [1, 5], inner: [2, 6] };
   const rotateBump = { outer: 17, mid: 14, inner: 11 };
 
+  const boardTitle =
+    "Orbit Trap board — trap ▲, boost ▢, lock ⧈, fixed F, loose gold. Tap highlighted cells when a move mode is on.";
+
   return (
-    <div className="flex h-full w-full min-h-0 flex-1 flex-col items-stretch justify-center">
+    <div className="flex h-full w-full min-h-0 flex-1 flex-col items-stretch justify-center lg:max-h-full">
       <svg
         viewBox="-102 -102 204 204"
-        className="mx-auto h-full w-full max-h-[min(88vh,780px)] min-h-[200px] max-w-[min(98vw,780px)] shrink-0 touch-manipulation select-none"
+        className="mx-auto h-full w-full min-h-[176px] max-h-[min(92vh,840px)] max-w-[min(96vw,840px)] shrink-0 touch-manipulation select-none lg:aspect-square lg:h-auto lg:max-h-[min(46svh,420px)] lg:max-w-[min(46svh,420px)] lg:min-h-0"
         style={{ touchAction: "manipulation" }}
-        aria-label="Orbit Trap board"
+        aria-label={boardTitle}
       >
+        <title>{boardTitle}</title>
         <defs>
           <radialGradient id={gradId} cx="50%" cy="50%" r="72%">
             <stop offset="0%" stopColor="#1e1e24" />
@@ -497,17 +501,6 @@ export default function Ov2OrbitTrapBoardView({
           );
         })}
       </svg>
-
-      <div
-        className="flex h-5 min-h-[1.25rem] shrink-0 items-center justify-center gap-x-2 border-t border-white/[0.06] bg-zinc-950/40 px-1 text-[9px] text-zinc-500"
-        title="Trap ▲ · Boost ▢ · Lock ⧈ · Fixed F · loose gold"
-      >
-        <span className="text-rose-300">▲</span>
-        <span className="text-emerald-300">▢</span>
-        <span className="text-violet-300">⧈</span>
-        <span className="text-cyan-300">F</span>
-        <span className="text-amber-300">●</span>
-      </div>
     </div>
   );
 }

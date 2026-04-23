@@ -92,6 +92,7 @@ export default function Ov2OrbitTrapScreen({
   }, [liveSessionId, authoritativeSnapshot, previewState]);
 
   const roster = useMemo(() => otActiveRoster(engineState), [engineState]);
+  const rosterSet = useMemo(() => new Set(roster), [roster]);
   const boardProps = useMemo(() => boardViewPropsFromEngineState(engineState), [engineState]);
   const legalMoves = useMemo(
     () => otListLegalMoveDestinations(engineState, engineState.turnSeat),
@@ -235,14 +236,15 @@ export default function Ov2OrbitTrapScreen({
       ) : null}
 
       <div className="shrink-0 rounded-lg border border-white/[0.08] bg-zinc-950/75 px-1 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-        <div className="min-w-0 flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {roster.map(i => {
+        <div className="grid min-w-0 grid-cols-4 gap-0.5 sm:gap-1">
+          {[0, 1, 2, 3].map(i => {
+            const inMatch = rosterSet.has(i);
             const p = engineState.players[i];
-            const active = engineState.turnSeat === i;
-            const heavy = p.orbsHeld >= 2;
-            const mine = mySeat != null && mySeat === i;
+            const active = inMatch && engineState.turnSeat === i;
+            const heavy = inMatch && p.orbsHeld >= 2;
+            const mine = inMatch && mySeat != null && mySeat === i;
             const modeChip =
-              isMyTurn && mine && actionPanel ? (
+              inMatch && isMyTurn && mine && actionPanel ? (
                 <span
                   className={`ml-0.5 rounded px-1 py-px text-[8px] font-black uppercase leading-none ${
                     actionPanel === "move"
@@ -258,35 +260,49 @@ export default function Ov2OrbitTrapScreen({
             return (
               <div
                 key={i}
-                className={`flex min-w-[4.85rem] shrink-0 flex-col rounded-md border px-1.5 py-1 ${
-                  active
-                    ? `border-amber-400/40 bg-gradient-to-b from-amber-950/45 to-zinc-950/55 ring-2 ${SEAT_RING[i]}`
-                    : "border-white/[0.06] bg-zinc-900/40 opacity-[0.78]"
+                className={`flex min-w-0 flex-col rounded-md border px-1 py-1 sm:px-1.5 ${
+                  !inMatch
+                    ? "border-dashed border-white/[0.08] bg-zinc-950/30 opacity-50 grayscale"
+                    : active
+                      ? `border-amber-400/40 bg-gradient-to-b from-amber-950/45 to-zinc-950/55 ring-2 ${SEAT_RING[i]}`
+                      : "border-white/[0.06] bg-zinc-900/40 opacity-[0.78]"
                 }`}
               >
-                <div className="flex flex-wrap items-center gap-0.5">
-                  {active ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-0.5">
+                  {!inMatch ? (
+                    <span className="shrink-0 rounded border border-white/10 bg-zinc-900/80 px-0.5 py-px text-[7px] font-bold uppercase leading-none text-zinc-500">
+                      Bench
+                    </span>
+                  ) : active ? (
                     <span className="shrink-0 rounded bg-amber-400 px-1 py-px text-[8px] font-black uppercase leading-none text-zinc-950">
                       Turn
                     </span>
                   ) : null}
-                  <span className={`text-[11px] font-extrabold tabular-nums ${mine ? "text-sky-200" : "text-zinc-100"}`}>
+                  <span
+                    className={`truncate text-[10px] font-extrabold tabular-nums sm:text-[11px] ${mine ? "text-sky-200" : inMatch ? "text-zinc-100" : "text-zinc-500"}`}
+                  >
                     P{i + 1}
                   </span>
-                  {mine ? (
-                    <span className="rounded-sm bg-sky-500/25 px-1 py-px text-[8px] font-black uppercase leading-none text-sky-100">
+                  {inMatch && mine ? (
+                    <span className="shrink-0 rounded-sm bg-sky-500/25 px-0.5 py-px text-[7px] font-black uppercase leading-none text-sky-100 sm:text-[8px]">
                       You
                     </span>
                   ) : null}
                   {modeChip}
                 </div>
-                <div className="mt-0.5 flex flex-wrap gap-x-0.5 gap-y-0 text-[8px] font-semibold leading-tight text-zinc-500">
-                  <span className={p.orbsHeld > 0 ? "text-amber-200/95" : ""}>●{p.orbsHeld}</span>
-                  {p.lockToken ? <span className="text-violet-200">lock</span> : null}
-                  {p.stunActive ? <span className="text-rose-300">stun</span> : null}
-                  {p.trapSlowPending ? <span className="text-rose-200/90">slow</span> : null}
-                  {p.boostPending ? <span className="text-emerald-200/90">boost</span> : null}
-                  {heavy ? <span className="text-amber-200">heavy</span> : null}
+                <div className="mt-0.5 flex min-h-[1rem] flex-wrap gap-x-0.5 text-[7px] font-semibold leading-tight text-zinc-500 sm:text-[8px]">
+                  {inMatch ? (
+                    <>
+                      <span className={p.orbsHeld > 0 ? "text-amber-200/95" : ""}>●{p.orbsHeld}</span>
+                      {p.lockToken ? <span className="text-violet-200">lock</span> : null}
+                      {p.stunActive ? <span className="text-rose-300">stun</span> : null}
+                      {p.trapSlowPending ? <span className="text-rose-200/90">slow</span> : null}
+                      {p.boostPending ? <span className="text-emerald-200/90">boost</span> : null}
+                      {heavy ? <span className="text-amber-200">heavy</span> : null}
+                    </>
+                  ) : (
+                    <span className="text-zinc-600">—</span>
+                  )}
                 </div>
               </div>
             );
@@ -294,27 +310,8 @@ export default function Ov2OrbitTrapScreen({
         </div>
       </div>
 
-      <div className="relative flex min-h-0 flex-[1.35] flex-col overflow-hidden rounded-lg border border-white/[0.1] bg-gradient-to-b from-zinc-950/80 to-zinc-950/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <div
-          className={`flex min-h-[1.75rem] shrink-0 items-center justify-center border-b border-white/[0.06] px-1.5 py-0.5 ${
-            actionPanel === "lock"
-              ? "bg-violet-950/20"
-              : actionPanel === "rotate"
-                ? "bg-sky-950/15"
-                : actionPanel === "move"
-                  ? "bg-emerald-950/15"
-                  : "bg-transparent"
-          }`}
-        >
-          <p
-            className={`line-clamp-2 text-center text-[10px] font-semibold leading-tight ${
-              !isMyTurn || !actionPanel ? "text-zinc-600" : actionPanel === "lock" ? "text-violet-200/95" : actionPanel === "rotate" ? "text-sky-200/95" : "text-emerald-200/95"
-            }`}
-          >
-            {boardActionHint || (isMyTurn ? "Pick an action — play on the board." : "")}
-          </p>
-        </div>
-        <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/[0.1] bg-gradient-to-b from-zinc-950/80 to-zinc-950/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] lg:max-h-[min(56svh,620px)] lg:shrink-0">
+        <div className="relative flex min-h-0 flex-1 items-stretch justify-center overflow-hidden lg:items-center lg:justify-center">
           <Ov2OrbitTrapBoardView
             state={boardProps}
             mySeat={isAuthoritative ? mySeat : null}
@@ -332,6 +329,19 @@ export default function Ov2OrbitTrapScreen({
       </div>
 
       <div className="flex w-full shrink-0 flex-col rounded-lg border border-white/[0.08] bg-zinc-950/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+        {isMyTurn && actionPanel && boardActionHint ? (
+          <p
+            className={`border-b border-white/[0.06] px-2 py-0.5 text-center text-[10px] font-semibold leading-tight ${
+              actionPanel === "lock"
+                ? "bg-violet-950/25 text-violet-100"
+                : actionPanel === "rotate"
+                  ? "bg-sky-950/20 text-sky-100"
+                  : "bg-emerald-950/20 text-emerald-100"
+            }`}
+          >
+            {boardActionHint}
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center justify-center gap-1 px-1 py-1">
           <button
             type="button"
