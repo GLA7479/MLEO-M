@@ -48,6 +48,24 @@ const OT_SEAT_MOB_TAG =
 const OT_SEAT_DESK_TAG =
   "w-full shrink-0 rounded border px-1 py-px text-center text-[8px] font-bold uppercase leading-none tracking-wide";
 
+/** Five fixed slots (lock → stun → slow → boost → heavy); empty slots keep layout so every seat aligns on X. */
+function OrbitTrapSeatTagSlots({ defs, inMatch, tagClassName }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-px overflow-hidden">
+      {defs.map(d => (
+        <div key={d.key} className="flex min-h-0 flex-1 basis-0 items-center justify-center overflow-hidden">
+          <span
+            className={`${tagClassName} ${d.skin} ${inMatch && d.show ? "" : "invisible"}`}
+            aria-hidden={!(inMatch && d.show)}
+          >
+            {d.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function boardViewPropsFromEngineState(st) {
   return {
     players: st.players,
@@ -464,20 +482,6 @@ export default function Ov2OrbitTrapScreen({
                 label: "heavy",
               },
             ];
-            const tagsMobile = statusDefs
-              .filter(d => d.show)
-              .map(d => (
-                <span key={d.key} className={`${OT_SEAT_MOB_TAG} ${d.skin}`}>
-                  {d.label}
-                </span>
-              ));
-            const tagsDesktop = statusDefs
-              .filter(d => d.show)
-              .map(d => (
-                <span key={d.key} className={`${OT_SEAT_DESK_TAG} ${d.skin}`}>
-                  {d.label}
-                </span>
-              ));
             const orbTone = !inMatch
               ? "border-white/[0.08] bg-zinc-900/80 text-zinc-500"
               : p.orbsHeld > 0
@@ -512,14 +516,8 @@ export default function Ov2OrbitTrapScreen({
                       {inMatch ? p.orbsHeld : "–"}
                     </span>
                   </div>
-                  <div className="col-start-2 row-start-2 flex min-h-0 min-w-0 flex-col gap-0.5 overflow-y-hidden overflow-x-hidden">
-                    {inMatch ? (
-                      tagsMobile.length > 0 ? (
-                        tagsMobile
-                      ) : null
-                    ) : (
-                      <span className="w-full shrink-0 text-center text-[8px] font-semibold text-zinc-600">—</span>
-                    )}
+                  <div className="col-start-2 row-start-2 flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+                    <OrbitTrapSeatTagSlots defs={statusDefs} inMatch={inMatch} tagClassName={OT_SEAT_MOB_TAG} />
                   </div>
                 </div>
                 {/* Desktop: same grid rhythm; fixed You rail width as before */}
@@ -546,14 +544,8 @@ export default function Ov2OrbitTrapScreen({
                       {inMatch ? p.orbsHeld : "–"}
                     </span>
                   </div>
-                  <div className="col-start-2 row-start-2 flex min-h-0 min-w-0 flex-col gap-0.5 overflow-y-hidden overflow-x-hidden">
-                    {inMatch ? (
-                      tagsDesktop.length > 0 ? (
-                        tagsDesktop
-                      ) : null
-                    ) : (
-                      <span className="w-full shrink-0 text-center text-[8px] font-semibold text-zinc-600">—</span>
-                    )}
+                  <div className="col-start-2 row-start-2 flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+                    <OrbitTrapSeatTagSlots defs={statusDefs} inMatch={inMatch} tagClassName={OT_SEAT_DESK_TAG} />
                   </div>
                 </div>
               </div>
