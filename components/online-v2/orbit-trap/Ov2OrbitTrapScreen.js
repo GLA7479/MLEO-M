@@ -420,7 +420,7 @@ export default function Ov2OrbitTrapScreen({
       ) : null}
 
       <div className="-mt-2.5 shrink-0 rounded-lg border border-white/[0.08] bg-zinc-950/75 px-1 py-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:-mt-3">
-        <div className="grid min-h-0 grid-cols-4 gap-0.5 sm:gap-1">
+        <div className="grid min-h-0 grid-cols-4 gap-1 sm:gap-1.5">
           {[0, 1, 2, 3].map(i => {
             const inMatch = rosterSet.has(i);
             const p = engineState.players[i];
