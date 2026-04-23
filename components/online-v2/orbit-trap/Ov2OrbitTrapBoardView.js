@@ -109,7 +109,7 @@ export default function Ov2OrbitTrapBoardView({
     <div className="flex h-full w-full min-h-0 flex-1 flex-col items-stretch justify-center lg:max-h-full">
       <svg
         viewBox="-102 -102 204 204"
-        className="mx-auto h-full w-full min-h-[176px] max-h-[min(92vh,840px)] max-w-[min(96vw,840px)] shrink-0 touch-manipulation select-none lg:aspect-square lg:h-auto lg:max-h-[min(46svh,420px)] lg:max-w-[min(46svh,420px)] lg:min-h-0"
+        className="mx-auto h-full w-full min-h-[176px] max-h-[min(92vh,840px)] max-w-[min(96vw,840px)] shrink-0 touch-manipulation select-none lg:aspect-square lg:h-auto lg:max-h-[min(54svh,520px)] lg:max-w-[min(54svh,520px)] lg:min-h-0"
         style={{ touchAction: "manipulation" }}
         aria-label={boardTitle}
       >

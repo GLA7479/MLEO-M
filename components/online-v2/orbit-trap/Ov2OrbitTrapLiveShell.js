@@ -25,6 +25,7 @@ import {
 } from "../../../lib/online-v2/orbit-trap/ov2OrbitTrapSessionApi";
 import { supabaseMP } from "../../../lib/supabaseClients";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
+import Ov2OrbitTrapHelpPanel from "./Ov2OrbitTrapHelpPanel";
 import Ov2OrbitTrapScreen from "./Ov2OrbitTrapScreen";
 
 function parseRoomQueryParam(q) {
@@ -349,23 +350,14 @@ export default function Ov2OrbitTrapLiveShell() {
       chromePreset="ov2_board"
       infoPanel={
         <>
-          <div className="space-y-0 text-[11px] leading-relaxed text-zinc-400">
-            <section className="border-b border-white/[0.05] py-2.5 first:pt-0 last:border-b-0 last:pb-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Rules (MVP)</p>
-              <p className="mt-1.5 text-zinc-400/95">
-                2–4 players, rings + Core. Collect two orbs, start your turn on the inner ring, then enter the Core to
-                win. Moves, rotations, and locks are validated on the server; you choose among the legal options shown
-                here.
-              </p>
-            </section>
-            <section className="py-2.5 last:pb-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Authority</p>
-              <p className="mt-1.5 text-zinc-400/95">
-                Snapshot + Realtime on <span className="font-mono text-zinc-500">ov2_orbit_trap_sessions</span>.
-                Settlement / rematch are deferred.
-              </p>
-            </section>
-          </div>
+          <Ov2OrbitTrapHelpPanel />
+          <section className="mt-3 border-t border-white/[0.06] pt-3 text-[11px] leading-relaxed text-zinc-400">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Authority</p>
+            <p className="mt-1.5 text-zinc-400/95">
+              Live play uses an authoritative snapshot and Realtime updates. Settlement and rematch are not in this
+              build yet.
+            </p>
+          </section>
           <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-white/[0.06] pt-3 text-[11px] text-zinc-500">
             <Link
               href="/online-v2/rooms"
