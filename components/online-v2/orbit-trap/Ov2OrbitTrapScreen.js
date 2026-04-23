@@ -42,11 +42,11 @@ function readOv2MemberRematchRequested(meta) {
 
 const SEAT_RING = ["ring-sky-400/80", "ring-amber-400/80", "ring-emerald-400/80", "ring-fuchsia-400/80"];
 
-/** Status tags: mobile 7px compact pad; desktop 8px one line, no scroll. */
+/** Status tags: full words, same width as You rail (`w-full text-center`). */
 const OT_SEAT_MOB_TAG =
-  "shrink-0 rounded border px-0.5 py-px text-[7px] font-bold uppercase leading-none tracking-wide";
+  "w-full shrink-0 rounded border px-0.5 py-px text-center text-[8px] font-bold uppercase leading-none tracking-wide";
 const OT_SEAT_DESK_TAG =
-  "shrink-0 rounded border px-1 py-px text-[8px] font-bold uppercase leading-none tracking-wide";
+  "w-full shrink-0 rounded border px-1 py-px text-center text-[8px] font-bold uppercase leading-none tracking-wide";
 
 function boardViewPropsFromEngineState(st) {
   return {
@@ -488,90 +488,72 @@ export default function Ov2OrbitTrapScreen({
                 key={i}
                 className={`box-border flex min-w-0 flex-col rounded-md border px-1 py-0 sm:px-1.5 sm:py-0.5 ${shellTone} h-[5rem] min-h-[5rem] max-h-[5rem] sm:h-[4.75rem] sm:min-h-[4.75rem] sm:max-h-[4.75rem]`}
               >
-                {/* Mobile: h-[5rem] card; row1 h-5; row2 h-7; orb w-[1.7rem] text-[11px]; tags scroll */}
-                <div className="flex h-full min-h-0 flex-col sm:hidden">
-                  <div className="flex h-5 min-h-5 max-h-5 flex-none flex-nowrap items-center gap-1 overflow-hidden">
+                {/* Mobile: row1 = P# + You rail (You always reserves space); row2 = orb + tags column under You rail */}
+                <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_2.05rem] grid-rows-[1.25rem_minmax(0,1fr)] gap-x-1 gap-y-0.5 overflow-hidden sm:hidden">
+                  <div className="col-start-1 row-start-1 flex min-h-5 min-w-0 items-center overflow-hidden">
                     <span
-                      className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[10px] font-extrabold tabular-nums leading-none ${mine ? "text-sky-200" : inMatch ? "text-zinc-100" : "text-zinc-500"}`}
+                      className={`min-w-0 truncate whitespace-nowrap text-left text-[10px] font-extrabold tabular-nums leading-none ${mine ? "text-sky-200" : inMatch ? "text-zinc-100" : "text-zinc-500"}`}
                     >
                       P{i + 1}
                     </span>
-                    <div className="flex h-5 w-[2.05rem] shrink-0 items-center justify-center">
-                      {inMatch && mine ? (
-                        <span className="shrink-0 rounded-sm bg-sky-500/30 px-1 py-px text-[7px] font-black uppercase leading-none text-sky-100">
-                          You
-                        </span>
-                      ) : (
-                        <span
-                          className="pointer-events-none select-none rounded-sm bg-sky-500/30 px-1 py-px text-[7px] font-black uppercase leading-none text-sky-100 opacity-0"
-                          aria-hidden
-                        >
-                          You
-                        </span>
-                      )}
-                    </div>
                   </div>
-                  <div className="mt-0.5 flex h-7 min-h-7 max-h-7 flex-none flex-nowrap items-center gap-1 overflow-hidden">
-                    <div className="flex h-7 w-[1.7rem] shrink-0 items-center justify-center">
-                      <span
-                        className={`flex h-7 w-full max-w-[1.7rem] items-center justify-center rounded-md border text-[11px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
-                      >
-                        {inMatch ? p.orbsHeld : "–"}
-                      </span>
-                    </div>
-                    <div className="min-h-0 min-w-0 flex-1 overflow-y-hidden [-webkit-overflow-scrolling:touch]">
-                      <div className="flex h-7 min-h-7 max-h-7 flex-nowrap items-center gap-0.5 overflow-x-auto overflow-y-hidden pr-px">
-                        {inMatch ? (
-                          tagsMobile.length > 0 ? (
-                            tagsMobile
-                          ) : null
-                        ) : (
-                          <span className="shrink-0 text-[7px] font-semibold text-zinc-600">—</span>
-                        )}
-                      </div>
-                    </div>
+                  <div className="col-start-2 row-start-1 flex h-5 min-h-5 max-h-5 w-full items-center justify-center overflow-hidden">
+                    <span
+                      className={`shrink-0 rounded-sm bg-sky-500/30 px-1 py-px text-[7px] font-black uppercase leading-none text-sky-100 ${inMatch && mine ? "" : "invisible"}`}
+                      aria-hidden={!(inMatch && mine)}
+                    >
+                      You
+                    </span>
+                  </div>
+                  <div className="col-start-1 row-start-2 flex min-h-0 items-start self-stretch overflow-hidden">
+                    <span
+                      className={`flex h-7 w-[1.7rem] max-w-[1.7rem] shrink-0 items-center justify-center rounded-md border text-[11px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
+                    >
+                      {inMatch ? p.orbsHeld : "–"}
+                    </span>
+                  </div>
+                  <div className="col-start-2 row-start-2 flex min-h-0 min-w-0 flex-col gap-0.5 overflow-y-hidden overflow-x-hidden">
+                    {inMatch ? (
+                      tagsMobile.length > 0 ? (
+                        tagsMobile
+                      ) : null
+                    ) : (
+                      <span className="w-full shrink-0 text-center text-[8px] font-semibold text-zinc-600">—</span>
+                    )}
                   </div>
                 </div>
-                {/* Desktop: row1 h-5 P# text-[13px]; row2 h-7 orb w-[2rem] text-[12px]; tags 8px one line */}
-                <div className="hidden h-full min-h-0 flex-col sm:flex">
-                  <div className="flex h-5 min-h-5 max-h-5 flex-none flex-nowrap items-center gap-1.5 overflow-hidden">
+                {/* Desktop: same grid rhythm; fixed You rail width as before */}
+                <div className="hidden h-full min-h-0 grid-cols-[minmax(0,1fr)_2.25rem] grid-rows-[1.25rem_minmax(0,1fr)] gap-x-1.5 gap-y-0.5 overflow-hidden sm:grid">
+                  <div className="col-start-1 row-start-1 flex min-h-5 min-w-0 items-center overflow-hidden">
                     <span
-                      className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[13px] font-extrabold tabular-nums leading-none ${mine ? "text-sky-200" : inMatch ? "text-zinc-100" : "text-zinc-500"}`}
+                      className={`min-w-0 truncate whitespace-nowrap text-left text-[13px] font-extrabold tabular-nums leading-none ${mine ? "text-sky-200" : inMatch ? "text-zinc-100" : "text-zinc-500"}`}
                     >
                       P{i + 1}
                     </span>
-                    <div className="flex h-5 w-[2.25rem] shrink-0 items-center justify-center">
-                      {inMatch && mine ? (
-                        <span className="shrink-0 rounded-sm bg-sky-500/30 px-1.5 py-px text-[8px] font-black uppercase leading-none text-sky-100">
-                          You
-                        </span>
-                      ) : (
-                        <span
-                          className="pointer-events-none select-none rounded-sm bg-sky-500/30 px-1.5 py-px text-[8px] font-black uppercase leading-none text-sky-100 opacity-0"
-                          aria-hidden
-                        >
-                          You
-                        </span>
-                      )}
-                    </div>
                   </div>
-                  <div className="mt-0.5 flex h-7 min-h-7 max-h-7 flex-none flex-nowrap items-center gap-1.5 overflow-hidden">
-                    <div className="flex h-7 w-[2rem] shrink-0 items-center justify-center">
-                      <span
-                        className={`flex h-7 w-full max-w-[2rem] items-center justify-center rounded-md border text-[12px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
-                      >
-                        {inMatch ? p.orbsHeld : "–"}
-                      </span>
-                    </div>
-                    <div className="flex min-h-0 min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-x-hidden overflow-y-hidden">
-                      {inMatch ? (
-                        tagsDesktop.length > 0 ? (
-                          tagsDesktop
-                        ) : null
-                      ) : (
-                        <span className="shrink-0 text-[8px] font-semibold text-zinc-600">—</span>
-                      )}
-                    </div>
+                  <div className="col-start-2 row-start-1 flex h-5 min-h-5 max-h-5 w-full items-center justify-center overflow-hidden">
+                    <span
+                      className={`shrink-0 rounded-sm bg-sky-500/30 px-1.5 py-px text-[8px] font-black uppercase leading-none text-sky-100 ${inMatch && mine ? "" : "invisible"}`}
+                      aria-hidden={!(inMatch && mine)}
+                    >
+                      You
+                    </span>
+                  </div>
+                  <div className="col-start-1 row-start-2 flex min-h-0 items-start self-stretch overflow-hidden">
+                    <span
+                      className={`flex h-7 w-[2rem] max-w-[2rem] shrink-0 items-center justify-center rounded-md border text-[12px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
+                    >
+                      {inMatch ? p.orbsHeld : "–"}
+                    </span>
+                  </div>
+                  <div className="col-start-2 row-start-2 flex min-h-0 min-w-0 flex-col gap-0.5 overflow-y-hidden overflow-x-hidden">
+                    {inMatch ? (
+                      tagsDesktop.length > 0 ? (
+                        tagsDesktop
+                      ) : null
+                    ) : (
+                      <span className="w-full shrink-0 text-center text-[8px] font-semibold text-zinc-600">—</span>
+                    )}
                   </div>
                 </div>
               </div>
