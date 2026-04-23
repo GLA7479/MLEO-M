@@ -18,6 +18,7 @@ import {
 } from "../../../lib/online-v2/ov2RoomsApi";
 import { getOv2ParticipantId } from "../../../lib/online-v2/ov2ParticipantId";
 import {
+  fetchOv2OrbitTrapSnapshotDetailed,
   requestOv2OrbitTrapApplyAction,
   requestOv2OrbitTrapOpenSession,
   subscribeOv2OrbitTrapSnapshot,
@@ -62,6 +63,7 @@ export default function Ov2OrbitTrapLiveShell() {
   const [openErr, setOpenErr] = useState("");
   const [authSnap, setAuthSnap] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const authSnapRef = useRef(null);
   const loadedOnceForRoomRef = useRef(null);
   const leaveInFlightRef = useRef(false);
   const selfDisplayName = useMemo(() => {
@@ -72,6 +74,10 @@ export default function Ov2OrbitTrapLiveShell() {
   useEffect(() => {
     setParticipantId(getOv2ParticipantId());
   }, []);
+
+  useEffect(() => {
+    authSnapRef.current = authSnap;
+  }, [authSnap]);
 
   const reloadContext = useCallback(async () => {
     if (!roomId) return;
@@ -276,14 +282,18 @@ export default function Ov2OrbitTrapLiveShell() {
     async action => {
       if (!roomId || !participantId) return { ok: false, error: "Missing room or participant" };
       const res = await requestOv2OrbitTrapApplyAction(roomId, participantId, action, {
-        expectedRevision: authSnap?.revision ?? null,
+        expectedRevision: authSnapRef.current?.revision ?? null,
       });
+      if (!res.ok && res.code === "REVISION_MISMATCH") {
+        const { snapshot: fresh } = await fetchOv2OrbitTrapSnapshotDetailed(roomId, { participantKey: participantId });
+        if (fresh) setAuthSnap(fresh);
+      }
       if (res.ok && res.snapshot) {
         setAuthSnap(res.snapshot);
       }
       return res;
     },
-    [roomId, participantId, authSnap?.revision]
+    [roomId, participantId]
   );
 
   const onLeaveTable = useCallback(async () => {
@@ -344,7 +354,8 @@ export default function Ov2OrbitTrapLiveShell() {
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Rules (MVP)</p>
               <p className="mt-1.5 text-zinc-400/95">
                 2–4 players, rings + Core. Collect two orbs, start your turn on the inner ring, then enter the Core to
-                win. Moves are validated on the server; this UI picks a legal default per action for smoke testing.
+                win. Moves, rotations, and locks are validated on the server; you choose among the legal options shown
+                here.
               </p>
             </section>
             <section className="py-2.5 last:pb-0">

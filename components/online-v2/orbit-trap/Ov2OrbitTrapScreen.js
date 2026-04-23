@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
 import {
   createInitialOtState,
+  otActiveRoster,
   otCanApplyLock,
   otListLegalMoveDestinations,
   otListLegalRotateRings,
@@ -36,6 +37,8 @@ function boardViewPropsFromEngineState(st) {
     fixedOrbKeys: [...st.fixedOrbKeys],
     turnSeat: st.turnSeat,
     ringLock: st.ringLock,
+    phase: st.phase,
+    activeSeats: st.activeSeats?.length >= 2 ? st.activeSeats : [0, 1, 2, 3],
   };
 }
 
@@ -75,12 +78,19 @@ export default function Ov2OrbitTrapScreen({
 
   const engineState = useMemo(() => {
     if (liveSessionId && authoritativeSnapshot?.state && typeof authoritativeSnapshot.state === "object") {
-      const g = orbitTrapGameStateFromRpc(/** @type {Record<string, unknown>} */ (authoritativeSnapshot.state));
+      const raw = { .../** @type {Record<string, unknown>} */ (authoritativeSnapshot.state) };
+      const innerAct = raw.activeSeats;
+      if (!Array.isArray(innerAct) || innerAct.length < 2) {
+        const top = authoritativeSnapshot.activeSeats;
+        if (Array.isArray(top) && top.length >= 2) raw.activeSeats = top;
+      }
+      const g = orbitTrapGameStateFromRpc(raw);
       return g || previewState;
     }
     return previewState;
   }, [liveSessionId, authoritativeSnapshot, previewState]);
 
+  const roster = useMemo(() => otActiveRoster(engineState), [engineState]);
   const boardProps = useMemo(() => boardViewPropsFromEngineState(engineState), [engineState]);
   const legalMoves = useMemo(
     () => otListLegalMoveDestinations(engineState, engineState.turnSeat),
@@ -99,7 +109,13 @@ export default function Ov2OrbitTrapScreen({
   }, [engineState, canLock]);
 
   const mySeat = authoritativeSnapshot?.mySeat ?? null;
-  const isAuthoritative = Boolean(liveSessionId && authoritativeSnapshot);
+  /** Require embedded game state so we never show preview legals as "Live". */
+  const isAuthoritative = Boolean(
+    liveSessionId &&
+      authoritativeSnapshot &&
+      authoritativeSnapshot.state &&
+      typeof authoritativeSnapshot.state === "object"
+  );
   const isMyTurn =
     isAuthoritative &&
     mySeat != null &&
@@ -191,56 +207,76 @@ export default function Ov2OrbitTrapScreen({
         </div>
       ) : null}
 
-      <div className="shrink-0 rounded-lg border border-white/[0.08] bg-zinc-950/55 px-2 py-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 flex flex-1 gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {engineState.players.map((p, i) => {
-              const active = engineState.turnSeat === i;
-              const heavy = p.orbsHeld >= 2;
-              const mine = mySeat != null && mySeat === i;
-              return (
-                <div
-                  key={i}
-                  className={`flex min-w-[5.5rem] shrink-0 flex-col rounded-md border border-white/[0.06] bg-zinc-900/40 px-1.5 py-1 ${
-                    active ? `ring-2 ${SEAT_RING[i]}` : "ring-2 ring-transparent"
-                  }`}
-                >
-                  <div className="truncate text-[10px] font-semibold text-zinc-200">
-                    P{i + 1}
-                    {mine ? <span className="text-sky-300/90"> · you</span> : null}
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap gap-0.5 text-[9px] text-zinc-500">
-                    <span>Orbs {p.orbsHeld}</span>
-                    {p.lockToken ? <span className="text-violet-300">Lock</span> : null}
-                    {p.stunActive ? <span className="text-rose-300">Stun</span> : null}
-                    {heavy ? <span className="text-amber-200">Heavy</span> : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="shrink-0 text-right">
-            <div className="text-[9px] font-medium uppercase tracking-wide text-zinc-500">Turn</div>
-            <div className="font-mono text-xs tabular-nums text-zinc-200">P{engineState.turnSeat + 1}</div>
-            <div className="mt-0.5 font-mono text-[10px] tabular-nums text-zinc-500">
-              r{isAuthoritative ? authoritativeSnapshot.revision : engineState.revision}
+      <div className="shrink-0 rounded-lg border border-white/[0.1] bg-zinc-950/65 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div
+            className={`min-w-0 flex-1 rounded-md border px-2 py-1.5 ${
+              isMyTurn
+                ? "border-amber-500/35 bg-amber-950/40"
+                : "border-white/[0.06] bg-zinc-900/50"
+            }`}
+          >
+            <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Current turn</div>
+            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className="text-sm font-bold tabular-nums text-zinc-50">Seat {engineState.turnSeat + 1}</span>
+              {isAuthoritative && isMyTurn ? (
+                <span className="text-[11px] font-semibold text-amber-200/95">Your move</span>
+              ) : isAuthoritative && mySeat != null ? (
+                <span className="text-[10px] text-zinc-500">You are seat {mySeat + 1}</span>
+              ) : null}
             </div>
           </div>
+          <div className="shrink-0 rounded-md border border-white/[0.06] bg-zinc-900/55 px-2 py-1.5 text-right">
+            <div className="text-[9px] font-medium uppercase tracking-wide text-zinc-500">Revision</div>
+            <div className="font-mono text-sm font-semibold tabular-nums text-zinc-100">
+              {isAuthoritative ? authoritativeSnapshot.revision : engineState.revision}
+            </div>
+            <div className="mt-0.5 text-[9px] font-medium text-zinc-500">{isAuthoritative ? "Live" : "Preview"}</div>
+          </div>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/[0.05] pt-1 text-[10px] text-zinc-500">
+        <div className="min-w-0 flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {roster.map(i => {
+            const p = engineState.players[i];
+            const active = engineState.turnSeat === i;
+            const heavy = p.orbsHeld >= 2;
+            const mine = mySeat != null && mySeat === i;
+            return (
+              <div
+                key={i}
+                className={`flex min-w-[5.75rem] shrink-0 flex-col rounded-md border border-white/[0.08] bg-zinc-900/45 px-1.5 py-1 ${
+                  active ? `ring-2 ${SEAT_RING[i]}` : "ring-2 ring-transparent"
+                }`}
+              >
+                <div className="truncate text-[10px] font-semibold text-zinc-100">
+                  P{i + 1}
+                  {mine ? <span className="text-sky-300/95"> · you</span> : null}
+                </div>
+                <div className="mt-0.5 flex flex-wrap gap-0.5 text-[9px] text-zinc-400">
+                  <span>Orbs {p.orbsHeld}</span>
+                  {p.lockToken ? <span className="text-violet-300">Lock</span> : null}
+                  {p.stunActive ? <span className="text-rose-300">Stun</span> : null}
+                  {p.trapSlowPending ? <span className="text-rose-200/80">Trap slow</span> : null}
+                  {p.boostPending ? <span className="text-emerald-200/80">Boost+</span> : null}
+                  {heavy ? <span className="text-amber-200">Heavy</span> : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/[0.06] pt-1.5 text-[10px] text-zinc-500">
           <span>
-            {isAuthoritative ? "Live" : "Preview"} · legal moves: {legalMoves.length}
+            In match: {roster.map(s => `P${s + 1}`).join(", ")} · legal moves: {legalMoves.length}
           </span>
           <span className="hidden sm:inline">·</span>
           <span className="text-zinc-600">No page scroll</span>
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-white/[0.07] bg-zinc-950/35">
-        <Ov2OrbitTrapBoardView state={boardProps} />
+      <div className="relative flex min-h-[220px] flex-[1.25] flex-col overflow-hidden rounded-xl border border-white/[0.1] bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+        <Ov2OrbitTrapBoardView state={boardProps} mySeat={isAuthoritative ? mySeat : null} />
       </div>
 
-      <div className="flex min-h-0 max-h-[46%] shrink-0 flex-col gap-1 overflow-hidden rounded-lg border border-white/[0.08] bg-zinc-950/55 px-2 py-2 sm:max-h-[40%]">
+      <div className="flex min-h-0 max-h-[44%] shrink-0 flex-col gap-1 overflow-hidden rounded-xl border border-t-zinc-800/80 border-white/[0.1] bg-zinc-950/55 px-2 py-2 sm:max-h-[38%]">
         <div className="mb-0.5 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-500">Actions</div>
         <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
           <button
