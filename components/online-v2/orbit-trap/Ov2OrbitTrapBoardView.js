@@ -52,6 +52,11 @@ function ringXY(slot, radius) {
  * @param {Set<string> | null} [props.highlightLegalMoveKeys] cell keys (e.g. outer:3) — client legal hints only
  * @param {Set<string> | null} [props.highlightRotateRings]
  * @param {Set<string> | null} [props.highlightLockRings]
+ * @param {'move'|'rotate'|'lock'|null} [props.actionMode]
+ * @param {boolean} [props.boardInteractive] when true, board accepts taps for the active action mode
+ * @param {(ring: string, slot: number) => void} [props.onMovePick]
+ * @param {(ring: string, dir: 1|-1) => void} [props.onRotatePick]
+ * @param {(ring: string) => void} [props.onLockPick]
  */
 export default function Ov2OrbitTrapBoardView({
   state,
@@ -60,15 +65,20 @@ export default function Ov2OrbitTrapBoardView({
   highlightLegalMoveKeys = null,
   highlightRotateRings = null,
   highlightLockRings = null,
+  actionMode = null,
+  boardInteractive = false,
+  onMovePick,
+  onRotatePick,
+  onLockPick,
 }) {
   const gid = useId().replace(/:/g, "");
   const traps = useMemo(() => new Set(OV2_ORBIT_TRAP_TRAPS.map(([r, s]) => ov2OrbitTrapCellKey(r, s))), []);
   const boosts = useMemo(() => new Set(OV2_ORBIT_TRAP_BOOSTS.map(([r, s]) => ov2OrbitTrapCellKey(r, s))), []);
   const locks = useMemo(() => new Set(OV2_ORBIT_TRAP_LOCK_SLOTS.map(([r, s]) => ov2OrbitTrapCellKey(r, s))), []);
 
-  const R_OUT = 82;
-  const R_MID = 56;
-  const R_INN = 31;
+  const R_OUT = 84;
+  const R_MID = 57;
+  const R_INN = 32;
   const R_CORE = 13;
 
   /** @type {{ ring: string; r: number }[]} */
@@ -80,39 +90,53 @@ export default function Ov2OrbitTrapBoardView({
 
   const gradId = `otBoardBg-${gid}`;
   const glowId = `otLegalGlow-${gid}`;
-
-  const rosterLabel = useMemo(() => {
-    if (!rosterSeatIndices || rosterSeatIndices.length < 2) return "";
-    return rosterSeatIndices.map(s => `P${s + 1}`).join(", ");
-  }, [rosterSeatIndices]);
+  const gateGlowId = `otGateGlow-${gid}`;
 
   const ringRadius = ring => (ring === "outer" ? R_OUT : ring === "mid" ? R_MID : R_INN);
 
+  const moveMode = boardInteractive && actionMode === "move" && highlightLegalMoveKeys && highlightLegalMoveKeys.size > 0;
+  const rotateMode = boardInteractive && actionMode === "rotate" && highlightRotateRings && highlightRotateRings.size > 0;
+  const lockMode = boardInteractive && actionMode === "lock" && highlightLockRings && highlightLockRings.size > 0;
+
+  /** Per-ring CW/CCW anchor slots (spread so controls sit outside the ring, away from common starts). */
+  const rotateUiSlots = { outer: [3, 7], mid: [1, 5], inner: [2, 6] };
+  const rotateBump = { outer: 17, mid: 14, inner: 11 };
+
   return (
-    <div className="flex h-full w-full min-h-0 flex-1 flex-col items-stretch justify-center gap-1 px-0.5 py-0.5">
+    <div className="flex h-full w-full min-h-0 flex-1 flex-col items-stretch justify-center">
       <svg
-        viewBox="-100 -100 200 200"
-        className="mx-auto h-full w-full max-h-[min(82vh,680px)] min-h-[200px] max-w-[min(96vw,680px)] shrink touch-none select-none"
+        viewBox="-102 -102 204 204"
+        className="mx-auto h-full w-full max-h-[min(88vh,780px)] min-h-[200px] max-w-[min(98vw,780px)] shrink-0 touch-manipulation select-none"
+        style={{ touchAction: "manipulation" }}
         aria-label="Orbit Trap board"
       >
         <defs>
-          <radialGradient id={gradId} cx="50%" cy="50%" r="70%">
-            <stop offset="0%" stopColor="#18181b" />
-            <stop offset="100%" stopColor="#09090b" />
+          <radialGradient id={gradId} cx="50%" cy="50%" r="72%">
+            <stop offset="0%" stopColor="#1e1e24" />
+            <stop offset="55%" stopColor="#12121a" />
+            <stop offset="100%" stopColor="#07070c" />
           </radialGradient>
-          <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
-            <feGaussianBlur stdDeviation="1.2" result="b" />
+          <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="1.4" result="b" />
             <feMerge>
               <feMergeNode in="b" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          <filter id={gateGlowId} x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="0.8" result="g" />
+            <feMerge>
+              <feMergeNode in="g" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
-        <circle cx="0" cy="0" r="98" fill={`url(#${gradId})`} stroke="#52525b" strokeWidth="0.75" />
+        <circle cx="0" cy="0" r="100" fill={`url(#${gradId})`} stroke="#3f3f46" strokeWidth="1" />
 
         {ringRadii.map(({ ring, r }) => {
           const locked = state.ringLock?.ring === ring;
           const rotHi = highlightRotateRings?.has(ring);
+          const ringActive = rotateMode && rotHi;
           return (
             <circle
               key={ring}
@@ -120,11 +144,11 @@ export default function Ov2OrbitTrapBoardView({
               cy="0"
               r={r}
               fill="none"
-              stroke={locked ? "#fb923c" : rotHi ? "#34d399" : "#64748b"}
-              strokeWidth={locked ? 1.35 : rotHi ? 1.45 : 0.6}
-              strokeDasharray={locked ? "4 3" : rotHi ? "3 2" : "0"}
+              stroke={locked ? "#fb923c" : ringActive ? "#5eead4" : rotHi ? "#34d399" : "#575b6b"}
+              strokeWidth={locked ? 2.1 : ringActive ? 2.4 : rotHi ? 1.8 : 0.85}
+              strokeDasharray={locked ? "5 4" : ringActive ? "4 3" : rotHi ? "3 2" : "2 3"}
               opacity={0.98}
-              {...(rotHi ? { filter: `url(#${glowId})` } : {})}
+              {...(rotHi || ringActive ? { filter: `url(#${glowId})` } : {})}
             />
           );
         })}
@@ -136,43 +160,84 @@ export default function Ov2OrbitTrapBoardView({
             const isTrap = traps.has(ck);
             const isBoost = boosts.has(ck);
             const isLock = locks.has(ck);
-            let fill = "transparent";
-            let mark = "";
+            let fill = "rgba(39,39,42,0.35)";
+            let stroke = "#52525b";
             if (isTrap) {
-              fill = "rgba(244,63,94,0.22)";
-              mark = "!";
+              fill = "rgba(190,18,60,0.38)";
+              stroke = "#fda4af";
             } else if (isBoost) {
-              fill = "rgba(52,211,153,0.2)";
-              mark = "+";
+              fill = "rgba(5,150,105,0.36)";
+              stroke = "#6ee7b7";
             } else if (isLock) {
-              fill = "rgba(129,140,248,0.2)";
-              mark = "\u25C6";
+              fill = "rgba(91,33,182,0.34)";
+              stroke = "#c4b5fd";
             }
-            const lockRingHi = highlightLockRings?.has(ring) && isLock;
+            const lockRingHi = lockMode && highlightLockRings?.has(ring) && isLock;
+            const cellR = lockRingHi ? 7.2 : 5.8;
+            const lockClickable = lockRingHi && onLockPick;
             return (
               <g key={`${ring}-${slot}`}>
-                <circle
-                  cx={x}
-                  cy={y}
-                  r={5.6}
-                  fill={fill}
-                  stroke={lockRingHi ? "#c4b5fd" : "#3f3f46"}
-                  strokeWidth={lockRingHi ? 0.85 : 0.4}
-                />
+                {isTrap ? (
+                  <polygon
+                    points={`${x},${y - 6.2} ${x + 5.4},${y + 3.1} ${x - 5.4},${y + 3.1}`}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={0.55}
+                    opacity={0.95}
+                  />
+                ) : isBoost ? (
+                  <rect
+                    x={x - 5.2}
+                    y={y - 5.2}
+                    width="10.4"
+                    height="10.4"
+                    rx="2.2"
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={0.55}
+                    opacity={0.95}
+                  />
+                ) : isLock ? (
+                  <path
+                    d={`M ${x - 4.5} ${y - 2} L ${x + 4.5} ${y - 2} L ${x + 4.5} ${y + 4} L ${x} ${y + 6.8} L ${x - 4.5} ${y + 4} Z`}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={0.55}
+                    opacity={0.95}
+                  />
+                ) : (
+                  <circle cx={x} cy={y} r={cellR * 0.82} fill={fill} stroke={stroke} strokeWidth={0.45} />
+                )}
                 {lockRingHi ? (
-                  <circle cx={x} cy={y} r={7.8} fill="none" stroke="#a78bfa" strokeWidth={0.65} strokeDasharray="2 1.5" opacity={0.95} />
+                  <circle cx={x} cy={y} r={cellR + 2.4} fill="none" stroke="#c4b5fd" strokeWidth={0.9} strokeDasharray="2 2" opacity={0.98} />
                 ) : null}
-                {mark ? (
-                  <text
-                    x={x}
-                    y={y + 2.2}
-                    textAnchor="middle"
-                    fontSize="3.4"
-                    fill={lockRingHi ? "#e9d5ff" : "#a1a1aa"}
-                    fontWeight="700"
-                    opacity={0.92}
-                  >
-                    {mark}
+                {lockClickable ? (
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={12}
+                    fill="transparent"
+                    className="cursor-pointer"
+                    style={{ pointerEvents: "all" }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onLockPick(ring);
+                    }}
+                  />
+                ) : null}
+                {isTrap ? (
+                  <text x={x} y={y + 2.4} textAnchor="middle" fontSize="4.2" fill="#fecdd3" fontWeight="900" opacity={0.95}>
+                    !
+                  </text>
+                ) : null}
+                {isBoost ? (
+                  <text x={x} y={y + 2.5} textAnchor="middle" fontSize="4.6" fill="#d1fae5" fontWeight="900" opacity={0.95}>
+                    +
+                  </text>
+                ) : null}
+                {isLock && !isTrap && !isBoost ? (
+                  <text x={x} y={y + 2.2} textAnchor="middle" fontSize="3.8" fill="#ede9fe" fontWeight="800" opacity={0.95}>
+                    ⧈
                   </text>
                 ) : null}
               </g>
@@ -180,63 +245,40 @@ export default function Ov2OrbitTrapBoardView({
           })
         )}
 
-        {highlightLegalMoveKeys && highlightLegalMoveKeys.size > 0
-          ? [...highlightLegalMoveKeys].map(k => {
-              const parsed = parseCellKey(k);
-              if (!parsed) return null;
-              if (parsed.ring === "core") {
-                return (
-                  <circle
-                    key={`hl-${k}`}
-                    cx="0"
-                    cy="0"
-                    r={R_CORE + 5}
-                    fill="none"
-                    stroke="#34d399"
-                    strokeWidth={0.9}
-                    strokeDasharray="2.5 2"
-                    opacity={0.92}
-                    filter={`url(#${glowId})`}
-                  />
-                );
-              }
-              const rr = ringRadius(parsed.ring);
-              if (!rr) return null;
-              const { x, y } = ringXY(parsed.slot, rr);
-              return (
-                <circle
-                  key={`hl-${k}`}
-                  cx={x}
-                  cy={y}
-                  r={8.2}
-                  fill="none"
-                  stroke="#34d399"
-                  strokeWidth={0.85}
-                  strokeDasharray="2.5 2"
-                  opacity={0.9}
-                  filter={`url(#${glowId})`}
-                />
-              );
-            })
-          : null}
-
         {OV2_ORBIT_TRAP_GATES_OUTER_MID.map(([s], i) => {
           const a = ringXY(s, R_OUT);
           const b = ringXY(s, R_MID);
           const mx = (a.x + b.x) / 2;
           const my = (a.y + b.y) / 2;
           return (
-            <g key={`om-${i}`}>
+            <g key={`om-${i}`} filter={`url(#${gateGlowId})`}>
               <line
                 x1={a.x}
                 y1={a.y}
                 x2={b.x}
                 y2={b.y}
                 stroke="#e2e8f0"
-                strokeWidth={1.05}
-                strokeOpacity={0.78}
+                strokeWidth={2.4}
+                strokeLinecap="round"
+                strokeOpacity={0.92}
               />
-              <circle cx={mx} cy={my} r={1.35} fill="#94a3b8" fillOpacity={0.85} />
+              <line
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke="#64748b"
+                strokeWidth={0.85}
+                strokeLinecap="round"
+                strokeOpacity={0.55}
+              />
+              <polygon
+                points={`${mx},${my - 2.8} ${mx + 2.4},${my + 1.6} ${mx - 2.4},${my + 1.6}`}
+                fill="#f8fafc"
+                fillOpacity={0.9}
+                stroke="#94a3b8"
+                strokeWidth={0.35}
+              />
             </g>
           );
         })}
@@ -246,17 +288,34 @@ export default function Ov2OrbitTrapBoardView({
           const mx = (a.x + b.x) / 2;
           const my = (a.y + b.y) / 2;
           return (
-            <g key={`mi-${i}`}>
+            <g key={`mi-${i}`} filter={`url(#${gateGlowId})`}>
               <line
                 x1={a.x}
                 y1={a.y}
                 x2={b.x}
                 y2={b.y}
                 stroke="#e2e8f0"
-                strokeWidth={1.05}
-                strokeOpacity={0.78}
+                strokeWidth={2.4}
+                strokeLinecap="round"
+                strokeOpacity={0.92}
               />
-              <circle cx={mx} cy={my} r={1.35} fill="#94a3b8" fillOpacity={0.85} />
+              <line
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke="#64748b"
+                strokeWidth={0.85}
+                strokeLinecap="round"
+                strokeOpacity={0.55}
+              />
+              <polygon
+                points={`${mx},${my - 2.8} ${mx + 2.4},${my + 1.6} ${mx - 2.4},${my + 1.6}`}
+                fill="#f8fafc"
+                fillOpacity={0.9}
+                stroke="#94a3b8"
+                strokeWidth={0.35}
+              />
             </g>
           );
         })}
@@ -268,8 +327,9 @@ export default function Ov2OrbitTrapBoardView({
           const { x, y } = ringXY(slot, r);
           return (
             <g key={`fx-${fk}`}>
-              <circle cx={x} cy={y} r={3.6} fill="#22d3ee" stroke="#0891b2" strokeWidth={0.45} opacity={0.95} />
-              <text x={x} y={y + 1.8} textAnchor="middle" fontSize="3.8" fill="#0c4a6e" fontWeight="800">
+              <circle cx={x} cy={y} r={5.2} fill="none" stroke="#22d3ee" strokeWidth={1.1} opacity={0.95} />
+              <circle cx={x} cy={y} r={3.9} fill="#0891b2" stroke="#67e8f9" strokeWidth={0.55} opacity={0.98} />
+              <text x={x} y={y + 2} textAnchor="middle" fontSize="4.4" fill="#ecfeff" fontWeight="900">
                 F
               </text>
             </g>
@@ -281,32 +341,138 @@ export default function Ov2OrbitTrapBoardView({
           const { x, y } = ringXY(o.slot, r);
           return (
             <g key={`loose-${i}-${o.ring}-${o.slot}`}>
-              <circle cx={x} cy={y} r={3.1} fill="#fde047" stroke="#ca8a04" strokeWidth={0.4} />
-              <text x={x} y={y + 1.6} textAnchor="middle" fontSize="3.4" fill="#713f12" fontWeight="800">
-                o
-              </text>
+              <circle cx={x} cy={y} r={4.6} fill="none" stroke="#fde047" strokeWidth={0.85} strokeDasharray="1.6 1.4" opacity={0.9} />
+              <circle cx={x} cy={y} r={3.5} fill="#facc15" stroke="#a16207" strokeWidth={0.45} />
             </g>
           );
         })}
 
-        <circle cx="0" cy="0" r={R_CORE} fill="#27272a" stroke="#c4b5fd" strokeWidth={0.85} opacity={0.97} />
-        <text x="0" y="2.2" textAnchor="middle" fontSize="7.5" fill="#d4d4d8" fontWeight="700">
+        <circle cx="0" cy="0" r={R_CORE} fill="#1c1917" stroke="#ddd6fe" strokeWidth={1.05} opacity={0.98} />
+        <text x="0" y="2.6" textAnchor="middle" fontSize="7.8" fill="#e7e5e4" fontWeight="800">
           Core
         </text>
+
+        {highlightLegalMoveKeys && highlightLegalMoveKeys.size > 0
+          ? [...highlightLegalMoveKeys].map(k => {
+              const parsed = parseCellKey(k);
+              if (!parsed) return null;
+              if (parsed.ring === "core") {
+                const canTap = moveMode && onMovePick;
+                return (
+                  <g key={`hl-${k}`}>
+                    <circle cx="0" cy="0" r={R_CORE + 9} fill="rgba(16,185,129,0.12)" stroke="#34d399" strokeWidth={1.35} opacity={0.95} filter={`url(#${glowId})`} />
+                    <circle cx="0" cy="0" r={R_CORE + 14} fill="none" stroke="#6ee7b7" strokeWidth={0.75} strokeDasharray="3 2" opacity={0.88} />
+                    {canTap ? (
+                      <circle
+                        cx="0"
+                        cy="0"
+                        r={22}
+                        fill="transparent"
+                        className="cursor-pointer"
+                        style={{ pointerEvents: "all" }}
+                        onClick={e => {
+                          e.stopPropagation();
+                          onMovePick("core", 0);
+                        }}
+                      />
+                    ) : null}
+                  </g>
+                );
+              }
+              const rr = ringRadius(parsed.ring);
+              if (!rr) return null;
+              const { x, y } = ringXY(parsed.slot, rr);
+              const canTap = moveMode && onMovePick;
+              return (
+                <g key={`hl-${k}`}>
+                  <circle cx={x} cy={y} r={11.5} fill="rgba(16,185,129,0.2)" stroke="#34d399" strokeWidth={1.5} opacity={0.95} filter={`url(#${glowId})`} />
+                  <circle cx={x} cy={y} r={14} fill="none" stroke="#a7f3d0" strokeWidth={0.65} strokeDasharray="2.5 2" opacity={0.9} />
+                  {canTap ? (
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={16}
+                      fill="transparent"
+                      className="cursor-pointer"
+                      style={{ pointerEvents: "all" }}
+                      onClick={e => {
+                        e.stopPropagation();
+                        onMovePick(parsed.ring, parsed.slot);
+                      }}
+                    />
+                  ) : null}
+                </g>
+              );
+            })
+          : null}
+
+        {rotateMode && highlightRotateRings
+          ? [...highlightRotateRings].map(ring => {
+              const rr = ringRadius(ring);
+              if (!rr || !onRotatePick) return null;
+              const [cwSlot, ccwSlot] = rotateUiSlots[ring] || [2, 6];
+              const bump = rotateBump[ring] ?? 12;
+              const cw = ringXY(cwSlot, rr + bump);
+              const ccw = ringXY(ccwSlot, rr + bump);
+              return (
+                <g key={`rot-ui-${ring}`}>
+                  <g
+                    className="cursor-pointer"
+                    style={{ pointerEvents: "all" }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onRotatePick(ring, 1);
+                    }}
+                  >
+                    <circle cx={cw.x} cy={cw.y} r={9} fill="rgba(14,165,233,0.35)" stroke="#38bdf8" strokeWidth={1.1} />
+                    <text x={cw.x} y={cw.y + 3.2} textAnchor="middle" fontSize="8" fill="#e0f2fe" fontWeight="900">
+                      ⟳
+                    </text>
+                    <text x={cw.x} y={cw.y - 5.5} textAnchor="middle" fontSize="3.2" fill="#bae6fd" fontWeight="700">
+                      CW
+                    </text>
+                  </g>
+                  <g
+                    className="cursor-pointer"
+                    style={{ pointerEvents: "all" }}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onRotatePick(ring, -1);
+                    }}
+                  >
+                    <circle cx={ccw.x} cy={ccw.y} r={9} fill="rgba(14,165,233,0.28)" stroke="#7dd3fc" strokeWidth={1.05} />
+                    <text x={ccw.x} y={ccw.y + 3} textAnchor="middle" fontSize="7.5" fill="#e0f2fe" fontWeight="900">
+                      ⟲
+                    </text>
+                    <text x={ccw.x} y={ccw.y - 5.5} textAnchor="middle" fontSize="3.2" fill="#bae6fd" fontWeight="700">
+                      CCW
+                    </text>
+                  </g>
+                </g>
+              );
+            })
+          : null}
 
         {state.players.map((pl, seat) => {
           if (pl.inPlay === false) return null;
           const isTurn = state.turnSeat === seat;
           const isYou = mySeat != null && mySeat === seat;
+          const inactive = rosterSeatIndices && rosterSeatIndices.length && !rosterSeatIndices.includes(seat);
+          const dim = inactive ? 0.48 : 1;
           if (pl.ring === "core") {
             return (
-              <g key={`p-${seat}`}>
-                {isTurn ? <circle cx="0" cy="0" r={7.2} fill="none" stroke="#fbbf24" strokeWidth={1.2} opacity={0.95} /> : null}
-                {isYou ? <circle cx="0" cy="0" r={8.4} fill="none" stroke="#38bdf8" strokeWidth={0.55} strokeDasharray="2 2" opacity={0.9} /> : null}
-                <circle cx="0" cy="0" r={5.2} fill={SEAT_COLORS[seat]} stroke="#fafafa" strokeWidth={0.55} />
-                <text x="0" y="2.2" textAnchor="middle" fontSize="5.8" fill="#0a0a0a" fontWeight="800">
+              <g key={`p-${seat}`} opacity={dim}>
+                {isTurn ? <circle cx="0" cy="0" r={9.2} fill="none" stroke="#fbbf24" strokeWidth={2} opacity={0.98} /> : null}
+                {isYou ? <circle cx="0" cy="0" r={10.8} fill="none" stroke="#38bdf8" strokeWidth={0.85} strokeDasharray="3 2.5" opacity={0.95} /> : null}
+                <circle cx="0" cy="0" r={5.6} fill={SEAT_COLORS[seat]} stroke="#fafafa" strokeWidth={0.65} />
+                <text x="0" y="2.4" textAnchor="middle" fontSize="6.2" fill="#0a0a0a" fontWeight="900">
                   {seat + 1}
                 </text>
+                {isYou ? (
+                  <text x="0" y={-11} textAnchor="middle" fontSize="3.4" fill="#7dd3fc" fontWeight="800">
+                    YOU
+                  </text>
+                ) : null}
               </g>
             );
           }
@@ -314,53 +480,33 @@ export default function Ov2OrbitTrapBoardView({
           const { x, y } = ringXY(pl.slot, r);
           const heavy = pl.orbsHeld >= 2;
           return (
-            <g key={`p-${seat}`} transform={`translate(${x},${y})`}>
-              {isTurn ? <circle cx="0" cy="0" r={8.4} fill="none" stroke="#fbbf24" strokeWidth={1.15} opacity={0.92} /> : null}
-              {isYou ? <circle cx="0" cy="0" r={9.6} fill="none" stroke="#38bdf8" strokeWidth={0.6} strokeDasharray="2.5 2" opacity={0.88} /> : null}
-              {heavy ? (
-                <circle cx="0" cy="0" r={6.6} fill="none" stroke={SEAT_COLORS[seat]} strokeWidth={1.15} opacity={0.88} />
-              ) : null}
-              <circle cx="0" cy="0" r={5} fill={SEAT_COLORS[seat]} stroke="#fafafa" strokeWidth={0.55} />
-              <text x="0" y="2.2" textAnchor="middle" fontSize="5.8" fill="#0a0a0a" fontWeight="800">
+            <g key={`p-${seat}`} transform={`translate(${x},${y})`} opacity={dim}>
+              {isTurn ? <circle cx="0" cy="0" r={10.2} fill="none" stroke="#fbbf24" strokeWidth={1.95} opacity={0.96} /> : null}
+              {isYou ? <circle cx="0" cy="0" r={11.4} fill="none" stroke="#38bdf8" strokeWidth={0.75} strokeDasharray="3 2.5" opacity={0.92} /> : null}
+              {heavy ? <circle cx="0" cy="0" r={7.4} fill="none" stroke="#fcd34d" strokeWidth={1.35} opacity={0.9} /> : null}
+              <circle cx="0" cy="0" r={5.4} fill={SEAT_COLORS[seat]} stroke="#fafafa" strokeWidth={0.65} />
+              <text x="0" y="2.4" textAnchor="middle" fontSize="6.2" fill="#0a0a0a" fontWeight="900">
                 {seat + 1}
               </text>
+              {isYou ? (
+                <text x="0" y={-10} textAnchor="middle" fontSize="3.2" fill="#7dd3fc" fontWeight="800">
+                  YOU
+                </text>
+              ) : null}
             </g>
           );
         })}
       </svg>
 
-      <div className="flex shrink-0 flex-col gap-1 border-t border-white/[0.06] px-1 pb-0.5 pt-1.5">
-        {rosterLabel ? (
-          <p className="text-center text-[9px] font-medium text-zinc-300">
-            Match seats: <span className="font-mono text-zinc-100">{rosterLabel}</span>
-            {mySeat != null ? (
-              <>
-                {" "}
-                · <span className="text-sky-300/90">You = P{mySeat + 1}</span>
-              </>
-            ) : null}
-            {" · "}
-            <span className="text-amber-200/90">Turn</span> = amber · <span className="text-sky-300/90">You</span> = sky dashed
-          </p>
-        ) : null}
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[9px] leading-tight text-zinc-400">
-          <span>
-            <span className="font-semibold text-rose-200/90">!</span> trap
-          </span>
-          <span>
-            <span className="font-semibold text-emerald-200/90">+</span> boost
-          </span>
-          <span>
-            <span className="font-semibold text-violet-200/90">{"\u25C6"}</span> lock pickup
-          </span>
-          <span>
-            <span className="font-semibold text-cyan-200/90">F</span> fixed
-          </span>
-          <span>
-            <span className="font-semibold text-amber-200/90">o</span> loose
-          </span>
-          <span className="text-zinc-500">Dots on gates · dashed emerald = legal move (when Move is open)</span>
-        </div>
+      <div
+        className="flex h-5 min-h-[1.25rem] shrink-0 items-center justify-center gap-x-2 border-t border-white/[0.06] bg-zinc-950/40 px-1 text-[9px] text-zinc-500"
+        title="Trap ▲ · Boost ▢ · Lock ⧈ · Fixed F · loose gold"
+      >
+        <span className="text-rose-300">▲</span>
+        <span className="text-emerald-300">▢</span>
+        <span className="text-violet-300">⧈</span>
+        <span className="text-cyan-300">F</span>
+        <span className="text-amber-300">●</span>
       </div>
     </div>
   );

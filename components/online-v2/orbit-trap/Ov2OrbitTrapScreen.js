@@ -141,9 +141,9 @@ export default function Ov2OrbitTrapScreen({
 
   const boardActionHint = useMemo(() => {
     if (!isMyTurn || !actionPanel) return "";
-    if (actionPanel === "move") return "Emerald rings on the board = legal destinations (server validates).";
-    if (actionPanel === "rotate") return "Emerald ring outline = ring you can rotate.";
-    if (actionPanel === "lock") return "Violet rings on lock pickup cells = rings you can lock.";
+    if (actionPanel === "move") return "Move: tap a glowing ring cell or Core on the board.";
+    if (actionPanel === "rotate") return "Rotate: tap ⟳ / ⟲ on the board next to each ring you can spin.";
+    if (actionPanel === "lock") return "Lock: tap a violet lock cell on the board.";
     return "";
   }, [isMyTurn, actionPanel]);
 
@@ -213,8 +213,10 @@ export default function Ov2OrbitTrapScreen({
   const chipBase =
     "min-h-[2.75rem] min-w-[2.75rem] shrink-0 rounded-lg border px-2 py-1.5 text-center text-[11px] font-semibold leading-tight transition active:scale-[0.98] disabled:opacity-40 sm:min-h-[2.5rem] sm:text-xs";
 
+  const boardInteractive = Boolean(isMyTurn && !actionBusy && onAuthoritativeAction);
+
   const body = (
-    <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
       {contextInput && !liveSessionId ? (
         <div className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-950/25 px-2 py-1.5 text-[10px] text-amber-100/95">
           Waiting for <span className="font-semibold">active_session_id</span>. Host can use{" "}
@@ -232,106 +234,113 @@ export default function Ov2OrbitTrapScreen({
         </div>
       ) : null}
 
-      <div className="shrink-0 rounded-lg border border-white/[0.1] bg-zinc-950/65 px-2 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div
-            className={`min-w-0 flex-1 rounded-md border px-2 py-1.5 ${
-              isMyTurn
-                ? "border-amber-500/35 bg-amber-950/40"
-                : "border-white/[0.06] bg-zinc-900/50"
-            }`}
-          >
-            <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Current turn</div>
-            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="text-sm font-bold tabular-nums text-zinc-50">Seat {engineState.turnSeat + 1}</span>
-              {isAuthoritative && isMyTurn ? (
-                <span className="text-[11px] font-semibold text-amber-200/95">Your move</span>
-              ) : isAuthoritative && mySeat != null ? (
-                <span className="text-[10px] text-zinc-500">You are seat {mySeat + 1}</span>
-              ) : null}
-            </div>
-          </div>
-          <div className="shrink-0 rounded-md border border-white/[0.06] bg-zinc-900/55 px-2 py-1.5 text-right">
-            <div className="text-[9px] font-medium uppercase tracking-wide text-zinc-500">Revision</div>
-            <div className="font-mono text-sm font-semibold tabular-nums text-zinc-100">
-              {isAuthoritative ? authoritativeSnapshot.revision : engineState.revision}
-            </div>
-            <div className="mt-0.5 text-[9px] font-medium text-zinc-500">{isAuthoritative ? "Live" : "Preview"}</div>
-          </div>
-        </div>
+      <div className="shrink-0 rounded-lg border border-white/[0.08] bg-zinc-950/75 px-1 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
         <div className="min-w-0 flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {roster.map(i => {
             const p = engineState.players[i];
             const active = engineState.turnSeat === i;
             const heavy = p.orbsHeld >= 2;
             const mine = mySeat != null && mySeat === i;
+            const modeChip =
+              isMyTurn && mine && actionPanel ? (
+                <span
+                  className={`ml-0.5 rounded px-1 py-px text-[8px] font-black uppercase leading-none ${
+                    actionPanel === "move"
+                      ? "bg-emerald-500/35 text-emerald-50"
+                      : actionPanel === "rotate"
+                        ? "bg-sky-500/35 text-sky-50"
+                        : "bg-violet-500/35 text-violet-50"
+                  }`}
+                >
+                  {actionPanel}
+                </span>
+              ) : null;
             return (
               <div
                 key={i}
-                className={`flex min-w-[5.75rem] shrink-0 flex-col rounded-md border border-white/[0.08] bg-zinc-900/45 px-1.5 py-1 ${
-                  active ? `ring-2 ${SEAT_RING[i]}` : "ring-2 ring-transparent"
+                className={`flex min-w-[4.85rem] shrink-0 flex-col rounded-md border px-1.5 py-1 ${
+                  active
+                    ? `border-amber-400/40 bg-gradient-to-b from-amber-950/45 to-zinc-950/55 ring-2 ${SEAT_RING[i]}`
+                    : "border-white/[0.06] bg-zinc-900/40 opacity-[0.78]"
                 }`}
               >
-                <div className="truncate text-[10px] font-semibold text-zinc-100">
-                  P{i + 1}
-                  {mine ? <span className="text-sky-300/95"> · you</span> : null}
+                <div className="flex flex-wrap items-center gap-0.5">
+                  {active ? (
+                    <span className="shrink-0 rounded bg-amber-400 px-1 py-px text-[8px] font-black uppercase leading-none text-zinc-950">
+                      Turn
+                    </span>
+                  ) : null}
+                  <span className={`text-[11px] font-extrabold tabular-nums ${mine ? "text-sky-200" : "text-zinc-100"}`}>
+                    P{i + 1}
+                  </span>
+                  {mine ? (
+                    <span className="rounded-sm bg-sky-500/25 px-1 py-px text-[8px] font-black uppercase leading-none text-sky-100">
+                      You
+                    </span>
+                  ) : null}
+                  {modeChip}
                 </div>
-                <div className="mt-0.5 flex flex-wrap gap-0.5 text-[9px] text-zinc-400">
-                  <span>Orbs {p.orbsHeld}</span>
-                  {p.lockToken ? <span className="text-violet-300">Lock</span> : null}
-                  {p.stunActive ? <span className="text-rose-300">Stun</span> : null}
-                  {p.trapSlowPending ? <span className="text-rose-200/80">Trap slow</span> : null}
-                  {p.boostPending ? <span className="text-emerald-200/80">Boost+</span> : null}
-                  {heavy ? <span className="text-amber-200">Heavy</span> : null}
+                <div className="mt-0.5 flex flex-wrap gap-x-0.5 gap-y-0 text-[8px] font-semibold leading-tight text-zinc-500">
+                  <span className={p.orbsHeld > 0 ? "text-amber-200/95" : ""}>●{p.orbsHeld}</span>
+                  {p.lockToken ? <span className="text-violet-200">lock</span> : null}
+                  {p.stunActive ? <span className="text-rose-300">stun</span> : null}
+                  {p.trapSlowPending ? <span className="text-rose-200/90">slow</span> : null}
+                  {p.boostPending ? <span className="text-emerald-200/90">boost</span> : null}
+                  {heavy ? <span className="text-amber-200">heavy</span> : null}
                 </div>
               </div>
             );
           })}
         </div>
-        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-white/[0.06] pt-1.5 text-[10px] text-zinc-500">
-          <span>
-            In match: {roster.map(s => `P${s + 1}`).join(", ")} · legal moves: {legalMoves.length}
-          </span>
-          <span className="hidden sm:inline">·</span>
-          <span className="text-zinc-600">No page scroll</span>
+      </div>
+
+      <div className="relative flex min-h-0 flex-[1.35] flex-col overflow-hidden rounded-lg border border-white/[0.1] bg-gradient-to-b from-zinc-950/80 to-zinc-950/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div
+          className={`flex min-h-[1.75rem] shrink-0 items-center justify-center border-b border-white/[0.06] px-1.5 py-0.5 ${
+            actionPanel === "lock"
+              ? "bg-violet-950/20"
+              : actionPanel === "rotate"
+                ? "bg-sky-950/15"
+                : actionPanel === "move"
+                  ? "bg-emerald-950/15"
+                  : "bg-transparent"
+          }`}
+        >
+          <p
+            className={`line-clamp-2 text-center text-[10px] font-semibold leading-tight ${
+              !isMyTurn || !actionPanel ? "text-zinc-600" : actionPanel === "lock" ? "text-violet-200/95" : actionPanel === "rotate" ? "text-sky-200/95" : "text-emerald-200/95"
+            }`}
+          >
+            {boardActionHint || (isMyTurn ? "Pick an action — play on the board." : "")}
+          </p>
+        </div>
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          <Ov2OrbitTrapBoardView
+            state={boardProps}
+            mySeat={isAuthoritative ? mySeat : null}
+            rosterSeatIndices={roster}
+            highlightLegalMoveKeys={legalMoveCellKeys}
+            highlightRotateRings={legalRotateRingSet}
+            highlightLockRings={legalLockRingSet}
+            actionMode={actionPanel}
+            boardInteractive={boardInteractive}
+            onMovePick={(ring, slot) => void runAction({ type: "move", toRing: ring, toSlot: slot })}
+            onRotatePick={(ring, dir) => void runAction({ type: "rotate", ring, dir })}
+            onLockPick={ring => void runAction({ type: "lock", ring })}
+          />
         </div>
       </div>
 
-      <div className="relative flex min-h-[220px] flex-[1.25] flex-col overflow-hidden rounded-xl border border-white/[0.1] bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-        {boardActionHint ? (
-          <p
-            className={`shrink-0 border-b border-white/[0.06] bg-zinc-900/40 px-2 py-1 text-center text-[9px] leading-snug ${
-              actionPanel === "lock"
-                ? "text-violet-200/90"
-                : actionPanel === "rotate"
-                  ? "text-sky-200/90"
-                  : "text-emerald-200/85"
-            }`}
-          >
-            {boardActionHint}
-          </p>
-        ) : null}
-        <Ov2OrbitTrapBoardView
-          state={boardProps}
-          mySeat={isAuthoritative ? mySeat : null}
-          rosterSeatIndices={roster}
-          highlightLegalMoveKeys={legalMoveCellKeys}
-          highlightRotateRings={legalRotateRingSet}
-          highlightLockRings={legalLockRingSet}
-        />
-      </div>
-
-      <div className="flex min-h-0 max-h-[44%] shrink-0 flex-col gap-1 overflow-hidden rounded-xl border border-t-zinc-800/80 border-white/[0.1] bg-zinc-950/55 px-2 py-2 sm:max-h-[38%]">
-        <div className="mb-0.5 text-center text-[10px] font-medium uppercase tracking-wide text-zinc-500">Actions</div>
-        <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
+      <div className="flex w-full shrink-0 flex-col rounded-lg border border-white/[0.08] bg-zinc-950/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+        <div className="flex flex-wrap items-center justify-center gap-1 px-1 py-1">
           <button
             type="button"
             disabled={!isMyTurn || actionBusy || legalMoves.length === 0 || !onAuthoritativeAction}
             onClick={() => togglePanel("move")}
-            className={`rounded-lg border px-4 py-2.5 text-xs font-semibold transition active:scale-[0.98] disabled:opacity-45 ${
+            className={`rounded-md border px-3 py-1.5 text-[11px] font-bold transition active:scale-[0.98] disabled:opacity-45 ${
               actionPanel === "move"
-                ? "border-emerald-400/50 bg-emerald-900/50 text-emerald-50"
-                : "border-emerald-500/25 bg-emerald-950/40 text-emerald-100/90 hover:bg-emerald-900/45"
+                ? "border-emerald-400/55 bg-emerald-900/55 text-emerald-50"
+                : "border-emerald-500/20 bg-emerald-950/30 text-emerald-100/90 hover:bg-emerald-900/40"
             }`}
           >
             Move
@@ -340,10 +349,10 @@ export default function Ov2OrbitTrapScreen({
             type="button"
             disabled={!isMyTurn || actionBusy || legalRotates.length === 0 || !onAuthoritativeAction}
             onClick={() => togglePanel("rotate")}
-            className={`rounded-lg border px-4 py-2.5 text-xs font-semibold transition active:scale-[0.98] disabled:opacity-45 ${
+            className={`rounded-md border px-3 py-1.5 text-[11px] font-bold transition active:scale-[0.98] disabled:opacity-45 ${
               actionPanel === "rotate"
-                ? "border-sky-400/50 bg-sky-900/45 text-sky-50"
-                : "border-sky-500/25 bg-sky-950/35 text-sky-100/90 hover:bg-sky-900/40"
+                ? "border-sky-400/55 bg-sky-900/50 text-sky-50"
+                : "border-sky-500/20 bg-sky-950/30 text-sky-100/90 hover:bg-sky-900/40"
             }`}
           >
             Rotate
@@ -352,109 +361,94 @@ export default function Ov2OrbitTrapScreen({
             type="button"
             disabled={!isMyTurn || actionBusy || !canLock || legalLockRings.length === 0 || !onAuthoritativeAction}
             onClick={() => togglePanel("lock")}
-            className={`rounded-lg border px-4 py-2.5 text-xs font-semibold transition active:scale-[0.98] disabled:opacity-45 ${
+            className={`rounded-md border px-3 py-1.5 text-[11px] font-bold transition active:scale-[0.98] disabled:opacity-45 ${
               actionPanel === "lock"
-                ? "border-violet-400/50 bg-violet-900/45 text-violet-50"
-                : "border-violet-500/25 bg-violet-950/35 text-violet-100/90 hover:bg-violet-900/40"
+                ? "border-violet-400/55 bg-violet-900/50 text-violet-50"
+                : "border-violet-500/20 bg-violet-950/30 text-violet-100/90 hover:bg-violet-900/40"
             }`}
           >
             Lock
           </button>
         </div>
 
-        {actionPanel === "move" && isMyTurn ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-1 border-t border-white/[0.06] pt-1.5">
-            <p className="shrink-0 text-[10px] font-medium text-zinc-400">
-              Pick destination — same cells highlighted on the board (server validates path).
-            </p>
-            <div className="flex min-h-0 flex-1 flex-wrap content-start gap-1.5 overflow-y-auto overscroll-contain py-0.5 [-webkit-overflow-scrolling:touch]">
-              {legalMoves.map((d, idx) => {
-                const onBoard = legalMoveCellKeys?.has(ov2OrbitTrapCellKey(d.ring, d.slot)) ?? false;
-                return (
-                <button
-                  key={`${d.ring}:${d.slot}:${idx}`}
-                  type="button"
-                  disabled={actionBusy}
-                  onClick={() => void runAction({ type: "move", toRing: d.ring, toSlot: d.slot })}
-                  className={`${chipBase} border-emerald-500/35 bg-emerald-950/55 text-emerald-100 hover:border-emerald-400/55 hover:bg-emerald-900/40 ${
-                    onBoard ? "ring-2 ring-emerald-400/55 ring-offset-2 ring-offset-zinc-950" : ""
-                  }`}
-                >
-                  {formatMoveDestination(d)}
-                </button>
-              );
-              })}
-            </div>
-          </div>
-        ) : null}
-
-        {actionPanel === "rotate" && isMyTurn ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-1.5 border-t border-white/[0.06] pt-1.5">
-            <p className="shrink-0 text-[10px] font-medium text-zinc-400">
-              Ring + direction — emerald outline on the board matches a rotatable ring.
-            </p>
-            <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
-              {legalRotates.map(r => (
-                <div
-                  key={r}
-                  className={`flex flex-wrap items-center justify-between gap-2 rounded-md border px-1.5 py-1 ${
-                    legalRotateRingSet?.has(r)
-                      ? "border-emerald-500/35 bg-emerald-950/25"
-                      : "border-white/[0.06] bg-zinc-900/35"
-                  }`}
-                >
-                  <span className="text-[11px] font-semibold text-zinc-200 sm:text-xs">{shortRingName(r)}</span>
-                  <div className="flex shrink-0 gap-1">
+        {actionPanel && isMyTurn ? (
+          <div className="max-h-[min(30vh,11.5rem)] min-h-0 overflow-y-auto overscroll-contain border-t border-white/[0.06] px-1 py-1 [-webkit-overflow-scrolling:touch]">
+            {actionPanel === "move" ? (
+              <div className="flex flex-wrap content-start gap-1">
+                {legalMoves.map((d, idx) => {
+                  const onBoard = legalMoveCellKeys?.has(ov2OrbitTrapCellKey(d.ring, d.slot)) ?? false;
+                  return (
                     <button
+                      key={`${d.ring}:${d.slot}:${idx}`}
                       type="button"
                       disabled={actionBusy}
-                      onClick={() => void runAction({ type: "rotate", ring: r, dir: 1 })}
-                      className={`${chipBase} border-sky-500/35 bg-sky-950/50 text-sky-100 hover:border-sky-400/50`}
-                      title="Clockwise"
+                      onClick={() => void runAction({ type: "move", toRing: d.ring, toSlot: d.slot })}
+                      className={`${chipBase} min-h-[2.25rem] border-emerald-500/35 bg-emerald-950/50 py-1 text-[10px] text-emerald-100 hover:border-emerald-400/50 sm:min-h-[2rem] ${
+                        onBoard ? "ring-1 ring-emerald-400/60" : ""
+                      }`}
                     >
-                      CW
+                      {formatMoveDestination(d)}
                     </button>
-                    <button
-                      type="button"
-                      disabled={actionBusy}
-                      onClick={() => void runAction({ type: "rotate", ring: r, dir: -1 })}
-                      className={`${chipBase} border-sky-500/35 bg-sky-950/50 text-sky-100 hover:border-sky-400/50`}
-                      title="Counter-clockwise"
-                    >
-                      CCW
-                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+            {actionPanel === "rotate" ? (
+              <div className="flex flex-col gap-1">
+                {legalRotates.map(r => (
+                  <div
+                    key={r}
+                    className={`flex flex-wrap items-center justify-between gap-1.5 rounded border px-1 py-0.5 ${
+                      legalRotateRingSet?.has(r) ? "border-emerald-500/30 bg-emerald-950/20" : "border-white/[0.06] bg-zinc-900/35"
+                    }`}
+                  >
+                    <span className="text-[10px] font-bold text-zinc-200">{shortRingName(r)}</span>
+                    <div className="flex shrink-0 gap-0.5">
+                      <button
+                        type="button"
+                        disabled={actionBusy}
+                        onClick={() => void runAction({ type: "rotate", ring: r, dir: 1 })}
+                        className={`${chipBase} min-h-[2rem] min-w-[2.25rem] border-sky-500/35 bg-sky-950/45 py-1 text-[10px] text-sky-100`}
+                        title="Clockwise"
+                      >
+                        CW
+                      </button>
+                      <button
+                        type="button"
+                        disabled={actionBusy}
+                        onClick={() => void runAction({ type: "rotate", ring: r, dir: -1 })}
+                        className={`${chipBase} min-h-[2rem] min-w-[2.25rem] border-sky-500/35 bg-sky-950/45 py-1 text-[10px] text-sky-100`}
+                        title="Counter-clockwise"
+                      >
+                        CCW
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {actionPanel === "lock" && isMyTurn ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-1 border-t border-white/[0.06] pt-1.5">
-            <p className="shrink-0 text-[10px] font-medium text-zinc-400">
-              Pick ring — violet glow on the lock pickup cell for that ring.
-            </p>
-            <div className="flex flex-wrap gap-1.5 overflow-y-auto overscroll-contain py-0.5 [-webkit-overflow-scrolling:touch]">
-              {legalLockRings.map(r => (
-                <button
-                  key={r}
-                  type="button"
-                  disabled={actionBusy}
-                  onClick={() => void runAction({ type: "lock", ring: r })}
-                  className={`${chipBase} border-violet-500/35 bg-violet-950/50 text-violet-100 hover:border-violet-400/55 hover:bg-violet-900/40 ${
-                    legalLockRingSet?.has(r) ? "ring-2 ring-violet-400/50 ring-offset-2 ring-offset-zinc-950" : ""
-                  }`}
-                >
-                  {shortRingName(r)}
-                </button>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : null}
+            {actionPanel === "lock" ? (
+              <div className="flex flex-wrap gap-1">
+                {legalLockRings.map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    disabled={actionBusy}
+                    onClick={() => void runAction({ type: "lock", ring: r })}
+                    className={`${chipBase} min-h-[2.25rem] border-violet-500/35 bg-violet-950/45 py-1 text-[10px] text-violet-100 sm:min-h-[2rem] ${
+                      legalLockRingSet?.has(r) ? "ring-1 ring-violet-400/55" : ""
+                    }`}
+                  >
+                    {shortRingName(r)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
         {contextInput?.onLeaveToLobby ? (
-          <div className="mt-1 flex shrink-0 justify-center border-t border-white/[0.06] pt-1.5">
+          <div className="flex shrink-0 justify-center border-t border-white/[0.06] py-1">
             <button
               type="button"
               disabled={contextInput.leaveToLobbyBusy}
