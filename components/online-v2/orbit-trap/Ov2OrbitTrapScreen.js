@@ -515,7 +515,6 @@ export default function Ov2OrbitTrapScreen({
                     <div className="flex h-7 w-[1.7rem] shrink-0 items-center justify-center">
                       <span
                         className={`flex h-7 w-full max-w-[1.7rem] items-center justify-center rounded-md border text-[11px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
-                        title={inMatch ? `Orbs held: ${p.orbsHeld}` : "Bench"}
                       >
                         {inMatch ? p.orbsHeld : "–"}
                       </span>
@@ -560,7 +559,6 @@ export default function Ov2OrbitTrapScreen({
                     <div className="flex h-7 w-[2rem] shrink-0 items-center justify-center">
                       <span
                         className={`flex h-7 w-full max-w-[2rem] items-center justify-center rounded-md border text-[12px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
-                        title={inMatch ? `Orbs held: ${p.orbsHeld}` : "Bench"}
                       >
                         {inMatch ? p.orbsHeld : "–"}
                       </span>
