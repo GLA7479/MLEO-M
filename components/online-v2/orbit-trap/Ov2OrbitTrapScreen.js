@@ -511,7 +511,7 @@ export default function Ov2OrbitTrapScreen({
                   </div>
                   <div className="col-start-1 row-start-2 flex min-h-0 items-start self-stretch overflow-hidden">
                     <span
-                      className={`flex h-7 w-[1.7rem] max-w-[1.7rem] shrink-0 items-center justify-center rounded-md border text-[11px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
+                      className={`flex h-8 w-[1.85rem] max-w-[1.85rem] shrink-0 items-center justify-center rounded-md border text-[13px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
                     >
                       {inMatch ? p.orbsHeld : "–"}
                     </span>
@@ -539,7 +539,7 @@ export default function Ov2OrbitTrapScreen({
                   </div>
                   <div className="col-start-1 row-start-2 flex min-h-0 items-start self-stretch overflow-hidden">
                     <span
-                      className={`flex h-7 w-[2rem] max-w-[2rem] shrink-0 items-center justify-center rounded-md border text-[12px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
+                      className={`flex h-8 w-[2.125rem] max-w-[2.125rem] shrink-0 items-center justify-center rounded-md border text-[14px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
                     >
                       {inMatch ? p.orbsHeld : "–"}
                     </span>
