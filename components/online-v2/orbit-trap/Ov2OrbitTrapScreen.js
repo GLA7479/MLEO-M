@@ -42,6 +42,27 @@ function readOv2MemberRematchRequested(meta) {
 
 const SEAT_RING = ["ring-sky-400/80", "ring-amber-400/80", "ring-emerald-400/80", "ring-fuchsia-400/80"];
 
+/**
+ * Fixed strip: two internal rows, fixed heights per breakpoint — no wrap jumps on turn change.
+ * Mobile: slightly taller card + horizontal tag scroll if needed. Desktop: roomier type + widths.
+ */
+const OT_SEAT_STRIP_CARD_H =
+  "h-[4.5rem] min-h-[4.5rem] max-h-[4.5rem] sm:h-[4.625rem] sm:min-h-[4.625rem] sm:max-h-[4.625rem]";
+const OT_SEAT_STRIP_ROW1 =
+  "flex h-5 min-h-5 max-h-5 flex-none flex-nowrap items-center gap-0.5 overflow-hidden sm:h-6 sm:min-h-6 sm:max-h-6 sm:gap-1";
+const OT_SEAT_STRIP_TURN_SLOT =
+  "flex h-[1.25rem] w-[2.15rem] shrink-0 items-center justify-center sm:h-[1.375rem] sm:w-[2.45rem]";
+const OT_SEAT_STRIP_YOU_SLOT =
+  "flex h-[1.25rem] w-[1.85rem] shrink-0 items-center justify-center sm:h-[1.375rem] sm:w-[2.1rem]";
+const OT_SEAT_STRIP_ROW2 =
+  "mt-0.5 flex h-5 min-h-5 max-h-5 flex-none flex-nowrap items-center gap-0.5 overflow-hidden sm:h-6 sm:min-h-6 sm:max-h-6 sm:gap-1";
+const OT_SEAT_STRIP_ORB_SLOT = "flex h-5 w-[2rem] shrink-0 items-center justify-center sm:h-6 sm:w-[2.35rem]";
+const OT_SEAT_STRIP_MODE_SLOT = "flex h-5 w-[2.65rem] shrink-0 items-center justify-center sm:h-6 sm:w-[3.25rem]";
+const OT_SEAT_TAG =
+  "shrink-0 rounded px-1 py-px text-[8px] font-bold uppercase leading-none tracking-wide sm:px-1.5 sm:text-[9px]";
+const OT_SEAT_TAGS_SCROLL =
+  "flex min-w-0 flex-1 flex-nowrap items-center justify-start gap-0.5 overflow-y-hidden max-sm:overflow-x-auto max-sm:pb-px sm:overflow-hidden";
+
 function boardViewPropsFromEngineState(st) {
   return {
     players: st.players,
@@ -301,14 +322,14 @@ export default function Ov2OrbitTrapScreen({
     return new Set(legalLockRings.map(String));
   }, [isMyTurn, actionPanel, legalLockRings]);
 
-  /** One-line helper under actions — fixed height row (text only, no large panels). */
+  /** Context for assistive tech only (no visible row — avoids layout jump / removed HUD line). */
   const chooserStatusLine = useMemo(() => {
     if (isAuthoritative && engineState.phase === "finished") return "Match finished.";
     if (!isMyTurn) return "Waiting for your turn.";
     if (!actionPanel) return "Pick a mode, then play on the board.";
     if (actionPanel === "move") return "Move: tap highlighted cells or Core on the board.";
-    if (actionPanel === "rotate") return "Rotate: tap ⟳ / ⟲ on the board next to each ring.";
-    if (actionPanel === "lock") return "Lock: tap a highlighted violet ⧈ cell on the board.";
+    if (actionPanel === "rotate") return "Rotate: tap the ring controls on the board.";
+    if (actionPanel === "lock") return "Lock: tap a highlighted lock cell on the board.";
     return "";
   }, [isAuthoritative, engineState.phase, isMyTurn, actionPanel]);
 
@@ -378,58 +399,54 @@ export default function Ov2OrbitTrapScreen({
   );
 
   const body = (
-    <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
       {contextInput && !liveSessionId ? (
-        <div className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-950/25 px-2 py-1.5 text-[10px] text-amber-100/95">
-          Waiting for <span className="font-semibold">active_session_id</span>. Host can use{" "}
-          <span className="font-semibold">Open match</span> in the live shell (or start from the room lobby).
+        <div className="flex h-[1.625rem] min-h-[1.625rem] max-h-[1.625rem] shrink-0 items-center overflow-hidden rounded-lg border border-amber-500/30 bg-amber-950/25 px-2 text-[10px] leading-tight text-amber-100/95">
+          <span className="min-w-0 truncate">
+            Waiting for <span className="font-semibold">active_session_id</span>. Host can use{" "}
+            <span className="font-semibold">Open match</span> in the live shell (or start from the room lobby).
+          </span>
         </div>
       ) : null}
       {liveSessionId && authorityLoading && !authoritativeSnapshot ? (
-        <div className="shrink-0 rounded-lg border border-sky-500/25 bg-sky-950/20 px-2 py-1.5 text-[10px] text-sky-100/90">
-          Syncing authoritative board…
+        <div className="flex h-[1.625rem] min-h-[1.625rem] max-h-[1.625rem] shrink-0 items-center overflow-hidden rounded-lg border border-sky-500/25 bg-sky-950/20 px-2 text-[10px] text-sky-100/90">
+          <span className="truncate">Syncing authoritative board…</span>
         </div>
       ) : null}
-      {actionErr ? (
+      {contextInput ? (
+        <div
+          className="flex min-h-[1.375rem] max-h-[1.375rem] shrink-0 items-center overflow-hidden rounded-lg border border-transparent px-0.5"
+          aria-live="polite"
+        >
+          {actionErr ? (
+            <div className="w-full truncate rounded-lg border border-red-500/30 bg-red-950/25 px-2 py-0.5 text-[10px] leading-tight text-red-200">
+              {actionErr}
+            </div>
+          ) : (
+            <span className="block h-px w-full shrink-0 select-none opacity-0" aria-hidden>
+              .
+            </span>
+          )}
+        </div>
+      ) : actionErr ? (
         <div className="shrink-0 rounded-lg border border-red-500/30 bg-red-950/25 px-2 py-1 text-[10px] text-red-200">
           {actionErr}
         </div>
       ) : null}
 
-      <div className="shrink-0 rounded-lg border border-white/[0.08] bg-zinc-950/75 px-1 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-        <div className="grid min-w-0 grid-cols-4 gap-0.5 sm:gap-1">
+      <div className="shrink-0 rounded-lg border border-white/[0.08] bg-zinc-950/75 px-1 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:py-1">
+        <div className="grid min-h-0 grid-cols-4 gap-0.5 sm:gap-1">
           {[0, 1, 2, 3].map(i => {
             const inMatch = rosterSet.has(i);
             const p = engineState.players[i];
             const active = inMatch && engineState.turnSeat === i;
             const heavy = inMatch && p.orbsHeld >= 2;
             const mine = inMatch && mySeat != null && mySeat === i;
-            const modeSlot =
-              inMatch && mine ? (
-                <span className="inline-flex h-4 w-[3rem] shrink-0 items-center justify-center">
-                  {isMyTurn && actionPanel ? (
-                    <span
-                      className={`rounded px-1 py-px text-[8px] font-black uppercase leading-none ${
-                        actionPanel === "move"
-                          ? "bg-emerald-500/35 text-emerald-50"
-                          : actionPanel === "rotate"
-                            ? "bg-sky-500/35 text-sky-50"
-                            : "bg-violet-500/35 text-violet-50"
-                      }`}
-                    >
-                      {actionPanel}
-                    </span>
-                  ) : (
-                    <span className="invisible select-none text-[8px] font-black uppercase" aria-hidden>
-                      lock
-                    </span>
-                  )}
-                </span>
-              ) : null;
+            const modeChipVisible = Boolean(inMatch && mine && isMyTurn && actionPanel);
             return (
               <div
                 key={i}
-                className={`flex min-w-0 flex-col rounded-md border px-1 py-1 sm:px-1.5 ${
+                className={`box-border flex min-w-0 flex-col rounded-md border px-1 py-0.5 sm:px-1.5 sm:py-1 ${OT_SEAT_STRIP_CARD_H} ${
                   !inMatch
                     ? "border-dashed border-white/[0.08] bg-zinc-950/30 opacity-50 grayscale"
                     : active
@@ -437,41 +454,118 @@ export default function Ov2OrbitTrapScreen({
                       : "border-white/[0.06] bg-zinc-900/40 opacity-[0.78]"
                 }`}
               >
-                <div className="flex min-w-0 flex-wrap items-center gap-0.5">
-                  {!inMatch ? (
-                    <span className="shrink-0 rounded border border-white/10 bg-zinc-900/80 px-0.5 py-px text-[7px] font-bold uppercase leading-none text-zinc-500">
-                      Bench
-                    </span>
-                  ) : active ? (
-                    <span className="shrink-0 rounded bg-amber-400 px-1 py-px text-[8px] font-black uppercase leading-none text-zinc-950">
-                      Turn
-                    </span>
-                  ) : null}
+                <div className={OT_SEAT_STRIP_ROW1}>
+                  <div className={OT_SEAT_STRIP_TURN_SLOT}>
+                    {!inMatch ? (
+                      <span className="shrink-0 rounded border border-white/12 bg-zinc-900/90 px-1 py-0.5 text-[7px] font-bold uppercase leading-none text-zinc-400 sm:text-[8px]">
+                        Bench
+                      </span>
+                    ) : active ? (
+                      <span className="shrink-0 rounded bg-amber-400 px-1 py-0.5 text-[7px] font-black uppercase leading-none text-zinc-950 sm:text-[8px]">
+                        Turn
+                      </span>
+                    ) : (
+                      <span
+                        className="pointer-events-none shrink-0 select-none rounded bg-amber-400 px-1 py-0.5 text-[7px] font-black uppercase leading-none text-zinc-950 opacity-0 sm:text-[8px]"
+                        aria-hidden
+                      >
+                        Turn
+                      </span>
+                    )}
+                  </div>
                   <span
-                    className={`truncate text-[10px] font-extrabold tabular-nums sm:text-[11px] ${mine ? "text-sky-200" : inMatch ? "text-zinc-100" : "text-zinc-500"}`}
+                    className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[10px] font-extrabold tabular-nums leading-none sm:text-[12px] ${mine ? "text-sky-200" : inMatch ? "text-zinc-100" : "text-zinc-500"}`}
                   >
                     P{i + 1}
                   </span>
-                  {inMatch && mine ? (
-                    <span className="shrink-0 rounded-sm bg-sky-500/25 px-0.5 py-px text-[7px] font-black uppercase leading-none text-sky-100 sm:text-[8px]">
-                      You
-                    </span>
-                  ) : null}
-                  {modeSlot}
+                  <div className={OT_SEAT_STRIP_YOU_SLOT}>
+                    {inMatch && mine ? (
+                      <span className="shrink-0 rounded-sm bg-sky-500/30 px-1 py-0.5 text-[7px] font-black uppercase leading-none text-sky-100 sm:text-[8px]">
+                        You
+                      </span>
+                    ) : (
+                      <span
+                        className="pointer-events-none select-none rounded-sm bg-sky-500/30 px-1 py-0.5 text-[7px] font-black uppercase leading-none text-sky-100 opacity-0 sm:text-[8px]"
+                        aria-hidden
+                      >
+                        You
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="mt-0.5 flex min-h-[1rem] flex-wrap gap-x-0.5 text-[7px] font-semibold leading-tight text-zinc-500 sm:text-[8px]">
-                  {inMatch ? (
-                    <>
-                      <span className={p.orbsHeld > 0 ? "text-amber-200/95" : ""}>●{p.orbsHeld}</span>
-                      {p.lockToken ? <span className="text-violet-200">lock</span> : null}
-                      {p.stunActive ? <span className="text-rose-300">stun</span> : null}
-                      {p.trapSlowPending ? <span className="text-rose-200/90">slow</span> : null}
-                      {p.boostPending ? <span className="text-emerald-200/90">boost</span> : null}
-                      {heavy ? <span className="text-amber-200">heavy</span> : null}
-                    </>
-                  ) : (
-                    <span className="text-zinc-600">—</span>
-                  )}
+                <div className={OT_SEAT_STRIP_ROW2}>
+                  <div className={OT_SEAT_STRIP_ORB_SLOT}>
+                    <span
+                      className={[
+                        "flex h-full w-full items-center justify-center rounded-md border text-[11px] font-black tabular-nums leading-none shadow-inner sm:text-[14px]",
+                        !inMatch
+                          ? "border-white/[0.08] bg-zinc-900/80 text-zinc-600"
+                          : p.orbsHeld > 0
+                            ? "border-amber-400/50 bg-gradient-to-b from-amber-900/55 to-amber-950/80 text-amber-50"
+                            : "border-white/14 bg-zinc-900/75 text-zinc-400",
+                      ].join(" ")}
+                      title={inMatch ? `Orbs held: ${p.orbsHeld}` : "Bench"}
+                    >
+                      {inMatch ? p.orbsHeld : "–"}
+                    </span>
+                  </div>
+                  <div className={OT_SEAT_STRIP_MODE_SLOT}>
+                    {modeChipVisible ? (
+                      <span
+                        className={`rounded px-1 py-0.5 text-[7px] font-black uppercase leading-none sm:px-1.5 sm:text-[8px] ${
+                          actionPanel === "move"
+                            ? "bg-emerald-500/40 text-emerald-50 ring-1 ring-emerald-400/25"
+                            : actionPanel === "rotate"
+                              ? "bg-sky-500/40 text-sky-50 ring-1 ring-sky-400/25"
+                              : "bg-violet-500/40 text-violet-50 ring-1 ring-violet-400/25"
+                        }`}
+                      >
+                        {actionPanel}
+                      </span>
+                    ) : (
+                      <span
+                        className="pointer-events-none select-none rounded px-1.5 py-0.5 text-[8px] font-black uppercase leading-none opacity-0 ring-1 ring-transparent"
+                        aria-hidden
+                      >
+                        move
+                      </span>
+                    )}
+                  </div>
+                  <div className={OT_SEAT_TAGS_SCROLL}>
+                    {inMatch ? (
+                      <>
+                        {p.lockToken ? (
+                          <span className={`${OT_SEAT_TAG} border border-violet-500/30 bg-violet-950/45 text-violet-100`}>
+                            lock
+                          </span>
+                        ) : null}
+                        {p.stunActive ? (
+                          <span className={`${OT_SEAT_TAG} border border-rose-500/30 bg-rose-950/40 text-rose-100`}>
+                            stun
+                          </span>
+                        ) : null}
+                        {p.trapSlowPending ? (
+                          <span className={`${OT_SEAT_TAG} border border-rose-400/25 bg-rose-950/35 text-rose-100/95`}>
+                            slow
+                          </span>
+                        ) : null}
+                        {p.boostPending ? (
+                          <span className={`${OT_SEAT_TAG} border border-emerald-500/28 bg-emerald-950/40 text-emerald-100`}>
+                            boost
+                          </span>
+                        ) : null}
+                        {heavy ? (
+                          <span className={`${OT_SEAT_TAG} border border-amber-500/35 bg-amber-950/45 text-amber-100`}>
+                            heavy
+                          </span>
+                        ) : null}
+                      </>
+                    ) : (
+                      <span className="truncate text-[8px] font-semibold uppercase tracking-wide text-zinc-600">
+                        —
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -539,11 +633,7 @@ export default function Ov2OrbitTrapScreen({
               Lock
             </button>
           </div>
-          <div className="flex h-10 shrink-0 items-center border-t border-white/[0.05] bg-zinc-950/40 px-1">
-            <p className="line-clamp-2 w-full text-center text-[9px] font-medium leading-snug text-zinc-500 [overflow-wrap:anywhere]">
-              {chooserStatusLine}
-            </p>
-          </div>
+          <p className="sr-only">{chooserStatusLine}</p>
 
           {contextInput?.onLeaveToLobby ? (
             <div className="flex shrink-0 justify-center border-t border-white/[0.06] py-1">
