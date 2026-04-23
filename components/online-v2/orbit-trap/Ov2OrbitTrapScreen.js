@@ -42,26 +42,11 @@ function readOv2MemberRematchRequested(meta) {
 
 const SEAT_RING = ["ring-sky-400/80", "ring-amber-400/80", "ring-emerald-400/80", "ring-fuchsia-400/80"];
 
-/**
- * Fixed strip: two internal rows, fixed heights per breakpoint — no wrap jumps on turn change.
- * Mobile: slightly taller card + horizontal tag scroll if needed. Desktop: roomier type + widths.
- */
-const OT_SEAT_STRIP_CARD_H =
-  "h-[4.5rem] min-h-[4.5rem] max-h-[4.5rem] sm:h-[4.625rem] sm:min-h-[4.625rem] sm:max-h-[4.625rem]";
-const OT_SEAT_STRIP_ROW1 =
-  "flex h-5 min-h-5 max-h-5 flex-none flex-nowrap items-center gap-0.5 overflow-hidden sm:h-6 sm:min-h-6 sm:max-h-6 sm:gap-1";
-const OT_SEAT_STRIP_TURN_SLOT =
-  "flex h-[1.25rem] w-[2.15rem] shrink-0 items-center justify-center sm:h-[1.375rem] sm:w-[2.45rem]";
-const OT_SEAT_STRIP_YOU_SLOT =
-  "flex h-[1.25rem] w-[1.85rem] shrink-0 items-center justify-center sm:h-[1.375rem] sm:w-[2.1rem]";
-const OT_SEAT_STRIP_ROW2 =
-  "mt-0.5 flex h-5 min-h-5 max-h-5 flex-none flex-nowrap items-center gap-0.5 overflow-hidden sm:h-6 sm:min-h-6 sm:max-h-6 sm:gap-1";
-const OT_SEAT_STRIP_ORB_SLOT = "flex h-5 w-[2rem] shrink-0 items-center justify-center sm:h-6 sm:w-[2.35rem]";
-const OT_SEAT_STRIP_MODE_SLOT = "flex h-5 w-[2.65rem] shrink-0 items-center justify-center sm:h-6 sm:w-[3.25rem]";
-const OT_SEAT_TAG =
-  "shrink-0 rounded px-1 py-px text-[8px] font-bold uppercase leading-none tracking-wide sm:px-1.5 sm:text-[9px]";
-const OT_SEAT_TAGS_SCROLL =
-  "flex min-w-0 flex-1 flex-nowrap items-center justify-start gap-0.5 overflow-y-hidden max-sm:overflow-x-auto max-sm:pb-px sm:overflow-hidden";
+/** Status tags: mobile 7px compact pad; desktop 8px one line, no scroll. */
+const OT_SEAT_MOB_TAG =
+  "shrink-0 rounded border px-0.5 py-px text-[7px] font-bold uppercase leading-none tracking-wide";
+const OT_SEAT_DESK_TAG =
+  "shrink-0 rounded border px-1 py-px text-[8px] font-bold uppercase leading-none tracking-wide";
 
 function boardViewPropsFromEngineState(st) {
   return {
@@ -399,7 +384,7 @@ export default function Ov2OrbitTrapScreen({
   );
 
   const body = (
-    <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden">
       {contextInput && !liveSessionId ? (
         <div className="flex h-[1.625rem] min-h-[1.625rem] max-h-[1.625rem] shrink-0 items-center overflow-hidden rounded-lg border border-amber-500/30 bg-amber-950/25 px-2 text-[10px] leading-tight text-amber-100/95">
           <span className="min-w-0 truncate">
@@ -415,7 +400,7 @@ export default function Ov2OrbitTrapScreen({
       ) : null}
       {contextInput ? (
         <div
-          className="flex min-h-[1.375rem] max-h-[1.375rem] shrink-0 items-center overflow-hidden rounded-lg border border-transparent px-0.5"
+          className="flex min-h-[1rem] max-h-[1.125rem] shrink-0 items-center overflow-hidden rounded-lg border border-transparent px-0.5"
           aria-live="polite"
         >
           {actionErr ? (
@@ -434,7 +419,7 @@ export default function Ov2OrbitTrapScreen({
         </div>
       ) : null}
 
-      <div className="shrink-0 rounded-lg border border-white/[0.08] bg-zinc-950/75 px-1 py-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:py-1">
+      <div className="-mt-2.5 shrink-0 rounded-lg border border-white/[0.08] bg-zinc-950/75 px-1 py-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:-mt-3">
         <div className="grid min-h-0 grid-cols-4 gap-0.5 sm:gap-1">
           {[0, 1, 2, 3].map(i => {
             const inMatch = rosterSet.has(i);
@@ -442,129 +427,153 @@ export default function Ov2OrbitTrapScreen({
             const active = inMatch && engineState.turnSeat === i;
             const heavy = inMatch && p.orbsHeld >= 2;
             const mine = inMatch && mySeat != null && mySeat === i;
-            const modeChipVisible = Boolean(inMatch && mine && isMyTurn && actionPanel);
+            const shellTone = !inMatch
+              ? "border-dashed border-white/[0.08] bg-zinc-950/30 opacity-50 grayscale"
+              : active
+                ? `border-amber-400/40 bg-gradient-to-b from-amber-950/45 to-zinc-950/55 ring-2 ${SEAT_RING[i]}`
+                : "border-white/[0.06] bg-zinc-900/40 opacity-[0.78]";
+            const statusDefs = [
+              {
+                key: "lock",
+                show: Boolean(p.lockToken),
+                skin: "border-violet-500/30 bg-violet-950/45 text-violet-100",
+                label: "lock",
+              },
+              {
+                key: "stun",
+                show: Boolean(p.stunActive),
+                skin: "border-rose-500/30 bg-rose-950/40 text-rose-100",
+                label: "stun",
+              },
+              {
+                key: "slow",
+                show: Boolean(p.trapSlowPending),
+                skin: "border-rose-400/25 bg-rose-950/35 text-rose-100/95",
+                label: "slow",
+              },
+              {
+                key: "boost",
+                show: Boolean(p.boostPending),
+                skin: "border-emerald-500/28 bg-emerald-950/40 text-emerald-100",
+                label: "boost",
+              },
+              {
+                key: "heavy",
+                show: Boolean(heavy),
+                skin: "border-amber-500/35 bg-amber-950/45 text-amber-100",
+                label: "heavy",
+              },
+            ];
+            const tagsMobile = statusDefs
+              .filter(d => d.show)
+              .map(d => (
+                <span key={d.key} className={`${OT_SEAT_MOB_TAG} ${d.skin}`}>
+                  {d.label}
+                </span>
+              ));
+            const tagsDesktop = statusDefs
+              .filter(d => d.show)
+              .map(d => (
+                <span key={d.key} className={`${OT_SEAT_DESK_TAG} ${d.skin}`}>
+                  {d.label}
+                </span>
+              ));
+            const orbTone = !inMatch
+              ? "border-white/[0.08] bg-zinc-900/80 text-zinc-500"
+              : p.orbsHeld > 0
+                ? "border-amber-400/50 bg-gradient-to-b from-amber-900/55 to-amber-950/80 text-amber-50"
+                : "border-white/14 bg-zinc-900/75 text-zinc-400";
             return (
               <div
                 key={i}
-                className={`box-border flex min-w-0 flex-col rounded-md border px-1 py-0.5 sm:px-1.5 sm:py-1 ${OT_SEAT_STRIP_CARD_H} ${
-                  !inMatch
-                    ? "border-dashed border-white/[0.08] bg-zinc-950/30 opacity-50 grayscale"
-                    : active
-                      ? `border-amber-400/40 bg-gradient-to-b from-amber-950/45 to-zinc-950/55 ring-2 ${SEAT_RING[i]}`
-                      : "border-white/[0.06] bg-zinc-900/40 opacity-[0.78]"
-                }`}
+                className={`box-border flex min-w-0 flex-col rounded-md border px-1 py-0 sm:px-1.5 sm:py-0.5 ${shellTone} h-[5rem] min-h-[5rem] max-h-[5rem] sm:h-[4.75rem] sm:min-h-[4.75rem] sm:max-h-[4.75rem]`}
               >
-                <div className={OT_SEAT_STRIP_ROW1}>
-                  <div className={OT_SEAT_STRIP_TURN_SLOT}>
-                    {!inMatch ? (
-                      <span className="shrink-0 rounded border border-white/12 bg-zinc-900/90 px-1 py-0.5 text-[7px] font-bold uppercase leading-none text-zinc-400 sm:text-[8px]">
-                        Bench
-                      </span>
-                    ) : active ? (
-                      <span className="shrink-0 rounded bg-amber-400 px-1 py-0.5 text-[7px] font-black uppercase leading-none text-zinc-950 sm:text-[8px]">
-                        Turn
-                      </span>
-                    ) : (
-                      <span
-                        className="pointer-events-none shrink-0 select-none rounded bg-amber-400 px-1 py-0.5 text-[7px] font-black uppercase leading-none text-zinc-950 opacity-0 sm:text-[8px]"
-                        aria-hidden
-                      >
-                        Turn
-                      </span>
-                    )}
+                {/* Mobile: h-[5rem] card; row1 h-5; row2 h-7; orb w-[1.7rem] text-[11px]; tags scroll */}
+                <div className="flex h-full min-h-0 flex-col sm:hidden">
+                  <div className="flex h-5 min-h-5 max-h-5 flex-none flex-nowrap items-center gap-1 overflow-hidden">
+                    <span
+                      className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[10px] font-extrabold tabular-nums leading-none ${mine ? "text-sky-200" : inMatch ? "text-zinc-100" : "text-zinc-500"}`}
+                    >
+                      P{i + 1}
+                    </span>
+                    <div className="flex h-5 w-[2.05rem] shrink-0 items-center justify-center">
+                      {inMatch && mine ? (
+                        <span className="shrink-0 rounded-sm bg-sky-500/30 px-1 py-px text-[7px] font-black uppercase leading-none text-sky-100">
+                          You
+                        </span>
+                      ) : (
+                        <span
+                          className="pointer-events-none select-none rounded-sm bg-sky-500/30 px-1 py-px text-[7px] font-black uppercase leading-none text-sky-100 opacity-0"
+                          aria-hidden
+                        >
+                          You
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <span
-                    className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[10px] font-extrabold tabular-nums leading-none sm:text-[12px] ${mine ? "text-sky-200" : inMatch ? "text-zinc-100" : "text-zinc-500"}`}
-                  >
-                    P{i + 1}
-                  </span>
-                  <div className={OT_SEAT_STRIP_YOU_SLOT}>
-                    {inMatch && mine ? (
-                      <span className="shrink-0 rounded-sm bg-sky-500/30 px-1 py-0.5 text-[7px] font-black uppercase leading-none text-sky-100 sm:text-[8px]">
-                        You
-                      </span>
-                    ) : (
+                  <div className="mt-0.5 flex h-7 min-h-7 max-h-7 flex-none flex-nowrap items-center gap-1 overflow-hidden">
+                    <div className="flex h-7 w-[1.7rem] shrink-0 items-center justify-center">
                       <span
-                        className="pointer-events-none select-none rounded-sm bg-sky-500/30 px-1 py-0.5 text-[7px] font-black uppercase leading-none text-sky-100 opacity-0 sm:text-[8px]"
-                        aria-hidden
+                        className={`flex h-7 w-full max-w-[1.7rem] items-center justify-center rounded-md border text-[11px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
+                        title={inMatch ? `Orbs held: ${p.orbsHeld}` : "Bench"}
                       >
-                        You
+                        {inMatch ? p.orbsHeld : "–"}
                       </span>
-                    )}
+                    </div>
+                    <div className="min-h-0 min-w-0 flex-1 overflow-y-hidden [-webkit-overflow-scrolling:touch]">
+                      <div className="flex h-7 min-h-7 max-h-7 flex-nowrap items-center gap-0.5 overflow-x-auto overflow-y-hidden pr-px">
+                        {inMatch ? (
+                          tagsMobile.length > 0 ? (
+                            tagsMobile
+                          ) : null
+                        ) : (
+                          <span className="shrink-0 text-[7px] font-semibold text-zinc-600">—</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className={OT_SEAT_STRIP_ROW2}>
-                  <div className={OT_SEAT_STRIP_ORB_SLOT}>
+                {/* Desktop: row1 h-5 P# text-[13px]; row2 h-7 orb w-[2rem] text-[12px]; tags 8px one line */}
+                <div className="hidden h-full min-h-0 flex-col sm:flex">
+                  <div className="flex h-5 min-h-5 max-h-5 flex-none flex-nowrap items-center gap-1.5 overflow-hidden">
                     <span
-                      className={[
-                        "flex h-full w-full items-center justify-center rounded-md border text-[11px] font-black tabular-nums leading-none shadow-inner sm:text-[14px]",
-                        !inMatch
-                          ? "border-white/[0.08] bg-zinc-900/80 text-zinc-600"
-                          : p.orbsHeld > 0
-                            ? "border-amber-400/50 bg-gradient-to-b from-amber-900/55 to-amber-950/80 text-amber-50"
-                            : "border-white/14 bg-zinc-900/75 text-zinc-400",
-                      ].join(" ")}
-                      title={inMatch ? `Orbs held: ${p.orbsHeld}` : "Bench"}
+                      className={`min-w-0 flex-1 truncate whitespace-nowrap text-left text-[13px] font-extrabold tabular-nums leading-none ${mine ? "text-sky-200" : inMatch ? "text-zinc-100" : "text-zinc-500"}`}
                     >
-                      {inMatch ? p.orbsHeld : "–"}
+                      P{i + 1}
                     </span>
+                    <div className="flex h-5 w-[2.25rem] shrink-0 items-center justify-center">
+                      {inMatch && mine ? (
+                        <span className="shrink-0 rounded-sm bg-sky-500/30 px-1.5 py-px text-[8px] font-black uppercase leading-none text-sky-100">
+                          You
+                        </span>
+                      ) : (
+                        <span
+                          className="pointer-events-none select-none rounded-sm bg-sky-500/30 px-1.5 py-px text-[8px] font-black uppercase leading-none text-sky-100 opacity-0"
+                          aria-hidden
+                        >
+                          You
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className={OT_SEAT_STRIP_MODE_SLOT}>
-                    {modeChipVisible ? (
+                  <div className="mt-0.5 flex h-7 min-h-7 max-h-7 flex-none flex-nowrap items-center gap-1.5 overflow-hidden">
+                    <div className="flex h-7 w-[2rem] shrink-0 items-center justify-center">
                       <span
-                        className={`rounded px-1 py-0.5 text-[7px] font-black uppercase leading-none sm:px-1.5 sm:text-[8px] ${
-                          actionPanel === "move"
-                            ? "bg-emerald-500/40 text-emerald-50 ring-1 ring-emerald-400/25"
-                            : actionPanel === "rotate"
-                              ? "bg-sky-500/40 text-sky-50 ring-1 ring-sky-400/25"
-                              : "bg-violet-500/40 text-violet-50 ring-1 ring-violet-400/25"
-                        }`}
+                        className={`flex h-7 w-full max-w-[2rem] items-center justify-center rounded-md border text-[12px] font-black tabular-nums leading-none shadow-inner ${orbTone}`}
+                        title={inMatch ? `Orbs held: ${p.orbsHeld}` : "Bench"}
                       >
-                        {actionPanel}
+                        {inMatch ? p.orbsHeld : "–"}
                       </span>
-                    ) : (
-                      <span
-                        className="pointer-events-none select-none rounded px-1.5 py-0.5 text-[8px] font-black uppercase leading-none opacity-0 ring-1 ring-transparent"
-                        aria-hidden
-                      >
-                        move
-                      </span>
-                    )}
-                  </div>
-                  <div className={OT_SEAT_TAGS_SCROLL}>
-                    {inMatch ? (
-                      <>
-                        {p.lockToken ? (
-                          <span className={`${OT_SEAT_TAG} border border-violet-500/30 bg-violet-950/45 text-violet-100`}>
-                            lock
-                          </span>
-                        ) : null}
-                        {p.stunActive ? (
-                          <span className={`${OT_SEAT_TAG} border border-rose-500/30 bg-rose-950/40 text-rose-100`}>
-                            stun
-                          </span>
-                        ) : null}
-                        {p.trapSlowPending ? (
-                          <span className={`${OT_SEAT_TAG} border border-rose-400/25 bg-rose-950/35 text-rose-100/95`}>
-                            slow
-                          </span>
-                        ) : null}
-                        {p.boostPending ? (
-                          <span className={`${OT_SEAT_TAG} border border-emerald-500/28 bg-emerald-950/40 text-emerald-100`}>
-                            boost
-                          </span>
-                        ) : null}
-                        {heavy ? (
-                          <span className={`${OT_SEAT_TAG} border border-amber-500/35 bg-amber-950/45 text-amber-100`}>
-                            heavy
-                          </span>
-                        ) : null}
-                      </>
-                    ) : (
-                      <span className="truncate text-[8px] font-semibold uppercase tracking-wide text-zinc-600">
-                        —
-                      </span>
-                    )}
+                    </div>
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-nowrap items-center gap-0.5 overflow-x-hidden overflow-y-hidden">
+                      {inMatch ? (
+                        tagsDesktop.length > 0 ? (
+                          tagsDesktop
+                        ) : null
+                      ) : (
+                        <span className="shrink-0 text-[8px] font-semibold text-zinc-600">—</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -573,7 +582,7 @@ export default function Ov2OrbitTrapScreen({
         </div>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/[0.1] bg-gradient-to-b from-zinc-950/80 to-zinc-950/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="relative mt-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/[0.1] bg-gradient-to-b from-zinc-950/80 to-zinc-950/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:mt-2.5">
         <div className="relative flex min-h-0 flex-1 items-stretch justify-center overflow-hidden lg:items-center lg:justify-center">
           <Ov2OrbitTrapBoardView
             state={boardProps}
