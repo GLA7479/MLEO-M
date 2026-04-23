@@ -160,7 +160,7 @@ export default function Ov2SharedQuickMatchBar({
       return;
     }
     if (!gameId) {
-      setMsg("Pick a game tab first (Ludo, Rummy 51, or Bingo). Quick Match needs an exact game.");
+      setMsg('Pick a game tab first. Quick Match needs an exact game (not "All").');
       return;
     }
     setBusy(true);
@@ -253,8 +253,7 @@ export default function Ov2SharedQuickMatchBar({
         <div className="flex flex-col gap-2">
           {!gameId ? (
             <p className="text-[10px] text-zinc-500">
-              Select <span className="text-zinc-400">Ludo</span>, <span className="text-zinc-400">Rummy 51</span>, or{" "}
-              <span className="text-zinc-400">Bingo</span> above — Quick Match cannot run on &quot;All&quot;.
+              Select a specific game tab above — Quick Match cannot run on &quot;All&quot;.
             </p>
           ) : null}
           <div>

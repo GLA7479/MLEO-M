@@ -597,6 +597,21 @@ export default function Ov2SharedRoomScreen({
           await router.push(`/ov2-tanks?room=${encodeURIComponent(roomId)}`);
           return;
         }
+        if (isOrbitTrapRoom) {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: qmAuthorityHostPk });
+          if (cancelled || !canon) return;
+          const ms = Number(canon.match_seq);
+          if (!Number.isFinite(ms)) return;
+          const open = await requestOv2OrbitTrapOpenSession(roomId, qmAuthorityHostPk, {
+            expectedRoomMatchSeq: Math.floor(ms),
+          });
+          if (cancelled || !open?.ok) return;
+          qmLiveOpenDoneRef.current = true;
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          await router.push(`/ov2-orbit-trap?room=${encodeURIComponent(roomId)}`);
+          return;
+        }
         if (isSnakesRoom) {
           const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: qmAuthorityHostPk });
           if (cancelled || !canon) return;
@@ -639,6 +654,7 @@ export default function Ov2SharedRoomScreen({
     isFleetHuntRoom,
     isGoalDuelRoom,
     isTanksRoom,
+    isOrbitTrapRoom,
     isSnakesRoom,
     roomId,
     router,

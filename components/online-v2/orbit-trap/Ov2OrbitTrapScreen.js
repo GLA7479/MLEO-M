@@ -10,6 +10,7 @@ import {
   otListLegalMoveDestinations,
   otListLegalRotateRings,
 } from "../../../lib/online-v2/orbit-trap/ov2OrbitTrapEngine.js";
+import { ov2OrbitTrapCellKey } from "../../../lib/online-v2/orbit-trap/ov2OrbitTrapBoardSpec.js";
 import { orbitTrapGameStateFromRpc } from "../../../lib/online-v2/orbit-trap/ov2OrbitTrapSessionApi";
 import Ov2OrbitTrapBoardView from "./Ov2OrbitTrapBoardView";
 
@@ -121,6 +122,30 @@ export default function Ov2OrbitTrapScreen({
     mySeat != null &&
     engineState.phase === "playing" &&
     engineState.turnSeat === mySeat;
+
+  /** Same keys as board highlights — client hints only; server validates. */
+  const legalMoveCellKeys = useMemo(() => {
+    if (!isMyTurn || actionPanel !== "move") return null;
+    return new Set(legalMoves.map(d => ov2OrbitTrapCellKey(d.ring, d.slot)));
+  }, [isMyTurn, actionPanel, legalMoves]);
+
+  const legalRotateRingSet = useMemo(() => {
+    if (!isMyTurn || actionPanel !== "rotate") return null;
+    return new Set(legalRotates.map(String));
+  }, [isMyTurn, actionPanel, legalRotates]);
+
+  const legalLockRingSet = useMemo(() => {
+    if (!isMyTurn || actionPanel !== "lock") return null;
+    return new Set(legalLockRings.map(String));
+  }, [isMyTurn, actionPanel, legalLockRings]);
+
+  const boardActionHint = useMemo(() => {
+    if (!isMyTurn || !actionPanel) return "";
+    if (actionPanel === "move") return "Emerald rings on the board = legal destinations (server validates).";
+    if (actionPanel === "rotate") return "Emerald ring outline = ring you can rotate.";
+    if (actionPanel === "lock") return "Violet rings on lock pickup cells = rings you can lock.";
+    return "";
+  }, [isMyTurn, actionPanel]);
 
   const authRevision = isAuthoritative ? Number(authoritativeSnapshot?.revision) || 0 : null;
 
@@ -273,7 +298,27 @@ export default function Ov2OrbitTrapScreen({
       </div>
 
       <div className="relative flex min-h-[220px] flex-[1.25] flex-col overflow-hidden rounded-xl border border-white/[0.1] bg-zinc-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-        <Ov2OrbitTrapBoardView state={boardProps} mySeat={isAuthoritative ? mySeat : null} />
+        {boardActionHint ? (
+          <p
+            className={`shrink-0 border-b border-white/[0.06] bg-zinc-900/40 px-2 py-1 text-center text-[9px] leading-snug ${
+              actionPanel === "lock"
+                ? "text-violet-200/90"
+                : actionPanel === "rotate"
+                  ? "text-sky-200/90"
+                  : "text-emerald-200/85"
+            }`}
+          >
+            {boardActionHint}
+          </p>
+        ) : null}
+        <Ov2OrbitTrapBoardView
+          state={boardProps}
+          mySeat={isAuthoritative ? mySeat : null}
+          rosterSeatIndices={roster}
+          highlightLegalMoveKeys={legalMoveCellKeys}
+          highlightRotateRings={legalRotateRingSet}
+          highlightLockRings={legalLockRingSet}
+        />
       </div>
 
       <div className="flex min-h-0 max-h-[44%] shrink-0 flex-col gap-1 overflow-hidden rounded-xl border border-t-zinc-800/80 border-white/[0.1] bg-zinc-950/55 px-2 py-2 sm:max-h-[38%]">
@@ -319,31 +364,44 @@ export default function Ov2OrbitTrapScreen({
 
         {actionPanel === "move" && isMyTurn ? (
           <div className="flex min-h-0 flex-1 flex-col gap-1 border-t border-white/[0.06] pt-1.5">
-            <p className="shrink-0 text-[10px] font-medium text-zinc-400">Pick destination (server validates path)</p>
+            <p className="shrink-0 text-[10px] font-medium text-zinc-400">
+              Pick destination — same cells highlighted on the board (server validates path).
+            </p>
             <div className="flex min-h-0 flex-1 flex-wrap content-start gap-1.5 overflow-y-auto overscroll-contain py-0.5 [-webkit-overflow-scrolling:touch]">
-              {legalMoves.map((d, idx) => (
+              {legalMoves.map((d, idx) => {
+                const onBoard = legalMoveCellKeys?.has(ov2OrbitTrapCellKey(d.ring, d.slot)) ?? false;
+                return (
                 <button
                   key={`${d.ring}:${d.slot}:${idx}`}
                   type="button"
                   disabled={actionBusy}
                   onClick={() => void runAction({ type: "move", toRing: d.ring, toSlot: d.slot })}
-                  className={`${chipBase} border-emerald-500/35 bg-emerald-950/55 text-emerald-100 hover:border-emerald-400/55 hover:bg-emerald-900/40`}
+                  className={`${chipBase} border-emerald-500/35 bg-emerald-950/55 text-emerald-100 hover:border-emerald-400/55 hover:bg-emerald-900/40 ${
+                    onBoard ? "ring-2 ring-emerald-400/55 ring-offset-2 ring-offset-zinc-950" : ""
+                  }`}
                 >
                   {formatMoveDestination(d)}
                 </button>
-              ))}
+              );
+              })}
             </div>
           </div>
         ) : null}
 
         {actionPanel === "rotate" && isMyTurn ? (
           <div className="flex min-h-0 flex-1 flex-col gap-1.5 border-t border-white/[0.06] pt-1.5">
-            <p className="shrink-0 text-[10px] font-medium text-zinc-400">Ring + direction (1 slot)</p>
+            <p className="shrink-0 text-[10px] font-medium text-zinc-400">
+              Ring + direction — emerald outline on the board matches a rotatable ring.
+            </p>
             <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
               {legalRotates.map(r => (
                 <div
                   key={r}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/[0.06] bg-zinc-900/35 px-1.5 py-1"
+                  className={`flex flex-wrap items-center justify-between gap-2 rounded-md border px-1.5 py-1 ${
+                    legalRotateRingSet?.has(r)
+                      ? "border-emerald-500/35 bg-emerald-950/25"
+                      : "border-white/[0.06] bg-zinc-900/35"
+                  }`}
                 >
                   <span className="text-[11px] font-semibold text-zinc-200 sm:text-xs">{shortRingName(r)}</span>
                   <div className="flex shrink-0 gap-1">
@@ -374,7 +432,9 @@ export default function Ov2OrbitTrapScreen({
 
         {actionPanel === "lock" && isMyTurn ? (
           <div className="flex min-h-0 flex-1 flex-col gap-1 border-t border-white/[0.06] pt-1.5">
-            <p className="shrink-0 text-[10px] font-medium text-zinc-400">Pick ring to lock</p>
+            <p className="shrink-0 text-[10px] font-medium text-zinc-400">
+              Pick ring — violet glow on the lock pickup cell for that ring.
+            </p>
             <div className="flex flex-wrap gap-1.5 overflow-y-auto overscroll-contain py-0.5 [-webkit-overflow-scrolling:touch]">
               {legalLockRings.map(r => (
                 <button
@@ -382,7 +442,9 @@ export default function Ov2OrbitTrapScreen({
                   type="button"
                   disabled={actionBusy}
                   onClick={() => void runAction({ type: "lock", ring: r })}
-                  className={`${chipBase} border-violet-500/35 bg-violet-950/50 text-violet-100 hover:border-violet-400/55 hover:bg-violet-900/40`}
+                  className={`${chipBase} border-violet-500/35 bg-violet-950/50 text-violet-100 hover:border-violet-400/55 hover:bg-violet-900/40 ${
+                    legalLockRingSet?.has(r) ? "ring-2 ring-violet-400/50 ring-offset-2 ring-offset-zinc-950" : ""
+                  }`}
                 >
                   {shortRingName(r)}
                 </button>

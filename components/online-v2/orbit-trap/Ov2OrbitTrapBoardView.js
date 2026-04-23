@@ -14,6 +14,19 @@ import {
 const SEAT_COLORS = ["#38bdf8", "#fbbf24", "#34d399", "#e879f9"];
 
 /**
+ * @param {string} k
+ * @returns {{ ring: string; slot: number } | null}
+ */
+function parseCellKey(k) {
+  const i = k.indexOf(":");
+  if (i < 0) return null;
+  const ring = k.slice(0, i);
+  const slot = Number(k.slice(i + 1));
+  if (!Number.isFinite(slot)) return null;
+  return { ring, slot };
+}
+
+/**
  * Slot 0 (O1) at top; indices increase clockwise.
  * @param {number} slot
  * @param {number} radius
@@ -35,8 +48,19 @@ function ringXY(slot, radius) {
  *   activeSeats?: number[];
  * }} props.state
  * @param {number | null} [props.mySeat]
+ * @param {number[]} [props.rosterSeatIndices] seats in this match (for legend)
+ * @param {Set<string> | null} [props.highlightLegalMoveKeys] cell keys (e.g. outer:3) — client legal hints only
+ * @param {Set<string> | null} [props.highlightRotateRings]
+ * @param {Set<string> | null} [props.highlightLockRings]
  */
-export default function Ov2OrbitTrapBoardView({ state, mySeat = null }) {
+export default function Ov2OrbitTrapBoardView({
+  state,
+  mySeat = null,
+  rosterSeatIndices = null,
+  highlightLegalMoveKeys = null,
+  highlightRotateRings = null,
+  highlightLockRings = null,
+}) {
   const gid = useId().replace(/:/g, "");
   const traps = useMemo(() => new Set(OV2_ORBIT_TRAP_TRAPS.map(([r, s]) => ov2OrbitTrapCellKey(r, s))), []);
   const boosts = useMemo(() => new Set(OV2_ORBIT_TRAP_BOOSTS.map(([r, s]) => ov2OrbitTrapCellKey(r, s))), []);
@@ -55,12 +79,20 @@ export default function Ov2OrbitTrapBoardView({ state, mySeat = null }) {
   ];
 
   const gradId = `otBoardBg-${gid}`;
+  const glowId = `otLegalGlow-${gid}`;
+
+  const rosterLabel = useMemo(() => {
+    if (!rosterSeatIndices || rosterSeatIndices.length < 2) return "";
+    return rosterSeatIndices.map(s => `P${s + 1}`).join(", ");
+  }, [rosterSeatIndices]);
+
+  const ringRadius = ring => (ring === "outer" ? R_OUT : ring === "mid" ? R_MID : R_INN);
 
   return (
-    <div className="flex h-full w-full min-h-0 flex-1 flex-col items-stretch justify-center gap-1.5 px-0.5 py-0.5">
+    <div className="flex h-full w-full min-h-0 flex-1 flex-col items-stretch justify-center gap-1 px-0.5 py-0.5">
       <svg
         viewBox="-100 -100 200 200"
-        className="mx-auto h-full w-full max-h-[min(82vh,680px)] min-h-[220px] max-w-[min(96vw,680px)] shrink touch-none select-none"
+        className="mx-auto h-full w-full max-h-[min(82vh,680px)] min-h-[200px] max-w-[min(96vw,680px)] shrink touch-none select-none"
         aria-label="Orbit Trap board"
       >
         <defs>
@@ -68,22 +100,34 @@ export default function Ov2OrbitTrapBoardView({ state, mySeat = null }) {
             <stop offset="0%" stopColor="#18181b" />
             <stop offset="100%" stopColor="#09090b" />
           </radialGradient>
+          <filter id={glowId} x="-40%" y="-40%" width="180%" height="180%">
+            <feGaussianBlur stdDeviation="1.2" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
         <circle cx="0" cy="0" r="98" fill={`url(#${gradId})`} stroke="#52525b" strokeWidth="0.75" />
 
-        {ringRadii.map(({ ring, r }) => (
-          <circle
-            key={ring}
-            cx="0"
-            cy="0"
-            r={r}
-            fill="none"
-            stroke={state.ringLock?.ring === ring ? "#fb923c" : "#64748b"}
-            strokeWidth={state.ringLock?.ring === ring ? 1.35 : 0.6}
-            strokeDasharray={state.ringLock?.ring === ring ? "4 3" : "0"}
-            opacity={0.96}
-          />
-        ))}
+        {ringRadii.map(({ ring, r }) => {
+          const locked = state.ringLock?.ring === ring;
+          const rotHi = highlightRotateRings?.has(ring);
+          return (
+            <circle
+              key={ring}
+              cx="0"
+              cy="0"
+              r={r}
+              fill="none"
+              stroke={locked ? "#fb923c" : rotHi ? "#34d399" : "#64748b"}
+              strokeWidth={locked ? 1.35 : rotHi ? 1.45 : 0.6}
+              strokeDasharray={locked ? "4 3" : rotHi ? "3 2" : "0"}
+              opacity={0.98}
+              {...(rotHi ? { filter: `url(#${glowId})` } : {})}
+            />
+          );
+        })}
 
         {ringRadii.map(({ ring, r }) =>
           Array.from({ length: OV2_ORBIT_TRAP_RING_SLOTS }, (_, slot) => {
@@ -104,16 +148,27 @@ export default function Ov2OrbitTrapBoardView({ state, mySeat = null }) {
               fill = "rgba(129,140,248,0.2)";
               mark = "\u25C6";
             }
+            const lockRingHi = highlightLockRings?.has(ring) && isLock;
             return (
               <g key={`${ring}-${slot}`}>
-                <circle cx={x} cy={y} r={5.6} fill={fill} stroke="#3f3f46" strokeWidth="0.4" />
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={5.6}
+                  fill={fill}
+                  stroke={lockRingHi ? "#c4b5fd" : "#3f3f46"}
+                  strokeWidth={lockRingHi ? 0.85 : 0.4}
+                />
+                {lockRingHi ? (
+                  <circle cx={x} cy={y} r={7.8} fill="none" stroke="#a78bfa" strokeWidth={0.65} strokeDasharray="2 1.5" opacity={0.95} />
+                ) : null}
                 {mark ? (
                   <text
                     x={x}
                     y={y + 2.2}
                     textAnchor="middle"
                     fontSize="3.4"
-                    fill="#a1a1aa"
+                    fill={lockRingHi ? "#e9d5ff" : "#a1a1aa"}
                     fontWeight="700"
                     opacity={0.92}
                   >
@@ -125,36 +180,84 @@ export default function Ov2OrbitTrapBoardView({ state, mySeat = null }) {
           })
         )}
 
+        {highlightLegalMoveKeys && highlightLegalMoveKeys.size > 0
+          ? [...highlightLegalMoveKeys].map(k => {
+              const parsed = parseCellKey(k);
+              if (!parsed) return null;
+              if (parsed.ring === "core") {
+                return (
+                  <circle
+                    key={`hl-${k}`}
+                    cx="0"
+                    cy="0"
+                    r={R_CORE + 5}
+                    fill="none"
+                    stroke="#34d399"
+                    strokeWidth={0.9}
+                    strokeDasharray="2.5 2"
+                    opacity={0.92}
+                    filter={`url(#${glowId})`}
+                  />
+                );
+              }
+              const rr = ringRadius(parsed.ring);
+              if (!rr) return null;
+              const { x, y } = ringXY(parsed.slot, rr);
+              return (
+                <circle
+                  key={`hl-${k}`}
+                  cx={x}
+                  cy={y}
+                  r={8.2}
+                  fill="none"
+                  stroke="#34d399"
+                  strokeWidth={0.85}
+                  strokeDasharray="2.5 2"
+                  opacity={0.9}
+                  filter={`url(#${glowId})`}
+                />
+              );
+            })
+          : null}
+
         {OV2_ORBIT_TRAP_GATES_OUTER_MID.map(([s], i) => {
           const a = ringXY(s, R_OUT);
           const b = ringXY(s, R_MID);
+          const mx = (a.x + b.x) / 2;
+          const my = (a.y + b.y) / 2;
           return (
-            <line
-              key={`om-${i}`}
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
-              stroke="#cbd5e1"
-              strokeWidth={1}
-              strokeOpacity={0.72}
-            />
+            <g key={`om-${i}`}>
+              <line
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke="#e2e8f0"
+                strokeWidth={1.05}
+                strokeOpacity={0.78}
+              />
+              <circle cx={mx} cy={my} r={1.35} fill="#94a3b8" fillOpacity={0.85} />
+            </g>
           );
         })}
         {OV2_ORBIT_TRAP_GATES_MID_INNER.map(([s], i) => {
           const a = ringXY(s, R_MID);
           const b = ringXY(s, R_INN);
+          const mx = (a.x + b.x) / 2;
+          const my = (a.y + b.y) / 2;
           return (
-            <line
-              key={`mi-${i}`}
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
-              stroke="#cbd5e1"
-              strokeWidth={1}
-              strokeOpacity={0.72}
-            />
+            <g key={`mi-${i}`}>
+              <line
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke="#e2e8f0"
+                strokeWidth={1.05}
+                strokeOpacity={0.78}
+              />
+              <circle cx={mx} cy={my} r={1.35} fill="#94a3b8" fillOpacity={0.85} />
+            </g>
           );
         })}
 
@@ -165,7 +268,7 @@ export default function Ov2OrbitTrapBoardView({ state, mySeat = null }) {
           const { x, y } = ringXY(slot, r);
           return (
             <g key={`fx-${fk}`}>
-              <circle cx={x} cy={y} r={3.6} fill="#22d3ee" stroke="#0891b2" strokeWidth="0.45" opacity={0.95} />
+              <circle cx={x} cy={y} r={3.6} fill="#22d3ee" stroke="#0891b2" strokeWidth={0.45} opacity={0.95} />
               <text x={x} y={y + 1.8} textAnchor="middle" fontSize="3.8" fill="#0c4a6e" fontWeight="800">
                 F
               </text>
@@ -226,23 +329,38 @@ export default function Ov2OrbitTrapBoardView({ state, mySeat = null }) {
         })}
       </svg>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-white/[0.06] px-1 pb-0.5 pt-1.5 text-[9px] leading-tight text-zinc-400">
-        <span>
-          <span className="font-semibold text-rose-200/90">!</span> trap
-        </span>
-        <span>
-          <span className="font-semibold text-emerald-200/90">+</span> boost
-        </span>
-        <span>
-          <span className="font-semibold text-violet-200/90">{"\u25C6"}</span> lock pickup
-        </span>
-        <span>
-          <span className="font-semibold text-cyan-200/90">F</span> fixed orb
-        </span>
-        <span>
-          <span className="font-semibold text-amber-200/90">o</span> loose orb
-        </span>
-        <span className="text-zinc-500">Lines = ring gates</span>
+      <div className="flex shrink-0 flex-col gap-1 border-t border-white/[0.06] px-1 pb-0.5 pt-1.5">
+        {rosterLabel ? (
+          <p className="text-center text-[9px] font-medium text-zinc-300">
+            Match seats: <span className="font-mono text-zinc-100">{rosterLabel}</span>
+            {mySeat != null ? (
+              <>
+                {" "}
+                · <span className="text-sky-300/90">You = P{mySeat + 1}</span>
+              </>
+            ) : null}
+            {" · "}
+            <span className="text-amber-200/90">Turn</span> = amber · <span className="text-sky-300/90">You</span> = sky dashed
+          </p>
+        ) : null}
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[9px] leading-tight text-zinc-400">
+          <span>
+            <span className="font-semibold text-rose-200/90">!</span> trap
+          </span>
+          <span>
+            <span className="font-semibold text-emerald-200/90">+</span> boost
+          </span>
+          <span>
+            <span className="font-semibold text-violet-200/90">{"\u25C6"}</span> lock pickup
+          </span>
+          <span>
+            <span className="font-semibold text-cyan-200/90">F</span> fixed
+          </span>
+          <span>
+            <span className="font-semibold text-amber-200/90">o</span> loose
+          </span>
+          <span className="text-zinc-500">Dots on gates · dashed emerald = legal move (when Move is open)</span>
+        </div>
       </div>
     </div>
   );

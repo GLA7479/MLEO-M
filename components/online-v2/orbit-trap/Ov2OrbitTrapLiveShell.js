@@ -362,7 +362,7 @@ export default function Ov2OrbitTrapLiveShell() {
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Authority</p>
               <p className="mt-1.5 text-zinc-400/95">
                 Snapshot + Realtime on <span className="font-mono text-zinc-500">ov2_orbit_trap_sessions</span>.
-                Settlement / rematch / Quick Match are deferred.
+                Settlement / rematch are deferred.
               </p>
             </section>
           </div>
