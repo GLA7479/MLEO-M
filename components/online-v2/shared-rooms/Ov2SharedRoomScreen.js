@@ -73,6 +73,10 @@ import {
   requestOv2SnakesOpenSession,
 } from "../../../lib/online-v2/snakes-and-ladders/ov2SnakesSessionApi";
 import {
+  fetchOv2OrbitTrapSnapshot,
+  requestOv2OrbitTrapOpenSession,
+} from "../../../lib/online-v2/orbit-trap/ov2OrbitTrapSessionApi";
+import {
   commitOv2RoomStake,
   fetchOv2RoomById,
   fetchOv2RoomLedgerForViewer,
@@ -182,6 +186,7 @@ export default function Ov2SharedRoomScreen({
   const isTanksRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.TANKS;
   const isSnakesLaddersRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.SNAKES_LADDERS;
   const isSnakesRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.SNAKES_AND_LADDERS;
+  const isOrbitTrapRoom = String(room?.product_game_id || "").trim() === ONLINE_V2_GAME_KINDS.ORBIT_TRAP;
   const isStakeSharedRoom =
     isRummy51Room ||
     isLudoRoom ||
@@ -198,7 +203,8 @@ export default function Ov2SharedRoomScreen({
     isGoalDuelRoom ||
     isTanksRoom ||
     isSnakesLaddersRoom ||
-    isSnakesRoom;
+    isSnakesRoom ||
+    isOrbitTrapRoom;
   const liveRuntimeId = room?.active_runtime_id || room?.active_session_id || null;
 
   const ledgerByParticipant = useMemo(() => {
@@ -964,7 +970,8 @@ export default function Ov2SharedRoomScreen({
         isFleetHuntRoom ||
         isGoalDuelRoom ||
         isTanksRoom ||
-        isSnakesRoom
+        isSnakesRoom ||
+        isOrbitTrapRoom
       ) {
         const prep = await prepareSharedHostPreStartStakes();
         if (!prep.ok) {
@@ -977,6 +984,25 @@ export default function Ov2SharedRoomScreen({
         host_participant_key: participantId,
       });
       setRuntimeHandoff(out.runtime_handoff || null);
+      if (isOrbitTrapRoom) {
+        const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+        const ms = Number(canon?.match_seq);
+        if (!Number.isFinite(ms)) {
+          setMsg("Could not read room match sequence. Refresh and retry.");
+          return;
+        }
+        const open = await requestOv2OrbitTrapOpenSession(roomId, participantId, {
+          expectedRoomMatchSeq: Math.floor(ms),
+        });
+        if (!open?.ok) {
+          setMsg(open?.error || "Could not open Orbit Trap session.");
+          return;
+        }
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        await router.push(`/ov2-orbit-trap?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
       if (isLudoRoom) {
         const open = await requestOv2LudoOpenSession(roomId, participantId, {
           presenceLeaderKey: participantId,
@@ -1702,6 +1728,47 @@ export default function Ov2SharedRoomScreen({
       };
     }
 
+    if (isOrbitTrapRoom) {
+      const otSid = room?.active_session_id || null;
+      if (otSid) {
+        didRouteToLiveRef.current = true;
+        setLaunchingLive(true);
+        void router.push(`/ov2-orbit-trap?room=${encodeURIComponent(roomId)}`);
+        return;
+      }
+      let cancelledOt = false;
+      void fetchOv2OrbitTrapSnapshot(roomId, { participantKey: participantId }).then(snap => {
+        if (cancelledOt || didRouteToLiveRef.current) return;
+        const ph = snap ? String(snap.phase || "").toLowerCase() : "";
+        if (ph === "playing" || ph === "finished") {
+          didRouteToLiveRef.current = true;
+          setLaunchingLive(true);
+          void router.push(`/ov2-orbit-trap?room=${encodeURIComponent(roomId)}`);
+        }
+      });
+      let intervalOt = null;
+      const tickOt = async () => {
+        try {
+          const canon = await fetchOv2RoomById(roomId, { viewerParticipantKey: participantId });
+          if (cancelledOt || didRouteToLiveRef.current) return;
+          if (canon?.active_session_id) {
+            if (intervalOt) clearInterval(intervalOt);
+            didRouteToLiveRef.current = true;
+            setLaunchingLive(true);
+            void router.push(`/ov2-orbit-trap?room=${encodeURIComponent(roomId)}`);
+          }
+        } catch {
+          // ignore
+        }
+      };
+      void tickOt();
+      intervalOt = setInterval(() => void tickOt(), 2500);
+      return () => {
+        cancelledOt = true;
+        if (intervalOt) clearInterval(intervalOt);
+      };
+    }
+
     if (!liveRuntimeId) return;
     if (isLudoRoom) {
       const ludoSid = room?.active_session_id || null;
@@ -1786,6 +1853,7 @@ export default function Ov2SharedRoomScreen({
     isGoalDuelRoom,
     isTanksRoom,
     isSnakesRoom,
+    isOrbitTrapRoom,
     room?.status,
     room?.active_session_id,
     liveRuntimeId,
@@ -2003,7 +2071,8 @@ export default function Ov2SharedRoomScreen({
           !isFleetHuntRoom &&
           !isGoalDuelRoom &&
           !isTanksRoom &&
-          !isSnakesRoom ? (
+          !isSnakesRoom &&
+          !isOrbitTrapRoom ? (
             <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-950/25 p-3 text-xs text-sky-100">
               <div className="font-bold">Runtime handoff ready</div>
               <div className="mt-1">Runtime ID: {runtimeHandoff.active_runtime_id}</div>
@@ -2027,7 +2096,8 @@ export default function Ov2SharedRoomScreen({
           isFleetHuntRoom ||
           isGoalDuelRoom ||
           isTanksRoom ||
-          isSnakesRoom) &&
+          isSnakesRoom ||
+          isOrbitTrapRoom) &&
         !launchingLive ? (
           <div className="mt-3 rounded-xl border border-teal-500/35 bg-teal-950/20 p-3 text-[11px] text-teal-100">
             <p className="font-semibold text-teal-50">Match starting</p>
@@ -2144,7 +2214,9 @@ export default function Ov2SharedRoomScreen({
                                       ? "Opening live Tanks..."
                                       : isSnakesRoom
                                         ? "Opening live Snakes & Ladders..."
-                                        : "Opening live Ludo game..."}
+                                        : isOrbitTrapRoom
+                                          ? "Opening Orbit Trap…"
+                                          : "Opening live Ludo game..."}
           </p>
         ) : null}
         {error ? <p className="text-[11px] text-red-300">{error}</p> : null}
