@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   OV2_ORBIT_TRAP_BOOSTS,
   OV2_ORBIT_TRAP_GATES_MID_INNER,
@@ -12,6 +12,9 @@ import {
 } from "../../../lib/online-v2/orbit-trap/ov2OrbitTrapBoardSpec.js";
 
 const SEAT_COLORS = ["#38bdf8", "#fbbf24", "#34d399", "#e879f9"];
+
+/** Optional PNG at `public/images/online-v2/orbit-trap/board-background.png` — if missing or unloadable, default gradient is used. */
+const OT_BOARD_CUSTOM_BG_URL = "/images/online-v2/orbit-trap/board-background.png";
 
 /**
  * @param {string} k
@@ -72,6 +75,24 @@ export default function Ov2OrbitTrapBoardView({
   onLockPick,
 }) {
   const gid = useId().replace(/:/g, "");
+  const [customBoardBgReady, setCustomBoardBgReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      if (img.naturalWidth > 0) setCustomBoardBgReady(true);
+    };
+    img.onerror = () => {
+      if (!cancelled) setCustomBoardBgReady(false);
+    };
+    img.src = OT_BOARD_CUSTOM_BG_URL;
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const traps = useMemo(() => new Set(OV2_ORBIT_TRAP_TRAPS.map(([r, s]) => ov2OrbitTrapCellKey(r, s))), []);
   const boosts = useMemo(() => new Set(OV2_ORBIT_TRAP_BOOSTS.map(([r, s]) => ov2OrbitTrapCellKey(r, s))), []);
   const locks = useMemo(() => new Set(OV2_ORBIT_TRAP_LOCK_SLOTS.map(([r, s]) => ov2OrbitTrapCellKey(r, s))), []);
@@ -89,6 +110,7 @@ export default function Ov2OrbitTrapBoardView({
   ];
 
   const gradId = `otBoardBg-${gid}`;
+  const boardBgClipId = `otBoardBgClip-${gid}`;
   const glowId = `otLegalGlow-${gid}`;
   const gateGlowId = `otGateGlow-${gid}`;
 
@@ -134,8 +156,29 @@ export default function Ov2OrbitTrapBoardView({
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+          {customBoardBgReady ? (
+            <clipPath id={boardBgClipId}>
+              <circle cx="0" cy="0" r="100" />
+            </clipPath>
+          ) : null}
         </defs>
-        <circle cx="0" cy="0" r="100" fill={`url(#${gradId})`} stroke="#3f3f46" strokeWidth="1" />
+        {customBoardBgReady ? (
+          <>
+            <g clipPath={`url(#${boardBgClipId})`}>
+              <image
+                href={OT_BOARD_CUSTOM_BG_URL}
+                x="-100"
+                y="-100"
+                width="200"
+                height="200"
+                preserveAspectRatio="xMidYMid slice"
+              />
+            </g>
+            <circle cx="0" cy="0" r="100" fill="none" stroke="#3f3f46" strokeWidth="1" />
+          </>
+        ) : (
+          <circle cx="0" cy="0" r="100" fill={`url(#${gradId})`} stroke="#3f3f46" strokeWidth="1" />
+        )}
 
         {ringRadii.map(({ ring, r }) => {
           const locked = state.ringLock?.ring === ring;
