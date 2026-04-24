@@ -355,8 +355,8 @@ export default function Ov2OrbitTrapLiveShell() {
           <section className="mt-3 border-t border-white/[0.06] pt-3 text-[11px] leading-relaxed text-zinc-400">
             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Authority</p>
             <p className="mt-1.5 text-zinc-400/95">
-              Live play uses an authoritative snapshot and Realtime updates. Settlement and rematch are not in this
-              build yet.
+              Live play uses an authoritative snapshot and Realtime updates. Finish modal amounts follow the same stake
+              / pot rules as other OV2 tables; vault claim RPC can be wired later like Snakes.
             </p>
           </section>
           <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-white/[0.06] pt-3 text-[11px] text-zinc-500">

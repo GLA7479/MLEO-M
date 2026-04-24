@@ -112,6 +112,10 @@ export default function Ov2OrbitTrapScreen({
   const selfKey = pk;
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
   const roomMembers = members;
+  const seatedCount = useMemo(
+    () => roomMembers.filter(m => m?.seat_index != null && m?.seat_index !== "").length,
+    [roomMembers]
+  );
   const roomHostKey = String(room?.host_participant_key || "").trim();
   const isHost = Boolean(selfKey && roomHostKey && selfKey === roomHostKey);
   const myMemberRow = useMemo(
@@ -139,6 +143,17 @@ export default function Ov2OrbitTrapScreen({
   /** @type {'move' | 'rotate' | 'lock' | null} */
   const [actionPanel, setActionPanel] = useState(null);
 
+  /** Snapshot `result` (Snakes-shaped): `winner`, `prize`, `lossPerSeat` — when DB omits it, amounts derive from room stake + seats. */
+  const snapResult = useMemo(() => {
+    const r = authoritativeSnapshot?.result;
+    return r && typeof r === "object" ? /** @type {Record<string, unknown>} */ (r) : null;
+  }, [authoritativeSnapshot?.result]);
+
+  /** Parity with board games: vault claim locks finish actions; wired when settlement RPC exists. */
+  const vaultClaimBusy = false;
+  const vaultClaimError = "";
+  const retryVaultClaim = useCallback(() => {}, []);
+
   const snapPhase = String(authoritativeSnapshot?.phase || "").toLowerCase();
   const finished =
     isAuthoritative && (engineState.phase === "finished" || snapPhase === "finished");
@@ -146,17 +161,64 @@ export default function Ov2OrbitTrapScreen({
     authoritativeSnapshot?.winnerSeat != null && authoritativeSnapshot.winnerSeat !== ""
       ? Number(authoritativeSnapshot.winnerSeat)
       : null;
-  const winnerFromResult =
-    winnerSeatSnap != null && Number.isInteger(winnerSeatSnap) && winnerSeatSnap >= 0 && winnerSeatSnap <= 3
-      ? winnerSeatSnap
-      : engineState.winnerSeat != null
-        ? engineState.winnerSeat
-        : null;
-  const prizeTotal = null;
-  const lossPerSeat = null;
+  const winnerFromResult = (() => {
+    if (snapResult?.winner != null && Number.isFinite(Number(snapResult.winner))) {
+      const w = Math.floor(Number(snapResult.winner));
+      if (w >= 0 && w <= 3) return w;
+    }
+    if (winnerSeatSnap != null && Number.isInteger(winnerSeatSnap) && winnerSeatSnap >= 0 && winnerSeatSnap <= 3)
+      return winnerSeatSnap;
+    if (engineState.winnerSeat != null) return engineState.winnerSeat;
+    return null;
+  })();
   const didIWin = finished && mySeat != null && winnerFromResult != null && Number(mySeat) === Number(winnerFromResult);
-  const winnerNet =
-    prizeTotal != null && lossPerSeat != null ? Math.max(0, Math.floor(prizeTotal - lossPerSeat)) : null;
+
+  const { prizeTotal, lossPerSeat, winnerNet } = useMemo(() => {
+    const snapRes = snapResult;
+    const stakePerSeat =
+      room && room.stake_per_seat != null && Number.isFinite(Number(room.stake_per_seat))
+        ? Math.max(0, Math.floor(Number(room.stake_per_seat)))
+        : null;
+    const act = authoritativeSnapshot?.activeSeats ?? engineState.activeSeats;
+    let potSeatCount = null;
+    if (Array.isArray(act)) {
+      const uniq = [
+        ...new Set(
+          act.map(x => Math.floor(Number(x))).filter(x => Number.isInteger(x) && x >= 0 && x <= 3)
+        ),
+      ];
+      if (uniq.length >= 2 && uniq.length <= 4) potSeatCount = uniq.length;
+    }
+    if (potSeatCount == null && eligibleRematch >= 2 && eligibleRematch <= 4) potSeatCount = eligibleRematch;
+    if (potSeatCount == null && seatedCount >= 2 && seatedCount <= 4) potSeatCount = seatedCount;
+
+    let loss =
+      snapRes?.lossPerSeat != null && Number.isFinite(Number(snapRes.lossPerSeat))
+        ? Math.floor(Number(snapRes.lossPerSeat))
+        : stakePerSeat;
+    let prize =
+      snapRes?.prize != null && Number.isFinite(Number(snapRes.prize)) ? Math.floor(Number(snapRes.prize)) : null;
+    if (prize == null && stakePerSeat != null && potSeatCount != null) prize = stakePerSeat * potSeatCount;
+    if (
+      prize != null &&
+      loss != null &&
+      prize > 0 &&
+      loss > 0 &&
+      prize <= loss &&
+      seatedCount >= 2
+    ) {
+      prize = loss * seatedCount;
+    }
+    const net = prize != null && loss != null ? Math.max(0, Math.floor(prize - loss)) : null;
+    return { prizeTotal: prize, lossPerSeat: loss, winnerNet: net };
+  }, [
+    snapResult,
+    authoritativeSnapshot?.activeSeats,
+    room?.stake_per_seat,
+    engineState.activeSeats,
+    eligibleRematch,
+    seatedCount,
+  ]);
 
   const isFinished = finished;
   const baseRematchEligible =
@@ -165,7 +227,7 @@ export default function Ov2OrbitTrapScreen({
     String(myMemberRow?.wallet_state || "").trim() === "committed" &&
     eligibleRematch >= 2 &&
     eligibleRematch <= 4;
-  const finishActionsLocked = false;
+  const finishActionsLocked = vaultClaimBusy;
   const canHostStartNextMatch =
     isFinished && isHost && eligibleRematch >= 2 && readyRematch >= eligibleRematch && !startNextBusy;
 
@@ -318,6 +380,7 @@ export default function Ov2OrbitTrapScreen({
 
   const finishAmountLine = useMemo(() => {
     if (!isFinished) return { text: "—", className: "text-zinc-500" };
+    if (vaultClaimBusy) return { text: "…", className: "text-zinc-400" };
     if (didIWin && winnerNet != null && prizeTotal != null) {
       return {
         text: `+${winnerNet.toLocaleString()} MLEO (pot ${prizeTotal.toLocaleString()})`,
@@ -337,7 +400,7 @@ export default function Ov2OrbitTrapScreen({
       };
     }
     return { text: "—", className: "text-zinc-500" };
-  }, [isFinished, didIWin, winnerNet, prizeTotal, mySeat, winnerFromResult, lossPerSeat]);
+  }, [isFinished, vaultClaimBusy, didIWin, winnerNet, prizeTotal, mySeat, winnerFromResult, lossPerSeat]);
 
   const currentMultiplier = 1;
 
@@ -355,6 +418,14 @@ export default function Ov2OrbitTrapScreen({
 
   const body = (
     <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden">
+      {authoritativeSnapshot && vaultClaimError && !vaultClaimBusy ? (
+        <p className="shrink-0 truncate px-0.5 text-[10px] text-red-300/95">
+          {vaultClaimError}{" "}
+          <button type="button" className="underline" onClick={() => void retryVaultClaim()}>
+            Retry
+          </button>
+        </p>
+      ) : null}
       {contextInput && !liveSessionId ? (
         <div className="flex h-[1.625rem] min-h-[1.625rem] max-h-[1.625rem] shrink-0 items-center overflow-hidden rounded-lg border border-amber-500/30 bg-amber-950/25 px-2 text-[10px] leading-tight text-amber-100/95">
           <span className="min-w-0 truncate">
