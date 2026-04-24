@@ -3,23 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useOv2OrbitTrapSession } from "../../../hooks/useOv2OrbitTrapSession";
 import { OV2_SHARED_LAST_ROOM_SESSION_KEY } from "../../../lib/online-v2/onlineV2GameRegistry";
 import { leaveOv2RoomWithForfeitRetry } from "../../../lib/online-v2/ov2RoomsApi";
+import { ov2OrbitTrapCellKey } from "../../../lib/online-v2/orbit-trap/ov2OrbitTrapBoardSpec.js";
 import OnlineV2GamePageShell from "../OnlineV2GamePageShell";
 import Ov2SharedFinishModalFrame from "../Ov2SharedFinishModalFrame";
-import {
-  createInitialOtState,
-  otActiveRoster,
-  otCanApplyLock,
-  otListLegalMoveDestinations,
-  otListLegalRotateRings,
-} from "../../../lib/online-v2/orbit-trap/ov2OrbitTrapEngine.js";
-import { ov2OrbitTrapCellKey } from "../../../lib/online-v2/orbit-trap/ov2OrbitTrapBoardSpec.js";
-import { orbitTrapGameStateFromRpc } from "../../../lib/online-v2/orbit-trap/ov2OrbitTrapSessionApi";
 import Ov2OrbitTrapBoardView from "./Ov2OrbitTrapBoardView";
 import Ov2OrbitTrapHelpPanel from "./Ov2OrbitTrapHelpPanel";
-
-const finishDismissStorageKey = sid => `ov2_orbit_trap_finish_dismiss_${sid}`;
 
 const BTN_PRIMARY =
   "rounded-lg border border-emerald-500/24 bg-gradient-to-b from-emerald-950/65 to-emerald-950 px-3 py-2 text-[11px] font-semibold text-emerald-100/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
@@ -28,6 +19,8 @@ const BTN_SECONDARY =
 const BTN_FINISH_DANGER =
   "rounded-lg border border-rose-500/24 bg-gradient-to-b from-rose-950/55 to-rose-950 px-3 py-2 text-[11px] font-semibold text-rose-100/78 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_3px_10px_rgba(0,0,0,0.26)] transition-[transform,opacity] active:scale-[0.98] disabled:opacity-45";
 
+const finishDismissStorageKey = sid => `ov2_orbit_trap_finish_dismiss_${sid}`;
+
 /** Same shape as Snakes `readOv2MemberRematchRequested` — includes Orbit Trap buckets for future parity. */
 function readOv2MemberRematchRequested(meta) {
   const raw = meta && typeof meta === "object" ? meta : null;
@@ -35,7 +28,8 @@ function readOv2MemberRematchRequested(meta) {
   for (const key of ["ludo", "snakes", "ov2_snakes", "orbit_trap", "ov2_orbit_trap"]) {
     const bucket = raw[key];
     if (!bucket || typeof bucket !== "object") continue;
-    if (bucket.rematch_requested === true || bucket.rematch_requested === "true" || bucket.rematch_requested === 1) return true;
+    if (bucket.rematch_requested === true || bucket.rematch_requested === "true" || bucket.rematch_requested === 1)
+      return true;
   }
   return false;
 }
@@ -64,18 +58,6 @@ function OrbitTrapSeatTagSlots({ defs, inMatch, tagClassName }) {
       ))}
     </div>
   );
-}
-
-function boardViewPropsFromEngineState(st) {
-  return {
-    players: st.players,
-    looseOrbs: st.looseOrbs,
-    fixedOrbKeys: [...st.fixedOrbKeys],
-    turnSeat: st.turnSeat,
-    ringLock: st.ringLock,
-    phase: st.phase,
-    activeSeats: st.activeSeats?.length >= 2 ? st.activeSeats : [0, 1, 2, 3],
-  };
 }
 
 /**
@@ -107,61 +89,25 @@ export default function Ov2OrbitTrapScreen({
   onAuthoritativeAction,
 }) {
   const router = useRouter();
-  const [previewState] = useState(() => createInitialOtState());
-  const [actionBusy, setActionBusy] = useState(false);
-  const [actionErr, setActionErr] = useState("");
-  /** @type {'move' | 'rotate' | 'lock' | null} */
-  const [actionPanel, setActionPanel] = useState(null);
-  const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
-  const [exitBusy, setExitBusy] = useState(false);
-  const [exitErr, setExitErr] = useState("");
-  const [rematchIntentBusy, setRematchIntentBusy] = useState(false);
-  const [startNextBusy, setStartNextBusy] = useState(false);
-
-  const engineState = useMemo(() => {
-    if (liveSessionId && authoritativeSnapshot?.state && typeof authoritativeSnapshot.state === "object") {
-      const raw = { .../** @type {Record<string, unknown>} */ (authoritativeSnapshot.state) };
-      const innerAct = raw.activeSeats;
-      if (!Array.isArray(innerAct) || innerAct.length < 2) {
-        const top = authoritativeSnapshot.activeSeats;
-        if (Array.isArray(top) && top.length >= 2) raw.activeSeats = top;
-      }
-      const g = orbitTrapGameStateFromRpc(raw);
-      return g || previewState;
-    }
-    return previewState;
-  }, [liveSessionId, authoritativeSnapshot, previewState]);
-
-  const roster = useMemo(() => otActiveRoster(engineState), [engineState]);
-  const rosterSet = useMemo(() => new Set(roster), [roster]);
-  const boardProps = useMemo(() => boardViewPropsFromEngineState(engineState), [engineState]);
-  const legalMoves = useMemo(
-    () => otListLegalMoveDestinations(engineState, engineState.turnSeat),
-    [engineState]
-  );
-  const legalRotates = useMemo(() => otListLegalRotateRings(engineState, engineState.turnSeat), [engineState]);
-  const canLock = useMemo(() => otCanApplyLock(engineState, engineState.turnSeat), [engineState]);
-
-  const legalLockRings = useMemo(() => {
-    if (!canLock) return [];
-    const rings = ["outer", "mid", "inner"];
-    return rings.filter(r => {
-      if (engineState.ringLock && engineState.ringLock.ring === r) return false;
-      return true;
-    });
-  }, [engineState, canLock]);
-
-  const mySeat = authoritativeSnapshot?.mySeat ?? null;
-  /** Require embedded game state so we never show preview legals as "Live". */
-  const isAuthoritative = Boolean(
-    liveSessionId &&
-      authoritativeSnapshot &&
-      authoritativeSnapshot.state &&
-      typeof authoritativeSnapshot.state === "object"
-  );
+  const session = useOv2OrbitTrapSession({ liveSessionId, authoritativeSnapshot });
+  const {
+    engineState,
+    roster,
+    rosterSet,
+    boardProps,
+    legalMoves,
+    legalRotates,
+    legalLockRings,
+    canLock,
+    mySeat,
+    isAuthoritative,
+    isMyTurn,
+    authRevision,
+  } = session;
 
   const room = contextInput?.room;
-  const roomId = room && typeof room === "object" && room.id != null ? String(room.id).trim() : "";
+  const roomId =
+    room && typeof room === "object" && room.id != null ? String(room.id).trim() : "";
   const pk = contextInput?.self?.participant_key != null ? String(contextInput.self.participant_key).trim() : "";
   const selfKey = pk;
   const members = Array.isArray(contextInput?.members) ? contextInput.members : [];
@@ -181,7 +127,17 @@ export default function Ov2OrbitTrapScreen({
     () => seatedCommitted.filter(m => readOv2MemberRematchRequested(m?.meta)).length,
     [seatedCommitted]
   );
-  const myRematchRequested = (() => readOv2MemberRematchRequested(myMemberRow?.meta))();
+  const myRematchRequested = readOv2MemberRematchRequested(myMemberRow?.meta);
+
+  const [finishModalDismissedSessionId, setFinishModalDismissedSessionId] = useState("");
+  const [exitBusy, setExitBusy] = useState(false);
+  const [exitErr, setExitErr] = useState("");
+  const [rematchIntentBusy, setRematchIntentBusy] = useState(false);
+  const [startNextBusy, setStartNextBusy] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionErr, setActionErr] = useState("");
+  /** @type {'move' | 'rotate' | 'lock' | null} */
+  const [actionPanel, setActionPanel] = useState(null);
 
   const snapPhase = String(authoritativeSnapshot?.phase || "").toLowerCase();
   const finished =
@@ -196,7 +152,6 @@ export default function Ov2OrbitTrapScreen({
       : engineState.winnerSeat != null
         ? engineState.winnerSeat
         : null;
-  /** Snapshot does not yet expose `result` (prize / loss); parity with Snakes layout when unset. */
   const prizeTotal = null;
   const lossPerSeat = null;
   const didIWin = finished && mySeat != null && winnerFromResult != null && Number(mySeat) === Number(winnerFromResult);
@@ -219,17 +174,22 @@ export default function Ov2OrbitTrapScreen({
       String(room && typeof room === "object" && room.active_session_id != null ? room.active_session_id : "").trim() ||
       (roomId ? `room:${roomId}` : "")
     : "";
-  const finishModalDismissed =
-    finishSessionId.length > 0 &&
-    (finishModalDismissedSessionId === finishSessionId ||
-      (typeof window !== "undefined" &&
-        (() => {
-          try {
-            return window.sessionStorage.getItem(finishDismissStorageKey(finishSessionId)) === "1";
-          } catch {
-            return false;
-          }
-        })()));
+
+  const finishModalDismissed = useMemo(
+    () =>
+      finishSessionId.length > 0 &&
+      (finishModalDismissedSessionId === finishSessionId ||
+        (typeof window !== "undefined" &&
+          (() => {
+            try {
+              return window.sessionStorage.getItem(finishDismissStorageKey(finishSessionId)) === "1";
+            } catch {
+              return false;
+            }
+          })())),
+    [finishSessionId, finishModalDismissedSessionId]
+  );
+
   const showResultModal = Boolean(contextInput && isFinished && !finishModalDismissed);
 
   const dismissFinishModal = useCallback(() => {
@@ -248,14 +208,92 @@ export default function Ov2OrbitTrapScreen({
     if (!roomId || !selfKey) return { ok: false, error: "missing" };
     return { ok: false, error: "Orbit Trap rematch RPC not wired yet" };
   }, [roomId, selfKey]);
+
   const cancelRematch = useCallback(async () => {
     if (!roomId || !selfKey) return { ok: false, error: "missing" };
     return { ok: false, error: "Orbit Trap rematch RPC not wired yet" };
   }, [roomId, selfKey]);
+
   const startNextMatch = useCallback(async () => {
     if (!roomId || !selfKey) return { ok: false, error: "missing" };
     return { ok: false, error: "Orbit Trap start-next RPC not wired yet" };
   }, [roomId, selfKey]);
+
+  useEffect(() => {
+    setActionPanel(null);
+  }, [authRevision, engineState.turnSeat, liveSessionId]);
+
+  const runAction = useCallback(
+    async action => {
+      if (!onAuthoritativeAction) return;
+      setActionErr("");
+      setActionBusy(true);
+      try {
+        const out = await onAuthoritativeAction(action);
+        if (!out?.ok) {
+          setActionErr(out?.error || "Action rejected.");
+          return;
+        }
+        setActionPanel(null);
+        await onSessionRefresh?.(liveSessionId, liveSessionId, {});
+      } catch (e) {
+        setActionErr(e?.message || String(e));
+      } finally {
+        setActionBusy(false);
+      }
+    },
+    [onAuthoritativeAction, onSessionRefresh, liveSessionId]
+  );
+
+  const togglePanel = useCallback(
+    /** @param {'move' | 'rotate' | 'lock'} id */ id => {
+      if (!isMyTurn || actionBusy) return;
+      setActionPanel(p => (p === id ? null : id));
+    },
+    [isMyTurn, actionBusy]
+  );
+
+  const legalMoveCellKeys = useMemo(() => {
+    if (!isMyTurn || actionPanel !== "move") return null;
+    return new Set(legalMoves.map(d => ov2OrbitTrapCellKey(d.ring, d.slot)));
+  }, [isMyTurn, actionPanel, legalMoves]);
+
+  const legalRotateRingSet = useMemo(() => {
+    if (!isMyTurn || actionPanel !== "rotate") return null;
+    return new Set(legalRotates.map(String));
+  }, [isMyTurn, actionPanel, legalRotates]);
+
+  const legalLockRingSet = useMemo(() => {
+    if (!isMyTurn || actionPanel !== "lock") return null;
+    return new Set(legalLockRings.map(String));
+  }, [isMyTurn, actionPanel, legalLockRings]);
+
+  const chooserStatusLine = useMemo(() => {
+    if (isAuthoritative && engineState.phase === "finished") return "Match finished.";
+    if (!isMyTurn) return "Waiting for your turn.";
+    if (!actionPanel) return "Pick a mode, then play on the board.";
+    if (actionPanel === "move") return "Move: tap highlighted cells or Core on the board.";
+    if (actionPanel === "rotate") return "Rotate: tap the ring controls on the board.";
+    if (actionPanel === "lock") return "Lock: tap a highlighted lock cell on the board.";
+    return "";
+  }, [isAuthoritative, engineState.phase, isMyTurn, actionPanel]);
+
+  const boardInteractive = Boolean(
+    isMyTurn && !actionBusy && onAuthoritativeAction && engineState.phase === "playing"
+  );
+
+  const subtitle = contextInput
+    ? isAuthoritative
+      ? "Shared room · authoritative session"
+      : liveSessionId
+        ? "Shared room · loading session state…"
+        : "Shared room · local rules preview (no session yet)"
+    : "Dev preview · add ?room=… or open from OV2 rooms";
+
+  const roomShortId =
+    contextInput?.room && typeof contextInput.room === "object" && contextInput.room.id != null
+      ? String(contextInput.room.id).slice(0, 8)
+      : "";
 
   const finishOutcome = useMemo(() => {
     if (!isFinished) return "unknown";
@@ -303,88 +341,6 @@ export default function Ov2OrbitTrapScreen({
 
   const currentMultiplier = 1;
 
-  const isMyTurn =
-    isAuthoritative &&
-    mySeat != null &&
-    engineState.phase === "playing" &&
-    engineState.turnSeat === mySeat;
-
-  /** Same keys as board highlights — client hints only; server validates. */
-  const legalMoveCellKeys = useMemo(() => {
-    if (!isMyTurn || actionPanel !== "move") return null;
-    return new Set(legalMoves.map(d => ov2OrbitTrapCellKey(d.ring, d.slot)));
-  }, [isMyTurn, actionPanel, legalMoves]);
-
-  const legalRotateRingSet = useMemo(() => {
-    if (!isMyTurn || actionPanel !== "rotate") return null;
-    return new Set(legalRotates.map(String));
-  }, [isMyTurn, actionPanel, legalRotates]);
-
-  const legalLockRingSet = useMemo(() => {
-    if (!isMyTurn || actionPanel !== "lock") return null;
-    return new Set(legalLockRings.map(String));
-  }, [isMyTurn, actionPanel, legalLockRings]);
-
-  /** Context for assistive tech only (no visible row — avoids layout jump / removed HUD line). */
-  const chooserStatusLine = useMemo(() => {
-    if (isAuthoritative && engineState.phase === "finished") return "Match finished.";
-    if (!isMyTurn) return "Waiting for your turn.";
-    if (!actionPanel) return "Pick a mode, then play on the board.";
-    if (actionPanel === "move") return "Move: tap highlighted cells or Core on the board.";
-    if (actionPanel === "rotate") return "Rotate: tap the ring controls on the board.";
-    if (actionPanel === "lock") return "Lock: tap a highlighted lock cell on the board.";
-    return "";
-  }, [isAuthoritative, engineState.phase, isMyTurn, actionPanel]);
-
-  const authRevision = isAuthoritative ? Number(authoritativeSnapshot?.revision) || 0 : null;
-
-  useEffect(() => {
-    setActionPanel(null);
-  }, [authRevision, engineState.turnSeat, liveSessionId]);
-
-  const subtitle = contextInput
-    ? isAuthoritative
-      ? "Shared room · authoritative session"
-      : liveSessionId
-        ? "Shared room · loading session state…"
-        : "Shared room · local rules preview (no session yet)"
-    : "Dev preview · add ?room=… or open from OV2 rooms";
-
-  const roomShortId =
-    contextInput?.room && typeof contextInput.room === "object" && contextInput.room.id != null
-      ? String(contextInput.room.id).slice(0, 8)
-      : "";
-
-  const runAction = useCallback(
-    async action => {
-      if (!onAuthoritativeAction) return;
-      setActionErr("");
-      setActionBusy(true);
-      try {
-        const out = await onAuthoritativeAction(action);
-        if (!out?.ok) {
-          setActionErr(out?.error || "Action rejected.");
-          return;
-        }
-        setActionPanel(null);
-        await onSessionRefresh?.(liveSessionId, liveSessionId, {});
-      } catch (e) {
-        setActionErr(e?.message || String(e));
-      } finally {
-        setActionBusy(false);
-      }
-    },
-    [onAuthoritativeAction, onSessionRefresh, liveSessionId]
-  );
-
-  const togglePanel = useCallback(
-    /** @param {'move' | 'rotate' | 'lock'} id */ id => {
-      if (!isMyTurn || actionBusy) return;
-      setActionPanel(p => (p === id ? null : id));
-    },
-    [isMyTurn, actionBusy]
-  );
-
   const infoPanel = (
     <Ov2OrbitTrapHelpPanel
       roomSnippet={
@@ -395,10 +351,6 @@ export default function Ov2OrbitTrapScreen({
         ) : null
       }
     />
-  );
-
-  const boardInteractive = Boolean(
-    isMyTurn && !actionBusy && onAuthoritativeAction && engineState.phase === "playing"
   );
 
   const body = (

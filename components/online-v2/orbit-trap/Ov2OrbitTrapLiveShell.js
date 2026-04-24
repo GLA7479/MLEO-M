@@ -210,7 +210,8 @@ export default function Ov2OrbitTrapLiveShell() {
   }, [members]);
   const roomLifecycle =
     room && typeof room === "object" && room.lifecycle_phase != null ? String(room.lifecycle_phase).trim() : "";
-  const roomStatusUpper = room && typeof room === "object" && room.status != null ? String(room.status).trim().toUpperCase() : "";
+  const roomStatusUpper =
+    room && typeof room === "object" && room.status != null ? String(room.status).trim().toUpperCase() : "";
   const isHost = useMemo(
     () => Boolean(room && participantId && room.host_participant_key === participantId),
     [room, participantId]
