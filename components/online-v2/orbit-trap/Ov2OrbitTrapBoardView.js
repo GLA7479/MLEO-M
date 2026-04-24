@@ -182,10 +182,17 @@ export default function Ov2OrbitTrapBoardView({
             </clipPath>
           ) : null}
         </defs>
+        <circle
+          cx="0"
+          cy="0"
+          r="100"
+          fill={`url(#${gradId})`}
+          stroke={boardBgViewBox ? "none" : "#3f3f46"}
+          strokeWidth="1"
+        />
         {boardBgViewBox ? (
           <>
             <g clipPath={`url(#${boardBgClipId})`}>
-              <circle cx="0" cy="0" r="100" fill={`url(#${gradId})`} />
               <svg
                 x="-103"
                 y="-103"
@@ -205,9 +212,7 @@ export default function Ov2OrbitTrapBoardView({
             </g>
             <circle cx="0" cy="0" r="100" fill="none" stroke="#3f3f46" strokeWidth="1" />
           </>
-        ) : (
-          <circle cx="0" cy="0" r="100" fill={`url(#${gradId})`} stroke="#3f3f46" strokeWidth="1" />
-        )}
+        ) : null}
 
         {ringRadii.map(({ ring, r }) => {
           const locked = state.ringLock?.ring === ring;
