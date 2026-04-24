@@ -16,6 +16,9 @@ const SEAT_COLORS = ["#38bdf8", "#fbbf24", "#34d399", "#e879f9"];
 /** Optional PNG at `public/images/online-v2/orbit-trap/board-background.png` — if missing or unloadable, default gradient is used. */
 const OT_BOARD_CUSTOM_BG_URL = "/images/online-v2/orbit-trap/board-background.png";
 
+/** Per-edge viewBox crop (0–0.2): zooms past transparent padding typical in square “coin” PNGs so the disk stays opaque. */
+const OT_BOARD_BG_VIEWBOX_INSET = 0.07;
+
 /**
  * @param {string} k
  * @returns {{ ring: string; slot: number } | null}
@@ -75,17 +78,21 @@ export default function Ov2OrbitTrapBoardView({
   onLockPick,
 }) {
   const gid = useId().replace(/:/g, "");
-  const [customBoardBgReady, setCustomBoardBgReady] = useState(false);
+  /** When set, optional board PNG loaded — use natural size to scale (cover) the r=100 disk; otherwise same gradient-only disk as before. */
+  const [customBoardBgMeta, setCustomBoardBgMeta] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     const img = new Image();
     img.onload = () => {
       if (cancelled) return;
-      if (img.naturalWidth > 0) setCustomBoardBgReady(true);
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+      if (nw > 0 && nh > 0) setCustomBoardBgMeta({ w: nw, h: nh });
+      else setCustomBoardBgMeta(null);
     };
     img.onerror = () => {
-      if (!cancelled) setCustomBoardBgReady(false);
+      if (!cancelled) setCustomBoardBgMeta(null);
     };
     img.src = OT_BOARD_CUSTOM_BG_URL;
     return () => {
@@ -127,6 +134,19 @@ export default function Ov2OrbitTrapBoardView({
   const boardTitle =
     "Orbit Trap board — trap ▲, boost ▢, lock ⧈, fixed F, loose gold. Tap highlighted cells when a move mode is on.";
 
+  const customBoardBgDims =
+    customBoardBgMeta && customBoardBgMeta.w > 0 && customBoardBgMeta.h > 0 ? customBoardBgMeta : null;
+
+  let boardBgViewBox = null;
+  if (customBoardBgDims) {
+    const inset = Math.min(OT_BOARD_BG_VIEWBOX_INSET, 0.24);
+    const vbX = customBoardBgDims.w * inset;
+    const vbY = customBoardBgDims.h * inset;
+    const vbW = customBoardBgDims.w * (1 - 2 * inset);
+    const vbH = customBoardBgDims.h * (1 - 2 * inset);
+    if (vbW > 0 && vbH > 0) boardBgViewBox = { vbX, vbY, vbW, vbH };
+  }
+
   return (
     <div className="flex h-full w-full min-h-0 flex-1 flex-col items-stretch justify-center lg:max-h-full">
       <svg
@@ -156,23 +176,32 @@ export default function Ov2OrbitTrapBoardView({
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          {customBoardBgReady ? (
+          {boardBgViewBox ? (
             <clipPath id={boardBgClipId}>
               <circle cx="0" cy="0" r="100" />
             </clipPath>
           ) : null}
         </defs>
-        {customBoardBgReady ? (
+        {boardBgViewBox ? (
           <>
             <g clipPath={`url(#${boardBgClipId})`}>
-              <image
-                href={OT_BOARD_CUSTOM_BG_URL}
-                x="-100"
-                y="-100"
-                width="200"
-                height="200"
+              <circle cx="0" cy="0" r="100" fill={`url(#${gradId})`} />
+              <svg
+                x="-103"
+                y="-103"
+                width="206"
+                height="206"
+                viewBox={`${boardBgViewBox.vbX} ${boardBgViewBox.vbY} ${boardBgViewBox.vbW} ${boardBgViewBox.vbH}`}
                 preserveAspectRatio="xMidYMid slice"
-              />
+              >
+                <image
+                  href={OT_BOARD_CUSTOM_BG_URL}
+                  x="0"
+                  y="0"
+                  width={customBoardBgDims.w}
+                  height={customBoardBgDims.h}
+                />
+              </svg>
             </g>
             <circle cx="0" cy="0" r="100" fill="none" stroke="#3f3f46" strokeWidth="1" />
           </>
