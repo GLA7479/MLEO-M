@@ -4,18 +4,29 @@ import {
   parseSetCookieHeaders,
   qaDeviceId,
 } from "./deviceCookie.mjs";
+import { sleep, rateLimitBackoffMs } from "./requestPacing.mjs";
 
 const CSRF_HEADER = "x-csrf-token";
 
 export class QaHttpClient {
-  constructor({ baseUrl, personaId, mock = false }) {
+  constructor({ baseUrl, personaId, mock = false, pacingMs = 0, maxRetries = 3 }) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
     this.personaId = personaId;
     this.deviceId = qaDeviceId(personaId);
     this.mock = mock;
+    this.pacingMs = Math.max(0, pacingMs);
+    this.maxRetries = maxRetries;
     this.jar = {};
     this.csrfToken = null;
+    this._lastRequestAt = 0;
     this._initDeviceCookies();
+  }
+
+  async _waitPacing() {
+    if (!this.pacingMs) return;
+    const elapsed = Date.now() - this._lastRequestAt;
+    const wait = this.pacingMs - elapsed;
+    if (wait > 0) await sleep(wait);
   }
 
   _initDeviceCookies() {
@@ -60,7 +71,6 @@ export class QaHttpClient {
   }
 
   async request(method, path, { body, headers = {}, json = true } = {}) {
-    const started = Date.now();
     if (this.mock) {
       return {
         ok: true,
@@ -69,31 +79,44 @@ export class QaHttpClient {
         ms: 0,
       };
     }
-    if (!this.csrfToken && method !== "GET") await this.ensureCsrf();
-    const url = path.startsWith("http") ? path : `${this.baseUrl}${path}`;
-    const h = {
-      cookie: cookieHeaderFromJar(this.jar),
-      ...headers,
-    };
-    if (method !== "GET" && this.csrfToken) h[CSRF_HEADER] = this.csrfToken;
-    if (body != null) h["content-type"] = "application/json";
 
-    const res = await fetch(url, {
-      method,
-      headers: h,
-      body: body != null ? JSON.stringify(body) : undefined,
-    });
-    await this._mergeCookies(res);
-    const ms = Date.now() - started;
-    let data = null;
-    if (json) {
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
+    let lastResult = null;
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      await this._waitPacing();
+      const started = Date.now();
+      if (!this.csrfToken && method !== "GET") await this.ensureCsrf();
+      const url = path.startsWith("http") ? path : `${this.baseUrl}${path}`;
+      const h = {
+        cookie: cookieHeaderFromJar(this.jar),
+        ...headers,
+      };
+      if (method !== "GET" && this.csrfToken) h[CSRF_HEADER] = this.csrfToken;
+      if (body != null) h["content-type"] = "application/json";
+
+      const res = await fetch(url, {
+        method,
+        headers: h,
+        body: body != null ? JSON.stringify(body) : undefined,
+      });
+      this._lastRequestAt = Date.now();
+      await this._mergeCookies(res);
+      const ms = Date.now() - started;
+      let data = null;
+      if (json) {
+        try {
+          data = await res.json();
+        } catch {
+          data = null;
+        }
       }
+      lastResult = { ok: res.ok, status: res.status, data, ms };
+      const rateLimited =
+        res.status === 429 ||
+        /too many requests/i.test(String(data?.message || data?.code || ""));
+      if (!rateLimited || attempt >= this.maxRetries) break;
+      await sleep(rateLimitBackoffMs(attempt));
     }
-    return { ok: res.ok, status: res.status, data, ms };
+    return lastResult;
   }
 
   get(path, opts) {

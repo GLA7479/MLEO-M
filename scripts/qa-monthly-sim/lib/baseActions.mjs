@@ -12,16 +12,16 @@ export const BASE_ACTION_CATALOG = {
   build: {
     method: "POST",
     path: "/api/base/action/build",
-    body: () => ({ building_key: "power_cell" }),
+    body: null,
     automation: "implemented",
-    note: "Requires valid building_key from player state; uses power_cell default",
+    note: "building_key chosen from live BASE state (buildings + requires)",
   },
   research: {
     method: "POST",
     path: "/api/base/action/research",
-    body: () => ({ research_key: "logistics_boost" }),
+    body: null,
     automation: "implemented",
-    note: "May fail if research_key invalid for current state",
+    note: "research_key chosen from live BASE state (unlock order + prerequisites)",
   },
   maintenance: {
     method: "POST",
@@ -61,9 +61,9 @@ export const BASE_ACTION_CATALOG = {
   spend: {
     method: "POST",
     path: "/api/base/action/spend",
-    body: () => ({ spend_type: "refill" }),
+    body: null,
     automation: "implemented",
-    note: "Allowed: blueprint | overclock | refill",
+    note: "spend_type from live energy (refill when not near full)",
   },
   profile: {
     method: "POST",

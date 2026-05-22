@@ -58,11 +58,18 @@ async function executeAction(ctx, item) {
   return { ok: false };
 }
 
+function requestPacingMs(args, isPilot) {
+  if (args.compressed && args.mode === "local") return 900;
+  if (isPilot && args.mode === "live") return 1500;
+  return 0;
+}
+
 async function runPersonaDay(persona, schedule, opts) {
   const client = new QaHttpClient({
     baseUrl: opts.baseUrl,
     personaId: persona.id,
     mock: opts.mock,
+    pacingMs: opts.pacingMs ?? 0,
   });
   const stats = {
     lastVault: null,
@@ -312,6 +319,7 @@ async function main() {
   const logger = new EventLogger({ runId, simDay: args.day, dryRun: false });
   const coverage = new CoverageTracker();
   const results = [];
+  const pacingMs = requestPacingMs(args, isPilot);
 
   for (const { persona, schedule } of schedules) {
     if (!schedule.active) {
@@ -332,6 +340,7 @@ async function main() {
         runId,
         coverage,
         immediateExecution,
+        pacingMs,
       });
       results.push(r);
     } catch (e) {

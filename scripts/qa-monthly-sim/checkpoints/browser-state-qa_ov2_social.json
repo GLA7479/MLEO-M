@@ -32,10 +32,10 @@
     },
     {
       "name": "mleo_csrf_token",
-      "value": "04787aabc7b90e5c368553f4c469bce39c486f922bdbe25334a4b6e1cfa03446.0725ebdbc1661d996b9afe887284f6bdadf24f76bdef3cf7c4952371edebf3e4",
+      "value": "5cc99b1b2391a7102c9584d39c4985d05f135d9d2e95f281a32942c6658c23a5.a5ab9b95994eee3303cbdd6719f7b0b4ae61d5df554203b9277de7e238d76a77",
       "domain": "localhost",
       "path": "/",
-      "expires": 1779545208.1146,
+      "expires": 1779546249.45613,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"

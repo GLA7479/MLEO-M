@@ -51,8 +51,10 @@ export class CoverageTracker {
       cur.status = "coverage_gap";
       return;
     }
-    if (outcome === "ok" || outcome === "covered") cur.status = "covered";
-    else if (cur.status === "missed") cur.status = "error";
+    if (outcome === "coverage_gap") cur.status = "coverage_gap";
+    else if (outcome === "ok" || outcome === "covered") {
+      if (cur.status !== "coverage_gap") cur.status = "covered";
+    } else if (outcome === "error" && cur.status !== "covered") cur.status = "error";
     if (note) cur.reason = note;
   }
 
