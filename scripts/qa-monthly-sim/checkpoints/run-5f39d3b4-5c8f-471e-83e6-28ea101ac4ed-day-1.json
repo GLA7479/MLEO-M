@@ -1,0 +1,379 @@
+{
+  "runId": "5f39d3b4-5c8f-471e-83e6-28ea101ac4ed",
+  "day": 1,
+  "mode": "local",
+  "runAnchorDate": "2026-05-22",
+  "immediateExecution": true,
+  "results": [],
+  "coverage": {
+    "soloV2": {
+      "total": 28,
+      "covered": 0,
+      "missed": 28,
+      "coverage_gap": 0,
+      "error": 0,
+      "games": [
+        {
+          "id": "quick_flip",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "odd_even",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "mystery_box",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "dice_pick",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "limit_run",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "number_hunt",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "core_breaker",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "flash_vein",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "drop_run",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "speed_track",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "gold_rush_digger",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "treasure_doors",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "vault_doors",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "crystal_path",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "triple_dice",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "challenge_21",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "high_low_cards",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "mystery_chamber",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "diamonds",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "solo_ladder",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "pulse_lock",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "echo_sequence",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "safe_zone",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "surge_cashout",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "rail_logic",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "shadow_tell",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "core_balance",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "relic_draft",
+          "status": "missed",
+          "attempts": 0
+        }
+      ],
+      "monthlyPlanDays": 30
+    },
+    "ov2": {
+      "total": 16,
+      "covered": 0,
+      "missed": 16,
+      "coverage_gap": 0,
+      "games": [
+        {
+          "id": "ludo",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "snakes_and_ladders",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "rummy51",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "bingo",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "backgammon",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "checkers",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "chess",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "dominoes",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "fourline",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "flipgrid",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "meldmatch",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "color_clash",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "fleet_hunt",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "goal_duel",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "tanks",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "orbit_trap",
+          "status": "missed",
+          "attempts": 0
+        }
+      ]
+    },
+    "base": {
+      "total": 15,
+      "covered": 0,
+      "coverage_gap": 5,
+      "missed": 10,
+      "actions": [
+        {
+          "action": "state",
+          "status": "missed",
+          "attempts": 0,
+          "note": "Read BASE state"
+        },
+        {
+          "action": "build",
+          "status": "missed",
+          "attempts": 0,
+          "note": "Requires valid building_key from player state; uses power_cell default"
+        },
+        {
+          "action": "research",
+          "status": "missed",
+          "attempts": 0,
+          "note": "May fail if research_key invalid for current state"
+        },
+        {
+          "action": "maintenance",
+          "status": "missed",
+          "attempts": 0,
+          "note": "RPC base_perform_maintenance — no body"
+        },
+        {
+          "action": "expedition",
+          "status": "missed",
+          "attempts": 0,
+          "note": "RPC base_launch_expedition — no body"
+        },
+        {
+          "action": "ship",
+          "status": "missed",
+          "attempts": 0,
+          "note": "RPC base_ship_to_vault — no body"
+        },
+        {
+          "action": "crew",
+          "status": "missed",
+          "attempts": 0,
+          "note": "RPC base_hire_crew — no body"
+        },
+        {
+          "action": "sector_deploy",
+          "status": "missed",
+          "attempts": 0,
+          "note": "RPC base_deploy_next_sector — no body"
+        },
+        {
+          "action": "spend",
+          "status": "missed",
+          "attempts": 0,
+          "note": "Allowed: blueprint | overclock | refill"
+        },
+        {
+          "action": "profile",
+          "status": "missed",
+          "attempts": 0,
+          "note": "Empty body allowed (optional crew_role / commander_path)"
+        },
+        {
+          "action": "module",
+          "status": "coverage_gap",
+          "attempts": 0,
+          "note": "Requires module_key from live BASE state — not guessed"
+        },
+        {
+          "action": "mission_claim",
+          "status": "coverage_gap",
+          "attempts": 0,
+          "note": "Requires mission_key from live missions — not guessed"
+        },
+        {
+          "action": "contract_claim",
+          "status": "coverage_gap",
+          "attempts": 0,
+          "note": "Requires contract_key from live contracts — not guessed"
+        },
+        {
+          "action": "command_protocol",
+          "status": "coverage_gap",
+          "attempts": 0,
+          "note": "Requires protocol_id valid for unlocked protocols — not guessed"
+        },
+        {
+          "action": "unlock_support_program",
+          "status": "coverage_gap",
+          "attempts": 0,
+          "note": "Requires building_key + program_key from state — not guessed"
+        }
+      ]
+    },
+    "miners": {
+      "total": 4,
+      "covered": 0,
+      "missed": 4,
+      "actions": [
+        {
+          "action": "state",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "action": "accrue",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "action": "claim_vault",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "action": "gift_claim",
+          "status": "missed",
+          "attempts": 0
+        }
+      ]
+    },
+    "timing": {
+      "actionCount": 0,
+      "outsideWindowCount": 0,
+      "samples": []
+    }
+  },
+  "savedAt": "2026-05-22T13:55:30.292Z"
+}
