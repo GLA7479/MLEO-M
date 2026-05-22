@@ -60,14 +60,47 @@ function pickBaseAction(rng) {
  * Build ordered actions for one persona on one sim day.
  * @returns {{ active: boolean, actions: Array, totalMinutes: number, runAnchorDate: string }}
  */
-export function buildDaySchedule(persona, simDay, { compressed = false, runAnchorDate = null } = {}) {
-  if (!isActiveToday(persona, simDay)) {
+/** Validation-only: inject one action per primary module (does not affect monthly RNG schedule). */
+function buildForcedValidationSeedActions(persona, simDay, anchor) {
+  const dayOv2 = ov2GameForSimDay(simDay);
+  const soloKey = soloGamesForSimDay(simDay)[0] || "quick_flip";
+  const seeds = [];
+  const push = (module, action, extra = {}) => {
+    const h = 9 + seeds.length;
+    seeds.push({
+      scheduledAt: buildScheduledAt(anchor, simDay, h, 10 + seeds.length),
+      wallClockLabel: buildScheduledAt(anchor, simDay, h, 10 + seeds.length),
+      module,
+      action,
+      params: { personaId: persona.id, displayName: persona.displayName, ...extra },
+    });
+  };
+
+  if (persona.moduleWeights.miners >= 0.25) push("miners", "state");
+  if (persona.moduleWeights.base >= 0.25) push("base", "state");
+  if (persona.moduleWeights.solo_v2 >= 0.25) {
+    push("solo_v2", "solo_session", { gameKey: soloKey });
+  }
+  if (persona.moduleWeights.ov2 >= 0.25) {
+    push("ov2", "ov2_lobby");
+    push("ov2", "ov2_room_create", {
+      ov2GameId: dayOv2?.id,
+      ov2GameTitle: dayOv2?.title || "Ludo",
+    });
+  }
+  return seeds;
+}
+
+export function buildDaySchedule(persona, simDay, { compressed = false, runAnchorDate = null, forceActive = false } = {}) {
+  if (!forceActive && !isActiveToday(persona, simDay)) {
     return { active: false, actions: [], totalMinutes: 0, runAnchorDate: runAnchorDate || new Date().toISOString().slice(0, 10) };
   }
 
   const anchor = runAnchorDate || new Date().toISOString().slice(0, 10);
   const rng = seededForPersona(persona, simDay + 1000);
-  const totalMinutes = minutesBudget(persona, rng);
+  const totalMinutes = forceActive
+    ? Math.max(20, Math.min(minutesBudget(persona, rng), persona.maxDailyMinutes))
+    : minutesBudget(persona, rng);
   const actions = [];
   let spent = 0;
   const windows = persona.preferredWindows || ["morning"];
@@ -77,6 +110,13 @@ export function buildDaySchedule(persona, simDay, { compressed = false, runAncho
   let cursorMin = pickInt(rng, 0, 59);
 
   const dayOv2 = ov2GameForSimDay(simDay);
+
+  if (forceActive) {
+    for (const seedAction of buildForcedValidationSeedActions(persona, simDay, anchor)) {
+      actions.push(seedAction);
+      spent += seedAction.module === "ov2" ? 8 : seedAction.module === "solo_v2" ? 4 : 2;
+    }
+  }
 
   while (spent < totalMinutes) {
     const mod = pickModule(persona, rng);
@@ -121,7 +161,13 @@ export function buildDaySchedule(persona, simDay, { compressed = false, runAncho
     if (actions.length > 200) break;
   }
 
-  return { active: true, actions, totalMinutes, runAnchorDate: anchor };
+  return {
+    active: true,
+    actions,
+    totalMinutes,
+    runAnchorDate: anchor,
+    forceActive: Boolean(forceActive),
+  };
 }
 
 export function buildSchedulesForDay(personas, simDay, opts) {

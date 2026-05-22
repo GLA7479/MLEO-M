@@ -16,7 +16,7 @@
     "test:ov2-cc-engine": "node --test lib/online-v2/community_cards/ov2CcMultiEngine.test.mjs",
     "test:ov2-checkers-engine-invariants": "node scripts/ov2-checkers-engine-invariants.mjs",
     "qa:dry-run": "node scripts/qa-monthly-sim/runner.mjs --dry-run --day 1 --mode=local",
-    "qa:validate": "node scripts/qa-monthly-sim/runner.mjs --users qa_ghost,qa_miner_core --day 1 --mode=local --compressed",
+    "qa:validate": "node scripts/qa-monthly-sim/runner.mjs --users qa_miner_core,qa_base_ops,qa_solo_safe,qa_ov2_social,qa_balanced --day 1 --mode=local --compressed --force-active",
     "qa:pilot": "node scripts/qa-monthly-sim/runner.mjs --users qa_ghost,qa_miner_core,qa_base_ops,qa_solo_safe,qa_ov2_social --day 1 --mode=live --approve-pilot",
     "qa:run": "node scripts/qa-monthly-sim/runner.mjs --all-users --month 1 --mode=live --approve-full-run",
     "qa:report": "node scripts/qa-monthly-sim/reporter.mjs",

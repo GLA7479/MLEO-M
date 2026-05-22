@@ -1,0 +1,91 @@
+{
+  "cookies": [
+    {
+      "name": "wagmi.store",
+      "value": "{\"state\":{\"connections\":{\"__type\":\"Map\",\"value\":[]},\"chainId\":1,\"current\":null},\"version\":2}",
+      "domain": "localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "mleo_arcade_device",
+      "value": "dc3c5a61-45f9-43bf-a49c-91a2c393a9aa",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1810994777.838108,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "mleo_arcade_device_sig",
+      "value": "58fc6ef8c4a8582218d87bce1c5764ff43d8ead203ba059231808d76960b050e",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1810994777.838241,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "mleo_csrf_token",
+      "value": "04787aabc7b90e5c368553f4c469bce39c486f922bdbe25334a4b6e1cfa03446.0725ebdbc1661d996b9afe887284f6bdadf24f76bdef3cf7c4952371edebf3e4",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1779545208.1146,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "@appkit/connection_status",
+          "value": "disconnected"
+        },
+        {
+          "name": "rk-version",
+          "value": "2.2.8"
+        },
+        {
+          "name": "vault_device_id",
+          "value": "9d3b0f14-5062-4997-b659-8c59feb6e1dc"
+        },
+        {
+          "name": "@appkit/active_namespace",
+          "value": "eip155"
+        },
+        {
+          "name": "ov2_participant_id_v1",
+          "value": "qa-qa_ov2_social-participant"
+        },
+        {
+          "name": "cbwsdk.store",
+          "value": "{\"state\":{\"chains\":[],\"keys\":{},\"account\":{},\"spendPermissions\":[],\"config\":{\"version\":\"4.3.6\",\"metadata\":{\"appName\":\"MLEO Miners\",\"appLogoUrl\":\"\",\"appChainIds\":[1,137,42161,8453,10,11155111,56,97]},\"preference\":{\"options\":\"all\"},\"deviceId\":\"c62e8c01-f868-488f-a5df-2c4e64949f71\"}},\"version\":0}"
+        },
+        {
+          "name": "vault_nonce",
+          "value": "d4785e32-2e7a-48a3-b3d2-a5ae39f1a123"
+        },
+        {
+          "name": "mleo_rush_core_v4",
+          "value": "{\"vault\":0}"
+        },
+        {
+          "name": "@appkit/active_caip_network_id",
+          "value": "eip155:1"
+        },
+        {
+          "name": "ov2_display_name_v1",
+          "value": "[QA] OV2 Social"
+        }
+      ]
+    }
+  ]
+}

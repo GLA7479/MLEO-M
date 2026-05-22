@@ -27,6 +27,23 @@ import { buildMonthlySoloCoveragePlan } from "./lib/monthlyCoveragePlan.mjs";
 
 loadEnvLocal();
 
+/** Gate 3 validation only: force personas active without changing monthly RNG rules. */
+function assertForceActiveAllowed(args) {
+  if (!args.forceActive) return;
+  if (args.mode === "live") {
+    throw new Error("--force-active is not allowed with --mode=live");
+  }
+  if (!args.compressed || args.mode !== "local") {
+    throw new Error("--force-active requires --mode=local --compressed (validation only)");
+  }
+  if (args.approvePilot || args.approveFullRun) {
+    throw new Error("--force-active is not allowed with --approve-pilot or --approve-full-run");
+  }
+  if (args.allUsers) {
+    throw new Error("--force-active is not allowed with --all-users (30-day run)");
+  }
+}
+
 const REPORTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../reports");
 
 const PILOT_USERS = ["qa_ghost", "qa_miner_core", "qa_base_ops", "qa_solo_safe", "qa_ov2_social"];
@@ -181,6 +198,7 @@ async function main() {
 
   try {
     assertLiveNotCompressed(args.mode, args.compressed);
+    assertForceActiveAllowed(args);
   } catch (e) {
     console.error(e.message);
     process.exit(1);
@@ -204,6 +222,7 @@ async function main() {
     const schedules = buildSchedulesForDay(personas, args.day, {
       compressed: args.compressed,
       runAnchorDate,
+      forceActive: args.forceActive,
     });
     console.log(
       JSON.stringify(
@@ -213,10 +232,12 @@ async function main() {
           baseUrl: args.baseUrl,
           day: args.day,
           runAnchorDate,
+          forceActive: args.forceActive,
           immediateExecution: true,
           personas: schedules.map(({ persona, schedule }) => ({
             id: persona.id,
             active: schedule.active,
+            forceActive: schedule.forceActive,
             actionCount: schedule.actions.length,
             totalMinutes: schedule.totalMinutes,
             sampleActions: schedule.actions.slice(0, 5).map(a => ({
@@ -267,6 +288,7 @@ async function main() {
   const schedules = buildSchedulesForDay(personas, args.day, {
     compressed: args.compressed,
     runAnchorDate,
+    forceActive: args.forceActive,
   });
 
   let runId = args.runId;
@@ -279,7 +301,7 @@ async function main() {
         mode: args.mode,
         seed: args.seed,
         monthNumber: args.month,
-        label: isFullMonth ? "monthly-30d" : isPilot ? "pilot-24h" : "validation",
+        label: isFullMonth ? "monthly-30d" : isPilot ? "pilot-24h" : args.forceActive ? "validation-force-active" : "validation",
       });
     } catch (e) {
       console.warn("[runner] DB run create failed — continuing with local run id:", e.message);
@@ -354,6 +376,7 @@ async function main() {
         day: args.day,
         mode: args.mode,
         baseUrl: args.baseUrl,
+        forceActive: args.forceActive,
         immediateExecution,
         wallClockHonored: !immediateExecution,
         usersRun: results.length,

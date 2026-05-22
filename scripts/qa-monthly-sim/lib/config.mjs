@@ -30,6 +30,7 @@ export function parseArgs(argv) {
     runAnchorDate: null,
     approvePilot: false,
     approveFullRun: false,
+    forceActive: false,
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -69,7 +70,8 @@ export function parseArgs(argv) {
     else if (a === "--run-date" && next) {
       args.runAnchorDate = next;
       i++;
-    } else if (a.startsWith("--run-date=")) args.runAnchorDate = a.split("=")[1];
+    }     else if (a.startsWith("--run-date=")) args.runAnchorDate = a.split("=")[1];
+    else if (a === "--force-active" || a === "--validation-force-active") args.forceActive = true;
   }
   if (args.baseUrlOverride) args.baseUrl = args.baseUrlOverride;
   else args.baseUrl = getBaseUrl(args.mode);

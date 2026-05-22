@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import { timingFields } from "../lib/logHelpers.mjs";
 import { chromium } from "playwright";
 import { browserStatePath } from "../checkpoint.mjs";
@@ -105,7 +106,7 @@ export async function runOv2Action(ctx, item) {
       rawResponse: { url: page.url(), migrationWarning: hasMigration, gameTitle, gameId },
     });
 
-    fs.mkdirSync(fs.dirname(storage), { recursive: true });
+    fs.mkdirSync(path.dirname(storage), { recursive: true });
     await browserCtx.storageState({ path: storage });
     await browserCtx.close();
     return { ok: outcome === "ok" && coverageStatus === "covered" };

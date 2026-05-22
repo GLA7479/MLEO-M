@@ -1,0 +1,1406 @@
+{
+  "runId": "2e4e8b24-3a98-4b8e-aab6-0a5630b5a799",
+  "day": 1,
+  "mode": "local",
+  "generatedAt": "2026-05-22T14:04:58.105Z",
+  "coverage": {
+    "soloV2": {
+      "total": 28,
+      "covered": 1,
+      "missed": 26,
+      "coverage_gap": 0,
+      "error": 1,
+      "games": [
+        {
+          "id": "quick_flip",
+          "status": "covered",
+          "attempts": 9,
+          "reason": "automated_event_resolve"
+        },
+        {
+          "id": "odd_even",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "mystery_box",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "dice_pick",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "limit_run",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "number_hunt",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "core_breaker",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "flash_vein",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "drop_run",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "speed_track",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "gold_rush_digger",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "treasure_doors",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "vault_doors",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "crystal_path",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "triple_dice",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "challenge_21",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "high_low_cards",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "mystery_chamber",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "diamonds",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "solo_ladder",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "pulse_lock",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "echo_sequence",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "safe_zone",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "surge_cashout",
+          "status": "error",
+          "attempts": 6,
+          "reason": "action must be launch or cashout"
+        },
+        {
+          "id": "rail_logic",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "shadow_tell",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "core_balance",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "relic_draft",
+          "status": "missed",
+          "attempts": 0
+        }
+      ],
+      "monthlyPlanDays": 30
+    },
+    "ov2": {
+      "total": 16,
+      "covered": 0,
+      "missed": 16,
+      "coverage_gap": 0,
+      "games": [
+        {
+          "id": "ludo",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "snakes_and_ladders",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "rummy51",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "bingo",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "backgammon",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "checkers",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "chess",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "dominoes",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "fourline",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "flipgrid",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "meldmatch",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "color_clash",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "fleet_hunt",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "goal_duel",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "tanks",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "orbit_trap",
+          "status": "missed",
+          "attempts": 0
+        }
+      ]
+    },
+    "base": {
+      "total": 15,
+      "covered": 4,
+      "coverage_gap": 5,
+      "missed": 0,
+      "actions": [
+        {
+          "action": "state",
+          "status": "covered",
+          "attempts": 7,
+          "note": "Read BASE state"
+        },
+        {
+          "action": "build",
+          "status": "error",
+          "attempts": 5,
+          "note": "Requires valid building_key from player state; uses power_cell default",
+          "reason": "Invalid building key: power_cell"
+        },
+        {
+          "action": "research",
+          "status": "error",
+          "attempts": 5,
+          "note": "May fail if research_key invalid for current state",
+          "reason": "Invalid research key: logistics_boost"
+        },
+        {
+          "action": "maintenance",
+          "status": "covered",
+          "attempts": 3,
+          "note": "RPC base_perform_maintenance — no body",
+          "reason": "Need GOLD, SCRAP and DATA for maintenance"
+        },
+        {
+          "action": "expedition",
+          "status": "covered",
+          "attempts": 4,
+          "note": "RPC base_launch_expedition — no body",
+          "reason": "Expedition team is still out in the field"
+        },
+        {
+          "action": "ship",
+          "status": "error",
+          "attempts": 2,
+          "note": "RPC base_ship_to_vault — no body",
+          "reason": "Nothing ready to ship yet"
+        },
+        {
+          "action": "crew",
+          "status": "covered",
+          "attempts": 4,
+          "note": "RPC base_hire_crew — no body",
+          "reason": "Crew hiring needs more supplies"
+        },
+        {
+          "action": "sector_deploy",
+          "status": "error",
+          "attempts": 5,
+          "note": "RPC base_deploy_next_sector — no body",
+          "reason": "Sector deploy requirements not met (frontier → freight)"
+        },
+        {
+          "action": "spend",
+          "status": "error",
+          "attempts": 3,
+          "note": "Allowed: blueprint | overclock | refill",
+          "reason": "Energy is already near full"
+        },
+        {
+          "action": "profile",
+          "status": "error",
+          "attempts": 5,
+          "note": "Empty body allowed (optional crew_role / commander_path)",
+          "reason": "Missing crew_role or commander_path"
+        },
+        {
+          "action": "module",
+          "status": "coverage_gap",
+          "attempts": 4,
+          "note": "Requires module_key from live BASE state — not guessed"
+        },
+        {
+          "action": "mission_claim",
+          "status": "coverage_gap",
+          "attempts": 6,
+          "note": "Requires mission_key from live missions — not guessed"
+        },
+        {
+          "action": "contract_claim",
+          "status": "coverage_gap",
+          "attempts": 3,
+          "note": "Requires contract_key from live contracts — not guessed"
+        },
+        {
+          "action": "command_protocol",
+          "status": "coverage_gap",
+          "attempts": 5,
+          "note": "Requires protocol_id valid for unlocked protocols — not guessed"
+        },
+        {
+          "action": "unlock_support_program",
+          "status": "coverage_gap",
+          "attempts": 2,
+          "note": "Requires building_key + program_key from state — not guessed"
+        }
+      ]
+    },
+    "miners": {
+      "total": 4,
+      "covered": 4,
+      "missed": 0,
+      "actions": [
+        {
+          "action": "state",
+          "status": "covered",
+          "attempts": 14
+        },
+        {
+          "action": "accrue",
+          "status": "covered",
+          "attempts": 10
+        },
+        {
+          "action": "claim_vault",
+          "status": "covered",
+          "attempts": 12
+        },
+        {
+          "action": "gift_claim",
+          "status": "covered",
+          "attempts": 12
+        }
+      ]
+    },
+    "timing": {
+      "actionCount": 128,
+      "outsideWindowCount": 0,
+      "samples": [
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T09:10:00.000Z",
+          "executedAt": "2026-05-22T14:03:38.855Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:40.659Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "gift_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:41.354Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:41.840Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "accrue",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:42.358Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:42.838Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "base",
+          "action": "contract_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:43.215Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "accrue",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:43.474Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "gift_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:43.843Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:44.238Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:44.682Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:45.092Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:45.469Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:45.844Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "base",
+          "action": "module",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:46.209Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "accrue",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:46.384Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "accrue",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:46.749Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:47.123Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:47.492Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:47.863Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:48.239Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:48.588Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "accrue",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:48.960Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "accrue",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:49.327Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "gift_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:49.687Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "gift_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:50.072Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "base",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:50.516Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:51.084Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:51.446Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:51.826Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "accrue",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:52.177Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:52.559Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "gift_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:52.922Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "gift_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:53.305Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "gift_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:53.686Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "base",
+          "action": "contract_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:54.063Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "gift_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:54.267Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "claim_vault",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:54.634Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:55.015Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:55.429Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "accrue",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:55.801Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "base",
+          "action": "mission_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:56.169Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "gift_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:56.340Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:56.704Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "gift_claim",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:57.099Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:57.470Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:57.823Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_miner_core",
+          "module": "miners",
+          "action": "accrue",
+          "plannedAt": "2026-05-22T17:01:00.000Z",
+          "executedAt": "2026-05-22T14:03:58.168Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "state",
+          "plannedAt": "2026-05-22T09:10:00.000Z",
+          "executedAt": "2026-05-22T14:03:59.187Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "state",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:03:59.567Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "spend",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:03:59.973Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "maintenance",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:00.441Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "research",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:00.911Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "crew",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:01.352Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "spend",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:01.808Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "spend",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:02.179Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "command_protocol",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:02.542Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "unlock_support_program",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:02.719Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "research",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:02.897Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "profile",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:03.272Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "mission_claim",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:03.538Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "miners",
+          "action": "state",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:03.717Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "crew",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:04.094Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "sector_deploy",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:04.477Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "mission_claim",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:05.045Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "build",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:05.223Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "profile",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:05.691Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "ship",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:05.888Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "build",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:06.337Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "profile",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:06.723Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "command_protocol",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:06.913Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "miners",
+          "action": "accrue",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:07.089Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "miners",
+          "action": "gift_claim",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:07.460Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "contract_claim",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:07.869Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "state",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:08.037Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "mission_claim",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:08.486Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "research",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:08.658Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "profile",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:09.044Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "expedition",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:09.238Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "state",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:09.709Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "build",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:10.268Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "sector_deploy",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:10.667Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "unlock_support_program",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:11.144Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "module",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:11.313Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "crew",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:11.487Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "maintenance",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:11.894Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "sector_deploy",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:12.436Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "module",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:12.825Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "research",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:13.000Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "command_protocol",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:13.370Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "build",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:13.550Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "ship",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:13.916Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "sector_deploy",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:14.285Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "expedition",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:14.654Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "state",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:15.020Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "build",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:15.451Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "command_protocol",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:15.828Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "sector_deploy",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:15.995Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "research",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:16.370Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        },
+        {
+          "userId": "qa_base_ops",
+          "module": "base",
+          "action": "crew",
+          "plannedAt": "2026-05-22T16:37:00.000Z",
+          "executedAt": "2026-05-22T14:04:16.730Z",
+          "waitedMs": 0,
+          "outsideWindow": false
+        }
+      ]
+    }
+  },
+  "monthlySoloPlan": {
+    "1": [
+      "quick_flip",
+      "surge_cashout"
+    ],
+    "2": [
+      "odd_even",
+      "rail_logic"
+    ],
+    "3": [
+      "mystery_box",
+      "shadow_tell"
+    ],
+    "4": [
+      "dice_pick",
+      "core_balance"
+    ],
+    "5": [
+      "limit_run",
+      "relic_draft"
+    ],
+    "6": [
+      "number_hunt"
+    ],
+    "7": [
+      "core_breaker"
+    ],
+    "8": [
+      "quick_flip",
+      "flash_vein"
+    ],
+    "9": [
+      "odd_even",
+      "drop_run"
+    ],
+    "10": [
+      "mystery_box",
+      "speed_track"
+    ],
+    "11": [
+      "dice_pick",
+      "gold_rush_digger"
+    ],
+    "12": [
+      "limit_run",
+      "treasure_doors"
+    ],
+    "13": [
+      "number_hunt",
+      "vault_doors"
+    ],
+    "14": [
+      "core_breaker",
+      "crystal_path"
+    ],
+    "15": [
+      "flash_vein",
+      "triple_dice"
+    ],
+    "16": [
+      "drop_run",
+      "challenge_21"
+    ],
+    "17": [
+      "speed_track",
+      "high_low_cards"
+    ],
+    "18": [
+      "gold_rush_digger",
+      "mystery_chamber"
+    ],
+    "19": [
+      "treasure_doors",
+      "diamonds"
+    ],
+    "20": [
+      "vault_doors",
+      "solo_ladder"
+    ],
+    "21": [
+      "crystal_path",
+      "pulse_lock"
+    ],
+    "22": [
+      "triple_dice",
+      "echo_sequence"
+    ],
+    "23": [
+      "challenge_21",
+      "safe_zone"
+    ],
+    "24": [
+      "high_low_cards",
+      "surge_cashout"
+    ],
+    "25": [
+      "mystery_chamber",
+      "rail_logic"
+    ],
+    "26": [
+      "diamonds",
+      "shadow_tell"
+    ],
+    "27": [
+      "solo_ladder",
+      "core_balance"
+    ],
+    "28": [
+      "pulse_lock",
+      "relic_draft"
+    ],
+    "29": [
+      "echo_sequence"
+    ],
+    "30": [
+      "safe_zone"
+    ]
+  }
+}
