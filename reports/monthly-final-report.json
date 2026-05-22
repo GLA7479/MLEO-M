@@ -1,0 +1,23 @@
+{
+  "runId": "local-1779456440244",
+  "summaries": [
+    {
+      "user_id": "qa_miner_core",
+      "sim_day": 15,
+      "net_delta": 0,
+      "vault_end": 10000000,
+      "error_count": 0,
+      "session_count": 0
+    },
+    {
+      "user_id": "qa_daily_grind",
+      "sim_day": 15,
+      "net_delta": 0,
+      "vault_end": 10000000,
+      "error_count": 0,
+      "session_count": 0
+    }
+  ],
+  "alerts": [],
+  "generatedAt": "2026-05-22T13:27:58.767Z"
+}

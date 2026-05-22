@@ -1,0 +1,16 @@
+{
+  "runId": "local-1779456440244",
+  "day": 15,
+  "mode": "local",
+  "results": [
+    {
+      "user": "qa_miner_core",
+      "vaultEnd": 10000000
+    },
+    {
+      "user": "qa_daily_grind",
+      "vaultEnd": 10000000
+    }
+  ],
+  "savedAt": "2026-05-22T13:27:44.975Z"
+}
