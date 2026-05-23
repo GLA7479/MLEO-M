@@ -12,30 +12,30 @@
     },
     {
       "name": "mleo_arcade_device",
-      "value": "dc3c5a61-45f9-43bf-a49c-91a2c393a9aa",
+      "value": "5f1d2018-f94c-421b-9e95-626ef231e6e0",
       "domain": "localhost",
       "path": "/",
-      "expires": 1810994777.838108,
+      "expires": 1811069968.121261,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "mleo_arcade_device_sig",
-      "value": "58fc6ef8c4a8582218d87bce1c5764ff43d8ead203ba059231808d76960b050e",
+      "value": "b4dc550b6974753a941c9a7ef52a5db3d3ff46d1cd9c7a2be128c6d09badb486",
       "domain": "localhost",
       "path": "/",
-      "expires": 1810994777.838241,
+      "expires": 1811069968.121335,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "mleo_csrf_token",
-      "value": "0a166c2f5e88b47b0838d7eb9872196471d669ca0e01af783c979bc3e0ce53db.7808938f2e9b790be2123bea5cb6b5582c5e782c5551031178ebcda47320cd9d",
+      "value": "5ce4f37c6909be5fd89f094bb06ca948b80ca5fd17e9abc99fe1e17126c6bea1.3220aecca5df7faef7adc2c7e86d45f3d5f29e18ef4a4a40a64b9548d609e31c",
       "domain": "localhost",
       "path": "/",
-      "expires": 1779620313.275193,
+      "expires": 1779620368.141092,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
@@ -52,30 +52,30 @@
     },
     {
       "name": "mleo_arcade_device",
-      "value": "1fb4d6a5-b47c-437e-b452-ceb406c557fc",
+      "value": "165b54f0-01be-4158-a6eb-c3627576d778",
       "domain": "mleo-m.vercel.app",
       "path": "/",
-      "expires": 1811071445.006077,
+      "expires": 1811072012.147104,
       "httpOnly": true,
       "secure": true,
       "sameSite": "Lax"
     },
     {
       "name": "mleo_arcade_device_sig",
-      "value": "af8818a5d840932ea45f45e81eccbfab50994b603593943ac3423dce6cfe96b7",
+      "value": "e45f33422aa7b6e22002b3ebd2f9e1661aff8f812fc6082ed1767d3d8fa8fedd",
       "domain": "mleo-m.vercel.app",
       "path": "/",
-      "expires": 1811071445.006171,
+      "expires": 1811072012.147163,
       "httpOnly": true,
       "secure": true,
       "sameSite": "Lax"
     },
     {
       "name": "mleo_csrf_token",
-      "value": "1fc83e27b7e220247c555976240dab7283f2c89aef0d382fc9db9b2e10d73f9b.01d6062c9178eb15c525c07955f3b5b241b17d77a396d8afc382865615121488",
+      "value": "249834cf2dc053ee91c57d4ed81e762e3fa1ddbd3599d453e2edf3641b7ea284.29db06ce9d7014caf1e0c66f08b53e04628c29b9c453d9d81aa2db23894c4b54",
       "domain": "mleo-m.vercel.app",
       "path": "/",
-      "expires": 1779621845.006728,
+      "expires": 1779622412.147522,
       "httpOnly": true,
       "secure": true,
       "sameSite": "Lax"
@@ -95,11 +95,11 @@
         },
         {
           "name": "vault_device_id",
-          "value": "4128f5f6-c1a6-4262-bd68-4ca28f1a14fc"
+          "value": "7e82ada4-3a16-448c-b945-d6fdfb9d9d20"
         },
         {
           "name": "ov2_participant_id_v1",
-          "value": "qa-qa_ov2_social-participant"
+          "value": "qa-qa_room_creator-participant"
         },
         {
           "name": "@appkit/active_namespace",
@@ -107,15 +107,15 @@
         },
         {
           "name": "cbwsdk.store",
-          "value": "{\"state\":{\"chains\":[],\"keys\":{},\"account\":{},\"spendPermissions\":[],\"config\":{\"version\":\"4.3.6\",\"metadata\":{\"appName\":\"MLEO Miners\",\"appLogoUrl\":\"\",\"appChainIds\":[1,137,42161,8453,10,11155111,56,97]},\"preference\":{\"options\":\"all\"},\"deviceId\":\"47c82a59-99a7-4e12-b458-9e06473785c2\"}},\"version\":0}"
+          "value": "{\"state\":{\"chains\":[],\"keys\":{},\"account\":{},\"spendPermissions\":[],\"config\":{\"version\":\"4.3.6\",\"metadata\":{\"appName\":\"MLEO Miners\",\"appLogoUrl\":\"\",\"appChainIds\":[1,137,42161,8453,10,11155111,56,97]},\"preference\":{\"options\":\"all\"},\"deviceId\":\"f174cf6a-1a0a-4111-ab02-ea008d983e1a\"}},\"version\":0}"
         },
         {
           "name": "vault_nonce",
-          "value": "12ff4e13-700d-4a93-9018-427f954589b0"
+          "value": "7367a0e2-8615-4f27-8a34-1f98641a72e7"
         },
         {
           "name": "ov2_display_name_v1",
-          "value": "[QA] OV2 Social"
+          "value": "[QA] Room Creator"
         },
         {
           "name": "@appkit/active_caip_network_id",
@@ -127,44 +127,24 @@
       "origin": "http://localhost:3000",
       "localStorage": [
         {
-          "name": "@appkit/connection_status",
-          "value": "disconnected"
-        },
-        {
           "name": "rk-version",
           "value": "2.2.8"
         },
         {
-          "name": "vault_device_id",
-          "value": "9d3b0f14-5062-4997-b659-8c59feb6e1dc"
-        },
-        {
-          "name": "@appkit/active_namespace",
-          "value": "eip155"
-        },
-        {
-          "name": "ov2_participant_id_v1",
-          "value": "qa-qa_ov2_social-participant"
-        },
-        {
-          "name": "cbwsdk.store",
-          "value": "{\"state\":{\"chains\":[],\"keys\":{},\"account\":{},\"spendPermissions\":[],\"config\":{\"version\":\"4.3.6\",\"metadata\":{\"appName\":\"MLEO Miners\",\"appLogoUrl\":\"\",\"appChainIds\":[1,137,42161,8453,10,11155111,56,97]},\"preference\":{\"options\":\"all\"},\"deviceId\":\"c62e8c01-f868-488f-a5df-2c4e64949f71\"}},\"version\":0}"
-        },
-        {
           "name": "vault_nonce",
-          "value": "d4785e32-2e7a-48a3-b3d2-a5ae39f1a123"
+          "value": "666f08c9-9b88-4273-ad8c-aef462ffef07"
         },
         {
-          "name": "mleo_rush_core_v4",
-          "value": "{\"vault\":0}"
-        },
-        {
-          "name": "@appkit/active_caip_network_id",
-          "value": "eip155:1"
+          "name": "vault_device_id",
+          "value": "e146ccad-9dd3-40ae-b2cd-235c65f69a84"
         },
         {
           "name": "ov2_display_name_v1",
-          "value": "[QA] OV2 Social"
+          "value": "[QA] Room Creator"
+        },
+        {
+          "name": "ov2_participant_id_v1",
+          "value": "qa-qa_room_creator-participant"
         }
       ]
     }

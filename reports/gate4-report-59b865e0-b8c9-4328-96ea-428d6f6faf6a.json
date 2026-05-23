@@ -1,0 +1,67 @@
+{
+  "runId": "59b865e0-b8c9-4328-96ea-428d6f6faf6a",
+  "run": {
+    "id": "59b865e0-b8c9-4328-96ea-428d6f6faf6a",
+    "run_label": "pilot-24h",
+    "started_at": "2026-05-22T14:33:34.26766+00:00",
+    "ended_at": null,
+    "mode": "live",
+    "seed": 42,
+    "month_number": 1,
+    "status": "running",
+    "notes": null,
+    "created_at": "2026-05-22T14:33:34.26766+00:00"
+  },
+  "startTime": "2026-05-22T14:33:34.26766+00:00",
+  "endTime": null,
+  "status": "running",
+  "mode": "live",
+  "label": "pilot-24h",
+  "usersRun": 0,
+  "tableCounts": {
+    "qa_sim_run": 1,
+    "qa_sim_event": 0,
+    "qa_sim_session": 0,
+    "qa_sim_daily_summary": 0,
+    "qa_sim_economy_snapshot": 0,
+    "qa_sim_alert": 0
+  },
+  "alerts": {
+    "total": 0,
+    "byType": {},
+    "bySeverity": {},
+    "vault_mismatch": 0,
+    "duplicate_reward": 0,
+    "runner_error": 0,
+    "coverage_gap": 0,
+    "fail": 0,
+    "warning": 0
+  },
+  "eventsByModule": {},
+  "timing": {
+    "eventCount": 0,
+    "outsideWindowCount": 0,
+    "samples": [],
+    "coverageTiming": null
+  },
+  "coverage": {
+    "miners": null,
+    "base": null,
+    "soloV2": null,
+    "ov2": null
+  },
+  "economy": {
+    "topEarner": null,
+    "worstLoss": null,
+    "mostProfitableGame": null
+  },
+  "repeatedErrors": [],
+  "stuckSessions": [],
+  "orphanedRooms": [],
+  "paths": {
+    "coverage": null,
+    "checkpoint": null,
+    "pilotLog": "C:\\Users\\ERAN YOSEF\\Desktop\\final projects\\FINAL-WEB\\MLEO-GAME\\reports\\gate4-pilot-run.log"
+  },
+  "generatedAt": "2026-05-22T14:33:56.626Z"
+}

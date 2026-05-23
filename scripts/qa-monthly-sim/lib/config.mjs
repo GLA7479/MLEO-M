@@ -31,6 +31,21 @@ export function parseArgs(argv) {
     approvePilot: false,
     approveFullRun: false,
     forceActive: false,
+    orchestrationPreflight: false,
+    livePreflight: false,
+    pilotForceActive: false,
+    pilotWindowMinutes: 30,
+    liveWindowMinutes: 45,
+    approveLivePreflight: false,
+    daily: false,
+    approveDay: false,
+    campaignId: null,
+    dailyWindowHours: 6,
+    approvePilot24h: false,
+    resetDay: null,
+    perUserBudget: 5,
+    perUserBudgetExplicit: false,
+    dayExplicit: false,
   };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -48,8 +63,12 @@ export function parseArgs(argv) {
     } else if (a.startsWith("--mode=")) args.mode = a.split("=")[1];
     else if (a === "--day" && next) {
       args.day = Number(next) || 1;
+      args.dayExplicit = true;
       i++;
-    } else if (a.startsWith("--day=")) args.day = Number(a.split("=")[1]) || 1;
+    } else if (a.startsWith("--day=")) {
+      args.day = Number(a.split("=")[1]) || 1;
+      args.dayExplicit = true;
+    }
     else if (a === "--month" && next) {
       args.month = Number(next) || 1;
       i++;
@@ -72,6 +91,53 @@ export function parseArgs(argv) {
       i++;
     }     else if (a.startsWith("--run-date=")) args.runAnchorDate = a.split("=")[1];
     else if (a === "--force-active" || a === "--validation-force-active") args.forceActive = true;
+    else if (a === "--orchestration-preflight") args.orchestrationPreflight = true;
+    else if (a === "--live-preflight") args.livePreflight = true;
+    else if (a === "--approve-live-preflight") args.approveLivePreflight = true;
+    else if (a === "--pilot-force-active") args.pilotForceActive = true;
+    else if (a === "--pilot-window-minutes" && next) {
+      args.pilotWindowMinutes = Number(next) || 30;
+      i++;
+    } else if (a.startsWith("--pilot-window-minutes=")) {
+      args.pilotWindowMinutes = Number(a.split("=")[1]) || 30;
+    } else if (a === "--per-user-budget" && next) {
+      args.perUserBudget = Number(next) || 5;
+      args.perUserBudgetExplicit = true;
+      i++;
+    } else if (a.startsWith("--per-user-budget=")) {
+      args.perUserBudget = Number(a.split("=")[1]) || 5;
+      args.perUserBudgetExplicit = true;
+    } else if (a === "--live-window-minutes" && next) {
+      args.liveWindowMinutes = Number(next) || 45;
+      i++;
+    } else if (a.startsWith("--live-window-minutes=")) {
+      args.liveWindowMinutes = Number(a.split("=")[1]) || 45;
+    } else if (a === "--daily") args.daily = true;
+    else if (a === "--approve-day") args.approveDay = true;
+    else if (a === "--approve-pilot-24h") args.approvePilot24h = true;
+    else if (a === "--campaign-id" && next) {
+      args.campaignId = next;
+      i++;
+    } else if (a.startsWith("--campaign-id=")) args.campaignId = a.split("=")[1];
+    else if (a === "--daily-window-hours" && next) {
+      args.dailyWindowHours = Number(next) || 6;
+      i++;
+    } else if (a.startsWith("--daily-window-hours=")) {
+      args.dailyWindowHours = Number(a.split("=")[1]) || 6;
+    } else if (a === "--reset-day" && next) {
+      args.resetDay = Number(next) || null;
+      i++;
+    } else if (a.startsWith("--reset-day=")) {
+      args.resetDay = Number(a.split("=")[1]) || null;
+    }
+  }
+  args.pilotWindowMinutes = Math.min(60, Math.max(5, args.pilotWindowMinutes));
+  args.liveWindowMinutes = Math.min(60, Math.max(30, args.liveWindowMinutes));
+  args.dailyWindowHours = Math.min(24, Math.max(1, args.dailyWindowHours));
+  if (args.daily) {
+    args.perUserBudget = Math.min(20, Math.max(5, args.perUserBudget));
+  } else {
+    args.perUserBudget = Math.min(5, Math.max(1, args.perUserBudget));
   }
   if (args.baseUrlOverride) args.baseUrl = args.baseUrlOverride;
   else args.baseUrl = getBaseUrl(args.mode);

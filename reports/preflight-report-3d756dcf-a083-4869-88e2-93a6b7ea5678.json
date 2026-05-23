@@ -1,0 +1,981 @@
+{
+  "gate": "3.5",
+  "runId": "3d756dcf-a083-4869-88e2-93a6b7ea5678",
+  "run": {
+    "id": "3d756dcf-a083-4869-88e2-93a6b7ea5678",
+    "run_label": "orchestration-preflight",
+    "started_at": "2026-05-23T10:57:09.52192+00:00",
+    "ended_at": "2026-05-23T10:59:47.422+00:00",
+    "mode": "local",
+    "seed": 42,
+    "month_number": 1,
+    "status": "completed",
+    "notes": null,
+    "created_at": "2026-05-23T10:57:09.52192+00:00"
+  },
+  "startTime": "2026-05-23T10:57:09.52192+00:00",
+  "endTime": "2026-05-23T10:59:47.422+00:00",
+  "runtimeMs": 159031,
+  "status": "completed",
+  "mode": "local",
+  "compressed": true,
+  "plannedUsers": 20,
+  "usersExecuted": 20,
+  "usersSkipped": 0,
+  "usersFailed": 0,
+  "perUser": {
+    "qa_ghost": {
+      "userId": "qa_ghost",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_drifter": {
+      "userId": "qa_drifter",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_miner_core": {
+      "userId": "qa_miner_core",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_base_ops": {
+      "userId": "qa_base_ops",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_solo_safe": {
+      "userId": "qa_solo_safe",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_solo_risky": {
+      "userId": "qa_solo_risky",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_ov2_social": {
+      "userId": "qa_ov2_social",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_balanced": {
+      "userId": "qa_balanced",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_daily_grind": {
+      "userId": "qa_daily_grind",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_heavy_miner": {
+      "userId": "qa_heavy_miner",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_econ_tester": {
+      "userId": "qa_econ_tester",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_max_player": {
+      "userId": "qa_max_player",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_skip_days": {
+      "userId": "qa_skip_days",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_burst": {
+      "userId": "qa_burst",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_switcher": {
+      "userId": "qa_switcher",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_long_session": {
+      "userId": "qa_long_session",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_base_researcher": {
+      "userId": "qa_base_researcher",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_cashout_early": {
+      "userId": "qa_cashout_early",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_room_creator": {
+      "userId": "qa_room_creator",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    },
+    "qa_realtime_stress": {
+      "userId": "qa_realtime_stress",
+      "plannedActions": 5,
+      "executedActions": 5,
+      "modules": {
+        "miners": 2,
+        "base": 1,
+        "solo_v2": 1,
+        "ov2": 1
+      },
+      "status": "executed"
+    }
+  },
+  "tableCounts": {
+    "qa_sim_run": 1,
+    "qa_sim_event": 100,
+    "qa_sim_session": 400,
+    "qa_sim_daily_summary": 20,
+    "qa_sim_economy_snapshot": 20,
+    "qa_sim_alert": 0
+  },
+  "alerts": {
+    "total": 0,
+    "byType": {},
+    "vault_mismatch": 0,
+    "duplicate_reward": 0,
+    "runner_error": 0,
+    "coverage_gap": 0
+  },
+  "coverage": {
+    "miners": {
+      "total": 4,
+      "covered": 2,
+      "missed": 2,
+      "actions": [
+        {
+          "action": "state",
+          "status": "covered",
+          "attempts": 20
+        },
+        {
+          "action": "accrue",
+          "status": "covered",
+          "attempts": 20
+        },
+        {
+          "action": "claim_vault",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "action": "gift_claim",
+          "status": "missed",
+          "attempts": 0
+        }
+      ]
+    },
+    "base": {
+      "total": 15,
+      "covered": 1,
+      "coverage_gap": 5,
+      "missed": 9,
+      "actions": [
+        {
+          "action": "state",
+          "status": "covered",
+          "attempts": 20,
+          "note": "Read BASE state"
+        },
+        {
+          "action": "build",
+          "status": "missed",
+          "attempts": 0,
+          "note": "building_key chosen from live BASE state (buildings + requires)"
+        },
+        {
+          "action": "research",
+          "status": "missed",
+          "attempts": 0,
+          "note": "research_key chosen from live BASE state (unlock order + prerequisites)"
+        },
+        {
+          "action": "maintenance",
+          "status": "missed",
+          "attempts": 0,
+          "note": "RPC base_perform_maintenance — no body"
+        },
+        {
+          "action": "expedition",
+          "status": "missed",
+          "attempts": 0,
+          "note": "RPC base_launch_expedition — no body"
+        },
+        {
+          "action": "ship",
+          "status": "missed",
+          "attempts": 0,
+          "note": "RPC base_ship_to_vault — no body"
+        },
+        {
+          "action": "crew",
+          "status": "missed",
+          "attempts": 0,
+          "note": "RPC base_hire_crew — no body"
+        },
+        {
+          "action": "sector_deploy",
+          "status": "missed",
+          "attempts": 0,
+          "note": "RPC base_deploy_next_sector — no body"
+        },
+        {
+          "action": "spend",
+          "status": "missed",
+          "attempts": 0,
+          "note": "spend_type from live energy (refill when not near full)"
+        },
+        {
+          "action": "profile",
+          "status": "missed",
+          "attempts": 0,
+          "note": "Empty body allowed (optional crew_role / commander_path)"
+        },
+        {
+          "action": "module",
+          "status": "coverage_gap",
+          "attempts": 0,
+          "note": "Requires module_key from live BASE state — not guessed"
+        },
+        {
+          "action": "mission_claim",
+          "status": "coverage_gap",
+          "attempts": 0,
+          "note": "Requires mission_key from live missions — not guessed"
+        },
+        {
+          "action": "contract_claim",
+          "status": "coverage_gap",
+          "attempts": 0,
+          "note": "Requires contract_key from live contracts — not guessed"
+        },
+        {
+          "action": "command_protocol",
+          "status": "coverage_gap",
+          "attempts": 0,
+          "note": "Requires protocol_id valid for unlocked protocols — not guessed"
+        },
+        {
+          "action": "unlock_support_program",
+          "status": "coverage_gap",
+          "attempts": 0,
+          "note": "Requires building_key + program_key from state — not guessed"
+        }
+      ]
+    },
+    "soloV2": {
+      "total": 28,
+      "covered": 1,
+      "missed": 27,
+      "coverage_gap": 0,
+      "error": 0,
+      "games": [
+        {
+          "id": "quick_flip",
+          "status": "covered",
+          "attempts": 20,
+          "reason": "automated_event_resolve"
+        },
+        {
+          "id": "odd_even",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "mystery_box",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "dice_pick",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "limit_run",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "number_hunt",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "core_breaker",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "flash_vein",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "drop_run",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "speed_track",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "gold_rush_digger",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "treasure_doors",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "vault_doors",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "crystal_path",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "triple_dice",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "challenge_21",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "high_low_cards",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "mystery_chamber",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "diamonds",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "solo_ladder",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "pulse_lock",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "echo_sequence",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "safe_zone",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "surge_cashout",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "rail_logic",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "shadow_tell",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "core_balance",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "relic_draft",
+          "status": "missed",
+          "attempts": 0
+        }
+      ],
+      "monthlyPlanDays": 30
+    },
+    "ov2": {
+      "total": 16,
+      "covered": 1,
+      "missed": 15,
+      "coverage_gap": 0,
+      "games": [
+        {
+          "id": "ludo",
+          "status": "covered",
+          "attempts": 20,
+          "reason": "lobby_visit"
+        },
+        {
+          "id": "snakes_and_ladders",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "rummy51",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "bingo",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "backgammon",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "checkers",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "chess",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "dominoes",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "fourline",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "flipgrid",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "meldmatch",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "color_clash",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "fleet_hunt",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "goal_duel",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "tanks",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "orbit_trap",
+          "status": "missed",
+          "attempts": 0
+        }
+      ]
+    }
+  },
+  "moduleTouch": {
+    "miners": true,
+    "base": true,
+    "solo_v2": true,
+    "ov2": true,
+    "ov2NotBlockedByBase": true
+  },
+  "timing": {
+    "eventCount": 100,
+    "outsideWindowCount": 0,
+    "samples": [
+      {
+        "userId": "qa_ghost",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T10:57:08.319Z",
+        "executedAt": "2026-05-23T10:57:10.015Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_drifter",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T10:57:39.819Z",
+        "executedAt": "2026-05-23T10:57:11.335Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_miner_core",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T10:58:11.319Z",
+        "executedAt": "2026-05-23T10:57:11.832Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_base_ops",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T10:58:42.819Z",
+        "executedAt": "2026-05-23T10:57:12.236Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_solo_safe",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T10:59:14.319Z",
+        "executedAt": "2026-05-23T10:57:12.599Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_solo_risky",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T10:59:45.819Z",
+        "executedAt": "2026-05-23T10:57:12.974Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_ov2_social",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:00:17.319Z",
+        "executedAt": "2026-05-23T10:57:13.334Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_ghost",
+        "module": "base",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:00:26.319Z",
+        "executedAt": "2026-05-23T10:57:13.697Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_balanced",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:00:48.819Z",
+        "executedAt": "2026-05-23T10:57:14.339Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_drifter",
+        "module": "base",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:00:57.819Z",
+        "executedAt": "2026-05-23T10:57:14.719Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_daily_grind",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:01:20.319Z",
+        "executedAt": "2026-05-23T10:57:15.076Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_miner_core",
+        "module": "base",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:01:29.319Z",
+        "executedAt": "2026-05-23T10:57:15.429Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_heavy_miner",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:01:51.819Z",
+        "executedAt": "2026-05-23T10:57:15.841Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_base_ops",
+        "module": "base",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:02:00.819Z",
+        "executedAt": "2026-05-23T10:57:16.199Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_econ_tester",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:02:23.319Z",
+        "executedAt": "2026-05-23T10:57:16.562Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_solo_safe",
+        "module": "base",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:02:32.319Z",
+        "executedAt": "2026-05-23T10:57:16.923Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_max_player",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:02:54.819Z",
+        "executedAt": "2026-05-23T10:57:17.305Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_solo_risky",
+        "module": "base",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:03:03.819Z",
+        "executedAt": "2026-05-23T10:57:17.669Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_skip_days",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:03:26.319Z",
+        "executedAt": "2026-05-23T10:57:18.026Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_ov2_social",
+        "module": "base",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:03:35.319Z",
+        "executedAt": "2026-05-23T10:57:18.391Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_ghost",
+        "module": "solo_v2",
+        "action": "resolve",
+        "plannedAt": "2026-05-23T11:03:44.319Z",
+        "executedAt": "2026-05-23T10:57:18.756Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_burst",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:03:57.819Z",
+        "executedAt": "2026-05-23T10:57:23.615Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_balanced",
+        "module": "base",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:04:06.819Z",
+        "executedAt": "2026-05-23T10:57:23.986Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_drifter",
+        "module": "solo_v2",
+        "action": "resolve",
+        "plannedAt": "2026-05-23T11:04:15.819Z",
+        "executedAt": "2026-05-23T10:57:24.358Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_switcher",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:04:29.319Z",
+        "executedAt": "2026-05-23T10:57:28.375Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_daily_grind",
+        "module": "base",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:04:38.319Z",
+        "executedAt": "2026-05-23T10:57:28.754Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_miner_core",
+        "module": "solo_v2",
+        "action": "resolve",
+        "plannedAt": "2026-05-23T11:04:47.319Z",
+        "executedAt": "2026-05-23T10:57:29.108Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_long_session",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:05:00.819Z",
+        "executedAt": "2026-05-23T10:57:33.063Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_heavy_miner",
+        "module": "base",
+        "action": "state",
+        "plannedAt": "2026-05-23T11:05:09.819Z",
+        "executedAt": "2026-05-23T10:57:33.436Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_base_ops",
+        "module": "solo_v2",
+        "action": "resolve",
+        "plannedAt": "2026-05-23T11:05:18.819Z",
+        "executedAt": "2026-05-23T10:57:33.809Z",
+        "waitedMs": 0,
+        "outsideWindow": false
+      }
+    ]
+  },
+  "estimate": {
+    "plannedUsers": 20,
+    "totalPlannedActions": 100,
+    "actionsPerUser": {
+      "qa_ghost": 5,
+      "qa_drifter": 5,
+      "qa_miner_core": 5,
+      "qa_base_ops": 5,
+      "qa_solo_safe": 5,
+      "qa_solo_risky": 5,
+      "qa_ov2_social": 5,
+      "qa_balanced": 5,
+      "qa_daily_grind": 5,
+      "qa_heavy_miner": 5,
+      "qa_econ_tester": 5,
+      "qa_max_player": 5,
+      "qa_skip_days": 5,
+      "qa_burst": 5,
+      "qa_switcher": 5,
+      "qa_long_session": 5,
+      "qa_base_researcher": 5,
+      "qa_cashout_early": 5,
+      "qa_room_creator": 5,
+      "qa_realtime_stress": 5
+    },
+    "perModuleCounts": {
+      "miners": 40,
+      "base": 20,
+      "solo_v2": 20,
+      "ov2": 20
+    },
+    "firstScheduledTime": "2026-05-23T10:57:08.319Z",
+    "lastScheduledTime": "2026-05-23T11:20:18.819Z",
+    "scheduleSpanMs": 1390500,
+    "executionCostMs": 660000,
+    "estimatedDurationMs": 1390500,
+    "estimatedDurationMinutes": 23.18,
+    "requestedWindowMinutes": 30,
+    "requestedWindowMs": 1800000,
+    "fitsWindow": true
+  },
+  "paths": {
+    "coverage": "C:\\Users\\ERAN YOSEF\\Desktop\\final projects\\FINAL-WEB\\MLEO-GAME\\reports\\coverage-3d756dcf-a083-4869-88e2-93a6b7ea5678-day1.json",
+    "checkpoint": "C:\\Users\\ERAN YOSEF\\Desktop\\final projects\\FINAL-WEB\\MLEO-GAME\\scripts\\qa-monthly-sim\\checkpoints\\run-3d756dcf-a083-4869-88e2-93a6b7ea5678-day-1.json",
+    "report": "C:\\Users\\ERAN YOSEF\\Desktop\\final projects\\FINAL-WEB\\MLEO-GAME\\reports\\preflight-report-3d756dcf-a083-4869-88e2-93a6b7ea5678.json"
+  },
+  "generatedAt": "2026-05-23T10:59:49.470Z"
+}

@@ -1,0 +1,15 @@
+{
+  "campaignId": "8b562e38-00c9-466d-a64e-c98674394e23",
+  "seed": 42,
+  "label": "gate4-daily",
+  "createdAt": "2026-05-23T12:00:54.115Z",
+  "lastCompletedDay": 0,
+  "days": {
+    "1": {
+      "runId": "2045774a-e105-4a4e-8132-0be281b9ba42",
+      "simDay": 1,
+      "status": "running",
+      "startedAt": "2026-05-23T12:05:39.425Z"
+    }
+  }
+}

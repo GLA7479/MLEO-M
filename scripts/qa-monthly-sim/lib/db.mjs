@@ -21,21 +21,29 @@ export function getQaDb() {
   return admin;
 }
 
-export async function createRun({ mode, seed, monthNumber, label }) {
+export async function createRun({ mode, seed, monthNumber, label, notes = null }) {
   const db = getQaDb();
-  const { data, error } = await db
-    .from("qa_sim_run")
-    .insert({
-      run_label: label || "monthly-qa",
-      mode,
-      seed,
-      month_number: monthNumber,
-      status: "running",
-    })
-    .select("id")
-    .single();
+  const row = {
+    run_label: label || "monthly-qa",
+    mode,
+    seed,
+    month_number: monthNumber,
+    status: "running",
+  };
+  if (notes != null) {
+    row.notes = typeof notes === "string" ? notes : JSON.stringify(notes);
+  }
+  const { data, error } = await db.from("qa_sim_run").insert(row).select("id").single();
   if (error) throw error;
   return data.id;
+}
+
+export async function updateRunNotes(runId, notes) {
+  const db = getQaDb();
+  await db
+    .from("qa_sim_run")
+    .update({ notes: typeof notes === "string" ? notes : JSON.stringify(notes) })
+    .eq("id", runId);
 }
 
 export async function finishRun(runId, status = "completed") {

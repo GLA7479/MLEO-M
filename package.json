@@ -24,6 +24,14 @@
     "qa:cleanup": "node scripts/qa-monthly-sim/cleanup.mjs --dry-run",
     "qa:apply-migration": "node scripts/qa-monthly-sim/apply-migration.mjs",
     "qa:gate-check": "node scripts/qa-monthly-sim/gate-check.mjs",
+    "qa:orchestration-preflight": "node scripts/qa-monthly-sim/runner.mjs --orchestration-preflight --all-users --mode=local --compressed --pilot-window-minutes=30 --pilot-force-active --per-user-budget=5",
+    "qa:orchestration-preflight:dry-run": "node scripts/qa-monthly-sim/runner.mjs --orchestration-preflight --all-users --mode=local --compressed --pilot-window-minutes=30 --pilot-force-active --per-user-budget=5 --dry-run",
+    "qa:live-preflight": "node scripts/qa-monthly-sim/runner.mjs --live-preflight --all-users --mode=live --live-window-minutes=45 --pilot-force-active --approve-live-preflight --per-user-budget=5",
+    "qa:live-preflight:dry-run": "node scripts/qa-monthly-sim/runner.mjs --live-preflight --all-users --mode=live --live-window-minutes=45 --pilot-force-active --approve-live-preflight --per-user-budget=5 --dry-run",
+    "qa:day": "node scripts/qa-monthly-sim/runner.mjs --daily --all-users --mode=live --daily-window-hours=6 --pilot-force-active",
+    "qa:day:dry-run": "node scripts/qa-monthly-sim/runner.mjs --daily --all-users --mode=live --daily-window-hours=6 --pilot-force-active --dry-run",
+    "qa:day-status": "node scripts/qa-monthly-sim/day-status.mjs",
+    "qa:test:preflight": "node --test scripts/qa-monthly-sim/test/preflight-dryrun.test.mjs",
     "qa:wall-clock-proof": "node scripts/qa-monthly-sim/test/wall-clock-proof.mjs"
   },
   "dependencies": {
