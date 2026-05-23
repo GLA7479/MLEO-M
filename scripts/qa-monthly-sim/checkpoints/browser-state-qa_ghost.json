@@ -72,10 +72,10 @@
     },
     {
       "name": "mleo_csrf_token",
-      "value": "ae7f75fb920849106fbf025ae49fe737501593076bcc9d94380184bf96004fed.c7e7f4cca566e876eaca42282a41fbe4d6ac97eff3fb69d0947c4b63428e16e7",
+      "value": "7ee4068d27dc3a4942aaf453db3d2cacc99eaf822fc5fd327c53d81396fed269.63f5c907127488fc874a5d6401d0726ace7c09857c36406f6b89040feeda4cd2",
       "domain": "mleo-m.vercel.app",
       "path": "/",
-      "expires": 1779624340.689538,
+      "expires": 1779652527.202736,
       "httpOnly": true,
       "secure": true,
       "sameSite": "Lax"
@@ -86,24 +86,24 @@
       "origin": "https://mleo-m.vercel.app",
       "localStorage": [
         {
-          "name": "rk-version",
-          "value": "2.2.8"
-        },
-        {
           "name": "@appkit/connection_status",
           "value": "disconnected"
+        },
+        {
+          "name": "rk-version",
+          "value": "2.2.8"
         },
         {
           "name": "vault_device_id",
           "value": "857df95a-9d76-44ec-ab54-8f68fd6cb205"
         },
         {
-          "name": "ov2_participant_id_v1",
-          "value": "qa-qa_ghost-participant"
-        },
-        {
           "name": "@appkit/active_namespace",
           "value": "eip155"
+        },
+        {
+          "name": "ov2_participant_id_v1",
+          "value": "qa-qa_ghost-participant"
         },
         {
           "name": "cbwsdk.store",
@@ -114,12 +114,16 @@
           "value": "7ef0f5b0-3e85-470b-a479-b8128b4535f9"
         },
         {
-          "name": "ov2_display_name_v1",
-          "value": "[QA] Ghost"
+          "name": "mleo_rush_core_v4",
+          "value": "{\"vault\":0}"
         },
         {
           "name": "@appkit/active_caip_network_id",
           "value": "eip155:1"
+        },
+        {
+          "name": "ov2_display_name_v1",
+          "value": "[QA] Ghost"
         }
       ]
     },

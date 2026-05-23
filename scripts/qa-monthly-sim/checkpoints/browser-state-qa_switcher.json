@@ -72,10 +72,10 @@
     },
     {
       "name": "mleo_csrf_token",
-      "value": "2ac4c3f119c9326de2b40d825ea60fa556343f9867481feefdcc431ff6c57909.2ee928ea61b076675f1abcbe836e9e67d9735dd6aa07f66fb75c1a89aa709f1e",
+      "value": "eb69ac28dcbf8c285b6465c36ec23121644f5603d7889f28f4625b100ac472ec.ad17633d9067ede1dcb7f1f3d1facaf56dc0c954278222da33dc9c061cc9f6f8",
       "domain": "mleo-m.vercel.app",
       "path": "/",
-      "expires": 1779622223.220892,
+      "expires": 1779640719.039169,
       "httpOnly": true,
       "secure": true,
       "sameSite": "Lax"
@@ -86,24 +86,24 @@
       "origin": "https://mleo-m.vercel.app",
       "localStorage": [
         {
-          "name": "rk-version",
-          "value": "2.2.8"
-        },
-        {
           "name": "@appkit/connection_status",
           "value": "disconnected"
+        },
+        {
+          "name": "rk-version",
+          "value": "2.2.8"
         },
         {
           "name": "vault_device_id",
           "value": "6064eee5-07c8-4edd-ac6f-085e8de9f1d7"
         },
         {
-          "name": "ov2_participant_id_v1",
-          "value": "qa-qa_switcher-participant"
-        },
-        {
           "name": "@appkit/active_namespace",
           "value": "eip155"
+        },
+        {
+          "name": "ov2_participant_id_v1",
+          "value": "qa-qa_switcher-participant"
         },
         {
           "name": "cbwsdk.store",
@@ -114,12 +114,12 @@
           "value": "c2534c9e-3565-4a5d-b71f-9926036729f9"
         },
         {
-          "name": "ov2_display_name_v1",
-          "value": "[QA] Switcher"
-        },
-        {
           "name": "@appkit/active_caip_network_id",
           "value": "eip155:1"
+        },
+        {
+          "name": "ov2_display_name_v1",
+          "value": "[QA] Switcher"
         }
       ]
     },

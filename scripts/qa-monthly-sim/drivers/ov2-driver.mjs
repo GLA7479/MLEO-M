@@ -3,6 +3,7 @@ import path from "path";
 import { timingFields } from "../lib/logHelpers.mjs";
 import { chromium } from "playwright";
 import { browserStatePath } from "../checkpoint.mjs";
+import { waitUntilLeftOv2Room } from "../lib/ov2PageWait.mjs";
 
 export async function runOv2Action(ctx, item) {
   const { persona, logger, stats, baseUrl, mock, coverage } = ctx;
@@ -78,9 +79,7 @@ export async function runOv2Action(ctx, item) {
           try {
             await page.waitForURL(/room=/, { timeout: 90000 });
             await page.getByRole("button", { name: "Leave room" }).click();
-            await page.waitForFunction(() => !window.location.search.includes("room="), null, {
-              timeout: 90000,
-            });
+            await waitUntilLeftOv2Room(page, { timeout: 90000 });
             coverageStatus = "covered";
           } catch (e) {
             outcome = "error";

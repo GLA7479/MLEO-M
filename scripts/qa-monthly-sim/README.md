@@ -76,3 +76,17 @@ npm run qa:cleanup -- --run-id=<uuid> --confirm
 ## Excluded
 
 Legacy Arcade, Old Online, poker routes — not driven by this simulator.
+
+## Laptop runner (Gate 4 daily)
+
+Future live daily runs should use a **secondary laptop**, not the main work PC. See:
+
+**[LAPTOP-RUNNER.md](./LAPTOP-RUNNER.md)** — setup, sync checkpoints, verification, and commands.
+
+Quick checks (no live run):
+
+```bash
+npm run qa:laptop-preflight
+npm run qa:day-status
+npm run qa:day:2:dry-run
+```

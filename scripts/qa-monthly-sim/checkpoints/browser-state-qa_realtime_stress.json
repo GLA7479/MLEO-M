@@ -72,10 +72,10 @@
     },
     {
       "name": "mleo_csrf_token",
-      "value": "a66dd92cfc6fe90a8e72e8c71f8e4717f850ab9dc51aad4e5b9099496dd983c7.e689a3877b0cc5ab25ea76a4e675bbffec3c432512b52fdd278de1ba64815dc7",
+      "value": "bd9328d5e941e9ff0431fee8b66dbb4f1a2aebc6b227b6db22cdfef4e3e2fc26.ea3f5599eb5ebd4c9f41260d466a8cc158f0fdf0ab60e3e8fe56a221e73a33d8",
       "domain": "mleo-m.vercel.app",
       "path": "/",
-      "expires": 1779622459.388039,
+      "expires": 1779642609.502266,
       "httpOnly": true,
       "secure": true,
       "sameSite": "Lax"
@@ -86,24 +86,24 @@
       "origin": "https://mleo-m.vercel.app",
       "localStorage": [
         {
-          "name": "rk-version",
-          "value": "2.2.8"
-        },
-        {
           "name": "@appkit/connection_status",
           "value": "disconnected"
+        },
+        {
+          "name": "rk-version",
+          "value": "2.2.8"
         },
         {
           "name": "vault_device_id",
           "value": "f44c0fc0-9919-488c-9033-07d70a088928"
         },
         {
-          "name": "ov2_participant_id_v1",
-          "value": "qa-qa_realtime_stress-participant"
-        },
-        {
           "name": "@appkit/active_namespace",
           "value": "eip155"
+        },
+        {
+          "name": "ov2_participant_id_v1",
+          "value": "qa-qa_realtime_stress-participant"
         },
         {
           "name": "cbwsdk.store",
@@ -114,12 +114,16 @@
           "value": "fce6f754-9d8b-4155-9785-fbc71c4a3d38"
         },
         {
-          "name": "ov2_display_name_v1",
-          "value": "[QA] RT Stress"
+          "name": "mleo_rush_core_v4",
+          "value": "{\"vault\":0}"
         },
         {
           "name": "@appkit/active_caip_network_id",
           "value": "eip155:1"
+        },
+        {
+          "name": "ov2_display_name_v1",
+          "value": "[QA] RT Stress"
         }
       ]
     },

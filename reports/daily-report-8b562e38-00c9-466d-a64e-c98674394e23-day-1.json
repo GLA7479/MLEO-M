@@ -1,0 +1,998 @@
+{
+  "gate": "4",
+  "campaignId": "8b562e38-00c9-466d-a64e-c98674394e23",
+  "simDay": 1,
+  "runId": "2045774a-e105-4a4e-8132-0be281b9ba42",
+  "run": {
+    "id": "2045774a-e105-4a4e-8132-0be281b9ba42",
+    "run_label": "gate4-daily",
+    "started_at": "2026-05-23T12:05:39.012309+00:00",
+    "ended_at": "2026-05-23T17:10:32.638+00:00",
+    "mode": "live",
+    "seed": 42,
+    "month_number": 1,
+    "status": "completed",
+    "notes": "{\"campaignId\":\"8b562e38-00c9-466d-a64e-c98674394e23\",\"dayNumber\":1,\"seed\":42}",
+    "created_at": "2026-05-23T12:05:39.012309+00:00"
+  },
+  "startTime": "2026-05-23T12:05:39.012309+00:00",
+  "endTime": "2026-05-23T17:10:32.638+00:00",
+  "runtimeMs": 18293683,
+  "status": "completed",
+  "mode": "live",
+  "compressed": false,
+  "dailyWindowHours": 6,
+  "plannedUsers": 20,
+  "usersExecuted": 20,
+  "usersSkipped": 0,
+  "usersFailed": 0,
+  "perUser": {
+    "qa_ghost": {
+      "userId": "qa_ghost",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 5,
+        "base": 4,
+        "solo_v2": 2,
+        "ov2": 4
+      },
+      "status": "executed"
+    },
+    "qa_drifter": {
+      "userId": "qa_drifter",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 6,
+        "base": 9,
+        "solo_v2": 0,
+        "ov2": 0
+      },
+      "status": "executed"
+    },
+    "qa_miner_core": {
+      "userId": "qa_miner_core",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 15,
+        "base": 0,
+        "solo_v2": 0,
+        "ov2": 0
+      },
+      "status": "executed"
+    },
+    "qa_base_ops": {
+      "userId": "qa_base_ops",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 1,
+        "base": 14,
+        "solo_v2": 0,
+        "ov2": 0
+      },
+      "status": "executed"
+    },
+    "qa_solo_safe": {
+      "userId": "qa_solo_safe",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 0,
+        "base": 0,
+        "solo_v2": 15,
+        "ov2": 0
+      },
+      "status": "executed"
+    },
+    "qa_solo_risky": {
+      "userId": "qa_solo_risky",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 0,
+        "base": 0,
+        "solo_v2": 15,
+        "ov2": 0
+      },
+      "status": "executed"
+    },
+    "qa_ov2_social": {
+      "userId": "qa_ov2_social",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 0,
+        "base": 0,
+        "solo_v2": 0,
+        "ov2": 15
+      },
+      "status": "executed"
+    },
+    "qa_balanced": {
+      "userId": "qa_balanced",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 5,
+        "base": 1,
+        "solo_v2": 3,
+        "ov2": 6
+      },
+      "status": "executed"
+    },
+    "qa_daily_grind": {
+      "userId": "qa_daily_grind",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 7,
+        "base": 2,
+        "solo_v2": 6,
+        "ov2": 0
+      },
+      "status": "executed"
+    },
+    "qa_heavy_miner": {
+      "userId": "qa_heavy_miner",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 14,
+        "base": 1,
+        "solo_v2": 0,
+        "ov2": 0
+      },
+      "status": "executed"
+    },
+    "qa_econ_tester": {
+      "userId": "qa_econ_tester",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 2,
+        "base": 3,
+        "solo_v2": 10,
+        "ov2": 0
+      },
+      "status": "executed"
+    },
+    "qa_max_player": {
+      "userId": "qa_max_player",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 4,
+        "base": 6,
+        "solo_v2": 2,
+        "ov2": 3
+      },
+      "status": "executed"
+    },
+    "qa_skip_days": {
+      "userId": "qa_skip_days",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 3,
+        "base": 12,
+        "solo_v2": 0,
+        "ov2": 0
+      },
+      "status": "executed"
+    },
+    "qa_burst": {
+      "userId": "qa_burst",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 0,
+        "base": 0,
+        "solo_v2": 11,
+        "ov2": 4
+      },
+      "status": "executed"
+    },
+    "qa_switcher": {
+      "userId": "qa_switcher",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 6,
+        "base": 4,
+        "solo_v2": 3,
+        "ov2": 2
+      },
+      "status": "executed"
+    },
+    "qa_long_session": {
+      "userId": "qa_long_session",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 0,
+        "base": 0,
+        "solo_v2": 6,
+        "ov2": 9
+      },
+      "status": "executed"
+    },
+    "qa_base_researcher": {
+      "userId": "qa_base_researcher",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 0,
+        "base": 15,
+        "solo_v2": 0,
+        "ov2": 0
+      },
+      "status": "executed"
+    },
+    "qa_cashout_early": {
+      "userId": "qa_cashout_early",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 0,
+        "base": 0,
+        "solo_v2": 15,
+        "ov2": 0
+      },
+      "status": "executed"
+    },
+    "qa_room_creator": {
+      "userId": "qa_room_creator",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 0,
+        "base": 0,
+        "solo_v2": 0,
+        "ov2": 15
+      },
+      "status": "executed"
+    },
+    "qa_realtime_stress": {
+      "userId": "qa_realtime_stress",
+      "plannedActions": 15,
+      "executedActions": 15,
+      "modules": {
+        "miners": 0,
+        "base": 0,
+        "solo_v2": 4,
+        "ov2": 11
+      },
+      "status": "executed"
+    }
+  },
+  "tableCounts": {
+    "qa_sim_run": 1,
+    "qa_sim_event": 300,
+    "qa_sim_session": 1840,
+    "qa_sim_daily_summary": 20,
+    "qa_sim_economy_snapshot": 20,
+    "qa_sim_alert": 1
+  },
+  "alerts": {
+    "total": 1,
+    "byType": {
+      "outside_window": 1
+    },
+    "vault_mismatch": 0,
+    "duplicate_reward": 0,
+    "runner_error": 0,
+    "coverage_gap": 0,
+    "outside_window": 1
+  },
+  "coverage": {
+    "miners": {
+      "total": 4,
+      "covered": 4,
+      "missed": 0,
+      "actions": [
+        {
+          "action": "state",
+          "status": "covered",
+          "attempts": 22
+        },
+        {
+          "action": "accrue",
+          "status": "covered",
+          "attempts": 16
+        },
+        {
+          "action": "claim_vault",
+          "status": "covered",
+          "attempts": 12
+        },
+        {
+          "action": "gift_claim",
+          "status": "covered",
+          "attempts": 18
+        }
+      ]
+    },
+    "base": {
+      "total": 15,
+      "covered": 2,
+      "coverage_gap": 12,
+      "missed": 1,
+      "actions": [
+        {
+          "action": "state",
+          "status": "covered",
+          "attempts": 3,
+          "note": "Read BASE state"
+        },
+        {
+          "action": "build",
+          "status": "coverage_gap",
+          "attempts": 9,
+          "note": "building_key chosen from live BASE state (buildings + requires)",
+          "reason": "Insufficient resources"
+        },
+        {
+          "action": "research",
+          "status": "coverage_gap",
+          "attempts": 2,
+          "note": "research_key chosen from live BASE state (unlock order + prerequisites)",
+          "reason": "Not enough resources"
+        },
+        {
+          "action": "maintenance",
+          "status": "coverage_gap",
+          "attempts": 5,
+          "note": "RPC base_perform_maintenance — no body",
+          "reason": "Need GOLD, SCRAP and DATA for maintenance"
+        },
+        {
+          "action": "expedition",
+          "status": "missed",
+          "attempts": 0,
+          "note": "RPC base_launch_expedition — no body"
+        },
+        {
+          "action": "ship",
+          "status": "coverage_gap",
+          "attempts": 2,
+          "note": "RPC base_ship_to_vault — no body",
+          "reason": "Nothing ready to ship yet"
+        },
+        {
+          "action": "crew",
+          "status": "covered",
+          "attempts": 3,
+          "note": "RPC base_hire_crew — no body"
+        },
+        {
+          "action": "sector_deploy",
+          "status": "coverage_gap",
+          "attempts": 5,
+          "note": "RPC base_deploy_next_sector — no body",
+          "reason": "Sector deploy requirements not met (frontier → freight)"
+        },
+        {
+          "action": "spend",
+          "status": "coverage_gap",
+          "attempts": 4,
+          "note": "spend_type from live energy (refill when not near full)",
+          "reason": "Energy near full — spend not applicable"
+        },
+        {
+          "action": "profile",
+          "status": "coverage_gap",
+          "attempts": 7,
+          "note": "Empty body allowed (optional crew_role / commander_path)",
+          "reason": "Missing crew_role or commander_path"
+        },
+        {
+          "action": "module",
+          "status": "coverage_gap",
+          "attempts": 8,
+          "note": "Requires module_key from live BASE state — not guessed"
+        },
+        {
+          "action": "mission_claim",
+          "status": "coverage_gap",
+          "attempts": 5,
+          "note": "Requires mission_key from live missions — not guessed"
+        },
+        {
+          "action": "contract_claim",
+          "status": "coverage_gap",
+          "attempts": 6,
+          "note": "Requires contract_key from live contracts — not guessed"
+        },
+        {
+          "action": "command_protocol",
+          "status": "coverage_gap",
+          "attempts": 5,
+          "note": "Requires protocol_id valid for unlocked protocols — not guessed"
+        },
+        {
+          "action": "unlock_support_program",
+          "status": "coverage_gap",
+          "attempts": 7,
+          "note": "Requires building_key + program_key from state — not guessed"
+        }
+      ]
+    },
+    "soloV2": {
+      "total": 28,
+      "covered": 2,
+      "missed": 26,
+      "coverage_gap": 0,
+      "error": 0,
+      "games": [
+        {
+          "id": "quick_flip",
+          "status": "covered",
+          "attempts": 48,
+          "reason": "automated_event_resolve"
+        },
+        {
+          "id": "odd_even",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "mystery_box",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "dice_pick",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "limit_run",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "number_hunt",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "core_breaker",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "flash_vein",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "drop_run",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "speed_track",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "gold_rush_digger",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "treasure_doors",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "vault_doors",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "crystal_path",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "triple_dice",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "challenge_21",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "high_low_cards",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "mystery_chamber",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "diamonds",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "solo_ladder",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "pulse_lock",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "echo_sequence",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "safe_zone",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "surge_cashout",
+          "status": "covered",
+          "attempts": 44,
+          "reason": "surge_launch_cashout"
+        },
+        {
+          "id": "rail_logic",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "shadow_tell",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "core_balance",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "relic_draft",
+          "status": "missed",
+          "attempts": 0
+        }
+      ],
+      "monthlyPlanDays": 30
+    },
+    "ov2": {
+      "total": 16,
+      "covered": 1,
+      "missed": 15,
+      "coverage_gap": 0,
+      "games": [
+        {
+          "id": "ludo",
+          "status": "covered",
+          "attempts": 69,
+          "reason": "page.waitForFunction: EvalError: Refused to evaluate a string as JavaScript because 'unsafe-eval' is not an allowed source of script in the following Content Security Policy directive: \"script-src 'self' 'unsafe-inline'  https:\".\n\n    at eval (<anonymous>)\n    at predicate (eval at evaluate (:234:30), <anonymous>:11:37)\n    at next (eval at evaluate (:234:30), <anonymous>:32:31)"
+        },
+        {
+          "id": "snakes_and_ladders",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "rummy51",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "bingo",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "backgammon",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "checkers",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "chess",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "dominoes",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "fourline",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "flipgrid",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "meldmatch",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "color_clash",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "fleet_hunt",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "goal_duel",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "tanks",
+          "status": "missed",
+          "attempts": 0
+        },
+        {
+          "id": "orbit_trap",
+          "status": "missed",
+          "attempts": 0
+        }
+      ]
+    }
+  },
+  "moduleTouch": {
+    "miners": true,
+    "base": true,
+    "solo_v2": true,
+    "ov2": true,
+    "ov2NotBlockedByBase": true,
+    "soloNotBlockedByBase": true
+  },
+  "timing": {
+    "eventCount": 300,
+    "outsideWindowCount": 1,
+    "deadlineReached": false,
+    "samples": [
+      {
+        "userId": "qa_ghost",
+        "module": "ov2",
+        "action": "ov2_lobby",
+        "plannedAt": "2026-05-23T12:05:38.005Z",
+        "executedAt": "2026-05-23T12:05:39.427Z",
+        "waitedMs": 0,
+        "outsideWindow": true
+      },
+      {
+        "userId": "qa_drifter",
+        "module": "base",
+        "action": "profile",
+        "plannedAt": "2026-05-23T12:11:56.004Z",
+        "executedAt": "2026-05-23T12:11:56.016Z",
+        "waitedMs": 375142,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_miner_core",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T12:18:14.003Z",
+        "executedAt": "2026-05-23T12:18:14.004Z",
+        "waitedMs": 373416,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_ghost",
+        "module": "ov2",
+        "action": "ov2_lobby",
+        "plannedAt": "2026-05-23T12:18:50.005Z",
+        "executedAt": "2026-05-23T12:18:50.021Z",
+        "waitedMs": 33424,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_base_ops",
+        "module": "base",
+        "action": "build",
+        "plannedAt": "2026-05-23T12:24:32.002Z",
+        "executedAt": "2026-05-23T12:24:32.006Z",
+        "waitedMs": 339137,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_drifter",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T12:25:08.004Z",
+        "executedAt": "2026-05-23T12:25:08.018Z",
+        "waitedMs": 31448,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_solo_safe",
+        "module": "solo_v2",
+        "action": "resolve",
+        "plannedAt": "2026-05-23T12:30:50.001Z",
+        "executedAt": "2026-05-23T12:30:50.012Z",
+        "waitedMs": 340431,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_miner_core",
+        "module": "miners",
+        "action": "accrue",
+        "plannedAt": "2026-05-23T12:31:26.003Z",
+        "executedAt": "2026-05-23T12:31:26.005Z",
+        "waitedMs": 22911,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_ghost",
+        "module": "base",
+        "action": "build",
+        "plannedAt": "2026-05-23T12:32:02.005Z",
+        "executedAt": "2026-05-23T12:32:02.011Z",
+        "waitedMs": 33403,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_solo_risky",
+        "module": "solo_v2",
+        "action": "resolve",
+        "plannedAt": "2026-05-23T12:37:08.000Z",
+        "executedAt": "2026-05-23T12:37:08.012Z",
+        "waitedMs": 302064,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_base_ops",
+        "module": "base",
+        "action": "sector_deploy",
+        "plannedAt": "2026-05-23T12:37:44.002Z",
+        "executedAt": "2026-05-23T12:37:44.005Z",
+        "waitedMs": 24878,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_drifter",
+        "module": "base",
+        "action": "module",
+        "plannedAt": "2026-05-23T12:38:20.004Z",
+        "executedAt": "2026-05-23T12:38:20.015Z",
+        "waitedMs": 32336,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_ov2_social",
+        "module": "ov2",
+        "action": "ov2_lobby",
+        "plannedAt": "2026-05-23T12:43:25.999Z",
+        "executedAt": "2026-05-23T12:43:26.002Z",
+        "waitedMs": 305721,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_solo_safe",
+        "module": "solo_v2",
+        "action": "surge_cashout",
+        "plannedAt": "2026-05-23T12:44:02.001Z",
+        "executedAt": "2026-05-23T12:44:02.008Z",
+        "waitedMs": 34464,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_miner_core",
+        "module": "miners",
+        "action": "claim_vault",
+        "plannedAt": "2026-05-23T12:44:38.003Z",
+        "executedAt": "2026-05-23T12:44:38.010Z",
+        "waitedMs": 28252,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_ghost",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T12:45:14.005Z",
+        "executedAt": "2026-05-23T12:45:14.012Z",
+        "waitedMs": 34244,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_balanced",
+        "module": "solo_v2",
+        "action": "resolve",
+        "plannedAt": "2026-05-23T12:49:43.998Z",
+        "executedAt": "2026-05-23T12:49:44.001Z",
+        "waitedMs": 268525,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_solo_risky",
+        "module": "solo_v2",
+        "action": "surge_cashout",
+        "plannedAt": "2026-05-23T12:50:20.000Z",
+        "executedAt": "2026-05-23T12:50:20.005Z",
+        "waitedMs": 23627,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_base_ops",
+        "module": "base",
+        "action": "state",
+        "plannedAt": "2026-05-23T12:50:56.002Z",
+        "executedAt": "2026-05-23T12:50:56.010Z",
+        "waitedMs": 28099,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_drifter",
+        "module": "miners",
+        "action": "gift_claim",
+        "plannedAt": "2026-05-23T12:51:32.004Z",
+        "executedAt": "2026-05-23T12:51:32.014Z",
+        "waitedMs": 35040,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_daily_grind",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T12:56:01.997Z",
+        "executedAt": "2026-05-23T12:56:02.000Z",
+        "waitedMs": 267264,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_ov2_social",
+        "module": "ov2",
+        "action": "ov2_lobby",
+        "plannedAt": "2026-05-23T12:56:37.999Z",
+        "executedAt": "2026-05-23T12:56:38.013Z",
+        "waitedMs": 34371,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_solo_safe",
+        "module": "solo_v2",
+        "action": "resolve",
+        "plannedAt": "2026-05-23T12:57:14.001Z",
+        "executedAt": "2026-05-23T12:57:14.003Z",
+        "waitedMs": 34536,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_miner_core",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T12:57:50.003Z",
+        "executedAt": "2026-05-23T12:57:50.009Z",
+        "waitedMs": 28002,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_ghost",
+        "module": "base",
+        "action": "spend",
+        "plannedAt": "2026-05-23T12:58:26.005Z",
+        "executedAt": "2026-05-23T12:58:26.005Z",
+        "waitedMs": 34588,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_heavy_miner",
+        "module": "miners",
+        "action": "state",
+        "plannedAt": "2026-05-23T13:02:19.996Z",
+        "executedAt": "2026-05-23T13:02:19.997Z",
+        "waitedMs": 232502,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_balanced",
+        "module": "ov2",
+        "action": "ov2_lobby",
+        "plannedAt": "2026-05-23T13:02:55.998Z",
+        "executedAt": "2026-05-23T13:02:56.001Z",
+        "waitedMs": 34350,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_solo_risky",
+        "module": "solo_v2",
+        "action": "resolve",
+        "plannedAt": "2026-05-23T13:03:32.000Z",
+        "executedAt": "2026-05-23T13:03:32.003Z",
+        "waitedMs": 34682,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_base_ops",
+        "module": "base",
+        "action": "build",
+        "plannedAt": "2026-05-23T13:04:08.002Z",
+        "executedAt": "2026-05-23T13:04:08.003Z",
+        "waitedMs": 27866,
+        "outsideWindow": false
+      },
+      {
+        "userId": "qa_drifter",
+        "module": "base",
+        "action": "contract_claim",
+        "plannedAt": "2026-05-23T13:04:44.004Z",
+        "executedAt": "2026-05-23T13:04:44.005Z",
+        "waitedMs": 32000,
+        "outsideWindow": false
+      }
+    ]
+  },
+  "estimate": {
+    "plannedUsers": 20,
+    "totalPlannedActions": 300,
+    "actionsPerUser": {
+      "qa_ghost": 15,
+      "qa_drifter": 15,
+      "qa_miner_core": 15,
+      "qa_base_ops": 15,
+      "qa_solo_safe": 15,
+      "qa_solo_risky": 15,
+      "qa_ov2_social": 15,
+      "qa_balanced": 15,
+      "qa_daily_grind": 15,
+      "qa_heavy_miner": 15,
+      "qa_econ_tester": 15,
+      "qa_max_player": 15,
+      "qa_skip_days": 15,
+      "qa_burst": 15,
+      "qa_switcher": 15,
+      "qa_long_session": 15,
+      "qa_base_researcher": 15,
+      "qa_cashout_early": 15,
+      "qa_room_creator": 15,
+      "qa_realtime_stress": 15
+    },
+    "perModuleCounts": {
+      "miners": 68,
+      "base": 71,
+      "solo_v2": 92,
+      "ov2": 69
+    },
+    "firstScheduledTime": "2026-05-23T12:05:38.005Z",
+    "lastScheduledTime": "2026-05-23T17:10:07.986Z",
+    "scheduleSpanMs": 18269981,
+    "executionCostMs": 3984000,
+    "estimatedDurationMs": 18269981,
+    "estimatedDurationMinutes": 304.5,
+    "requestedWindowMinutes": 360,
+    "requestedWindowMs": 21600000,
+    "fitsWindow": true
+  },
+  "paths": {
+    "coverage": "C:\\Users\\ERAN YOSEF\\Desktop\\final projects\\FINAL-WEB\\MLEO-GAME\\reports\\coverage-2045774a-e105-4a4e-8132-0be281b9ba42-day1.json",
+    "checkpoint": "C:\\Users\\ERAN YOSEF\\Desktop\\final projects\\FINAL-WEB\\MLEO-GAME\\scripts\\qa-monthly-sim\\checkpoints\\campaign-8b562e38-00c9-466d-a64e-c98674394e23-day-1.json",
+    "reportJson": "C:\\Users\\ERAN YOSEF\\Desktop\\final projects\\FINAL-WEB\\MLEO-GAME\\reports\\daily-report-8b562e38-00c9-466d-a64e-c98674394e23-day-1.json",
+    "reportHtml": "C:\\Users\\ERAN YOSEF\\Desktop\\final projects\\FINAL-WEB\\MLEO-GAME\\reports\\daily-report-8b562e38-00c9-466d-a64e-c98674394e23-day-1.html"
+  },
+  "generatedAt": "2026-05-23T17:10:34.972Z"
+}

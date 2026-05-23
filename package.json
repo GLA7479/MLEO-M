@@ -28,10 +28,13 @@
     "qa:orchestration-preflight:dry-run": "node scripts/qa-monthly-sim/runner.mjs --orchestration-preflight --all-users --mode=local --compressed --pilot-window-minutes=30 --pilot-force-active --per-user-budget=5 --dry-run",
     "qa:live-preflight": "node scripts/qa-monthly-sim/runner.mjs --live-preflight --all-users --mode=live --live-window-minutes=45 --pilot-force-active --approve-live-preflight --per-user-budget=5",
     "qa:live-preflight:dry-run": "node scripts/qa-monthly-sim/runner.mjs --live-preflight --all-users --mode=live --live-window-minutes=45 --pilot-force-active --approve-live-preflight --per-user-budget=5 --dry-run",
-    "qa:day": "node scripts/qa-monthly-sim/runner.mjs --daily --all-users --mode=live --daily-window-hours=6 --pilot-force-active",
-    "qa:day:dry-run": "node scripts/qa-monthly-sim/runner.mjs --daily --all-users --mode=live --daily-window-hours=6 --pilot-force-active --dry-run",
+    "qa:day": "node scripts/qa-monthly-sim/run-day.mjs",
+    "qa:day:dry-run": "node scripts/qa-monthly-sim/run-day.mjs --dry-run",
+    "qa:day:2:dry-run": "node scripts/qa-monthly-sim/run-day.mjs --dry-run --day=2",
     "qa:day-status": "node scripts/qa-monthly-sim/day-status.mjs",
+    "qa:laptop-preflight": "node scripts/qa-monthly-sim/laptop-preflight.mjs",
     "qa:test:preflight": "node --test scripts/qa-monthly-sim/test/preflight-dryrun.test.mjs",
+    "qa:test:runner-fixes": "node --test scripts/qa-monthly-sim/test/ov2-wait.test.mjs scripts/qa-monthly-sim/test/run-day-args.test.mjs",
     "qa:wall-clock-proof": "node scripts/qa-monthly-sim/test/wall-clock-proof.mjs"
   },
   "dependencies": {

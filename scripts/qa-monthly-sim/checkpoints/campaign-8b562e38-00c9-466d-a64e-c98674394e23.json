@@ -3,13 +3,24 @@
   "seed": 42,
   "label": "gate4-daily",
   "createdAt": "2026-05-23T12:00:54.115Z",
-  "lastCompletedDay": 0,
+  "lastCompletedDay": 1,
   "days": {
     "1": {
       "runId": "2045774a-e105-4a4e-8132-0be281b9ba42",
       "simDay": 1,
-      "status": "running",
-      "startedAt": "2026-05-23T12:05:39.425Z"
+      "status": "completed",
+      "startedAt": "2026-05-23T12:05:39.425Z",
+      "endedAt": "2026-05-23T17:10:34.976Z",
+      "reportJson": "C:\\Users\\ERAN YOSEF\\Desktop\\final projects\\FINAL-WEB\\MLEO-GAME\\reports\\daily-report-8b562e38-00c9-466d-a64e-c98674394e23-day-1.json",
+      "reportHtml": "C:\\Users\\ERAN YOSEF\\Desktop\\final projects\\FINAL-WEB\\MLEO-GAME\\reports\\daily-report-8b562e38-00c9-466d-a64e-c98674394e23-day-1.html"
+    },
+    "2": {
+      "runId": "2801a4ef-3235-47d2-9141-7d75696bdd0b",
+      "simDay": 2,
+      "status": "aborted",
+      "startedAt": "2026-05-23T19:55:25.386Z",
+      "endedAt": "2026-05-23T19:56:34.403Z",
+      "note": "accidental start during fix test; killed before timeline"
     }
   }
 }

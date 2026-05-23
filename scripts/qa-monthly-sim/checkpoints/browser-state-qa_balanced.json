@@ -51,16 +51,6 @@
       "sameSite": "Lax"
     },
     {
-      "name": "mleo_csrf_token",
-      "value": "9cefe0a1802ab06dd6ab1fd96e6c81cee463f9c6830a2d93f097b9f4a863fe37.0d41a574dc8ea3268009c5d0140ff4a42331995f893622db04049935602309dd",
-      "domain": "mleo-m.vercel.app",
-      "path": "/",
-      "expires": 1779621892.264461,
-      "httpOnly": true,
-      "secure": true,
-      "sameSite": "Lax"
-    },
-    {
       "name": "mleo_arcade_device",
       "value": "e7e2d05a-8bd2-4282-a90e-97ebd0769aa2",
       "domain": "mleo-m.vercel.app",
@@ -79,6 +69,16 @@
       "httpOnly": true,
       "secure": true,
       "sameSite": "Lax"
+    },
+    {
+      "name": "mleo_csrf_token",
+      "value": "972bb6d6a5146b84737a0a80aa012741ab69a241aec842cb9b9da7919ef4da6c.19b0286285f647547c9e0d9c1d260be30f64430ef4386aefc219020959d5062f",
+      "domain": "mleo-m.vercel.app",
+      "path": "/",
+      "expires": 1779638073.043007,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
     }
   ],
   "origins": [
@@ -86,24 +86,24 @@
       "origin": "https://mleo-m.vercel.app",
       "localStorage": [
         {
-          "name": "rk-version",
-          "value": "2.2.8"
-        },
-        {
           "name": "@appkit/connection_status",
           "value": "disconnected"
+        },
+        {
+          "name": "rk-version",
+          "value": "2.2.8"
         },
         {
           "name": "vault_device_id",
           "value": "ff6041ac-5f43-4e75-bfb4-49efdf578d71"
         },
         {
-          "name": "ov2_participant_id_v1",
-          "value": "qa-qa_balanced-participant"
-        },
-        {
           "name": "@appkit/active_namespace",
           "value": "eip155"
+        },
+        {
+          "name": "ov2_participant_id_v1",
+          "value": "qa-qa_balanced-participant"
         },
         {
           "name": "cbwsdk.store",
@@ -114,12 +114,16 @@
           "value": "b8ddaf63-ff2c-4142-aa2e-c92fa0aa2c16"
         },
         {
-          "name": "ov2_display_name_v1",
-          "value": "[QA] Balanced"
+          "name": "mleo_rush_core_v4",
+          "value": "{\"vault\":0}"
         },
         {
           "name": "@appkit/active_caip_network_id",
           "value": "eip155:1"
+        },
+        {
+          "name": "ov2_display_name_v1",
+          "value": "[QA] Balanced"
         }
       ]
     },

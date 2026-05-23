@@ -72,10 +72,10 @@
     },
     {
       "name": "mleo_csrf_token",
-      "value": "6e8e49602ae25e34ce0568e8391072cadf4c60cb6cbd474af6faed2403027931.33901e9f39cc272962d898bc7772f6d014972695963e884d7eafe848a1c0fdfd",
+      "value": "ab8c7d9f1957c1d3d45e5f5551bb4e32cf9460d4923d1d4c46064033e533105e.dcdac35a5d6148f3227d6407fba8ae0953574239cf551d948beb70fef4ced1fe",
       "domain": "mleo-m.vercel.app",
       "path": "/",
-      "expires": 1779622175.695304,
+      "expires": 1779637965.094894,
       "httpOnly": true,
       "secure": true,
       "sameSite": "Lax"
@@ -86,36 +86,44 @@
       "origin": "https://mleo-m.vercel.app",
       "localStorage": [
         {
-          "name": "rk-version",
-          "value": "2.2.8"
-        },
-        {
           "name": "@appkit/connection_status",
           "value": "disconnected"
+        },
+        {
+          "name": "rk-version",
+          "value": "2.2.8"
         },
         {
           "name": "vault_device_id",
           "value": "121e04a0-dbc3-4e20-80eb-2d1ca1cda6ee"
         },
         {
+          "name": "@appkit/active_namespace",
+          "value": "eip155"
+        },
+        {
           "name": "ov2_participant_id_v1",
           "value": "qa-qa_burst-participant"
         },
         {
-          "name": "@appkit/active_namespace",
-          "value": "eip155"
+          "name": "cbwsdk.store",
+          "value": "{\"state\":{\"chains\":[],\"keys\":{},\"account\":{},\"spendPermissions\":[],\"config\":{\"version\":\"4.3.6\",\"metadata\":{\"appName\":\"MLEO Miners\",\"appLogoUrl\":\"\",\"appChainIds\":[1,137,42161,8453,10,11155111,56,97]},\"preference\":{\"options\":\"all\"},\"deviceId\":\"c4ae6abc-42e9-403c-b52d-4381a33e1a84\"}},\"version\":0}"
         },
         {
           "name": "vault_nonce",
           "value": "f9720320-e628-4251-b415-538f0396b1dd"
         },
         {
-          "name": "ov2_display_name_v1",
-          "value": "[QA] Burst"
+          "name": "mleo_rush_core_v4",
+          "value": "{\"vault\":0}"
         },
         {
           "name": "@appkit/active_caip_network_id",
           "value": "eip155:1"
+        },
+        {
+          "name": "ov2_display_name_v1",
+          "value": "[QA] Burst"
         }
       ]
     },
